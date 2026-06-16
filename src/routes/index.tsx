@@ -82,8 +82,8 @@ function Index() {
       <main>
         <section className="mx-auto max-w-6xl px-6 pt-20 pb-28 text-center">
           <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-1 text-xs text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-            New — now in public beta
+            <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
+            {status.message}
           </div>
           <h1 className="mx-auto max-w-3xl text-5xl font-semibold tracking-tight md:text-6xl">
             Build something people actually love.
