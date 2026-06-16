@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -21,7 +23,47 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+type Status = { state: "checking" | "ok" | "error"; message: string };
+
 function Index() {
+  const [status, setStatus] = useState<Status>({
+    state: "checking",
+    message: "Checking Supabase connection…",
+  });
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { error } = await supabase.auth.getSession();
+        if (!active) return;
+        if (error) {
+          setStatus({ state: "error", message: `Supabase error: ${error.message}` });
+        } else {
+          setStatus({
+            state: "ok",
+            message: `Connected to ${import.meta.env.VITE_SUPABASE_URL}`,
+          });
+        }
+      } catch (e) {
+        if (!active) return;
+        setStatus({
+          state: "error",
+          message: e instanceof Error ? e.message : "Unknown error",
+        });
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const dotClass =
+    status.state === "ok"
+      ? "bg-green-500"
+      : status.state === "error"
+        ? "bg-red-500"
+        : "bg-yellow-500 animate-pulse";
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
@@ -40,8 +82,8 @@ function Index() {
       <main>
         <section className="mx-auto max-w-6xl px-6 pt-20 pb-28 text-center">
           <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-1 text-xs text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-            New — now in public beta
+            <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
+            {status.message}
           </div>
           <h1 className="mx-auto max-w-3xl text-5xl font-semibold tracking-tight md:text-6xl">
             Build something people actually love.
