@@ -26,6 +26,44 @@ export const Route = createFileRoute("/")({
 type Status = { state: "checking" | "ok" | "error"; message: string };
 
 function Index() {
+  const [status, setStatus] = useState<Status>({
+    state: "checking",
+    message: "Checking Supabase connection…",
+  });
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { error } = await supabase.auth.getSession();
+        if (!active) return;
+        if (error) {
+          setStatus({ state: "error", message: `Supabase error: ${error.message}` });
+        } else {
+          setStatus({
+            state: "ok",
+            message: `Connected to ${import.meta.env.VITE_SUPABASE_URL}`,
+          });
+        }
+      } catch (e) {
+        if (!active) return;
+        setStatus({
+          state: "error",
+          message: e instanceof Error ? e.message : "Unknown error",
+        });
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const dotClass =
+    status.state === "ok"
+      ? "bg-green-500"
+      : status.state === "error"
+        ? "bg-red-500"
+        : "bg-yellow-500 animate-pulse";
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
