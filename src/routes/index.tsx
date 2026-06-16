@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -20,6 +22,8 @@ export const Route = createFileRoute("/")({
   }),
   component: Index,
 });
+
+type Status = { state: "checking" | "ok" | "error"; message: string };
 
 function Index() {
   return (
