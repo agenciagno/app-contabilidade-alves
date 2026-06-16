@@ -1,0 +1,145 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+
+export type BoletoStatus = 'PENDENTE' | 'PAGO' | 'FILA_IMPRESSAO' | 'IMPRESSO' | string;
+export type CanalEntrega = 'whatsapp' | 'email' | 'impresso' | 'whatsapp_email' | null;
+
+export interface BoletoControl {
+  id: string;
+  company_id: string;
+  contact_id: string;
+  reference_month: string;
+  status: BoletoStatus;
+  generated_at: string | null;
+  created_at: string;
+  updated_at: string;
+  // Campos novos (criados manualmente no Supabase)
+  valor: number | null;
+  valor_pago: number | null;
+  data_vencimento: string | null;
+  data_pagamento: string | null;
+  canal_entrega: CanalEntrega;
+  nosso_numero: string | null;
+  seu_numero: string | null;
+  linha_digitavel: string | null;
+  codigo_barras: string | null;
+  url_qrcode: string | null;
+  origem_baixa: string | null;
+  sicoob_response: any;
+}
+
+export interface BoletoWithContact extends BoletoControl {
+  contact_name: string;
+  contact_type: string;
+  contact_document: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+}
+
+const N8N_REENVIO_URL = 'https://n8n.contabilidadealves.com.br/webhook/sicoob-reenvio';
+const N8N_GERAR_URL = 'https://n8n.contabilidadealves.com.br/webhook/sicoob-gerar-boletos';
+
+export function useBoletoControls(referenceMonth: string) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // 1. Busca boleto_controls do mês com join em contacts
+  const { data: boletoList = [], isLoading, refetch } = useQuery({
+    queryKey: ['boleto-controls-v2', referenceMonth],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('boleto_controls')
+        .select(`
+          id, contact_id, company_id, reference_month, status, generated_at,
+          created_at, updated_at,
+          valor, valor_pago, data_vencimento, data_pagamento, canal_entrega,
+          nosso_numero, seu_numero, linha_digitavel, codigo_barras, url_qrcode,
+          origem_baixa, sicoob_response,
+          contacts:contact_id ( id, name, type, document, email, phone )
+        `)
+        .eq('reference_month', referenceMonth)
+        .order('data_vencimento', { ascending: false, nullsFirst: false });
+      if (error) throw error;
+      return (data || []).map((bc: any): BoletoWithContact => ({
+        ...bc,
+        contact_name: bc.contacts?.name ?? '—',
+        contact_type: bc.contacts?.type ?? 'cliente',
+        contact_document: bc.contacts?.document ?? null,
+        contact_email: bc.contacts?.email ?? null,
+        contact_phone: bc.contacts?.phone ?? null,
+      }));
+    },
+    staleTime: 1000 * 30,
+  });
+
+  // 2. Marcar como impresso (status FILA_IMPRESSAO -> IMPRESSO)
+  const markAsPrinted = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any)
+        .from('boleto_controls')
+        .update({ status: 'IMPRESSO' })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2', referenceMonth] });
+      toast({ title: 'Marcado como impresso' });
+    },
+    onError: (e: Error) => {
+      toast({ title: 'Erro ao atualizar', description: e.message, variant: 'destructive' });
+    },
+  });
+
+  // 3. Reenviar cobrança via N8N
+  const resendBilling = useMutation({
+    mutationFn: async (boleto: BoletoWithContact) => {
+      const res = await fetch(N8N_REENVIO_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          boleto_id: boleto.id,
+          contact_id: boleto.contact_id,
+          canal_entrega: boleto.canal_entrega,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    },
+    onSuccess: () => {
+      toast({ title: 'Cobrança reenviada com sucesso' });
+    },
+    onError: () => {
+      toast({ title: 'Erro ao reenviar', variant: 'destructive' });
+    },
+  });
+
+  // 4. Disparo manual de geração via N8N
+  const triggerGeneration = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(N8N_GERAR_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          triggered_by: 'manual',
+          timestamp: new Date().toISOString(),
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    },
+    onSuccess: () => {
+      toast({ title: 'Solicitação enviada — os boletos serão gerados em instantes' });
+    },
+    onError: () => {
+      toast({ title: 'Erro ao acionar geração. Verifique o N8N.', variant: 'destructive' });
+    },
+  });
+
+  return {
+    boletoList,
+    isLoading,
+    refetch,
+    markAsPrinted,
+    resendBilling,
+    triggerGeneration,
+  };
+}

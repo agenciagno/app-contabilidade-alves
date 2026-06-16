@@ -1,0 +1,427 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ─── Apple Design System — MODO CLARO ─── */
+    --font-system: -apple-system, system-ui, 'SF Pro Display', 'Inter', sans-serif;
+    --spring: 220ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+    /* Raios */
+    --r-sm: 8px;
+    --r-md: 10px;
+    --r-lg: 14px;
+    --r-xl: 18px;
+    --r-pill: 9999px;
+
+    /* Apple Backgrounds */
+    --apple-bg-base: #F2F2F7;
+    --apple-bg-surface: #FFFFFF;
+    --apple-bg-elevated: #F2F2F7;
+    --apple-mat-sidebar: rgba(242,242,247,0.95);
+    --apple-mat-card: rgba(255,255,255,0.96);
+    --apple-mat-modal: rgba(255,255,255,0.98);
+
+    /* Apple Text */
+    --apple-text-primary: rgba(0,0,0,1.0);
+    --apple-text-secondary: rgba(60,60,67,0.6);
+    --apple-text-tertiary: rgba(60,60,67,0.3);
+
+    /* Apple Borders */
+    --apple-border-hair: rgba(60,60,67,0.14);
+    --apple-border-subtle: rgba(60,60,67,0.20);
+    --apple-border-default: rgba(60,60,67,0.29);
+
+    /* Apple System Colors */
+    --apple-blue: #007AFF;
+    --apple-green: #34C759;
+    --apple-red: #FF3B30;
+    --apple-yellow: #FF9500;
+    --apple-purple: #AF52DE;
+
+    /* Badges */
+    --badge-success-bg: rgba(52,199,89,0.12);
+    --badge-success-text: #1a7a38;
+    --badge-danger-bg: rgba(255,59,48,0.11);
+    --badge-danger-text: #c0281f;
+    --badge-warning-bg: rgba(255,149,0,0.12);
+    --badge-warning-text: #a05c00;
+    --badge-info-bg: rgba(0,122,255,0.11);
+    --badge-info-text: #004fad;
+
+    /* Sidebar navigation */
+    --nav-active-bg: rgba(0,0,0,0.06);
+    --nav-active-text: #000000;
+    --nav-hover-bg: rgba(0,0,0,0.04);
+    --nav-idle-text: rgba(60,60,67,0.5);
+
+    /* Modal overlay */
+    --modal-overlay: rgba(0,0,0,0.45);
+
+    /* ─── shadcn/ui variables — Light ─── */
+    --background: 240 5% 96%;
+    --foreground: 0 0% 0%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+
+    --primary: 211 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 5% 94%;
+    --secondary-foreground: 0 0% 0%;
+
+    --muted: 240 5% 94%;
+    --muted-foreground: 240 4% 46%;
+
+    --accent: 240 5% 94%;
+    --accent-foreground: 0 0% 0%;
+
+    --destructive: 4 100% 59%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 70% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 35 100% 50%;
+    --warning-foreground: 0 0% 13%;
+
+    --border: 240 4% 86%;
+    --input: 240 4% 86%;
+    --ring: 211 100% 50%;
+
+    --radius: 1rem;
+
+    --sidebar-background: 240 5% 96%;
+    --sidebar-foreground: 0 0% 0%;
+    --sidebar-primary: 211 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 5% 95%;
+    --sidebar-accent-foreground: 0 0% 0%;
+    --sidebar-border: 240 4% 90%;
+    --sidebar-ring: 211 100% 50%;
+  }
+
+  .dark {
+    /* ─── Apple Design System — MODO ESCURO ─── */
+
+    /* Apple Backgrounds */
+    --apple-bg-base: #0f0f0f;
+    --apple-bg-surface: #1C1C1E;
+    --apple-bg-elevated: #2C2C2E;
+    --apple-mat-sidebar: rgba(28,28,28,0.94);
+    --apple-mat-card: rgba(28,28,30,0.88);
+    --apple-mat-modal: rgba(38,38,40,0.96);
+
+    /* Apple Text */
+    --apple-text-primary: rgba(235,235,245,1.0);
+    --apple-text-secondary: rgba(235,235,245,0.55);
+    --apple-text-tertiary: rgba(235,235,245,0.30);
+
+    /* Apple Borders */
+    --apple-border-hair: rgba(255,255,255,0.06);
+    --apple-border-subtle: rgba(255,255,255,0.09);
+    --apple-border-default: rgba(255,255,255,0.13);
+
+    /* Apple System Colors — dark (more vibrant) */
+    --apple-blue: #0A84FF;
+    --apple-green: #30D158;
+    --apple-red: #FF453A;
+    --apple-yellow: #FF9F0A;
+    --apple-purple: #BF5AF2;
+
+    /* Badges */
+    --badge-success-bg: rgba(48,209,88,0.14);
+    --badge-success-text: #30D158;
+    --badge-danger-bg: rgba(255,69,58,0.14);
+    --badge-danger-text: #FF453A;
+    --badge-warning-bg: rgba(255,159,10,0.14);
+    --badge-warning-text: #FF9F0A;
+    --badge-info-bg: rgba(10,132,255,0.14);
+    --badge-info-text: #0A84FF;
+
+    /* Sidebar navigation */
+    --nav-active-bg: rgba(255,255,255,0.08);
+    --nav-active-text: rgba(235,235,245,1.0);
+    --nav-hover-bg: rgba(255,255,255,0.05);
+    --nav-idle-text: rgba(235,235,245,0.45);
+
+    /* Modal overlay */
+    --modal-overlay: rgba(0,0,0,0.65);
+
+    /* ─── shadcn/ui variables — Dark ─── */
+    --background: 0 0% 5.9%;
+    --foreground: 240 6% 93%;
+
+    --card: 240 4% 11%;
+    --card-foreground: 240 6% 93%;
+
+    --popover: 240 4% 11%;
+    --popover-foreground: 240 6% 93%;
+
+    --primary: 211 100% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 3% 18%;
+    --secondary-foreground: 240 6% 93%;
+
+    --muted: 240 3% 16%;
+    --muted-foreground: 240 3% 62%;
+
+    --accent: 240 3% 18%;
+    --accent-foreground: 240 6% 93%;
+
+    --destructive: 3 100% 61%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 37 100% 53%;
+    --warning-foreground: 0 0% 13%;
+
+    --border: 240 3% 16%;
+    --input: 240 3% 16%;
+    --ring: 211 100% 52%;
+
+    --sidebar-background: 240 6% 6%;
+    --sidebar-foreground: 240 6% 93%;
+    --sidebar-primary: 211 100% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3% 14%;
+    --sidebar-accent-foreground: 240 6% 93%;
+    --sidebar-border: 240 3% 14%;
+    --sidebar-ring: 211 100% 52%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-system);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.2);
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.35);
+  }
+}
+
+/* ─── Apple Global Styles ─── */
+
+/* Sidebar glass effect */
+aside,
+nav[data-sidebar],
+[data-sidebar] {
+  background: var(--apple-mat-sidebar);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-right-color: var(--apple-border-hair);
+}
+
+/* Navigation items */
+[data-nav-item] {
+  color: var(--nav-idle-text);
+  border-radius: var(--r-md);
+  transition: all var(--spring);
+}
+
+[data-nav-item][data-active="true"],
+[data-nav-item].active {
+  background: var(--nav-active-bg);
+  color: var(--nav-active-text);
+}
+
+[data-nav-item]:hover {
+  background: var(--nav-hover-bg);
+  color: var(--nav-active-text);
+}
+
+/* Badge utilities */
+.badge-success { background: var(--badge-success-bg); color: var(--badge-success-text); }
+.badge-danger  { background: var(--badge-danger-bg);  color: var(--badge-danger-text); }
+.badge-warning { background: var(--badge-warning-bg); color: var(--badge-warning-text); }
+
+/* Monetary value utilities */
+.value-positive { color: var(--apple-green); font-weight: 600; letter-spacing: -0.2px; }
+.value-negative { color: var(--apple-red);   font-weight: 600; letter-spacing: -0.2px; }
+
+/* Global transitions */
+button, a, [role="button"] {
+  transition: all var(--spring);
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
+
+  [data-sidebar],
+  nav,
+  header,
+  .print-hidden,
+  .no-print,
+  button:not(.print-keep) {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  * {
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+  }
+
+  .print-visible {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  .card {
+    border: 1px solid #ddd !important;
+  }
+
+  .boleto-card {
+    page-break-inside: avoid;
+  }
+
+  table {
+    font-size: 9px !important;
+    width: 100% !important;
+  }
+
+  table th, table td {
+    padding: 2px 4px !important;
+  }
+
+  .fiscal-print-area .upcoming-table-card {
+    page-break-before: auto;
+  }
+}
+
+/* ─── Mobile overflow prevention ─── */
+html, body, #root {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Touch-friendly table scroll */
+.relative.w-full.overflow-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+.relative.w-full.overflow-auto table {
+  min-width: max-content;
+}
+
+/* ─── Responsive global rules ─── */
+img, svg {
+  max-width: 100%;
+  height: auto;
+}
+
+h1, h2 {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+/* Modals: constrain width on mobile only */
+@media (max-width: 639px) {
+  [role="dialog"]:not([data-mobile="true"]):not([data-sidebar]) {
+    max-width: calc(100vw - 32px) !important;
+  }
+}
+
+/* Kanban fade gradient indicator */
+.kanban-scroll-container {
+  position: relative;
+}
+.kanban-scroll-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 32px;
+  background: linear-gradient(to right, transparent, hsl(var(--background)));
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 200ms;
+}
+.kanban-scroll-container.has-scroll::after {
+  opacity: 1;
+}
+
+/* ─── Apple-styled tooltip ─── */
+.apple-tooltip {
+  background: var(--apple-bg-elevated) !important;
+  border: 0.5px solid var(--apple-border-subtle) !important;
+  color: var(--apple-text-primary) !important;
+  border-radius: var(--r-md) !important;
+  font-size: 12px !important;
+}
+
+/* ─── Table scroll fade gradient ─── */
+.table-scroll-container {
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+.table-scroll-container::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.table-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.25);
+  border-radius: 3px;
+}
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.4);
+}
+
+/* ─── DRE section row contrast ─── */
+:root {
+  --dre-section-color: #1a7a38;
+}
+.dark {
+  --dre-section-color: #34D172;
+}
