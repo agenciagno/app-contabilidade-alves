@@ -2616,9 +2616,62 @@ export type Database = {
         Args: { p_month: number; p_year: number }
         Returns: Json
       }
+      get_annual_metrics: {
+        Args: {
+          p_bank_id?: string
+          p_category_id?: string
+          p_contact_id?: string
+          p_year: number
+        }
+        Returns: Json
+      }
+      get_category_breakdown: {
+        Args: {
+          p_bank_id?: string
+          p_contact_id?: string
+          p_end_date: string
+          p_limit?: number
+          p_start_date: string
+          p_type: string
+        }
+        Returns: Json
+      }
+      get_dashboard_summary: {
+        Args: {
+          p_bank_id?: string
+          p_category_id?: string
+          p_contact_id?: string
+          p_end_date: string
+          p_payment_status?: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
       get_effective_responsible: {
         Args: { p_date: string; p_profile_id: string }
         Returns: string
+      }
+      get_monthly_evolution: {
+        Args: {
+          p_bank_id?: string
+          p_category_id?: string
+          p_contact_id?: string
+          p_months?: number
+        }
+        Returns: Json
+      }
+      get_transaction_kpis: {
+        Args: {
+          p_bank_id?: string
+          p_category_id?: string
+          p_contact_id?: string
+          p_end_date?: string
+          p_payment_status?: string
+          p_search?: string
+          p_start_date?: string
+          p_type?: string
+        }
+        Returns: Json
       }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: { Args: never; Returns: string }
