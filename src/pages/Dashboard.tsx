@@ -331,7 +331,7 @@ export default function Dashboard() {
   const lastMonthData = useMemo(() => processReportData(lastMonthTx), [lastMonthTx]);
 
 
-  const isLoading = loadingTransactions || loadingBanks;
+  const isLoading = loadingTransactions || loadingBanks || loadingSummary || loadingAnnual || loadingMonthly || loadingCategory;
 
   // Handlers
   const handleNewTransaction = (type: 'receita' | 'despesa') => {
