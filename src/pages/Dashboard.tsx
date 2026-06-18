@@ -174,39 +174,56 @@ export default function Dashboard() {
     return result;
   }, [allTransactions, period, customStartDate, customEndDate, selectedBankId, categoryFilter, contactFilter, paymentStatusFilter, searchTerm]);
 
-  // Calculate financial summary
+  // ---- RPC-backed metrics (replaces previous useMemo aggregations) ----
+  // Date range for the summary RPC (when no period filter, use a wide-open range)
+  const _summaryRange = useMemo(() => {
+    const r = getDateRange();
+    return {
+      start: r ? format(r.start, 'yyyy-MM-dd') : '1900-01-01',
+      end:   r ? format(r.end,   'yyyy-MM-dd') : '2999-12-31',
+    };
+  }, [period, customStartDate, customEndDate]);
+
+  const _summaryFilters = useMemo(() => ({
+    bankId: selectedBankId !== 'all' ? selectedBankId : undefined,
+    categoryId: categoryFilter !== 'all' ? categoryFilter : undefined,
+    contactId: contactFilter !== 'all' ? contactFilter : undefined,
+    paymentStatus: paymentStatusFilter !== 'all' ? paymentStatusFilter : undefined,
+  }), [selectedBankId, categoryFilter, contactFilter, paymentStatusFilter]);
+
+  const { data: dashboardSummary, isLoading: loadingSummary } = useDashboardSummary(
+    _summaryRange.start,
+    _summaryRange.end,
+    _summaryFilters,
+  );
+
+  const currentYear = now.getFullYear();
+  const { data: annualRpc, isLoading: loadingAnnual } = useAnnualMetrics(currentYear);
+  const { data: monthlyRpc, isLoading: loadingMonthly } = useMonthlyEvolution(6);
+  const { data: categoryRpc, isLoading: loadingCategory } = useCategoryBreakdown(
+    'despesa',
+    _summaryRange.start,
+    _summaryRange.end,
+    5,
+    {
+      bankId: _summaryFilters.bankId,
+      contactId: _summaryFilters.contactId,
+    },
+  );
+
+  // Adapt RPC snake_case → camelCase consumed by JSX (interface unchanged)
   const summary = useMemo(() => {
-    // Receitas
-    const receitasPagas = transactions
-      .filter(t => t.type === 'receita' && isEffectivelyPaid(t))
-      .reduce((sum, t) => sum + getEffectiveAmount(t), 0);
-
-    const aReceber = transactions
-      .filter(t => t.type === 'receita' && !isEffectivelyPaid(t))
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-
-    // Despesas
-    const despesasPagas = transactions
-      .filter(t => t.type === 'despesa' && isEffectivelyPaid(t))
-      .reduce((sum, t) => sum + getEffectiveAmount(t), 0);
-
-    const aPagar = transactions
-      .filter(t => t.type === 'despesa' && !isEffectivelyPaid(t))
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-
-    // Saldos
     const saldoBancario = banks
       .filter(b => b.is_active && !b.is_invisible)
       .reduce((sum, b) => sum + Number(b.current_balance), 0);
-
     return {
-      receitasPagas,
-      aReceber,
-      despesasPagas,
-      aPagar,
+      receitasPagas: Number(dashboardSummary?.receitas_pagas ?? 0),
+      aReceber:      Number(dashboardSummary?.a_receber ?? 0),
+      despesasPagas: Number(dashboardSummary?.despesas_pagas ?? 0),
+      aPagar:        Number(dashboardSummary?.a_pagar ?? 0),
       saldoBancario,
     };
-  }, [transactions, banks]);
+  }, [dashboardSummary, banks]);
 
   // Active filter count for badge
   const activeFilterCount = useMemo(() => {
@@ -220,102 +237,43 @@ export default function Dashboard() {
     return count;
   }, [selectedBankId, categoryFilter, contactFilter, paymentStatusFilter, searchTerm, period]);
 
-  // Annual metrics (independent of filters)
-  const annualMetrics = useMemo(() => {
-    const yearStr = format(new Date(), 'yyyy');
-    const yearStartStr = `${yearStr}-01-01`;
-    const yearEndStr = `${yearStr}-12-31`;
-
-    let receitasAno = 0;
-    let despesasAno = 0;
-    let receitasPagasAno = 0;
-    let despesasPagasAno = 0;
-
-    for (const t of allTransactions) {
-      const tDateStr = t.date || t.due_date || t.issue_date;
-      if (tDateStr && tDateStr >= yearStartStr && tDateStr <= yearEndStr) {
-        const amount = Number(t.amount);
-        const paid = isEffectivelyPaid(t);
-        const effectiveAmt = paid ? getEffectiveAmount(t) : amount;
-        if (t.type === 'receita') {
-          receitasAno += amount;
-          if (paid) receitasPagasAno += effectiveAmt;
-        } else {
-          despesasAno += amount;
-          if (paid) despesasPagasAno += effectiveAmt;
-        }
-      }
-    }
-
-    return {
-      lucroPrevisto: receitasAno - despesasAno,
-      lucroRealizado: receitasPagasAno - despesasPagasAno,
-      receitasAcumuladas: receitasPagasAno,
-      despesasAcumuladas: despesasPagasAno,
-      year: yearStr,
-    };
-  }, [allTransactions]);
-
+  const annualMetrics = useMemo(() => ({
+    lucroPrevisto: Number(annualRpc?.lucro_previsto ?? 0),
+    lucroRealizado: Number(annualRpc?.lucro_realizado ?? 0),
+    receitasAcumuladas: Number(annualRpc?.receitas_pagas_ano ?? 0),
+    despesasAcumuladas: Number(annualRpc?.despesas_pagas_ano ?? 0),
+    year: String(currentYear),
+  }), [annualRpc, currentYear]);
 
   const monthlyEvolution = useMemo(() => {
-    const months = [];
-    for (let i = 5; i >= 0; i--) {
-      const date = subMonths(now, i);
-      const monthKey = format(date, 'yyyy-MM');
-      months.push({
-        key: monthKey,
-        month: format(date, 'MMM', { locale: ptBR }),
-        receitas: 0,
-        despesas: 0,
-        saldo: 0,
-      });
-    }
-
-    allTransactions.forEach(t => {
-      const d = t.date || t.due_date || t.issue_date;
-      if (!d) return;
-      const tDate = parseISO(d);
-      const monthKey = format(tDate, 'yyyy-MM');
-      const monthData = months.find(m => m.key === monthKey);
-      if (monthData) {
-        if (t.type === 'receita') {
-          monthData.receitas += Number(t.amount);
-        } else {
-          monthData.despesas += Number(t.amount);
-        }
-      }
+    const rows = monthlyRpc ?? [];
+    return rows.map(r => {
+      const d = parseISO(r.mes);
+      const receitas = Number(r.receitas) || 0;
+      const despesas = Number(r.despesas) || 0;
+      return {
+        key: format(d, 'yyyy-MM'),
+        month: format(d, 'MMM', { locale: ptBR }),
+        receitas,
+        despesas,
+        saldo: receitas - despesas,
+      };
     });
+  }, [monthlyRpc]);
 
-    months.forEach(m => {
-      m.saldo = m.receitas - m.despesas;
-    });
-
-    return months;
-  }, [allTransactions, now]);
-
-  // Category chart data (expenses)
+  // Category chart data (expenses) — colors looked up from categories list
   const categoryChartData = useMemo(() => {
-    const categoryMap = new Map<string, { name: string; value: number; color: string }>();
-    
-    transactions.forEach(t => {
-      if (t.type === 'despesa' && t.category) {
-        const existing = categoryMap.get(t.category.id);
-        if (existing) {
-          existing.value += Number(t.amount);
-        } else {
-          categoryMap.set(t.category.id, {
-            name: t.category.name,
-            value: Number(t.amount),
-            color: t.category.color || CHART_COLORS[categoryMap.size % CHART_COLORS.length],
-          });
-        }
-      }
+    const rows = categoryRpc ?? [];
+    return rows.map((r, idx) => {
+      const cat = r.category_id ? categories.find(c => c.id === r.category_id) : null;
+      return {
+        name: r.category_name || 'Sem categoria',
+        value: Number(r.total) || 0,
+        color: cat?.color || CHART_COLORS[idx % CHART_COLORS.length],
+      };
     });
+  }, [categoryRpc, categories]);
 
-    return Array.from(categoryMap.values())
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-  }, [transactions]);
 
   // Revenue category chart data
   const revenueCategoryChartData = useMemo(() => {
