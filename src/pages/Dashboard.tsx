@@ -29,6 +29,7 @@ import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { useTransactions } from '@/hooks/useTransactions';
 import { isEffectivelyPaid, getEffectiveAmount } from '@/lib/financial-utils';
+import { useDashboardSummary, useAnnualMetrics, useMonthlyEvolution, useCategoryBreakdown } from '@/hooks/useRpcDashboard';
 import { useBanks } from '@/hooks/useBanks';
 import { useRecurringTransactions } from '@/hooks/useRecurringTransactions';
 import { useContacts } from '@/hooks/useContacts';
