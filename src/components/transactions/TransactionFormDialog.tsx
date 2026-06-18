@@ -124,6 +124,7 @@ export function TransactionFormDialog({
   );
 
   useEffect(() => {
+    if (transaction) return;
     if (dueDate) {
       const dueDateObj = new Date(dueDate + 'T00:00:00');
       if (!isNaN(dueDateObj.getTime())) {

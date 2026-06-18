@@ -876,7 +876,7 @@ export default function Transactions() {
           <CardContent className="px-3 py-[10px] min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <Landmark className="w-3.5 h-3.5 text-primary shrink-0" />
-              <p className="text-[11px] font-semibold text-muted-foreground">Saldo Bancário</p>
+              <p className="text-[11px] font-semibold text-muted-foreground">Saldo Disponível</p>
             </div>
             <p className={`text-base sm:text-lg font-bold truncate ${bankTotals.totalBalance >= 0 ? 'text-primary' : 'text-red-500'}`}>{formatCurrency(bankTotals.totalBalance)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Total bancos visíveis</p>
