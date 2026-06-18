@@ -50,8 +50,8 @@ export default function ActiveSessionsPanel() {
         .order('last_seen_at', { ascending: false });
       if (error) throw error;
 
-      const userIds = [...new Set((data || []).map((s) => s.user_id))];
-      const companyIds = [...new Set((data || []).map((s) => s.company_id).filter(Boolean))];
+      const userIds = [...new Set((data || []).map((s: any) => s.user_id as string))];
+      const companyIds = [...new Set((data || []).map((s: any) => s.company_id as string).filter(Boolean))];
 
       const [profilesRes, companiesRes] = await Promise.all([
         userIds.length
