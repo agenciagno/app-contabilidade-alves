@@ -54,7 +54,7 @@ export function BulkEditDialog({
     if (!field || !newValue) return;
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('transactions')
         .update({ [field]: newValue })
         .in('id', selectedIds);

@@ -44,7 +44,7 @@ export default function ActiveSessionsPanel() {
   const { data: sessions = [], isLoading, refetch } = useQuery({
     queryKey: ['active-sessions', isSuperAdmin],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('active_sessions')
         .select('id, user_id, company_id, session_uuid, device_info, logged_in_at, last_seen_at')
         .order('last_seen_at', { ascending: false });

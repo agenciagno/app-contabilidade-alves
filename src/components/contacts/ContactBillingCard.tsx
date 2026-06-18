@@ -39,7 +39,7 @@ export function ContactBillingCard({ contact }: Props) {
     value: boolean,
     revert: () => void,
   ) => {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('contacts')
       .update({ [field]: value })
       .eq('id', contact.id);
