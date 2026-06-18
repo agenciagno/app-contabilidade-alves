@@ -227,56 +227,64 @@ export function useServerTransactions(page: number, filters: ServerFilters) {
   };
 }
 
-// Separate KPI query — same filters, no pagination, minimal columns
+// Separate KPI query — delegates aggregation to Postgres RPC `get_transaction_kpis`
 export function useTransactionKPIs(filters: ServerFilters) {
+  const cf = filters.columnFilters;
+
+  // Map ServerFilters → RPC scalar params (single-value RPC).
+  // We pick the most relevant date range present in column filters, in priority order.
+  const dateRange =
+    cf.date ?? cf.due_date ?? cf.issue_date ?? cf.expected_date ?? undefined;
+  const p_start_date = dateRange?.start || null;
+  const p_end_date = dateRange?.end || null;
+
+  const p_type =
+    filters.type && filters.type !== 'all' && filters.type !== IS_EMPTY
+      ? filters.type
+      : null;
+
+  const p_bank_id =
+    filters.bankId && filters.bankId !== 'all' && filters.bankId !== IS_EMPTY
+      ? filters.bankId
+      : null;
+
+  const realCategoryIds = (filters.categoryIds || []).filter(id => id !== IS_EMPTY);
+  const p_category_id = realCategoryIds.length === 1 ? realCategoryIds[0] : null;
+
+  const realContactIds = (cf.contactIds || []).filter(id => id !== IS_EMPTY);
+  const p_contact_id = realContactIds.length === 1 ? realContactIds[0] : null;
+
+  const p_payment_status =
+    cf.status === 'Pago' ? 'paid' : cf.status === 'Pendente' ? 'pending' : null;
+
+  const p_search = filters.searchTerm || null;
+
+  const rpcParams = {
+    p_start_date,
+    p_end_date,
+    p_type,
+    p_bank_id,
+    p_category_id,
+    p_contact_id,
+    p_payment_status,
+    p_search,
+  };
+
   const { data, isLoading } = useQuery({
-    queryKey: ['transaction-kpis', filters],
+    queryKey: ['transaction-kpis', rpcParams],
     queryFn: async () => {
-      let query = supabase
-        .from('transactions')
-        .select('id, type, amount, paid_amount, is_paid, date, due_date');
-
-      query = applyFilters(query, filters);
-
-      // Fetch all rows (paginated to avoid 1000 limit)
-      const allRows: any[] = [];
-      const BATCH = 1000;
-      let offset = 0;
-      while (true) {
-        const { data: batch, error } = await query.range(offset, offset + BATCH - 1);
-        if (error) throw error;
-        allRows.push(...(batch || []));
-        if (!batch || batch.length < BATCH) break;
-        offset += BATCH;
-        // Re-create query for next page
-        query = supabase.from('transactions').select('id, type, amount, paid_amount, is_paid, date, due_date');
-        query = applyFilters(query, filters);
-        query = query.is('deleted_at', null);
-      }
-
-      const today = new Date().toISOString().split('T')[0];
-
-      let receitasPagas = 0, receitasPendentes = 0, despesasPagas = 0, despesasPendentes = 0;
-      let contasEmAtraso = 0, receitasEmAtraso = 0;
-
-      for (const t of allRows) {
-        const paid = isEffectivelyPaid(t);
-        const amt = Number(t.amount);
-        const effAmt = paid && t.paid_amount != null ? Number(t.paid_amount) : amt;
-
-        if (t.type === 'receita') {
-          if (paid) receitasPagas += effAmt; else receitasPendentes += amt;
-        } else {
-          if (paid) despesasPagas += effAmt; else despesasPendentes += amt;
-        }
-
-        if (!paid && t.due_date && t.due_date < today) {
-          if (t.type === 'receita') receitasEmAtraso += amt;
-          else contasEmAtraso += amt;
-        }
-      }
-
-      return { receitasPagas, receitasPendentes, despesasPagas, despesasPendentes, contasEmAtraso, receitasEmAtraso, totalFiltered: allRows.length };
+      const { data, error } = await supabase.rpc('get_transaction_kpis', rpcParams);
+      if (error) throw error;
+      const d = data as any;
+      return {
+        receitasPagas: Number(d?.receitas_pagas ?? 0),
+        receitasPendentes: Number(d?.receitas_pendentes ?? 0),
+        despesasPagas: Number(d?.despesas_pagas ?? 0),
+        despesasPendentes: Number(d?.despesas_pendentes ?? 0),
+        contasEmAtraso: Number(d?.contas_em_atraso ?? 0),
+        receitasEmAtraso: Number(d?.receitas_em_atraso ?? 0),
+        totalFiltered: 0,
+      };
     },
     staleTime: 1000 * 30,
     gcTime: 1000 * 60 * 5,
