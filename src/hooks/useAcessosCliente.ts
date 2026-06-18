@@ -49,7 +49,7 @@ export function useAcessosCliente(contactId: string | undefined) {
     queryKey: ['acessos-portais', contactId],
     queryFn: async (): Promise<AcessoPortal[]> => {
       if (!contactId) return [];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('acessos_portais')
         .select(
           'id, contact_id, company_id, portal, portal_label, login, validade_certificado, observacao, anexo_url, updated_at, atualizado_por'

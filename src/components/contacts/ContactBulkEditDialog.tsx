@@ -58,7 +58,7 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
         return;
       }
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('contacts')
         .update(updates)
         .in('id', selectedIds);

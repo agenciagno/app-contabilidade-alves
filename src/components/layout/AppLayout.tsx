@@ -47,7 +47,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         return;
       }
 
-      const { error: upsertError } = await supabase
+      const { error: upsertError } = await (supabase as any)
         .from('active_sessions')
         .upsert(
           {
