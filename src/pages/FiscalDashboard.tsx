@@ -529,6 +529,9 @@ export default function FiscalDashboard() {
         </div>
       </div>
 
+      {/* Pendências por Cliente */}
+      <ClientPendenciesSection tasks={tasks} today={today} onClientClick={(id) => navigate(`/fiscal/tarefas?contact=${id}`)} />
+
       {/* Upcoming */}
       <Card>
         <CardHeader><CardTitle className="text-base">Próximos Vencimentos (7 dias)</CardTitle></CardHeader>
