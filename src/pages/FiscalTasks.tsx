@@ -428,6 +428,7 @@ export default function FiscalTasks() {
   };
 
   const handleInlineReassign = async (taskId: string, newId: string) => {
+    if (guardLocked(taskId)) return;
     try {
       await updateTask.mutateAsync({ id: taskId, responsible_id: newId });
       const name = profileOptions.find((p) => p.id === newId)?.name ?? 'colaborador';
