@@ -323,6 +323,9 @@ export default function FiscalCalendar() {
             </SelectContent>
           </Select>
 
+          <FiscalPeriodStatusControl year={year} month={month} />
+
+
           <Button
             variant="outline"
             onClick={() => { setCustomInitial(null); setCustomOpen(true); }}
