@@ -674,10 +674,10 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
               )}
             </div>
             <div className="flex gap-2">
-              {isColaborador && task.status !== 'concluido' && (
-                <Button size="sm" variant="outline" onClick={handleMarkComplete} className="gap-1.5">
+              {task.status !== 'concluido' && (
+                <Button size="sm" variant="outline" onClick={handleOpenCompletion} className="gap-1.5">
                   <CheckCircle className="w-4 h-4" />
-                  Concluir
+                  Concluir Tarefa
                 </Button>
               )}
               <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
