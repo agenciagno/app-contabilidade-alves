@@ -26,6 +26,8 @@ import { TaskListView } from '@/components/fiscal/TaskListView';
 import { TaskCalendarView } from '@/components/fiscal/TaskCalendarView';
 import { TaskDetailModal } from '@/components/fiscal/TaskDetailModal';
 import { TaskCreateModal } from '@/components/fiscal/TaskCreateModal';
+import { BulkCompleteDialog } from '@/components/fiscal/BulkCompleteDialog';
+import { CheckCheck } from 'lucide-react';
 import { BulkReassignModal } from '@/components/fiscal/BulkReassignModal';
 import { MyDayView } from '@/components/fiscal/MyDayView';
 import { SearchableSelect } from '@/components/fiscal/SearchableSelect';
@@ -486,12 +488,18 @@ export default function FiscalTasks() {
     <div className="space-y-6">
       <div className="flex items-center justify-between py-4 flex-wrap gap-4">
         <h1 className="text-2xl font-bold text-foreground">Tarefas Fiscais</h1>
-        {canDelete && (
-          <Button className="gap-2" onClick={() => setCreateOpen(true)}>
-            <Plus className="w-4 h-4" />
-            Nova Tarefa
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setBulkCompleteOpen(true)}>
+            <CheckCheck className="w-4 h-4" />
+            Concluir em Lote
           </Button>
-        )}
+          {canDelete && (
+            <Button className="gap-2" onClick={() => setCreateOpen(true)}>
+              <Plus className="w-4 h-4" />
+              Nova Tarefa
+            </Button>
+          )}
+        </div>
       </div>
 
       {isSelectedPeriodClosed && (
