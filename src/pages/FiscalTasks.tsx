@@ -221,19 +221,13 @@ export default function FiscalTasks() {
   type QuickFilter = 'overdue' | 'today' | 'awaiting' | null;
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
 
-  // KPIs do mês corrente (respeita os filtros globais já aplicados em `tasks`)
+  // KPIs (respeita filtros globais já aplicados em `tasks`, incluindo competência)
   const kpis = useMemo(() => {
-    const today = new Date();
-    const todayStr = format(today, 'yyyy-MM-dd');
-    const curYear = today.getFullYear();
-    const curMonth = today.getMonth() + 1;
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
     const fiveDaysAgo = new Date();
     fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
 
-    const monthTasks = tasks.filter(
-      (t: any) => t.competence_year === curYear && t.competence_month === curMonth,
-    );
-    const overdue = monthTasks.filter(
+    const overdue = tasks.filter(
       (t) => t.status !== 'concluido' && t.due_date && t.due_date < todayStr,
     ).length;
     const dueToday = tasks.filter(
@@ -245,8 +239,8 @@ export default function FiscalTasks() {
         t.updated_at &&
         new Date(t.updated_at) < fiveDaysAgo,
     ).length;
-    const totalMonth = monthTasks.length;
-    const doneMonth = monthTasks.filter((t) => t.status === 'concluido').length;
+    const totalMonth = tasks.length;
+    const doneMonth = tasks.filter((t) => t.status === 'concluido').length;
     const pct = totalMonth > 0 ? Math.round((doneMonth / totalMonth) * 100) : 0;
     return { overdue, dueToday, awaiting, totalMonth, doneMonth, pct };
   }, [tasks]);
