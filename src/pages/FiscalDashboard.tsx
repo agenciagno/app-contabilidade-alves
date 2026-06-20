@@ -585,6 +585,14 @@ export default function FiscalDashboard() {
         />
       </div>
 
+      {/* Risk Radar */}
+      <RiskRadarCard
+        tasks={tasks}
+        today={today}
+        onClientClick={(id) => navigate(`/fiscal/tarefas?contact=${id}`)}
+        onSeeAll={() => navigate('/fiscal/tarefas?filter=atrasadas')}
+      />
+
       {/* 48h widget */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
