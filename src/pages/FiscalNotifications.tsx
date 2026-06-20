@@ -127,7 +127,7 @@ export default function FiscalNotifications() {
             <SelectContent>
               <SelectItem value="all">Todos os colaboradores</SelectItem>
               {profiles.map((p: any) => (
-                <SelectItem key={p.user_id} value={p.user_id}>{p.name || p.email || p.user_id}</SelectItem>
+                <SelectItem key={p.user_id} value={p.user_id}>{p.full_name || p.email || p.user_id}</SelectItem>
               ))}
             </SelectContent>
           </Select>
