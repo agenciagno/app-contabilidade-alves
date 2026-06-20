@@ -709,7 +709,7 @@ export default function FiscalTasks() {
       {/* Views */}
       {viewMode === 'kanban' && (
         <KanbanBoard
-          tasks={tasks}
+          tasks={displayedTasks}
           contactsMap={contactsMap}
           profilesMap={profilesMap}
           onStatusChange={handleStatusChange}
@@ -768,7 +768,7 @@ export default function FiscalTasks() {
             </div>
           )}
           <TaskListView
-            tasks={tasks}
+            tasks={displayedTasks}
             contactsMap={contactsMap}
             profilesMap={profilesMap}
             onTaskClick={handleTaskClick}
@@ -786,7 +786,7 @@ export default function FiscalTasks() {
 
       {viewMode === 'calendar' && (
         <TaskCalendarView
-          tasks={tasks}
+          tasks={displayedTasks}
           contactsMap={contactsMap}
           onTaskClick={handleTaskClick}
         />
