@@ -732,6 +732,9 @@ export default function FiscalTasks() {
         {/* View Toggle */}
         <div className="ml-auto">
           <ToggleGroup type="single" value={viewMode} onValueChange={v => v && setViewMode(v as ViewMode)} className="border border-border/50 rounded-md p-0.5">
+            <ToggleGroupItem value="myday" className="h-8 w-8 p-0" title="Meu Dia">
+              <Target className="h-4 w-4" />
+            </ToggleGroupItem>
             <ToggleGroupItem value="kanban" className="h-8 w-8 p-0" title="Kanban">
               <Kanban className="h-4 w-4" />
             </ToggleGroupItem>
