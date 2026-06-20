@@ -417,6 +417,11 @@ export default function FiscalTasks() {
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedTaskIds);
     if (ids.length === 0) return;
+    const lockedIds = ids.filter((id) => isTaskLocked(id));
+    if (lockedIds.length > 0) {
+      toast.error(`${lockedIds.length} tarefa(s) pertencem a competência encerrada e não podem ser excluídas.`);
+      return;
+    }
     const { error } = await supabase.from('fiscal_tasks').delete().in('id', ids);
     if (error) {
       toast.error(error.message);
