@@ -27,6 +27,7 @@ import { TaskCalendarView } from '@/components/fiscal/TaskCalendarView';
 import { TaskDetailModal } from '@/components/fiscal/TaskDetailModal';
 import { TaskCreateModal } from '@/components/fiscal/TaskCreateModal';
 import { BulkReassignModal } from '@/components/fiscal/BulkReassignModal';
+import { MyDayView } from '@/components/fiscal/MyDayView';
 import { SearchableSelect } from '@/components/fiscal/SearchableSelect';
 import {
   AlertDialog,
