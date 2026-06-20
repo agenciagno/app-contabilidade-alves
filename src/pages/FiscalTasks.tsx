@@ -43,7 +43,7 @@ import {
 import { isContactFiscalEligible } from '@/lib/fiscal-filters';
 import { toast } from 'sonner';
 
-type ViewMode = 'kanban' | 'list' | 'calendar';
+type ViewMode = 'myday' | 'kanban' | 'list' | 'calendar';
 
 // DateInput: accepts DD/MM/YYYY typing + popover calendar
 function DateInput({
