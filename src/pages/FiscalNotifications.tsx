@@ -63,7 +63,7 @@ export default function FiscalNotifications() {
       if (!companyId) return [];
       const { data } = await supabase
         .from('profiles')
-        .select('user_id, name, email')
+        .select('user_id, full_name, email')
         .eq('company_id', companyId);
       return data ?? [];
     },
@@ -72,7 +72,7 @@ export default function FiscalNotifications() {
 
   const profileMap = useMemo(() => {
     const m = new Map<string, { name: string | null; email: string | null }>();
-    profiles.forEach((p: any) => m.set(p.user_id, { name: p.name, email: p.email }));
+    profiles.forEach((p: any) => m.set(p.user_id, { name: p.full_name, email: p.email }));
     return m;
   }, [profiles]);
 
@@ -127,7 +127,7 @@ export default function FiscalNotifications() {
             <SelectContent>
               <SelectItem value="all">Todos os colaboradores</SelectItem>
               {profiles.map((p: any) => (
-                <SelectItem key={p.user_id} value={p.user_id}>{p.name || p.email || p.user_id}</SelectItem>
+                <SelectItem key={p.user_id} value={p.user_id}>{p.full_name || p.email || p.user_id}</SelectItem>
               ))}
             </SelectContent>
           </Select>

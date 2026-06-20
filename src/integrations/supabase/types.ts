@@ -359,6 +359,87 @@ export type Database = {
           },
         ]
       }
+      client_regime_history: {
+        Row: {
+          company_id: string
+          contact_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          reason: string | null
+          regime: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          contact_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          reason?: string | null
+          regime: string
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          contact_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          reason?: string | null
+          regime?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      client_revenue: {
+        Row: {
+          company_id: string
+          competence_month: number
+          competence_year: number
+          contact_id: string
+          created_at: string
+          created_by: string | null
+          gross_revenue: number
+          id: string
+          notes: string | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          competence_month: number
+          competence_year: number
+          contact_id: string
+          created_at?: string
+          created_by?: string | null
+          gross_revenue?: number
+          id?: string
+          notes?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          competence_month?: number
+          competence_year?: number
+          contact_id?: string
+          created_at?: string
+          created_by?: string | null
+          gross_revenue?: number
+          id?: string
+          notes?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cnds: {
         Row: {
           arquivo_url: string | null
@@ -1398,6 +1479,48 @@ export type Database = {
           },
         ]
       }
+      fiscal_audit_log: {
+        Row: {
+          action: string
+          company_id: string
+          entity_id: string
+          entity_type: string
+          field_changed: string | null
+          id: string
+          metadata: Json | null
+          new_value: Json | null
+          old_value: Json | null
+          performed_at: string
+          performed_by: string | null
+        }
+        Insert: {
+          action: string
+          company_id: string
+          entity_id: string
+          entity_type: string
+          field_changed?: string | null
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+        }
+        Update: {
+          action?: string
+          company_id?: string
+          entity_id?: string
+          entity_type?: string
+          field_changed?: string | null
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+        }
+        Relationships: []
+      }
       fiscal_calendar: {
         Row: {
           adjusted_due_date: string
@@ -1483,9 +1606,13 @@ export type Database = {
           holiday_adjustment: string
           id: string
           is_custom: boolean
+          jurisdiction: string | null
           name: string
           requires_employees: boolean | null
+          uf: string | null
           updated_at: string
+          valid_from: string | null
+          valid_until: string | null
         }
         Insert: {
           active?: boolean | null
@@ -1499,9 +1626,13 @@ export type Database = {
           holiday_adjustment: string
           id?: string
           is_custom?: boolean
+          jurisdiction?: string | null
           name: string
           requires_employees?: boolean | null
+          uf?: string | null
           updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
         }
         Update: {
           active?: boolean | null
@@ -1515,9 +1646,13 @@ export type Database = {
           holiday_adjustment?: string
           id?: string
           is_custom?: boolean
+          jurisdiction?: string | null
           name?: string
           requires_employees?: boolean | null
+          uf?: string | null
           updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
         }
         Relationships: [
           {
@@ -1529,6 +1664,54 @@ export type Database = {
           },
         ]
       }
+      fiscal_period_status: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          company_id: string
+          competence_month: number
+          competence_year: number
+          contact_id: string | null
+          created_at: string
+          id: string
+          reopen_reason: string | null
+          reopened_at: string | null
+          reopened_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          company_id: string
+          competence_month: number
+          competence_year: number
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          company_id?: string
+          competence_month?: number
+          competence_year?: number
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fiscal_tasks: {
         Row: {
           attachment_url: string | null
@@ -1537,6 +1720,8 @@ export type Database = {
           competence_month: number | null
           competence_year: number | null
           completed_at: string | null
+          completion_notes: string | null
+          completion_type: string | null
           contact_id: string
           created_at: string
           delivery_date: string | null
@@ -1548,6 +1733,7 @@ export type Database = {
           notes: string | null
           obligation_id: string | null
           original_responsible_id: string | null
+          protocol_number: string | null
           responsible_id: string | null
           status: string
           title: string
@@ -1560,6 +1746,8 @@ export type Database = {
           competence_month?: number | null
           competence_year?: number | null
           completed_at?: string | null
+          completion_notes?: string | null
+          completion_type?: string | null
           contact_id: string
           created_at?: string
           delivery_date?: string | null
@@ -1571,6 +1759,7 @@ export type Database = {
           notes?: string | null
           obligation_id?: string | null
           original_responsible_id?: string | null
+          protocol_number?: string | null
           responsible_id?: string | null
           status?: string
           title: string
@@ -1583,6 +1772,8 @@ export type Database = {
           competence_month?: number | null
           competence_year?: number | null
           completed_at?: string | null
+          completion_notes?: string | null
+          completion_type?: string | null
           contact_id?: string
           created_at?: string
           delivery_date?: string | null
@@ -1594,6 +1785,7 @@ export type Database = {
           notes?: string | null
           obligation_id?: string | null
           original_responsible_id?: string | null
+          protocol_number?: string | null
           responsible_id?: string | null
           status?: string
           title?: string
@@ -2541,6 +2733,18 @@ export type Database = {
       }
     }
     Views: {
+      client_revenue_ytd: {
+        Row: {
+          avg_monthly: number | null
+          company_id: string | null
+          competence_year: number | null
+          contact_id: string | null
+          months_reported: number | null
+          projected_annual: number | null
+          ytd_revenue: number | null
+        }
+        Relationships: []
+      }
       fiscal_calendar_effective: {
         Row: {
           adjusted_due_date: string | null
