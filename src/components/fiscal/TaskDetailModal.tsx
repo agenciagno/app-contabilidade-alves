@@ -16,10 +16,11 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Upload, Paperclip, CheckCircle, Trash2, Send,
   Clock, AlertTriangle, CheckCircle2, ExternalLink,
-  Plus, ArrowRight, UserCog,
+  Plus, ArrowRight, UserCog, Hash, X,
 } from 'lucide-react';
 import { FiscalTask } from '@/hooks/useFiscalTasks';
 import { useUserRole } from '@/hooks/useUserRole';
