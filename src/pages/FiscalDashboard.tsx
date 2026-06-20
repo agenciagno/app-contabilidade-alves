@@ -63,6 +63,7 @@ import {
   useFiscalTasks48h,
   FiscalTaskRow,
 } from '@/hooks/useFiscalDashboard';
+import { RevenueLimitsSection } from '@/components/fiscal/RevenueLimitsSection';
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
