@@ -22,6 +22,7 @@ import {
   UsersRound,
   LockKeyhole,
   Bell,
+  Shield,
   type LucideIcon,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
