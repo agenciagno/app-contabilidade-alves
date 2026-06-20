@@ -131,6 +131,13 @@ export default function FiscalCollaborators() {
   const { data: clientCountMap = {} } = useClientCountByProfile();
   const { data: history = [] } = useTransferHistory();
 
+  const now = new Date();
+  const { data: workloadMap = {} } = useWorkloadByProfile(
+    companyId,
+    now.getFullYear(),
+    now.getMonth() + 1
+  );
+
   const [modalOpen, setModalOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
