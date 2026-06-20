@@ -494,6 +494,14 @@ export default function FiscalTasks() {
         )}
       </div>
 
+      {isSelectedPeriodClosed && (
+        <div className="flex items-center gap-2 rounded-md border border-muted-foreground/30 bg-muted px-3 py-2 text-sm text-muted-foreground">
+          <span className="font-medium">Competência encerrada.</span>
+          As tarefas deste período estão bloqueadas para edição.
+        </div>
+      )}
+
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <button
