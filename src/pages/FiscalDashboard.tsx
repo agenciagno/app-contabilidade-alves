@@ -48,6 +48,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 import { useUserRole } from '@/hooks/useUserRole';
@@ -528,6 +529,9 @@ export default function FiscalDashboard() {
         </div>
       </div>
 
+      {/* Pendências por Cliente */}
+      <ClientPendenciesSection tasks={tasks} today={today} onClientClick={(id) => navigate(`/fiscal/tarefas?contact=${id}`)} />
+
       {/* Upcoming */}
       <Card>
         <CardHeader><CardTitle className="text-base">Próximos Vencimentos (7 dias)</CardTitle></CardHeader>
@@ -578,5 +582,226 @@ export default function FiscalDashboard() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ---- Pendências por Cliente ----
+type ClientRow = {
+  contactId: string;
+  name: string;
+  taxRegime: string | null;
+  pendentes: number;
+  emAndamento: number;
+  aguardando: number;
+  atrasadas: number;
+  concluidas: number;
+  total: number;
+  compliance: number;
+};
+
+type SortKey = 'name' | 'regime' | 'pendentes' | 'emAndamento' | 'aguardando' | 'atrasadas' | 'concluidas' | 'compliance';
+
+const REGIME_SHORT: Record<string, string> = {
+  'Simples Nacional': 'SN',
+  'Lucro Presumido': 'LP',
+  'Lucro Real': 'LR',
+  'MEI': 'MEI',
+};
+
+function regimeShortLabel(regime: string | null | undefined) {
+  if (!regime) return '—';
+  return REGIME_SHORT[regime] ?? regime;
+}
+
+function ClientPendenciesSection({
+  tasks,
+  today,
+  onClientClick,
+}: {
+  tasks: FiscalTaskRow[];
+  today: string;
+  onClientClick: (contactId: string) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState<SortKey>('atrasadas');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const rows = useMemo<ClientRow[]>(() => {
+    const map = new Map<string, ClientRow>();
+    for (const t of tasks as any[]) {
+      const cid: string | null = t.contact_id ?? null;
+      if (!cid) continue;
+      let row = map.get(cid);
+      if (!row) {
+        row = {
+          contactId: cid,
+          name: t.contacts?.name ?? '—',
+          taxRegime: t.contacts?.tax_regime ?? null,
+          pendentes: 0,
+          emAndamento: 0,
+          aguardando: 0,
+          atrasadas: 0,
+          concluidas: 0,
+          total: 0,
+          compliance: 0,
+        };
+        map.set(cid, row);
+      }
+      row.total += 1;
+      if (t.status === 'a_fazer') row.pendentes += 1;
+      else if (t.status === 'em_progresso') row.emAndamento += 1;
+      else if (t.status === 'aguardando_cliente') row.aguardando += 1;
+      else if (t.status === 'concluido') row.concluidas += 1;
+      if (t.status !== 'concluido' && t.due_date && t.due_date < today) row.atrasadas += 1;
+    }
+    for (const row of map.values()) {
+      row.compliance = row.total > 0 ? Math.round((row.concluidas / row.total) * 100) : 0;
+    }
+    return Array.from(map.values());
+  }, [tasks, today]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = q ? rows.filter((r) => r.name.toLowerCase().includes(q)) : rows;
+    const sorted = [...list].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      if (sortKey === 'name') return a.name.localeCompare(b.name) * dir;
+      if (sortKey === 'regime') return (a.taxRegime ?? '').localeCompare(b.taxRegime ?? '') * dir;
+      const av = (a as any)[sortKey] as number;
+      const bv = (b as any)[sortKey] as number;
+      if (av === bv) return a.name.localeCompare(b.name);
+      return (av - bv) * dir;
+    });
+    return sorted;
+  }, [rows, search, sortKey, sortDir]);
+
+  const PER_PAGE = 20;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const pageRows = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'name' || key === 'regime' ? 'asc' : 'desc');
+    }
+    setPage(1);
+  };
+
+  const SortBtn = ({ k, label, align }: { k: SortKey; label: string; align?: 'left' | 'right' }) => (
+    <button
+      type="button"
+      onClick={() => toggleSort(k)}
+      className={cn(
+        'inline-flex items-center gap-1 font-medium hover:text-foreground transition-colors',
+        align === 'right' ? 'justify-end w-full' : '',
+      )}
+    >
+      {label}
+      <ArrowUpDown className={cn('h-3 w-3', sortKey === k ? 'text-foreground' : 'text-muted-foreground/50')} />
+    </button>
+  );
+
+  const trafficLight = (atrasadas: number) => {
+    if (atrasadas >= 3) return 'bg-red-500';
+    if (atrasadas >= 1) return 'bg-yellow-500';
+    return 'bg-green-500';
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 space-y-0 pb-3">
+        <CardTitle className="text-base">Pendências por Cliente</CardTitle>
+        <Input
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          placeholder="Buscar cliente..."
+          className="h-9 w-full sm:w-[260px]"
+        />
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead><SortBtn k="name" label="Cliente" /></TableHead>
+              <TableHead><SortBtn k="regime" label="Regime" /></TableHead>
+              <TableHead className="text-right"><SortBtn k="pendentes" label="Pendentes" align="right" /></TableHead>
+              <TableHead className="text-right"><SortBtn k="emAndamento" label="Em Andamento" align="right" /></TableHead>
+              <TableHead className="text-right"><SortBtn k="aguardando" label="Aguardando" align="right" /></TableHead>
+              <TableHead className="text-right"><SortBtn k="atrasadas" label="Atrasadas" align="right" /></TableHead>
+              <TableHead className="text-right"><SortBtn k="concluidas" label="Concluídas" align="right" /></TableHead>
+              <TableHead className="text-right"><SortBtn k="compliance" label="% Compliance" align="right" /></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pageRows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
+                  Nenhum cliente encontrado
+                </TableCell>
+              </TableRow>
+            ) : (
+              pageRows.map((r) => (
+                <TableRow key={r.contactId}>
+                  <TableCell className="font-medium">
+                    <button
+                      type="button"
+                      onClick={() => onClientClick(r.contactId)}
+                      className="inline-flex items-center gap-2 text-left hover:underline"
+                    >
+                      <span className={cn('inline-block h-2.5 w-2.5 rounded-full', trafficLight(r.atrasadas))} />
+                      <span className="truncate">{r.name}</span>
+                    </button>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-[10px]">{regimeShortLabel(r.taxRegime)}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{r.pendentes}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.emAndamento}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.aguardando}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {r.atrasadas > 0 ? (
+                      <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">{r.atrasadas}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">0</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{r.concluidas}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    <span className={cn(
+                      'font-medium',
+                      r.compliance >= 90 ? 'text-green-600 dark:text-green-400'
+                        : r.compliance >= 70 ? 'text-yellow-600 dark:text-yellow-400'
+                        : 'text-red-600 dark:text-red-400',
+                    )}>
+                      {r.compliance}%
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+        {filtered.length > PER_PAGE && (
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t">
+            <span className="text-xs text-muted-foreground">
+              Mostrando {(currentPage - 1) * PER_PAGE + 1}–{Math.min(currentPage * PER_PAGE, filtered.length)} de {filtered.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                Anterior
+              </Button>
+              <span className="text-xs text-muted-foreground">Página {currentPage} de {totalPages}</span>
+              <Button size="sm" variant="outline" disabled={currentPage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                Próxima
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
