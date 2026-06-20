@@ -32,6 +32,8 @@ export interface FiscalTaskFilters {
   responsibleId?: string;
   titleSearch?: string;
   sortOrder?: 'asc' | 'desc';
+  competenceMonth?: number | null;
+  competenceYear?: number | null;
 }
 
 export function useFiscalTasks(filters: FiscalTaskFilters = {}) {
