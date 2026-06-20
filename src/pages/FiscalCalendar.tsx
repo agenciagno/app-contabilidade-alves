@@ -67,6 +67,7 @@ import { CalendarLaunchPreview } from '@/components/fiscal/CalendarLaunchPreview
 import { CalendarConflictMap } from '@/components/fiscal/CalendarConflictMap';
 import { IbsCbsSection, isRtRow } from '@/components/fiscal/IbsCbsSection';
 import { RtChecklistDialog } from '@/components/fiscal/RtChecklistDialog';
+import { FiscalPeriodStatusControl } from '@/components/fiscal/FiscalPeriodStatusControl';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
