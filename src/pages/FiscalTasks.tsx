@@ -447,6 +447,76 @@ export default function FiscalTasks() {
         )}
       </div>
 
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <button
+          type="button"
+          onClick={() => setQuickFilter((q) => (q === 'overdue' ? null : 'overdue'))}
+          className="text-left"
+        >
+          <Card
+            className={cn(
+              'p-3 border-l-4 border-l-destructive bg-destructive/5 hover:bg-destructive/10 transition-colors h-full',
+              quickFilter === 'overdue' && 'ring-2 ring-destructive',
+            )}
+          >
+            <div className="text-xs font-medium text-muted-foreground">Atrasadas</div>
+            <div className="text-2xl font-bold text-destructive mt-1">{kpis.overdue}</div>
+          </Card>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setQuickFilter((q) => (q === 'today' ? null : 'today'))}
+          className="text-left"
+        >
+          <Card
+            className={cn(
+              'p-3 border-l-4 border-l-orange-500 bg-orange-500/5 hover:bg-orange-500/10 transition-colors h-full',
+              quickFilter === 'today' && 'ring-2 ring-orange-500',
+            )}
+          >
+            <div className="text-xs font-medium text-muted-foreground">Vencem Hoje</div>
+            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">{kpis.dueToday}</div>
+          </Card>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setQuickFilter((q) => (q === 'awaiting' ? null : 'awaiting'))}
+          className="text-left"
+        >
+          <Card
+            className={cn(
+              'p-3 border-l-4 border-l-yellow-500 bg-yellow-500/5 hover:bg-yellow-500/10 transition-colors h-full',
+              quickFilter === 'awaiting' && 'ring-2 ring-yellow-500',
+            )}
+          >
+            <div className="text-xs font-medium text-muted-foreground">Aguardando Cliente +5 dias</div>
+            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">{kpis.awaiting}</div>
+          </Card>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setQuickFilter(null)}
+          className="text-left"
+        >
+          <Card
+            className={cn(
+              'p-3 border-l-4 border-l-green-500 bg-green-500/5 hover:bg-green-500/10 transition-colors h-full',
+              quickFilter === null && 'ring-2 ring-green-500',
+            )}
+          >
+            <div className="text-xs font-medium text-muted-foreground">Progresso do Mês</div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
+              {kpis.pct}% <span className="text-sm font-normal text-muted-foreground">({kpis.doneMonth}/{kpis.totalMonth})</span>
+            </div>
+            <Progress value={kpis.pct} className="h-1.5 mt-2" />
+          </Card>
+        </button>
+      </div>
+
       {/* Filters Bar */}
       <div className="flex flex-wrap gap-3 items-center">
 
