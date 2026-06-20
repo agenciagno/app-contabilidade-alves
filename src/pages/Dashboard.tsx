@@ -100,15 +100,54 @@ export default function Dashboard() {
   const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const { transactions: rawTransactions, isLoading: loadingTransactions, createTransaction } = useTransactions();
+  const queryClient = useQueryClient();
   const { banks, isLoading: loadingBanks, createBank } = useBanks();
   const { recurringTransactions } = useRecurringTransactions();
   const { contacts, createContact } = useContacts();
   const { categories, createCategory } = useCategories();
 
-  // Filter out transactions linked to invisible banks
-  const invisibleBankIds = useMemo(() => new Set(banks.filter(b => b.is_invisible).map(b => b.id)), [banks]);
-  const allTransactions = useMemo(() => rawTransactions.filter(t => !t.bank_id || !invisibleBankIds.has(t.bank_id)), [rawTransactions, invisibleBankIds]);
+  // Inline createTransaction mutation (was previously from useTransactions)
+  const createTransaction = useMutation({
+    mutationFn: async (transaction: TransactionInsert) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+      if (!profile) throw new Error('Perfil não encontrado');
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert({ ...transaction, company_id: profile.company_id })
+        .select()
+        .single();
+      if (error) throw error;
+      await createGlobalLog({
+        action: 'ADICAO',
+        module: 'FINANCEIRO',
+        entityId: data.id,
+        entityName: transaction.description,
+        details: `Transação "${transaction.description}" criada - ${transaction.type === 'receita' ? 'Receita' : 'Despesa'} de R$ ${Number(transaction.amount).toFixed(2)}`,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['server-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['transaction-kpis'] });
+      queryClient.invalidateQueries({ queryKey: ['banks'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['annual-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['monthly-evolution'] });
+      queryClient.invalidateQueries({ queryKey: ['category-breakdown'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-transactions-dashboard'] });
+      toast.success('Transação criada com sucesso!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message ?? 'Erro ao criar transação');
+    },
+  });
 
   // Get date range for filtering
   const getDateRange = (): { start: Date; end: Date } | null => {
@@ -130,51 +169,6 @@ export default function Dashboard() {
     setCustomEndDate(null);
   };
 
-  // Filter transactions based on all filters
-  const transactions = useMemo(() => {
-    let result = [...allTransactions];
-    
-    // Date filter
-    const dateRange = getDateRange();
-    if (dateRange) {
-      result = result.filter((t) => {
-        const d = t.date || t.due_date || t.issue_date;
-        if (!d) return false;
-        const txDate = parseISO(d);
-        return isWithinInterval(txDate, { start: dateRange.start, end: dateRange.end });
-      });
-    }
-    
-    // Bank filter
-    if (selectedBankId !== 'all') {
-      result = result.filter(t => t.bank_id === selectedBankId);
-    }
-    
-    // Category filter
-    if (categoryFilter !== 'all') {
-      result = result.filter(t => t.category_id === categoryFilter);
-    }
-    
-    // Contact filter
-    if (contactFilter !== 'all') {
-      result = result.filter(t => t.contact_id === contactFilter);
-    }
-    
-    // Payment status filter
-    if (paymentStatusFilter === 'paid') {
-      result = result.filter(t => t.is_paid);
-    } else if (paymentStatusFilter === 'pending') {
-      result = result.filter(t => !t.is_paid);
-    }
-    
-    // Search filter
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-      result = result.filter(t => t.description.toLowerCase().includes(search));
-    }
-    
-    return result;
-  }, [allTransactions, period, customStartDate, customEndDate, selectedBankId, categoryFilter, contactFilter, paymentStatusFilter, searchTerm]);
 
   // ---- RPC-backed metrics (replaces previous useMemo aggregations) ----
   // Date range for the summary RPC (when no period filter, use a wide-open range)
