@@ -29,6 +29,7 @@ import { TaskCreateModal } from '@/components/fiscal/TaskCreateModal';
 import { BulkReassignModal } from '@/components/fiscal/BulkReassignModal';
 import { MyDayView } from '@/components/fiscal/MyDayView';
 import { SearchableSelect } from '@/components/fiscal/SearchableSelect';
+import { useClosedPeriodsMap, periodKey } from '@/hooks/useFiscalPeriodStatus';
 import {
   AlertDialog,
   AlertDialogAction,
