@@ -326,11 +326,13 @@ export default function FiscalTasks() {
   }, [companyProfiles]);
 
   const handleStatusChange = (taskId: string, newStatus: string) => {
+    if (guardLocked(taskId)) return;
     updateTask.mutate({ id: taskId, status: newStatus as FiscalTask['status'] });
   };
 
   const handleUploadAttachment = async (task: FiscalTask, file: File) => {
     if (!companyId) return;
+    if (guardLocked(task.id)) return;
     try {
       const ext = file.name.split('.').pop();
       const path = `fiscal/${companyId}/${task.id}/${Date.now()}.${ext}`;
