@@ -206,6 +206,16 @@ export default function Dashboard() {
       contactId: _summaryFilters.contactId,
     },
   );
+  const { data: revenueCategoryRpc } = useCategoryBreakdown(
+    'receita',
+    _summaryRange.start,
+    _summaryRange.end,
+    5,
+    {
+      bankId: _summaryFilters.bankId,
+      contactId: _summaryFilters.contactId,
+    },
+  );
 
   // Adapt RPC snake_case → camelCase consumed by JSX (interface unchanged)
   const summary = useMemo(() => {
