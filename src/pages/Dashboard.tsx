@@ -281,63 +281,59 @@ export default function Dashboard() {
   }, [categoryRpc, categories]);
 
 
-  // Revenue category chart data
+  // Revenue category chart data (via RPC)
   const revenueCategoryChartData = useMemo(() => {
-    const categoryMap = new Map<string, { name: string; value: number; color: string }>();
-    
-    transactions.forEach(t => {
-      if (t.type === 'receita' && t.category) {
-        const existing = categoryMap.get(t.category.id);
-        if (existing) {
-          existing.value += Number(t.amount);
-        } else {
-          categoryMap.set(t.category.id, {
-            name: t.category.name,
-            value: Number(t.amount),
-            color: t.category.color || CHART_COLORS[categoryMap.size % CHART_COLORS.length],
-          });
-        }
-      }
+    const rows = revenueCategoryRpc ?? [];
+    return rows.map((r, idx) => {
+      const cat = r.category_id ? categories.find(c => c.id === r.category_id) : null;
+      return {
+        name: r.category_name || 'Sem categoria',
+        value: Number(r.total) || 0,
+        color: cat?.color || CHART_COLORS[idx % CHART_COLORS.length],
+      };
     });
+  }, [revenueCategoryRpc, categories]);
 
-    return Array.from(categoryMap.values())
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-  }, [transactions]);
+  // Pending transactions (unified list - a receber + a pagar) — direct query, top 15
+  const { data: pendingTransactions = [], isLoading: loadingPending } = useQuery({
+    queryKey: ['pending-transactions-dashboard'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*, category:categories(id, name, color), bank:banks(id, name, color), contact:contacts(id, name, type)')
+        .is('deleted_at', null)
+        .eq('is_paid', false)
+        .order('due_date', { ascending: true, nullsFirst: false })
+        .limit(15);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
-  // Pending transactions (unified list - a receber + a pagar)
-  const pendingTransactions = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    return allTransactions
-      .filter(t => !t.is_paid)
-      .sort((a, b) => new Date(a.due_date || a.date || '9999-12-31').getTime() - new Date(b.due_date || b.date || '9999-12-31').getTime())
-      .slice(0, 15);
-  }, [allTransactions]);
-
-  // DRE data
+  // DRE data — derived from RPC summary totals (independente de status de pagamento)
   const dreData = useMemo(() => {
-    const faturamentoBruto = transactions.filter(t => t.type === 'receita').reduce((s, t) => s + Number(t.amount), 0);
+    const faturamentoBruto = Number((dashboardSummary as any)?.total_receitas ?? 0);
     const impostos = faturamentoBruto * 0.15;
-    const despesasOperacionais = transactions.filter(t => t.type === 'despesa').reduce((s, t) => s + Number(t.amount), 0);
+    const despesasOperacionais = Number((dashboardSummary as any)?.total_despesas ?? 0);
     return { faturamentoBruto, impostos, despesasOperacionais };
-  }, [transactions]);
+  }, [dashboardSummary]);
 
   // Period comparison data
   const thisMonthStart = startOfMonth(now);
   const lastMonthStart = startOfMonth(subMonths(now, 1));
   const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
-  const invisibleBankIdArray = useMemo(() => Array.from(invisibleBankIds), [invisibleBankIds]);
+  const invisibleBankIdArray = useMemo<string[]>(
+    () => banks.filter(b => b.is_invisible).map(b => b.id),
+    [banks],
+  );
   const { data: thisMonthTx = [] } = useReportData({ startDate: thisMonthStart, endDate: now, invisibleBankIds: invisibleBankIdArray });
   const { data: lastMonthTx = [] } = useReportData({ startDate: lastMonthStart, endDate: lastMonthEnd, invisibleBankIds: invisibleBankIdArray });
 
   const thisMonthData = useMemo(() => processReportData(thisMonthTx), [thisMonthTx]);
   const lastMonthData = useMemo(() => processReportData(lastMonthTx), [lastMonthTx]);
 
-
-  const isLoading = loadingTransactions || loadingBanks || loadingSummary || loadingAnnual || loadingMonthly || loadingCategory;
+  const isLoading = loadingBanks || loadingSummary || loadingAnnual || loadingMonthly || loadingCategory || loadingPending;
 
   // Handlers
   const handleNewTransaction = (type: 'receita' | 'despesa') => {
@@ -369,9 +365,38 @@ export default function Dashboard() {
     });
   };
 
-  // Export handlers
-  const handleExportCSV = () => {
-    const reportData = transactions.map(t => ({
+  // Lazy fetch for exports — only runs when user clicks export
+  const fetchExportData = async () => {
+    let query = supabase
+      .from('transactions')
+      .select('*, category:categories(id, name, color), bank:banks(id, name, color), contact:contacts(id, name, type)')
+      .is('deleted_at', null)
+      .order('date', { ascending: false });
+
+    if (selectedBankId !== 'all') query = query.eq('bank_id', selectedBankId);
+    if (categoryFilter !== 'all') query = query.eq('category_id', categoryFilter);
+    if (contactFilter !== 'all') query = query.eq('contact_id', contactFilter);
+    if (paymentStatusFilter === 'paid') query = query.eq('is_paid', true);
+    if (paymentStatusFilter === 'pending') query = query.eq('is_paid', false);
+
+    const { data, error } = await query;
+    if (error || !data) {
+      toast.error('Erro ao carregar dados para exportação');
+      return [] as any[];
+    }
+
+    // Date filter (COALESCE date/due_date/issue_date) — applied client-side after fetch
+    const dateRange = getDateRange();
+    const filtered = dateRange
+      ? data.filter((t: any) => {
+          const d = t.date || t.due_date || t.issue_date;
+          if (!d) return false;
+          const txDate = parseISO(d);
+          return isWithinInterval(txDate, { start: dateRange.start, end: dateRange.end });
+        })
+      : data;
+
+    return filtered.map((t: any) => ({
       id: t.id,
       description: t.description,
       amount: Number(t.amount),
@@ -382,24 +407,27 @@ export default function Dashboard() {
       bank: t.bank ? { id: t.bank.id, name: t.bank.name, color: t.bank.color || '' } : null,
       contact: t.contact ? { id: t.contact.id, name: t.contact.name, type: t.contact.type } : null,
     }));
+  };
+
+  // Export handlers
+  const handleExportCSV = async () => {
+    const reportData = await fetchExportData();
+    if (reportData.length === 0) {
+      toast.error('Nenhuma transação para exportar');
+      return;
+    }
     exportToCSV(reportData);
   };
 
-  const handleExportPDF = () => {
-    const reportData = transactions.map(t => ({
-      id: t.id,
-      description: t.description,
-      amount: Number(t.amount),
-      type: t.type,
-      date: t.date,
-      is_paid: t.is_paid,
-      category: t.category ? { id: t.category.id, name: t.category.name, color: t.category.color || '' } : null,
-      bank: t.bank ? { id: t.bank.id, name: t.bank.name, color: t.bank.color || '' } : null,
-      contact: t.contact ? { id: t.contact.id, name: t.contact.name, type: t.contact.type } : null,
-    }));
+  const handleExportPDF = async () => {
+    const reportData = await fetchExportData();
+    if (reportData.length === 0) {
+      toast.error('Nenhuma transação para exportar');
+      return;
+    }
     const totals = {
-      receitas: transactions.filter(t => t.type === 'receita').reduce((sum, t) => sum + Number(t.amount), 0),
-      despesas: transactions.filter(t => t.type === 'despesa').reduce((sum, t) => sum + Number(t.amount), 0),
+      receitas: Number((dashboardSummary as any)?.total_receitas ?? 0),
+      despesas: Number((dashboardSummary as any)?.total_despesas ?? 0),
     };
     const dateRange = getDateRange();
     exportToPDF(reportData, totals, dateRange?.start, dateRange?.end);
