@@ -236,6 +236,27 @@ export default function FiscalTasks() {
 
   const { tasks, isLoading, createTask, updateTask, deleteTask } = useFiscalTasks(filters);
 
+  // Closed-period guard
+  const { data: closedPeriods } = useClosedPeriodsMap();
+  const isTaskLocked = (task: { id?: string } | string): boolean => {
+    const id = typeof task === 'string' ? task : task?.id;
+    if (!id || !closedPeriods || closedPeriods.size === 0) return false;
+    const t = tasks.find((x) => x.id === id) as any;
+    if (!t) return false;
+    return closedPeriods.has(periodKey(t.competence_year, t.competence_month));
+  };
+  const guardLocked = (task: { id?: string } | string): boolean => {
+    if (isTaskLocked(task)) {
+      toast.error('Competência encerrada — tarefa bloqueada para edição.');
+      return true;
+    }
+    return false;
+  };
+  const isSelectedPeriodClosed =
+    competenceMonth !== 'all' &&
+    !!competenceYear &&
+    !!closedPeriods?.has(`${competenceYear}-${competenceMonth}`);
+
   // Quick filter (cards de KPI no topo)
   type QuickFilter = 'overdue' | 'today' | 'awaiting' | null;
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
