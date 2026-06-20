@@ -572,7 +572,34 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                     disabled={uploading}
                   />
                 </div>
-                {attachmentUrl && (
+                {task.status === 'concluido' && (() => {
+                  const ct = (task as any).completion_type as string | null;
+                  if (ct === 'protocol') {
+                    return (
+                      <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 inline-flex items-center gap-1">
+                        <Hash className="w-3 h-3" /> Protocolo: {(task as any).protocol_number || '—'}
+                      </Badge>
+                    );
+                  }
+                  if (ct === 'transmitted') {
+                    return (
+                      <div className="space-y-1">
+                        <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 inline-flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" /> Transmitida
+                        </Badge>
+                        {(task as any).completion_notes && (
+                          <p className="text-xs text-muted-foreground whitespace-pre-wrap">{(task as any).completion_notes}</p>
+                        )}
+                      </div>
+                    );
+                  }
+                  return attachmentUrl ? (
+                    <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 inline-flex items-center gap-1">
+                      <Paperclip className="w-3 h-3" /> Documento anexado
+                    </Badge>
+                  ) : null;
+                })()}
+                {task.status !== 'concluido' && attachmentUrl && (
                   <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
                     ✅ Documento anexado
                   </Badge>
@@ -580,6 +607,104 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
               </div>
             )}
           </section>
+
+          {/* Painel de Conclusão (3 opções) */}
+          {completionOpen && task.status !== 'concluido' && (
+            <section className="space-y-3 rounded-md border border-primary/30 bg-primary/5 p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">Como deseja concluir esta tarefa?</h3>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setCompletionOpen(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <RadioGroup
+                value={completionType}
+                onValueChange={(v) => setCompletionType(v as any)}
+                className="space-y-2"
+              >
+                <label className="flex items-start gap-2 cursor-pointer p-2 rounded hover:bg-muted/40">
+                  <RadioGroupItem value="attachment" id="ct-att" className="mt-0.5" />
+                  <div className="text-sm">📎 Anexar comprovante</div>
+                </label>
+                <label className="flex items-start gap-2 cursor-pointer p-2 rounded hover:bg-muted/40">
+                  <RadioGroupItem value="protocol" id="ct-prot" className="mt-0.5" />
+                  <div className="text-sm">🔢 Informar protocolo</div>
+                </label>
+                <label className="flex items-start gap-2 cursor-pointer p-2 rounded hover:bg-muted/40">
+                  <RadioGroupItem value="transmitted" id="ct-trans" className="mt-0.5" />
+                  <div className="text-sm">✅ Marcar como transmitido</div>
+                </label>
+              </RadioGroup>
+
+              {completionType === 'attachment' && (
+                <div className="space-y-2">
+                  {attachmentUrl ? (
+                    <div className="text-xs text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5" /> Arquivo já anexado.
+                    </div>
+                  ) : (
+                    <Label htmlFor="task-attachment-confirm" className="cursor-pointer">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded border border-dashed border-border hover:bg-muted/50 text-xs">
+                        <Upload className="w-3.5 h-3.5" />
+                        {uploading ? 'Enviando...' : 'Selecionar arquivo'}
+                      </div>
+                      <input
+                        id="task-attachment-confirm"
+                        type="file"
+                        className="hidden"
+                        onChange={handleUpload}
+                        disabled={uploading}
+                      />
+                    </Label>
+                  )}
+                </div>
+              )}
+
+              {completionType === 'protocol' && (
+                <div className="space-y-2">
+                  <div>
+                    <Label className="text-xs">Número do protocolo</Label>
+                    <Input
+                      value={protocolNumber}
+                      onChange={(e) => setProtocolNumber(e.target.value)}
+                      placeholder="Ex: 2.06.000.123456-7"
+                      maxLength={100}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Observações (opcional)</Label>
+                    <Textarea
+                      value={completionNotesInput}
+                      onChange={(e) => setCompletionNotesInput(e.target.value)}
+                      rows={2}
+                      maxLength={1000}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {completionType === 'transmitted' && (
+                <div>
+                  <Label className="text-xs">Observações</Label>
+                  <Textarea
+                    value={completionNotesInput}
+                    onChange={(e) => setCompletionNotesInput(e.target.value)}
+                    rows={3}
+                    placeholder="Descreva como e onde foi transmitido..."
+                    maxLength={1000}
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Mínimo de 10 caracteres.</p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button size="sm" variant="ghost" onClick={() => setCompletionOpen(false)}>Cancelar</Button>
+                <Button size="sm" onClick={handleConfirmCompletion} className="gap-1.5">
+                  <CheckCircle className="w-4 h-4" /> Concluir
+                </Button>
+              </div>
+            </section>
+          )}
 
           <Separator />
 
