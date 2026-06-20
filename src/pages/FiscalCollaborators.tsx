@@ -161,6 +161,24 @@ export default function FiscalCollaborators() {
     return { coveringFor, absentTo };
   }, [history]);
 
+  // Workload distribution summary
+  const distribution = useMemo(() => {
+    const items = collaborators.map((c) => {
+      const load = workloadMap[c.id] ?? 0;
+      const pct = Math.round((load / CAPACITY) * 100);
+      return { id: c.id, name: c.full_name || c.email || '—', load, pct };
+    });
+    if (items.length === 0) {
+      return { items, most: null, least: null, avg: 0, spread: 0 };
+    }
+    const sorted = [...items].sort((a, b) => b.pct - a.pct);
+    const most = sorted[0];
+    const least = sorted[sorted.length - 1];
+    const avg = Math.round(items.reduce((s, i) => s + i.pct, 0) / items.length);
+    return { items, most, least, avg, spread: most.pct - least.pct };
+  }, [collaborators, workloadMap]);
+
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between py-4 flex-wrap gap-4">
