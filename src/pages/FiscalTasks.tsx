@@ -211,7 +211,9 @@ export default function FiscalTasks() {
     titleSearch: filterObligation !== 'all'
       ? (obligations.find((o) => o.id === filterObligation)?.name)
       : undefined,
-  }), [startDate, endDate, filterContact, filterResponsible, filterObligation, obligations]);
+    competenceMonth: competenceMonth !== 'all' ? Number(competenceMonth) : null,
+    competenceYear: competenceYear ? Number(competenceYear) : null,
+  }), [startDate, endDate, filterContact, filterResponsible, filterObligation, obligations, competenceMonth, competenceYear]);
 
   const { tasks, isLoading, createTask, updateTask, deleteTask } = useFiscalTasks(filters);
 
