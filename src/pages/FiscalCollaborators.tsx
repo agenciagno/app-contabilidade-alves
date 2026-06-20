@@ -189,6 +189,68 @@ export default function FiscalCollaborators() {
         </Button>
       </div>
 
+      {distribution.most && distribution.least && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Gauge className="w-5 h-5 text-primary" />
+              Distribuição de Carga
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Mais sobrecarregado</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-sm truncate">{distribution.most.name}</span>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-[10px]',
+                      distribution.most.pct > 100
+                        ? 'bg-red-500/10 text-red-600 border-red-500/30'
+                        : distribution.most.pct > 80
+                        ? 'bg-yellow-500/10 text-yellow-700 border-yellow-500/30'
+                        : 'bg-green-500/10 text-green-600 border-green-500/30'
+                    )}
+                  >
+                    {distribution.most.pct}% da capacidade
+                  </Badge>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Mais disponível</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-sm truncate">{distribution.least.name}</span>
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] bg-green-500/10 text-green-600 border-green-500/30"
+                  >
+                    {distribution.least.pct}% da capacidade
+                  </Badge>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Média da equipe</p>
+                <div className="flex items-center gap-2">
+                  <Progress value={Math.min(distribution.avg, 100)} className="h-2 flex-1" />
+                  <span className="text-sm font-medium tabular-nums">{distribution.avg}%</span>
+                </div>
+              </div>
+            </div>
+            {distribution.spread > 40 && (
+              <Alert className="bg-yellow-500/10 border-yellow-500/40">
+                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                <AlertDescription>
+                  Distribuição desbalanceada — considerar redistribuição (diferença de {distribution.spread} pontos
+                  percentuais entre o mais e o menos carregado).
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Colaboradores Ativos</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
