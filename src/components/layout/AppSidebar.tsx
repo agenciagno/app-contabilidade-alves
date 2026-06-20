@@ -127,6 +127,7 @@ const menuEntries: MenuEntry[] = [
       { title: 'Calendário Fiscal', url: '/fiscal/calendario', icon: CalendarClock, iconName: 'calendar-clock' },
       { title: 'Colaboradores', url: '/fiscal/colaboradores', icon: UsersRound, iconName: 'users-round' },
       { title: 'Notificações', url: '/fiscal/notificacoes', icon: Bell, iconName: 'bell' },
+      { title: 'Monitor CNPJ', url: '/fiscal/monitor-cnpj', icon: Shield, iconName: 'shield' },
     ],
 
   },
