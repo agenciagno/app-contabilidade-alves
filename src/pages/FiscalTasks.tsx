@@ -520,6 +520,28 @@ export default function FiscalTasks() {
       <div className="flex flex-wrap gap-3 items-center">
 
 
+        {/* Competência */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Competência:</span>
+          <Select value={competenceMonth} onValueChange={setCompetenceMonth}>
+            <SelectTrigger className="h-9 w-[130px] text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map((m, i) => (
+                <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={competenceYear} onValueChange={setCompetenceYear}>
+            <SelectTrigger className="h-9 w-[90px] text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {[2024, 2025, 2026, 2027].map((y) => (
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Date Range */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">De:</span>
