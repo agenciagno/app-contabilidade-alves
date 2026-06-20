@@ -800,7 +800,7 @@ export default function FiscalTasks() {
           onStatusChange={handleStatusChange}
           onTaskClick={handleTaskClick}
           onEdit={handleTaskClick}
-          onDelete={canDelete ? (id) => deleteTask.mutate(id) : undefined}
+          onDelete={canDelete ? (id) => { if (!guardLocked(id)) deleteTask.mutate(id); } : undefined}
           onUploadAttachment={handleUploadAttachment}
           onGroupClick={handleGroupClick}
           profileOptions={!isColaborador ? profileOptions : undefined}
