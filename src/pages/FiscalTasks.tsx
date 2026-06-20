@@ -29,6 +29,7 @@ import { TaskCreateModal } from '@/components/fiscal/TaskCreateModal';
 import { BulkReassignModal } from '@/components/fiscal/BulkReassignModal';
 import { MyDayView } from '@/components/fiscal/MyDayView';
 import { SearchableSelect } from '@/components/fiscal/SearchableSelect';
+import { useClosedPeriodsMap, periodKey } from '@/hooks/useFiscalPeriodStatus';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -235,6 +236,27 @@ export default function FiscalTasks() {
 
   const { tasks, isLoading, createTask, updateTask, deleteTask } = useFiscalTasks(filters);
 
+  // Closed-period guard
+  const { data: closedPeriods } = useClosedPeriodsMap();
+  const isTaskLocked = (task: { id?: string } | string): boolean => {
+    const id = typeof task === 'string' ? task : task?.id;
+    if (!id || !closedPeriods || closedPeriods.size === 0) return false;
+    const t = tasks.find((x) => x.id === id) as any;
+    if (!t) return false;
+    return closedPeriods.has(periodKey(t.competence_year, t.competence_month));
+  };
+  const guardLocked = (task: { id?: string } | string): boolean => {
+    if (isTaskLocked(task)) {
+      toast.error('Competência encerrada — tarefa bloqueada para edição.');
+      return true;
+    }
+    return false;
+  };
+  const isSelectedPeriodClosed =
+    competenceMonth !== 'all' &&
+    !!competenceYear &&
+    !!closedPeriods?.has(`${competenceYear}-${competenceMonth}`);
+
   // Quick filter (cards de KPI no topo)
   type QuickFilter = 'overdue' | 'today' | 'awaiting' | null;
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
@@ -304,11 +326,13 @@ export default function FiscalTasks() {
   }, [companyProfiles]);
 
   const handleStatusChange = (taskId: string, newStatus: string) => {
+    if (guardLocked(taskId)) return;
     updateTask.mutate({ id: taskId, status: newStatus as FiscalTask['status'] });
   };
 
   const handleUploadAttachment = async (task: FiscalTask, file: File) => {
     if (!companyId) return;
+    if (guardLocked(task.id)) return;
     try {
       const ext = file.name.split('.').pop();
       const path = `fiscal/${companyId}/${task.id}/${Date.now()}.${ext}`;
@@ -393,6 +417,11 @@ export default function FiscalTasks() {
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedTaskIds);
     if (ids.length === 0) return;
+    const lockedIds = ids.filter((id) => isTaskLocked(id));
+    if (lockedIds.length > 0) {
+      toast.error(`${lockedIds.length} tarefa(s) pertencem a competência encerrada e não podem ser excluídas.`);
+      return;
+    }
     const { error } = await supabase.from('fiscal_tasks').delete().in('id', ids);
     if (error) {
       toast.error(error.message);
@@ -404,6 +433,7 @@ export default function FiscalTasks() {
   };
 
   const handleInlineReassign = async (taskId: string, newId: string) => {
+    if (guardLocked(taskId)) return;
     try {
       await updateTask.mutateAsync({ id: taskId, responsible_id: newId });
       const name = profileOptions.find((p) => p.id === newId)?.name ?? 'colaborador';
@@ -463,6 +493,14 @@ export default function FiscalTasks() {
           </Button>
         )}
       </div>
+
+      {isSelectedPeriodClosed && (
+        <div className="flex items-center gap-2 rounded-md border border-muted-foreground/30 bg-muted px-3 py-2 text-sm text-muted-foreground">
+          <span className="font-medium">Competência encerrada.</span>
+          As tarefas deste período estão bloqueadas para edição.
+        </div>
+      )}
+
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -770,7 +808,7 @@ export default function FiscalTasks() {
           onStatusChange={handleStatusChange}
           onTaskClick={handleTaskClick}
           onEdit={handleTaskClick}
-          onDelete={canDelete ? (id) => deleteTask.mutate(id) : undefined}
+          onDelete={canDelete ? (id) => { if (!guardLocked(id)) deleteTask.mutate(id); } : undefined}
           onUploadAttachment={handleUploadAttachment}
           onGroupClick={handleGroupClick}
           profileOptions={!isColaborador ? profileOptions : undefined}
@@ -827,7 +865,7 @@ export default function FiscalTasks() {
             contactsMap={contactsMap}
             profilesMap={profilesMap}
             onTaskClick={handleTaskClick}
-            onDelete={id => deleteTask.mutate(id)}
+            onDelete={id => { if (!guardLocked(id)) deleteTask.mutate(id); }}
             canDelete={canDelete}
             selectedIds={selectedTaskIds}
             onToggleSelected={toggleSelected}
@@ -864,8 +902,8 @@ export default function FiscalTasks() {
         task={selectedTask}
         contacts={fiscalContacts.map((c: any) => ({ id: c.id, name: c.name }))}
         profiles={companyProfiles}
-        onUpdate={(id, data) => updateTask.mutate({ id, ...data })}
-        onDelete={id => deleteTask.mutate(id)}
+        onUpdate={(id, data) => { if (!guardLocked(id)) updateTask.mutate({ id, ...data }); }}
+        onDelete={id => { if (!guardLocked(id)) deleteTask.mutate(id); }}
         groupTasks={selectedGroupTasks}
         onUploadForTask={handleUploadAttachment}
       />
