@@ -137,6 +137,9 @@ export default function FiscalTasks() {
   const [filterContact, setFilterContact] = useState('all');
   const [filterResponsible, setFilterResponsible] = useState('all');
   const [filterObligation, setFilterObligation] = useState('all');
+  const now = new Date();
+  const [competenceMonth, setCompetenceMonth] = useState<string>(String(now.getMonth() + 1));
+  const [competenceYear, setCompetenceYear] = useState<string>(String(now.getFullYear()));
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
 
   // Pre-populate responsible from URL (?responsible=<profileId>)
@@ -208,7 +211,9 @@ export default function FiscalTasks() {
     titleSearch: filterObligation !== 'all'
       ? (obligations.find((o) => o.id === filterObligation)?.name)
       : undefined,
-  }), [startDate, endDate, filterContact, filterResponsible, filterObligation, obligations]);
+    competenceMonth: competenceMonth !== 'all' ? Number(competenceMonth) : null,
+    competenceYear: competenceYear ? Number(competenceYear) : null,
+  }), [startDate, endDate, filterContact, filterResponsible, filterObligation, obligations, competenceMonth, competenceYear]);
 
   const { tasks, isLoading, createTask, updateTask, deleteTask } = useFiscalTasks(filters);
 
@@ -216,19 +221,13 @@ export default function FiscalTasks() {
   type QuickFilter = 'overdue' | 'today' | 'awaiting' | null;
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
 
-  // KPIs do mês corrente (respeita os filtros globais já aplicados em `tasks`)
+  // KPIs (respeita filtros globais já aplicados em `tasks`, incluindo competência)
   const kpis = useMemo(() => {
-    const today = new Date();
-    const todayStr = format(today, 'yyyy-MM-dd');
-    const curYear = today.getFullYear();
-    const curMonth = today.getMonth() + 1;
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
     const fiveDaysAgo = new Date();
     fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
 
-    const monthTasks = tasks.filter(
-      (t: any) => t.competence_year === curYear && t.competence_month === curMonth,
-    );
-    const overdue = monthTasks.filter(
+    const overdue = tasks.filter(
       (t) => t.status !== 'concluido' && t.due_date && t.due_date < todayStr,
     ).length;
     const dueToday = tasks.filter(
@@ -240,8 +239,8 @@ export default function FiscalTasks() {
         t.updated_at &&
         new Date(t.updated_at) < fiveDaysAgo,
     ).length;
-    const totalMonth = monthTasks.length;
-    const doneMonth = monthTasks.filter((t) => t.status === 'concluido').length;
+    const totalMonth = tasks.length;
+    const doneMonth = tasks.filter((t) => t.status === 'concluido').length;
     const pct = totalMonth > 0 ? Math.round((doneMonth / totalMonth) * 100) : 0;
     return { overdue, dueToday, awaiting, totalMonth, doneMonth, pct };
   }, [tasks]);
@@ -520,6 +519,28 @@ export default function FiscalTasks() {
       {/* Filters Bar */}
       <div className="flex flex-wrap gap-3 items-center">
 
+
+        {/* Competência */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Competência:</span>
+          <Select value={competenceMonth} onValueChange={setCompetenceMonth}>
+            <SelectTrigger className="h-9 w-[130px] text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map((m, i) => (
+                <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={competenceYear} onValueChange={setCompetenceYear}>
+            <SelectTrigger className="h-9 w-[90px] text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {[2024, 2025, 2026, 2027].map((y) => (
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* Date Range */}
         <div className="flex items-center gap-2">
