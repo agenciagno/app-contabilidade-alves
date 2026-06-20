@@ -2,12 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowRightLeft, UserCheck, ChevronDown } from 'lucide-react';
+import { ArrowRightLeft, UserCheck, ChevronDown, AlertTriangle, Gauge } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
 import {
@@ -19,8 +21,40 @@ import {
 import { useTransferHistory } from '@/hooks/useTemporaryTransfers';
 import { TransferTemporaryModal } from '@/components/fiscal/TransferTemporaryModal';
 import { TransferHistoryPanel } from '@/components/fiscal/TransferHistoryPanel';
+import { supabase } from '@/integrations/supabase/client';
 
 import { cn } from '@/lib/utils';
+
+const CAPACITY = 50;
+
+function loadColor(pct: number) {
+  if (pct > 100) return { bar: 'bg-red-500', text: 'text-red-600 dark:text-red-400' };
+  if (pct > 70) return { bar: 'bg-yellow-500', text: 'text-yellow-600 dark:text-yellow-400' };
+  return { bar: 'bg-green-500', text: 'text-green-600 dark:text-green-400' };
+}
+
+function useWorkloadByProfile(companyId: string | undefined, year: number, month: number) {
+  return useQuery<Record<string, number>>({
+    queryKey: ['workload-by-profile', companyId, year, month],
+    enabled: !!companyId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('fiscal_tasks')
+        .select('responsible_id')
+        .eq('company_id', companyId)
+        .eq('competence_year', year)
+        .eq('competence_month', month)
+        .neq('status', 'concluido');
+      if (error) throw error;
+      const map: Record<string, number> = {};
+      (data ?? []).forEach((r: any) => {
+        if (!r.responsible_id) return;
+        map[r.responsible_id] = (map[r.responsible_id] ?? 0) + 1;
+      });
+      return map;
+    },
+  });
+}
 
 const STATUS_BADGE: Record<string, string> = {
   a_fazer: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30',
