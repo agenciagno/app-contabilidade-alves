@@ -212,6 +212,59 @@ export default function FiscalTasks() {
 
   const { tasks, isLoading, createTask, updateTask, deleteTask } = useFiscalTasks(filters);
 
+  // Quick filter (cards de KPI no topo)
+  type QuickFilter = 'overdue' | 'today' | 'awaiting' | null;
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>(null);
+
+  // KPIs do mês corrente (respeita os filtros globais já aplicados em `tasks`)
+  const kpis = useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    const curYear = today.getFullYear();
+    const curMonth = today.getMonth() + 1;
+    const fiveDaysAgo = new Date();
+    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+
+    const monthTasks = tasks.filter(
+      (t: any) => t.competence_year === curYear && t.competence_month === curMonth,
+    );
+    const overdue = monthTasks.filter(
+      (t) => t.status !== 'concluido' && t.due_date && t.due_date < todayStr,
+    ).length;
+    const dueToday = tasks.filter(
+      (t) => t.status !== 'concluido' && t.due_date === todayStr,
+    ).length;
+    const awaiting = tasks.filter(
+      (t) =>
+        t.status === 'aguardando_cliente' &&
+        t.updated_at &&
+        new Date(t.updated_at) < fiveDaysAgo,
+    ).length;
+    const totalMonth = monthTasks.length;
+    const doneMonth = monthTasks.filter((t) => t.status === 'concluido').length;
+    const pct = totalMonth > 0 ? Math.round((doneMonth / totalMonth) * 100) : 0;
+    return { overdue, dueToday, awaiting, totalMonth, doneMonth, pct };
+  }, [tasks]);
+
+  // Aplica quick filter em cima dos `tasks` já filtrados
+  const displayedTasks = useMemo(() => {
+    if (!quickFilter) return tasks;
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    if (quickFilter === 'overdue') {
+      return tasks.filter(
+        (t) => t.status !== 'concluido' && t.due_date && t.due_date < todayStr,
+      );
+    }
+    if (quickFilter === 'today') {
+      return tasks.filter((t) => t.due_date === todayStr);
+    }
+    if (quickFilter === 'awaiting') {
+      return tasks.filter((t) => t.status === 'aguardando_cliente');
+    }
+    return tasks;
+  }, [tasks, quickFilter]);
+
+
   // Only contacts eligible for the Fiscal module (active + tax regime set)
   const fiscalContacts = useMemo(
     () => (contacts ?? []).filter((c: any) => isContactFiscalEligible(c)),
