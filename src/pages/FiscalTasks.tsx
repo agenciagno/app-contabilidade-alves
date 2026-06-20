@@ -857,7 +857,7 @@ export default function FiscalTasks() {
             contactsMap={contactsMap}
             profilesMap={profilesMap}
             onTaskClick={handleTaskClick}
-            onDelete={id => deleteTask.mutate(id)}
+            onDelete={id => { if (!guardLocked(id)) deleteTask.mutate(id); }}
             canDelete={canDelete}
             selectedIds={selectedTaskIds}
             onToggleSelected={toggleSelected}
