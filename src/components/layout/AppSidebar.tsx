@@ -285,7 +285,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {entry.items
-                .filter((item) => (!['/fiscal/calendario', '/fiscal/dashboard', '/fiscal/colaboradores', '/fiscal/notificacoes'].includes(item.url)) || isAdmin || isSuperAdmin)
+                .filter((item) => (!['/fiscal/calendario', '/fiscal/dashboard', '/fiscal/colaboradores', '/fiscal/notificacoes', '/fiscal/monitor-cnpj'].includes(item.url)) || isAdmin || isSuperAdmin)
                 .map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild tooltip={item.title}>
