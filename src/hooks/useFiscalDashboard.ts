@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export interface FiscalTaskRow {
   id: string;
   status: string;
+  title?: string | null;
   due_date: string | null;
   fiscal_due_date: string | null;
   completed_at: string | null;
@@ -15,6 +16,7 @@ export interface FiscalTaskRow {
   responsible_id: string | null;
   contact_id: string | null;
   contacts?: { tax_regime: string | null; name?: string | null } | null;
+  fiscal_obligations_catalog?: { name: string | null } | null;
 }
 
 export interface CollaboratorRow {
