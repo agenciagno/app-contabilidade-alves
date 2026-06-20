@@ -201,6 +201,12 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  // Completion flow
+  const [completionOpen, setCompletionOpen] = useState(false);
+  const [completionType, setCompletionType] = useState<'attachment' | 'protocol' | 'transmitted'>('attachment');
+  const [protocolNumber, setProtocolNumber] = useState('');
+  const [completionNotesInput, setCompletionNotesInput] = useState('');
+
   useEffect(() => {
     if (task) {
       setTitle(task.title);
@@ -211,6 +217,10 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
       setNotesRaw(task.notes ?? null);
       setNewNote('');
       setAttachmentUrl(task.attachment_url);
+      setCompletionOpen(false);
+      setCompletionType('attachment');
+      setProtocolNumber('');
+      setCompletionNotesInput('');
     }
   }, [task]);
 
