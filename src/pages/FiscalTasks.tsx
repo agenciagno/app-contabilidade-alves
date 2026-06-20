@@ -904,6 +904,15 @@ export default function FiscalTasks() {
         isLoading={createTask.isPending}
       />
 
+      {/* Bulk Complete Modal */}
+      <BulkCompleteDialog
+        open={bulkCompleteOpen}
+        onOpenChange={setBulkCompleteOpen}
+        companyId={companyId}
+        year={competenceYear ? Number(competenceYear) : new Date().getFullYear()}
+        month={competenceMonth !== 'all' ? Number(competenceMonth) : new Date().getMonth() + 1}
+      />
+
       {/* Detail Modal */}
       <TaskDetailModal
         open={detailOpen}
