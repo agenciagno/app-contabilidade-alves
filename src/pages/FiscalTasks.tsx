@@ -137,6 +137,9 @@ export default function FiscalTasks() {
   const [filterContact, setFilterContact] = useState('all');
   const [filterResponsible, setFilterResponsible] = useState('all');
   const [filterObligation, setFilterObligation] = useState('all');
+  const now = new Date();
+  const [competenceMonth, setCompetenceMonth] = useState<string>(String(now.getMonth() + 1));
+  const [competenceYear, setCompetenceYear] = useState<string>(String(now.getFullYear()));
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
 
   // Pre-populate responsible from URL (?responsible=<profileId>)
