@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format, isValid, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Plus, Kanban, List, CalendarDays, CalendarIcon, X, ArrowRightLeft, Trash2, Bookmark, BookmarkPlus } from 'lucide-react';
+import { Plus, Kanban, List, CalendarDays, CalendarIcon, X, ArrowRightLeft, Trash2, Bookmark, BookmarkPlus, Target } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ import { TaskCalendarView } from '@/components/fiscal/TaskCalendarView';
 import { TaskDetailModal } from '@/components/fiscal/TaskDetailModal';
 import { TaskCreateModal } from '@/components/fiscal/TaskCreateModal';
 import { BulkReassignModal } from '@/components/fiscal/BulkReassignModal';
+import { MyDayView } from '@/components/fiscal/MyDayView';
 import { SearchableSelect } from '@/components/fiscal/SearchableSelect';
 import {
   AlertDialog,
@@ -42,7 +43,7 @@ import {
 import { isContactFiscalEligible } from '@/lib/fiscal-filters';
 import { toast } from 'sonner';
 
-type ViewMode = 'kanban' | 'list' | 'calendar';
+type ViewMode = 'myday' | 'kanban' | 'list' | 'calendar';
 
 // DateInput: accepts DD/MM/YYYY typing + popover calendar
 function DateInput({
@@ -140,7 +141,24 @@ export default function FiscalTasks() {
   const now = new Date();
   const [competenceMonth, setCompetenceMonth] = useState<string>(String(now.getMonth() + 1));
   const [competenceYear, setCompetenceYear] = useState<string>(String(now.getFullYear()));
-  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+  const isAdminUser = isAdmin || isSuperAdmin;
+  const [viewMode, setViewMode] = useState<ViewMode>(isAdminUser ? 'kanban' : 'myday');
+
+  // Current user's profile id (responsible_id reference)
+  const { data: currentProfile } = useQuery({
+    queryKey: ['current-profile-fiscal', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('user_id', user!.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+  const myProfileId = currentProfile?.id ?? null;
 
   // Pre-populate responsible from URL (?responsible=<profileId>)
   const [searchParams, setSearchParams] = useSearchParams();
@@ -714,6 +732,9 @@ export default function FiscalTasks() {
         {/* View Toggle */}
         <div className="ml-auto">
           <ToggleGroup type="single" value={viewMode} onValueChange={v => v && setViewMode(v as ViewMode)} className="border border-border/50 rounded-md p-0.5">
+            <ToggleGroupItem value="myday" className="h-8 w-8 p-0" title="Meu Dia">
+              <Target className="h-4 w-4" />
+            </ToggleGroupItem>
             <ToggleGroupItem value="kanban" className="h-8 w-8 p-0" title="Kanban">
               <Kanban className="h-4 w-4" />
             </ToggleGroupItem>
@@ -728,6 +749,19 @@ export default function FiscalTasks() {
       </div>
 
       {/* Views */}
+      {viewMode === 'myday' && (
+        <MyDayView
+          tasks={displayedTasks}
+          contactsMap={contactsMap}
+          profilesMap={profilesMap}
+          myProfileId={myProfileId}
+          isAdminUser={isAdminUser}
+          onStatusChange={handleStatusChange}
+          onTaskClick={handleTaskClick}
+          onUploadAttachment={handleUploadAttachment}
+        />
+      )}
+
       {viewMode === 'kanban' && (
         <KanbanBoard
           tasks={displayedTasks}
