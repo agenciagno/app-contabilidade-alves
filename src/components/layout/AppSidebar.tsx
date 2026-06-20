@@ -22,6 +22,7 @@ import {
   UsersRound,
   LockKeyhole,
   Bell,
+  Shield,
   type LucideIcon,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
@@ -126,6 +127,7 @@ const menuEntries: MenuEntry[] = [
       { title: 'Calendário Fiscal', url: '/fiscal/calendario', icon: CalendarClock, iconName: 'calendar-clock' },
       { title: 'Colaboradores', url: '/fiscal/colaboradores', icon: UsersRound, iconName: 'users-round' },
       { title: 'Notificações', url: '/fiscal/notificacoes', icon: Bell, iconName: 'bell' },
+      { title: 'Monitor CNPJ', url: '/fiscal/monitor-cnpj', icon: Shield, iconName: 'shield' },
     ],
 
   },
@@ -283,7 +285,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {entry.items
-                .filter((item) => (!['/fiscal/calendario', '/fiscal/dashboard', '/fiscal/colaboradores', '/fiscal/notificacoes'].includes(item.url)) || isAdmin || isSuperAdmin)
+                .filter((item) => (!['/fiscal/calendario', '/fiscal/dashboard', '/fiscal/colaboradores', '/fiscal/notificacoes', '/fiscal/monitor-cnpj'].includes(item.url)) || isAdmin || isSuperAdmin)
                 .map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild tooltip={item.title}>
