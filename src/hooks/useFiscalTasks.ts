@@ -100,6 +100,12 @@ export function useFiscalTasks(filters: FiscalTaskFilters = {}) {
       if (filters.titleSearch) {
         query = query.ilike('title', `%${filters.titleSearch}%`);
       }
+      if (filters.competenceMonth) {
+        query = query.eq('competence_month', filters.competenceMonth);
+      }
+      if (filters.competenceYear) {
+        query = query.eq('competence_year', filters.competenceYear);
+      }
 
       const { data, error } = await query;
       if (error) throw error;
