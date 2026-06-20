@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export interface FiscalTaskRow {
   id: string;
   status: string;
+  title?: string | null;
   due_date: string | null;
   fiscal_due_date: string | null;
   completed_at: string | null;
@@ -15,6 +16,7 @@ export interface FiscalTaskRow {
   responsible_id: string | null;
   contact_id: string | null;
   contacts?: { tax_regime: string | null; name?: string | null } | null;
+  fiscal_obligations_catalog?: { name: string | null } | null;
 }
 
 export interface CollaboratorRow {
@@ -85,7 +87,7 @@ export function useFiscalTasksOfMonth(year: number, month: number) {
     queryFn: async () => {
       let q = (supabase as any)
         .from('fiscal_tasks')
-        .select('id, status, due_date, fiscal_due_date, completed_at, created_at, responsible_id, contact_id, contacts(tax_regime, name)')
+        .select('id, status, title, due_date, fiscal_due_date, completed_at, created_at, responsible_id, contact_id, contacts(tax_regime, name), fiscal_obligations_catalog(name)')
         .eq('company_id', companyId)
         .eq('competence_year', year)
         .eq('competence_month', month);

@@ -8,10 +8,12 @@ import {
   ArrowUp,
   ArrowUpDown,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Download,
   ListChecks,
   RefreshCw,
+  ShieldAlert,
   TrendingUp,
 } from 'lucide-react';
 import {
@@ -49,6 +51,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 
 import { useUserRole } from '@/hooks/useUserRole';
@@ -210,6 +213,184 @@ function StatusBadge({ status, isLate }: { status: string; isLate: boolean }) {
   if (status === 'a_fazer') return <Badge className="bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/20">A Fazer</Badge>;
   if (status === 'concluido') return <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20">Concluído</Badge>;
   return <Badge variant="secondary">{status}</Badge>;
+}
+
+type RiskBand = 'critico' | 'atencao' | 'regular';
+
+interface RiskClient {
+  contact_id: string;
+  name: string;
+  atrasadas: number;
+  oldestObligation: string | null;
+  oldestDueDate: string | null;
+  daysLate: number;
+}
+
+function RiskRadarCard({
+  tasks,
+  today,
+  onClientClick,
+  onSeeAll,
+}: {
+  tasks: FiscalTaskRow[];
+  today: string;
+  onClientClick: (contactId: string) => void;
+  onSeeAll: () => void;
+}) {
+  const [openBand, setOpenBand] = useState<RiskBand | null>(null);
+
+  const { critico, atencao, regular } = useMemo(() => {
+    const byContact = new Map<string, { name: string; atrasadasList: FiscalTaskRow[]; hasAny: boolean }>();
+    tasks.forEach((t) => {
+      if (!t.contact_id) return;
+      const name = t.contacts?.name ?? '—';
+      const entry = byContact.get(t.contact_id) ?? { name, atrasadasList: [], hasAny: false };
+      entry.hasAny = true;
+      if (isLateTask(t, today)) entry.atrasadasList.push(t);
+      byContact.set(t.contact_id, entry);
+    });
+
+    const buildRow = (contact_id: string, name: string, lates: FiscalTaskRow[]): RiskClient => {
+      const sorted = [...lates].sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? ''));
+      const oldest = sorted[0];
+      const daysLate = oldest?.due_date ? differenceInDays(parseISO(today), parseISO(oldest.due_date)) : 0;
+      return {
+        contact_id,
+        name,
+        atrasadas: lates.length,
+        oldestObligation: oldest?.fiscal_obligations_catalog?.name ?? oldest?.title ?? null,
+        oldestDueDate: oldest?.due_date ?? null,
+        daysLate,
+      };
+    };
+
+    const critico: RiskClient[] = [];
+    const atencao: RiskClient[] = [];
+    const regular: RiskClient[] = [];
+    byContact.forEach((v, k) => {
+      const row = buildRow(k, v.name, v.atrasadasList);
+      if (row.atrasadas >= 3) critico.push(row);
+      else if (row.atrasadas >= 1) atencao.push(row);
+      else regular.push(row);
+    });
+
+    critico.sort((a, b) => b.atrasadas - a.atrasadas || b.daysLate - a.daysLate);
+    atencao.sort((a, b) => b.atrasadas - a.atrasadas || b.daysLate - a.daysLate);
+    regular.sort((a, b) => a.name.localeCompare(b.name));
+    return { critico, atencao, regular };
+  }, [tasks, today]);
+
+  const bands: Array<{
+    key: RiskBand;
+    icon: string;
+    label: string;
+    list: RiskClient[];
+    color: string;
+    bg: string;
+  }> = [
+    { key: 'critico', icon: '🔴', label: 'Crítico', list: critico, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10 hover:bg-red-500/15 border-red-500/30' },
+    { key: 'atencao', icon: '🟡', label: 'Atenção', list: atencao, color: 'text-yellow-700 dark:text-yellow-400', bg: 'bg-yellow-500/10 hover:bg-yellow-500/15 border-yellow-500/30' },
+    { key: 'regular', icon: '🟢', label: 'Regular', list: regular, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-500/10 hover:bg-green-500/15 border-green-500/30' },
+  ];
+
+  const active = bands.find((b) => b.key === openBand);
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <ShieldAlert className="h-5 w-5 text-orange-500" />
+          Radar de Risco
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {bands.map((b) => (
+            <button
+              key={b.key}
+              type="button"
+              onClick={() => setOpenBand(openBand === b.key ? null : b.key)}
+              className={cn(
+                'flex items-center justify-between rounded-md border px-4 py-3 transition-colors text-left',
+                b.bg,
+                openBand === b.key && 'ring-2 ring-offset-1 ring-offset-background ring-current'
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-lg leading-none">{b.icon}</span>
+                <span className={cn('text-sm font-medium', b.color)}>{b.label}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={cn('text-2xl font-semibold', b.color)}>{b.list.length}</span>
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 text-muted-foreground transition-transform',
+                    openBand === b.key && 'rotate-180'
+                  )}
+                />
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <Collapsible open={!!active}>
+          <CollapsibleContent>
+            {active && (
+              <div className="mt-2 rounded-md border bg-muted/30">
+                {active.list.length === 0 ? (
+                  <div className="p-4 text-sm text-muted-foreground text-center">
+                    Nenhum cliente nesta faixa.
+                  </div>
+                ) : (
+                  <>
+                    <div className="divide-y">
+                      {active.list.slice(0, 10).map((c) => (
+                        <button
+                          key={c.contact_id}
+                          type="button"
+                          onClick={() => onClientClick(c.contact_id)}
+                          className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-muted/60 text-left"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium truncate">{c.name}</p>
+                            {active.key !== 'regular' && c.oldestObligation && (
+                              <p className="text-xs text-muted-foreground truncate">
+                                Mais antiga: {c.oldestObligation}
+                                {c.oldestDueDate && ` — ${format(parseISO(c.oldestDueDate), 'dd/MM/yyyy')}`}
+                              </p>
+                            )}
+                          </div>
+                          {active.key !== 'regular' ? (
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Badge variant="secondary" className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">
+                                {c.atrasadas} atrasada{c.atrasadas > 1 ? 's' : ''}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {c.daysLate}d
+                              </Badge>
+                            </div>
+                          ) : (
+                            <Badge variant="outline" className="text-xs shrink-0">Em dia</Badge>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    {active.list.length > 10 && (
+                      <div className="p-2 border-t flex justify-end">
+                        <Button variant="ghost" size="sm" onClick={onSeeAll}>
+                          Ver todos ({active.list.length})
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function FiscalDashboard() {
@@ -403,6 +584,14 @@ export default function FiscalDashboard() {
           hasPrevious={prevCompliance.total > 0}
         />
       </div>
+
+      {/* Risk Radar */}
+      <RiskRadarCard
+        tasks={tasks}
+        today={today}
+        onClientClick={(id) => navigate(`/fiscal/tarefas?contact=${id}`)}
+        onSeeAll={() => navigate('/fiscal/tarefas?filter=atrasadas')}
+      />
 
       {/* 48h widget */}
       <Card>
