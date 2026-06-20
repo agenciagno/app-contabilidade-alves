@@ -141,7 +141,24 @@ export default function FiscalTasks() {
   const now = new Date();
   const [competenceMonth, setCompetenceMonth] = useState<string>(String(now.getMonth() + 1));
   const [competenceYear, setCompetenceYear] = useState<string>(String(now.getFullYear()));
-  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+  const isAdminUser = isAdmin || isSuperAdmin;
+  const [viewMode, setViewMode] = useState<ViewMode>(isAdminUser ? 'kanban' : 'myday');
+
+  // Current user's profile id (responsible_id reference)
+  const { data: currentProfile } = useQuery({
+    queryKey: ['current-profile-fiscal', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('user_id', user!.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+  const myProfileId = currentProfile?.id ?? null;
 
   // Pre-populate responsible from URL (?responsible=<profileId>)
   const [searchParams, setSearchParams] = useSearchParams();
