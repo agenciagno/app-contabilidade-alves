@@ -311,14 +311,54 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     toast({ title: '✅ Nota adicionada.' });
   };
 
-  const handleMarkComplete = () => {
-    if (!attachmentUrl) {
-      toast({ title: 'Anexe um arquivo antes de concluir', variant: 'destructive' });
-      return;
+  const handleOpenCompletion = () => {
+    setCompletionType(attachmentUrl ? 'attachment' : 'attachment');
+    setProtocolNumber('');
+    setCompletionNotesInput('');
+    setCompletionOpen(true);
+  };
+
+  const handleConfirmCompletion = () => {
+    if (completionType === 'attachment') {
+      if (!attachmentUrl) {
+        toast({ title: 'Anexe um arquivo antes de concluir', variant: 'destructive' });
+        return;
+      }
+      onUpdate(task.id, {
+        status: 'concluido',
+        completion_type: 'attachment',
+        completed_at: new Date().toISOString(),
+      } as any);
+    } else if (completionType === 'protocol') {
+      const proto = protocolNumber.trim();
+      if (!proto) {
+        toast({ title: 'Informe o número de protocolo', variant: 'destructive' });
+        return;
+      }
+      onUpdate(task.id, {
+        status: 'concluido',
+        completion_type: 'protocol',
+        protocol_number: proto,
+        completion_notes: completionNotesInput.trim() || null,
+        completed_at: new Date().toISOString(),
+      } as any);
+    } else if (completionType === 'transmitted') {
+      const notes = completionNotesInput.trim();
+      if (notes.length < 10) {
+        toast({ title: 'Descreva com pelo menos 10 caracteres', variant: 'destructive' });
+        return;
+      }
+      onUpdate(task.id, {
+        status: 'concluido',
+        completion_type: 'transmitted',
+        completion_notes: notes,
+        completed_at: new Date().toISOString(),
+      } as any);
     }
-    onUpdate(task.id, { status: 'concluido' });
+    setCompletionOpen(false);
     onOpenChange(false);
   };
+
 
 
   const contactName = contacts.find(c => c.id === task.contact_id)?.name || '—';
