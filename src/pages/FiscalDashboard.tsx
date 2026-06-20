@@ -721,6 +721,9 @@ export default function FiscalDashboard() {
       {/* Pendências por Cliente */}
       <ClientPendenciesSection tasks={tasks} today={today} onClientClick={(id) => navigate(`/fiscal/tarefas?contact=${id}`)} />
 
+      {/* Faturamento e Teto SN */}
+      <RevenueLimitsSection year={year} regime={regime} />
+
       {/* Upcoming */}
       <Card>
         <CardHeader><CardTitle className="text-base">Próximos Vencimentos (7 dias)</CardTitle></CardHeader>
