@@ -894,8 +894,8 @@ export default function FiscalTasks() {
         task={selectedTask}
         contacts={fiscalContacts.map((c: any) => ({ id: c.id, name: c.name }))}
         profiles={companyProfiles}
-        onUpdate={(id, data) => updateTask.mutate({ id, ...data })}
-        onDelete={id => deleteTask.mutate(id)}
+        onUpdate={(id, data) => { if (!guardLocked(id)) updateTask.mutate({ id, ...data }); }}
+        onDelete={id => { if (!guardLocked(id)) deleteTask.mutate(id); }}
         groupTasks={selectedGroupTasks}
         onUploadForTask={handleUploadAttachment}
       />
