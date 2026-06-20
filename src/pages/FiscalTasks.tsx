@@ -749,6 +749,19 @@ export default function FiscalTasks() {
       </div>
 
       {/* Views */}
+      {viewMode === 'myday' && (
+        <MyDayView
+          tasks={displayedTasks}
+          contactsMap={contactsMap}
+          profilesMap={profilesMap}
+          myProfileId={myProfileId}
+          isAdminUser={isAdminUser}
+          onStatusChange={handleStatusChange}
+          onTaskClick={handleTaskClick}
+          onUploadAttachment={handleUploadAttachment}
+        />
+      )}
+
       {viewMode === 'kanban' && (
         <KanbanBoard
           tasks={displayedTasks}
