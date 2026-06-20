@@ -87,7 +87,7 @@ export function useFiscalTasksOfMonth(year: number, month: number) {
     queryFn: async () => {
       let q = (supabase as any)
         .from('fiscal_tasks')
-        .select('id, status, due_date, fiscal_due_date, completed_at, created_at, responsible_id, contact_id, contacts(tax_regime, name)')
+        .select('id, status, title, due_date, fiscal_due_date, completed_at, created_at, responsible_id, contact_id, contacts(tax_regime, name), fiscal_obligations_catalog(name)')
         .eq('company_id', companyId)
         .eq('competence_year', year)
         .eq('competence_month', month);
