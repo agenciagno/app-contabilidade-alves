@@ -141,6 +141,7 @@ interface TeamNote {
   profile_name: string;
   text: string;
   created_at: string;
+  mentions?: { profile_id: string; name: string }[];
   legacy?: boolean;
 }
 
@@ -156,6 +157,7 @@ function parseNotes(raw: string | null, legacyDate: string): TeamNote[] {
         profile_name: n.profile_name || '—',
         text: String(n.text),
         created_at: n.created_at || legacyDate,
+        mentions: Array.isArray(n.mentions) ? n.mentions : undefined,
       }));
     }
   } catch { /* fallthrough to legacy */ }
@@ -164,6 +166,31 @@ function parseNotes(raw: string | null, legacyDate: string): TeamNote[] {
 
 function initialsOf(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
+}
+
+// Renders note text with @mentions highlighted
+function renderNoteText(text: string, mentions: { name: string }[] = []) {
+  if (!mentions.length) return <>{text}</>;
+  const names = mentions.map((m) => m.name).sort((a, b) => b.length - a.length);
+  const pattern = new RegExp(`@(${names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'g');
+  const parts: (string | { mention: string })[] = [];
+  let lastIdx = 0;
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(text)) !== null) {
+    if (m.index > lastIdx) parts.push(text.slice(lastIdx, m.index));
+    parts.push({ mention: m[0] });
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) parts.push(text.slice(lastIdx));
+  return (
+    <>
+      {parts.map((p, i) =>
+        typeof p === 'string'
+          ? <span key={i}>{p}</span>
+          : <span key={i} className="text-primary font-medium">{p.mention}</span>
+      )}
+    </>
+  );
 }
 
 interface TaskDetailModalProps {
