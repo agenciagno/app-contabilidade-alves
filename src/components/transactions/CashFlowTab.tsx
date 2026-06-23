@@ -36,6 +36,7 @@ interface CashFlowTabProps {
   categories: Category[];
   contacts: Contact[];
   togglePaid: { mutate: (args: { id: string; is_paid: boolean }) => void };
+  mode?: 'all' | 'receivables';
 }
 
 function formatCurrency(value: number) {
