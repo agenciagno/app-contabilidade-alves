@@ -786,7 +786,7 @@ export function CashFlowReportModal({
     const emittedAt = `Emitido em ${pad2(today.getDate())}/${pad2(today.getMonth() + 1)}/${today.getFullYear()} às ${pad2(today.getHours())}:${pad2(today.getMinutes())}`;
 
     doc.setFontSize(13); doc.setFont('helvetica', 'bold');
-    doc.text('${isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber'}', 14, 18);
+    doc.text(isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber', 14, 18);
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
     doc.text(`Período: ${monthlyMonthsLabel} / ${monthlyYear} • ${monthlyStatusLabel}`, 14, 25);
     const tableStartY = 32;
