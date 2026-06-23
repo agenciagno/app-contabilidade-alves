@@ -613,7 +613,8 @@ export function CashFlowReportModal({
       });
     }
 
-    doc.save(`contas-pagar-receber-${startDate || 'geral'}-${endDate || 'geral'}.pdf`);
+    const filePrefix = isReceivables ? 'a-receber' : 'contas-pagar-receber';
+    doc.save(`${filePrefix}-${startDate || 'geral'}-${endDate || 'geral'}.pdf`);
   };
 
   // ─── XLS Export ───────────────────────────────────────────────────
