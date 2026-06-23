@@ -773,7 +773,7 @@ export function CashFlowReportModal({
       const url = canvas.toDataURL('image/jpeg', 0.92);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `resumo-pagar-receber-${startDate || 'geral'}-${endDate || 'geral'}.jpg`;
+      a.download = `${isReceivables ? 'resumo-a-receber' : 'resumo-pagar-receber'}-${startDate || 'geral'}-${endDate || 'geral'}.jpg`;
       a.click();
     } catch (err) {
       console.error('Erro ao gerar imagem:', err);
