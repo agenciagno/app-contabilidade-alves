@@ -226,15 +226,15 @@ export function CashFlowReportModal({
 
   const availableYears = useMemo(() => {
     const years = new Set<number>([currentYear]);
-    for (const t of transactions) {
-      const ref = t.is_paid ? t.date : t.expected_date;
+    for (const t of txns) {
+      const ref = t.is_paid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
       if (ref) {
         const y = parseInt(ref.slice(0, 4), 10);
         if (!Number.isNaN(y)) years.add(y);
       }
     }
     return Array.from(years).sort((a, b) => b - a);
-  }, [transactions, currentYear]);
+  }, [txns, currentYear, isReceivables]);
 
   const sortedSelectedMonths = useMemo(
     () => Array.from(monthlyMonths).sort((a, b) => a - b),
