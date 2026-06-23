@@ -328,6 +328,28 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
             </div>
           )}
 
+          {isEditMode && (
+            <div className="space-y-2 pt-2 border-t">
+              <Label htmlFor="newPassword">Redefinir senha (opcional)</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="newPassword"
+                  type={showNewPassword ? 'text' : 'password'}
+                  placeholder="Deixe em branco para não alterar"
+                  className="pl-10 pr-10"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+                <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {newPassword && <PasswordStrength password={newPassword} />}
+            </div>
+          )}
+
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancelar
