@@ -164,16 +164,26 @@ export function CashFlowReportModal({
   const activeBanks = useMemo(() => banks.filter(b => b.is_active), [banks]);
   const totalBankBalance = useMemo(() => activeBanks.reduce((s, b) => s + Number(b.current_balance), 0), [activeBanks]);
 
-  // Filter: same strict rule as CashFlowTab — only !is_paid && expected_date not null
+  // Pre-filter: in receivables mode, only "A Receber" entries (receita > 0) — mirrors CashFlowTab
+  const txns = useMemo(() => {
+    if (!isReceivables) return transactions;
+    return transactions.filter(t => t.type === 'receita' && Number(t.amount) > 0);
+  }, [transactions, isReceivables]);
+
+  // Date key: receivables ranks by due_date (Vencimento); all ranks by expected_date (Data Prevista)
+  const dateKeyOf = (t: Transaction): string | null =>
+    isReceivables ? (t.due_date || t.expected_date || null) : (t.expected_date || null);
+
+  // Filter: same strict rule as CashFlowTab
   const filteredRows = useMemo(() => {
-    let result = transactions.filter(t => !t.is_paid && t.expected_date);
+    let result = txns.filter(t => !t.is_paid && (isReceivables ? (t.due_date || t.expected_date) : t.expected_date));
 
     if (startDate && endDate) {
       const s = parseISO(startDate);
       const e = parseISO(endDate);
       e.setHours(23, 59, 59, 999);
       result = result.filter(t => {
-        const dateKey = t.expected_date;
+        const dateKey = dateKeyOf(t);
         if (!dateKey) return false;
         const d = parseISO(dateKey);
         return isWithinInterval(d, { start: s, end: e });
@@ -184,9 +194,9 @@ export function CashFlowReportModal({
     if (contactId !== 'all') result = result.filter(t => t.contact_id === contactId);
     if (typeFilter !== 'all') result = result.filter(t => t.type === typeFilter);
 
-    result.sort((a, b) => (a.expected_date || '').localeCompare(b.expected_date || ''));
+    result.sort((a, b) => (dateKeyOf(a) || '').localeCompare(dateKeyOf(b) || ''));
     return result;
-  }, [transactions, startDate, endDate, categoryId, contactId, typeFilter]);
+  }, [txns, startDate, endDate, categoryId, contactId, typeFilter, isReceivables]);
 
   // Running balance rows
   const rowsWithBalance = useMemo(() => {
@@ -216,15 +226,15 @@ export function CashFlowReportModal({
 
   const availableYears = useMemo(() => {
     const years = new Set<number>([currentYear]);
-    for (const t of transactions) {
-      const ref = t.is_paid ? t.date : t.expected_date;
+    for (const t of txns) {
+      const ref = t.is_paid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
       if (ref) {
         const y = parseInt(ref.slice(0, 4), 10);
         if (!Number.isNaN(y)) years.add(y);
       }
     }
     return Array.from(years).sort((a, b) => b - a);
-  }, [transactions, currentYear]);
+  }, [txns, currentYear, isReceivables]);
 
   const sortedSelectedMonths = useMemo(
     () => Array.from(monthlyMonths).sort((a, b) => a - b),
@@ -249,9 +259,9 @@ export function CashFlowReportModal({
   const monthlyMatrix = useMemo(() => {
     // Filter rows by year + status + category
     const isPaid = monthlyStatus === 'paid';
-    const rows = transactions.filter(t => {
+    const rows = txns.filter(t => {
       if (t.is_paid !== isPaid) return false;
-      const ref = isPaid ? t.date : t.expected_date;
+      const ref = isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
       if (!ref) return false;
       if (parseInt(ref.slice(0, 4), 10) !== monthlyYear) return false;
       if (expandedSelectedCategories.size > 0 && !expandedSelectedCategories.has(t.category_id)) return false;
@@ -261,7 +271,7 @@ export function CashFlowReportModal({
     // Aggregate by event/category name
     const map = new Map<string, { name: string; color: string | null; monthly: number[]; total: number }>();
     for (const t of rows) {
-      const ref = isPaid ? t.date : t.expected_date;
+      const ref = isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
       if (!ref) continue;
       const month = parseInt(ref.slice(5, 7), 10) - 1;
       if (!sortedSelectedMonths.includes(month)) continue;
@@ -290,7 +300,7 @@ export function CashFlowReportModal({
       grand += e.total;
     }
     return { events, colTotals, grand };
-  }, [transactions, monthlyYear, monthlyStatus, expandedSelectedCategories, sortedSelectedMonths]);
+  }, [txns, monthlyYear, monthlyStatus, expandedSelectedCategories, sortedSelectedMonths, isReceivables]);
 
   // ─── Hierarchical matrix for "Versão Completa" (Evento → Cliente/Fornecedor) ──
   type HierarchicalEvent = {
@@ -307,9 +317,9 @@ export function CashFlowReportModal({
     const isPaid = monthlyStatus === 'paid';
     const catMap = new Map(categories.map(c => [c.id, c]));
 
-    const rows = transactions.filter(t => {
+    const rows = txns.filter(t => {
       if (t.is_paid !== isPaid) return false;
-      const ref = isPaid ? t.date : t.expected_date;
+      const ref = isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
       if (!ref) return false;
       if (parseInt(ref.slice(0, 4), 10) !== monthlyYear) return false;
       if (expandedSelectedCategories.size > 0 && !expandedSelectedCategories.has(t.category_id)) return false;
@@ -324,7 +334,7 @@ export function CashFlowReportModal({
     }>();
 
     for (const t of rows) {
-      const ref = isPaid ? t.date : t.expected_date;
+      const ref = isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
       if (!ref) continue;
       const month = parseInt(ref.slice(5, 7), 10) - 1;
       if (!sortedSelectedMonths.includes(month)) continue;
@@ -378,7 +388,7 @@ export function CashFlowReportModal({
     }
 
     return { groups, colTotals, grand };
-  }, [monthlyVersion, transactions, monthlyYear, monthlyStatus, expandedSelectedCategories, sortedSelectedMonths, categories]);
+  }, [monthlyVersion, txns, monthlyYear, monthlyStatus, expandedSelectedCategories, sortedSelectedMonths, categories, isReceivables]);
 
   const monthlyCategoryLabel = useMemo(() => {
     if (monthlySelectedCategories.size === 0) return 'Todas';
@@ -404,20 +414,22 @@ export function CashFlowReportModal({
 
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
-    doc.text('Relatório de Contas a Pagar/Receber', 14, 18);
+    doc.text(isReceivables ? 'Relatório de A Receber' : 'Relatório de Contas a Pagar/Receber', 14, 18);
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.text(`Período: ${periodLabel}`, 14, 25);
 
-    // 4 KPI cards
-    const cardW = 63;
+    // KPI cards (4 for all, 3 for receivables)
+    const kpiCount = isReceivables ? 3 : 4;
     const cardH = 14;
     const cardY = 32;
     const gap = 2;
     const padX = 3;
     const labelOffsetY = 6;
     const valueOffsetY = 12;
+    const totalW = 283 - 14; // page content width
+    const cardW = (totalW - gap * (kpiCount - 1)) / kpiCount;
     const col1X = 14;
     const col2X = col1X + cardW + gap;
     const col3X = col2X + cardW + gap;
@@ -439,21 +451,24 @@ export function CashFlowReportModal({
     doc.setFontSize(8); doc.setFont('helvetica', 'bold');
     doc.text(formatCurrency(kpis.entradas), col2X + padX, cardY + valueOffsetY);
 
-    // Saídas
-    doc.setFillColor(255, 245, 245);
-    doc.roundedRect(col3X, cardY, cardW, cardH, 2, 2, 'F');
-    doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(220, 38, 38);
-    doc.text('Saídas', col3X + padX, cardY + labelOffsetY);
-    doc.setFontSize(8); doc.setFont('helvetica', 'bold');
-    doc.text(formatCurrency(kpis.saidas), col3X + padX, cardY + valueOffsetY);
+    if (!isReceivables) {
+      // Saídas
+      doc.setFillColor(255, 245, 245);
+      doc.roundedRect(col3X, cardY, cardW, cardH, 2, 2, 'F');
+      doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(220, 38, 38);
+      doc.text('Saídas', col3X + padX, cardY + labelOffsetY);
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+      doc.text(formatCurrency(kpis.saidas), col3X + padX, cardY + valueOffsetY);
+    }
 
     // Saldos Atuais (Bancos)
+    const lastX = isReceivables ? col3X : col4X;
     doc.setFillColor(245, 245, 255);
-    doc.roundedRect(col4X, cardY, cardW, cardH, 2, 2, 'F');
+    doc.roundedRect(lastX, cardY, cardW, cardH, 2, 2, 'F');
     doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100);
-    doc.text('Saldos Atuais (Bancos)', col4X + padX, cardY + labelOffsetY);
+    doc.text('Saldos Atuais (Bancos)', lastX + padX, cardY + labelOffsetY);
     doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(0);
-    doc.text(formatCurrency(kpis.totalBankBalance), col4X + padX, cardY + valueOffsetY);
+    doc.text(formatCurrency(kpis.totalBankBalance), lastX + padX, cardY + valueOffsetY);
 
     const sepY = cardY + cardH + 4;
     doc.setDrawColor(230, 230, 230); doc.setLineWidth(0.3);
@@ -463,37 +478,59 @@ export function CashFlowReportModal({
     doc.text(`${filteredRows.length} lançamentos • Gerado em ${pad2(today.getDate())}/${pad2(today.getMonth() + 1)}/${today.getFullYear()}`, 14, sepY + 5);
     doc.setTextColor(0);
 
-    // 9 columns: PREVISTA | CLIENTE | RECEBER | PAGAR | VENCIMENTO | EVENTO | HISTÓRICO | SALDO ATUAL | STATUS
+    // Table — in receivables, drop "Prevista" column and only show Vencimento
+    const head = isReceivables
+      ? [['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']]
+      : [['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']];
+    const body = rowsWithBalance.map(r => isReceivables ? [
+      r.contact?.name || r.description,
+      formatCurrency(Number(r.amount)),
+      r.due_date ? formatDateBR(r.due_date) : '',
+      r.category?.name || '',
+      r.notes || '',
+      formatCurrency(r.saldoAtual),
+      getStatus(r.is_paid, r.due_date),
+    ] : [
+      formatDateBR(r.expected_date || ''),
+      r.contact?.name || r.description,
+      r.type === 'receita' ? formatCurrency(Number(r.amount)) : '',
+      r.type === 'despesa' ? formatCurrency(Number(r.amount)) : '',
+      r.due_date ? formatDateBR(r.due_date) : '',
+      r.category?.name || '',
+      r.notes || '',
+      formatCurrency(r.saldoAtual),
+      getStatus(r.is_paid, r.due_date),
+    ]);
+    const columnStyles = isReceivables ? {
+      0: { cellWidth: 50, halign: 'center' as const },
+      1: { cellWidth: 32, halign: 'center' as const },
+      2: { cellWidth: 24, halign: 'center' as const },
+      3: { cellWidth: 36, halign: 'center' as const },
+      4: { cellWidth: 60, halign: 'center' as const },
+      5: { cellWidth: 32, halign: 'center' as const },
+      6: { cellWidth: 18, halign: 'center' as const },
+    } : {
+      0: { cellWidth: 22, halign: 'center' as const },
+      1: { cellWidth: 40, halign: 'center' as const },
+      2: { cellWidth: 26, halign: 'center' as const },
+      3: { cellWidth: 26, halign: 'center' as const },
+      4: { cellWidth: 22, halign: 'center' as const },
+      5: { cellWidth: 30, halign: 'center' as const },
+      6: { cellWidth: 40, halign: 'center' as const },
+      7: { cellWidth: 28, halign: 'center' as const },
+      8: { cellWidth: 18, halign: 'center' as const },
+    };
+
     autoTable(doc, {
       startY: sepY + 10,
-      head: [['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']],
-      body: rowsWithBalance.map(r => [
-        formatDateBR(r.expected_date || ''),
-        r.contact?.name || r.description,
-        r.type === 'receita' ? formatCurrency(Number(r.amount)) : '',
-        r.type === 'despesa' ? formatCurrency(Number(r.amount)) : '',
-        r.due_date ? formatDateBR(r.due_date) : '',
-        r.category?.name || '',
-        r.notes || '',
-        formatCurrency(r.saldoAtual),
-        getStatus(r.is_paid, r.due_date),
-      ]),
+      head,
+      body,
       theme: 'striped',
       styles: { fontSize: 7, cellPadding: 1.5, halign: 'center' },
       headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold', fontSize: 6.5, halign: 'center' },
       alternateRowStyles: { fillColor: [248, 248, 248] },
       rowPageBreak: 'avoid',
-      columnStyles: {
-        0: { cellWidth: 22, halign: 'center' },
-        1: { cellWidth: 40, halign: 'center' },
-        2: { cellWidth: 26, halign: 'center' },
-        3: { cellWidth: 26, halign: 'center' },
-        4: { cellWidth: 22, halign: 'center' },
-        5: { cellWidth: 30, halign: 'center' },
-        6: { cellWidth: 40, halign: 'center' },
-        7: { cellWidth: 28, halign: 'center' },
-        8: { cellWidth: 18, halign: 'center' },
-      },
+      columnStyles,
       didDrawPage: (data) => {
         const pageCount = (doc as any).internal.getNumberOfPages();
         const pageHeight = doc.internal.pageSize.height;
@@ -576,13 +613,25 @@ export function CashFlowReportModal({
       });
     }
 
-    doc.save(`contas-pagar-receber-${startDate || 'geral'}-${endDate || 'geral'}.pdf`);
+    const filePrefix = isReceivables ? 'a-receber' : 'contas-pagar-receber';
+    doc.save(`${filePrefix}-${startDate || 'geral'}-${endDate || 'geral'}.pdf`);
   };
 
   // ─── XLS Export ───────────────────────────────────────────────────
   const exportXLS = () => {
-    const headers = ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status'];
-    const tableRows = rowsWithBalance.map(r => [
+    const headers = isReceivables
+      ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']
+      : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status'];
+    const colSpan = headers.length;
+    const tableRows = rowsWithBalance.map(r => isReceivables ? [
+      r.contact?.name || r.description || '',
+      Number(r.amount).toFixed(2).replace('.', ','),
+      r.due_date ? formatDateBR(r.due_date) : '',
+      r.category?.name || '',
+      r.notes || '',
+      r.saldoAtual.toFixed(2).replace('.', ','),
+      getStatus(r.is_paid, r.due_date),
+    ] : [
       formatDateBR(r.expected_date || ''),
       r.contact?.name || r.description || '',
       r.type === 'receita' ? Number(r.amount).toFixed(2).replace('.', ',') : '',
@@ -595,11 +644,11 @@ export function CashFlowReportModal({
     ]);
 
     const headerRows = `
-      <tr><td colspan="9"><b>${company?.name || 'Empresa'}</b></td></tr>
-      <tr><td colspan="9">Período: ${periodLabel}</td></tr>
-      <tr><td colspan="9">Evento Contábil: ${categoryLabel}</td></tr>
-      <tr><td colspan="9">Cliente/Fornecedor: ${contactLabel}</td></tr>
-      <tr><td colspan="9"></td></tr>
+      <tr><td colspan="${colSpan}"><b>${company?.name || 'Empresa'}</b></td></tr>
+      <tr><td colspan="${colSpan}">Período: ${periodLabel}</td></tr>
+      <tr><td colspan="${colSpan}">Evento Contábil: ${categoryLabel}</td></tr>
+      <tr><td colspan="${colSpan}">Cliente/Fornecedor: ${contactLabel}</td></tr>
+      <tr><td colspan="${colSpan}"></td></tr>
     `;
 
     const eventSummary = buildEventSummary(filteredRows);
@@ -614,8 +663,8 @@ export function CashFlowReportModal({
     );
 
     const eventBlock = eventSummary.length > 0
-      ? `<tr><td colspan="9"></td></tr>
-         <tr><td colspan="9"><b>Resumo por Evento Contábil</b></td></tr>
+      ? `<tr><td colspan="${colSpan}"></td></tr>
+         <tr><td colspan="${colSpan}"><b>Resumo por Evento Contábil</b></td></tr>
          <tr>${['Evento','Qtd','A Receber','A Pagar','Saldo'].map(h => `<th>${h}</th>`).join('')}</tr>
          ${eventSummary.map(g => `<tr><td>${g.name}</td><td>${g.qty}</td><td>${g.receber.toFixed(2).replace('.', ',')}</td><td>${g.pagar.toFixed(2).replace('.', ',')}</td><td>${g.saldo.toFixed(2).replace('.', ',')}</td></tr>`).join('')}
          <tr><td><b>TOTAL</b></td><td><b>${eventTotals.qty}</b></td><td><b>${eventTotals.receber.toFixed(2).replace('.', ',')}</b></td><td><b>${eventTotals.pagar.toFixed(2).replace('.', ',')}</b></td><td><b>${eventTotals.saldo.toFixed(2).replace('.', ',')}</b></td></tr>`
@@ -628,7 +677,8 @@ export function CashFlowReportModal({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `contas-pagar-receber-${startDate || 'geral'}-${endDate || 'geral'}.xls`;
+    const filePrefix = isReceivables ? 'a-receber' : 'contas-pagar-receber';
+    a.download = `${filePrefix}-${startDate || 'geral'}-${endDate || 'geral'}.xls`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -643,8 +693,18 @@ export function CashFlowReportModal({
       '',
     ];
 
-    const headers = ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status'];
-    const dataLines = rowsWithBalance.map(r => [
+    const headers = isReceivables
+      ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']
+      : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status'];
+    const dataLines = rowsWithBalance.map(r => (isReceivables ? [
+      `"${(r.contact?.name || r.description || '').replace(/"/g, '""')}"`,
+      Number(r.amount).toFixed(2).replace('.', ','),
+      r.due_date ? formatDateBR(r.due_date) : '',
+      r.category?.name || '',
+      `"${(r.notes || '').replace(/"/g, '""')}"`,
+      r.saldoAtual.toFixed(2).replace('.', ','),
+      getStatus(r.is_paid, r.due_date),
+    ] : [
       formatDateBR(r.expected_date || ''),
       `"${(r.contact?.name || r.description || '').replace(/"/g, '""')}"`,
       r.type === 'receita' ? Number(r.amount).toFixed(2).replace('.', ',') : '',
@@ -654,7 +714,7 @@ export function CashFlowReportModal({
       `"${(r.notes || '').replace(/"/g, '""')}"`,
       r.saldoAtual.toFixed(2).replace('.', ','),
       getStatus(r.is_paid, r.due_date),
-    ].join(';'));
+    ]).join(';'));
 
     const eventSummary = buildEventSummary(filteredRows);
     const eventTotals = eventSummary.reduce(
@@ -696,7 +756,8 @@ export function CashFlowReportModal({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `contas-pagar-receber-${startDate || 'geral'}-${endDate || 'geral'}.csv`;
+    const filePrefix = isReceivables ? 'a-receber' : 'contas-pagar-receber';
+    a.download = `${filePrefix}-${startDate || 'geral'}-${endDate || 'geral'}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -712,7 +773,7 @@ export function CashFlowReportModal({
       const url = canvas.toDataURL('image/jpeg', 0.92);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `resumo-pagar-receber-${startDate || 'geral'}-${endDate || 'geral'}.jpg`;
+      a.download = `${isReceivables ? 'resumo-a-receber' : 'resumo-pagar-receber'}-${startDate || 'geral'}-${endDate || 'geral'}.jpg`;
       a.click();
     } catch (err) {
       console.error('Erro ao gerar imagem:', err);
@@ -725,7 +786,7 @@ export function CashFlowReportModal({
     const emittedAt = `Emitido em ${pad2(today.getDate())}/${pad2(today.getMonth() + 1)}/${today.getFullYear()} às ${pad2(today.getHours())}:${pad2(today.getMinutes())}`;
 
     doc.setFontSize(13); doc.setFont('helvetica', 'bold');
-    doc.text('Consulta Mensal — Pagar/Receber', 14, 18);
+    doc.text(isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber', 14, 18);
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
     doc.text(`Período: ${monthlyMonthsLabel} / ${monthlyYear} • ${monthlyStatusLabel}`, 14, 25);
     const tableStartY = 32;
@@ -890,7 +951,7 @@ export function CashFlowReportModal({
     const headers = ['Evento', ...monthHeaders, 'TOTAL'];
     const meta = `
       <tr><td colspan="${headers.length}"><b>${company?.name || 'Empresa'}</b></td></tr>
-      <tr><td colspan="${headers.length}">Consulta Mensal — Pagar/Receber</td></tr>
+      <tr><td colspan="${headers.length}">${isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber'}</td></tr>
       <tr><td colspan="${headers.length}">Ano: ${monthlyYear} • Status: ${monthlyStatusLabel} • Evento: ${monthlyCategoryLabel}</td></tr>
       <tr><td colspan="${headers.length}"></td></tr>
     `;
@@ -926,7 +987,7 @@ export function CashFlowReportModal({
     const headers = ['Evento', ...monthHeaders, 'TOTAL'];
     const meta = [
       company?.name || 'Empresa',
-      'Consulta Mensal — Pagar/Receber',
+      isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber',
       `Ano: ${monthlyYear}`,
       `Status: ${monthlyStatusLabel}`,
       `Evento Contábil: ${monthlyCategoryLabel}`,
@@ -987,7 +1048,7 @@ export function CashFlowReportModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-primary" />
-            Relatório de Contas a Pagar/Receber
+            {isReceivables ? 'Relatório de A Receber' : 'Relatório de Contas a Pagar/Receber'}
           </DialogTitle>
         </DialogHeader>
 
@@ -1085,10 +1146,10 @@ export function CashFlowReportModal({
               style={{ fontFamily: 'sans-serif' }}
             >
               <div>
-                <h3 className="font-bold text-gray-900 text-sm">Relatório de Contas a Pagar/Receber</h3>
+                <h3 className="font-bold text-gray-900 text-sm">{isReceivables ? 'Relatório de A Receber' : 'Relatório de Contas a Pagar/Receber'}</h3>
                 <p className="text-[10px] text-gray-500">Período: {periodLabel}</p>
               </div>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className={`grid ${isReceivables ? 'grid-cols-3' : 'grid-cols-4'} gap-1.5`}>
                 <div className="bg-blue-50 rounded p-1.5 border-l-2 border-l-blue-500">
                   <p className="text-[9px] text-blue-700">Capital de Giro</p>
                   <p className={`font-bold text-[11px] ${kpis.capitalDeGiro >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatCurrency(kpis.capitalDeGiro)}</p>
@@ -1097,10 +1158,12 @@ export function CashFlowReportModal({
                   <p className="text-[9px] text-green-700">Entradas</p>
                   <p className="font-bold text-green-700 text-[11px]">{formatCurrency(kpis.entradas)}</p>
                 </div>
-                <div className="bg-red-50 rounded p-1.5 border-l-2 border-l-red-500">
-                  <p className="text-[9px] text-red-700">Saídas</p>
-                  <p className="font-bold text-red-700 text-[11px]">{formatCurrency(kpis.saidas)}</p>
-                </div>
+                {!isReceivables && (
+                  <div className="bg-red-50 rounded p-1.5 border-l-2 border-l-red-500">
+                    <p className="text-[9px] text-red-700">Saídas</p>
+                    <p className="font-bold text-red-700 text-[11px]">{formatCurrency(kpis.saidas)}</p>
+                  </div>
+                )}
                 <div className="bg-gray-50 rounded p-1.5 border-l-2 border-l-gray-400">
                   <p className="text-[9px] text-gray-600">Saldos Atuais</p>
                   <p className="font-bold text-gray-800 text-[11px]">{formatCurrency(kpis.totalBankBalance)}</p>
