@@ -21,7 +21,7 @@ import {
   Scale,
   UsersRound,
   LockKeyhole,
-  Bell,
+  
   Shield,
   type LucideIcon,
 } from 'lucide-react';
@@ -31,7 +31,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { usePinnedShortcuts, PinnedShortcut } from '@/hooks/usePinnedShortcuts';
 import { useUserRole } from '@/hooks/useUserRole';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
-import { useNotifications } from '@/hooks/useNotifications';
+
 import { ProfileModal } from '@/components/profile/ProfileModal';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -181,7 +181,7 @@ export function AppSidebar() {
   const { isSuperAdmin, isAdmin, isColaborador, allowedModules, fullName, avatarUrl } = useUserRole();
   const [profileOpen, setProfileOpen] = useState(false);
   const { pendingCount } = usePendingApprovals();
-  const { unreadCount } = useNotifications();
+  
 
   const planModules: string[] = (company as any)?.plan_modules ?? ['home', 'legalizacao', 'fiscal', 'pessoal_rh', 'financeiro', 'clientes', 'configuracoes'];
   const logoUrl: string | null = (company as any)?.logo_url ?? null;
