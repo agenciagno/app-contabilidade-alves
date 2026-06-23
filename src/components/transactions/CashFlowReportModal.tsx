@@ -987,7 +987,7 @@ export function CashFlowReportModal({
     const headers = ['Evento', ...monthHeaders, 'TOTAL'];
     const meta = [
       company?.name || 'Empresa',
-      '${isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber'}',
+      isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber',
       `Ano: ${monthlyYear}`,
       `Status: ${monthlyStatusLabel}`,
       `Evento Contábil: ${monthlyCategoryLabel}`,
