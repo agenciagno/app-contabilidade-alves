@@ -249,139 +249,153 @@ export default function MonitorCNPJ() {
         </Badge>
       </div>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-5 flex items-start justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Clientes Monitorados</p>
-              <p className="text-3xl font-semibold mt-1">{kpis.monitored}</p>
-            </div>
-            <Building className="h-5 w-5 text-primary" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5 flex items-start justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Alterações (30 dias)</p>
-              <p className="text-3xl font-semibold mt-1">{kpis.changes30}</p>
-            </div>
-            <Search className="h-5 w-5 text-muted-foreground" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5 flex items-start justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Situação Irregular</p>
-              <p
-                className={cn(
-                  'text-3xl font-semibold mt-1',
-                  kpis.irregular > 0 ? 'text-red-600 dark:text-red-400' : ''
-                )}
-              >
-                {kpis.irregular}
-              </p>
-            </div>
-            <Shield className="h-5 w-5 text-red-500" />
-          </CardContent>
-        </Card>
-      </div>
+      <Tabs defaultValue="monitor" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="monitor">Monitor CNPJ</TabsTrigger>
+          <TabsTrigger value="faturamento">Faturamento e Teto SN — 2026</TabsTrigger>
+        </TabsList>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Select value={situacaoFilter} onValueChange={setSituacaoFilter}>
-          <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas situações</SelectItem>
-            <SelectItem value="ativ">Ativa</SelectItem>
-            <SelectItem value="susp">Suspensa</SelectItem>
-            <SelectItem value="inap">Inapta</SelectItem>
-            <SelectItem value="baix">Baixada</SelectItem>
-          </SelectContent>
-        </Select>
-        <Input
-          placeholder="Buscar por nome ou CNPJ..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex-1"
-        />
-      </div>
+        <TabsContent value="monitor" className="space-y-6 mt-0">
+          {/* KPI cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="p-5 flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Clientes Monitorados</p>
+                  <p className="text-3xl font-semibold mt-1">{kpis.monitored}</p>
+                </div>
+                <Building className="h-5 w-5 text-primary" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5 flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Alterações (30 dias)</p>
+                  <p className="text-3xl font-semibold mt-1">{kpis.changes30}</p>
+                </div>
+                <Search className="h-5 w-5 text-muted-foreground" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5 flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Situação Irregular</p>
+                  <p
+                    className={cn(
+                      'text-3xl font-semibold mt-1',
+                      kpis.irregular > 0 ? 'text-red-600 dark:text-red-400' : ''
+                    )}
+                  >
+                    {kpis.irregular}
+                  </p>
+                </div>
+                <Shield className="h-5 w-5 text-red-500" />
+              </CardContent>
+            </Card>
+          </div>
 
-      {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          {hasNoMonitorData ? (
-            <div className="flex flex-col items-center justify-center text-center py-16 px-6 text-muted-foreground">
-              <Search className="h-12 w-12 mb-3 opacity-50" />
-              <p className="font-medium">Monitoramento CNPJ ainda não configurado.</p>
-              <p className="text-sm mt-1">
-                As verificações serão realizadas automaticamente via N8N.
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>CNPJ</TableHead>
-                  <TableHead>Situação Atual</TableHead>
-                  <TableHead>Última Verificação</TableHead>
-                  <TableHead>Última Alteração</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={5}>
-                        <Skeleton className="h-6 w-full" />
-                      </TableCell>
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Select value={situacaoFilter} onValueChange={setSituacaoFilter}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas situações</SelectItem>
+                <SelectItem value="ativ">Ativa</SelectItem>
+                <SelectItem value="susp">Suspensa</SelectItem>
+                <SelectItem value="inap">Inapta</SelectItem>
+                <SelectItem value="baix">Baixada</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Buscar por nome ou CNPJ..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1"
+            />
+          </div>
+
+          {/* Table */}
+          <Card>
+            <CardContent className="p-0">
+              {hasNoMonitorData ? (
+                <div className="flex flex-col items-center justify-center text-center py-16 px-6 text-muted-foreground">
+                  <Search className="h-12 w-12 mb-3 opacity-50" />
+                  <p className="font-medium">Monitoramento CNPJ ainda não configurado.</p>
+                  <p className="text-sm mt-1">
+                    As verificações serão realizadas automaticamente via N8N.
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>CNPJ</TableHead>
+                      <TableHead>Situação Atual</TableHead>
+                      <TableHead>Última Verificação</TableHead>
+                      <TableHead>Última Alteração</TableHead>
                     </TableRow>
-                  ))
-                ) : filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
-                      Nenhum cliente encontrado para os filtros aplicados.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filtered.map((row) => (
-                    <TableRow
-                      key={row.contact.id}
-                      className="cursor-pointer"
-                      onClick={() => setOpenContactId(row.contact.id)}
-                    >
-                      <TableCell className="font-medium">{row.displayName}</TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {formatCnpj(row.contact.document)}
-                      </TableCell>
-                      <TableCell>{situacaoBadge(row.situacaoAtual)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {relativeDate(row.ultimaVerificacao)}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {row.ultimaAlteracao ? (
-                          <span>
-                            {format(parseISO(row.ultimaAlteracao.data_consulta), 'dd/MM/yyyy')}{' '}
-                            <span className="text-muted-foreground">
-                              ({row.ultimaAlteracao.situacao_anterior} →{' '}
-                              {row.ultimaAlteracao.situacao_nova})
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      Array.from({ length: 5 }).map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell colSpan={5}>
+                            <Skeleton className="h-6 w-full" />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : filtered.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
+                          Nenhum cliente encontrado para os filtros aplicados.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filtered.map((row) => (
+                        <TableRow
+                          key={row.contact.id}
+                          className="cursor-pointer"
+                          onClick={() => setOpenContactId(row.contact.id)}
+                        >
+                          <TableCell className="font-medium">{row.displayName}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {formatCnpj(row.contact.document)}
+                          </TableCell>
+                          <TableCell>{situacaoBadge(row.situacaoAtual)}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {relativeDate(row.ultimaVerificacao)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {row.ultimaAlteracao ? (
+                              <span>
+                                {format(parseISO(row.ultimaAlteracao.data_consulta), 'dd/MM/yyyy')}{' '}
+                                <span className="text-muted-foreground">
+                                  ({row.ultimaAlteracao.situacao_anterior} →{' '}
+                                  {row.ultimaAlteracao.situacao_nova})
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="faturamento" className="mt-0">
+          <RevenueLimitsSection year={new Date().getFullYear()} regime="todos" />
+        </TabsContent>
+      </Tabs>
+
 
       {/* History modal */}
       <Dialog
