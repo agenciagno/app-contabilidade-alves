@@ -334,7 +334,7 @@ export function CashFlowReportModal({
     }>();
 
     for (const t of rows) {
-      const ref = isPaid ? t.date : t.expected_date;
+      const ref = isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
       if (!ref) continue;
       const month = parseInt(ref.slice(5, 7), 10) - 1;
       if (!sortedSelectedMonths.includes(month)) continue;
