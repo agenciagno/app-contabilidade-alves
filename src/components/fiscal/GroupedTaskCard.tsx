@@ -89,7 +89,7 @@ export function GroupedTaskCard({
               {format(parseISO(dueDate), 'dd/MM/yyyy', { locale: ptBR })}
             </Badge>
             <span className="text-[10px] text-muted-foreground">
-              {tasks.length} obrigações
+              {tasks.filter(t => t.status === 'concluido').length}/{tasks.length} concluídas
             </span>
           </div>
         </div>

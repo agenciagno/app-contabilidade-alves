@@ -63,6 +63,8 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   const [allowedModules, setAllowedModules] = useState<string[]>(ALL_MODULES.map(m => m.key));
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -72,6 +74,8 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
       setRole(editUser.role);
       setStatusActive(editUser.statusActive);
       setAllowedModules(editUser.allowedModules);
+      setNewPassword('');
+      setShowNewPassword(false);
       setErrors({});
     } else if (open && !editUser) {
       resetForm();
@@ -89,6 +93,8 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
     setEmail('');
     setPassword('');
     setShowPassword(false);
+    setNewPassword('');
+    setShowNewPassword(false);
     setRole('colaborador');
     setStatusActive(true);
     setAllowedModules(ALL_MODULES.map(m => m.key));
@@ -148,6 +154,21 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
           .eq('user_id', editUser!.userId);
 
         if (updateError) throw new Error(updateError.message || 'Erro ao atualizar usuário');
+
+        // Atualizar senha (opcional)
+        if (newPassword) {
+          if (!isPasswordStrong(newPassword)) {
+            toast.error('A nova senha não atende aos requisitos mínimos');
+            setIsLoading(false);
+            return;
+          }
+          const { data: pwData, error: pwErr } = await supabase.functions.invoke('admin-update-user-password', {
+            body: { userId: editUser!.userId, newPassword },
+          });
+          if (pwErr) throw new Error(pwErr.message || 'Erro ao atualizar senha');
+          if (pwData?.error) throw new Error(pwData.error);
+          toast.success('Senha atualizada com sucesso!');
+        }
 
         toast.success('Usuário atualizado com sucesso!');
         onSuccess();
@@ -304,6 +325,28 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
                 </button>
               </div>
               {password && <PasswordStrength password={password} />}
+            </div>
+          )}
+
+          {isEditMode && (
+            <div className="space-y-2 pt-2 border-t">
+              <Label htmlFor="newPassword">Redefinir senha (opcional)</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="newPassword"
+                  type={showNewPassword ? 'text' : 'password'}
+                  placeholder="Deixe em branco para não alterar"
+                  className="pl-10 pr-10"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+                <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {newPassword && <PasswordStrength password={newPassword} />}
             </div>
           )}
 

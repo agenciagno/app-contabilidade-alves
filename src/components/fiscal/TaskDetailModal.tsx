@@ -464,7 +464,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto px-6 py-6">
         <SheetHeader className="space-y-2 pb-4">
           <SheetTitle className="text-2xl">{contactName}</SheetTitle>
           <div className="flex flex-wrap items-center gap-2">
@@ -743,7 +743,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                       }}
                       rows={2}
                       placeholder="Escreva uma nota — use @ para mencionar a equipe..."
-                      className="w-full"
+                      className="w-full pr-8"
                     />
                     <AtSign className="absolute right-2 top-2 h-3.5 w-3.5 text-muted-foreground/60 pointer-events-none" />
                   </div>

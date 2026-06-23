@@ -1,90 +1,75 @@
+## 1) Kanban — Conclusão de cards agrupados (checklist)
 
-## 1) FISCAL → Dashboard (`src/pages/FiscalDashboard.tsx`)
+**Problema:** `KanbanBoard.tsx` calcula `displayStatus` do grupo via `STATUS_PRECEDENCE` (status mais avançado vence). Se uma tarefa do grupo é concluída, o card inteiro pula para "Concluído".
 
-**Linha 1 — KPIs principais (compactos)**
-- Manter apenas 4 cards, nesta ordem: **Pendente** (`a_fazer` + não atrasada), **Em Andamento** (`em_progresso`), **Atrasadas** (`status != concluido` e `due_date < hoje`), **Concluídas** (`concluido`).
-- Remover cards: Total, Sem Responsável, Taxa de Cumprimento, Comparativo Mês Anterior.
-- Reduzir padding (`p-5` → `p-3`), número `text-3xl` → `text-2xl`, ícone menor; grid `grid-cols-2 md:grid-cols-4`.
+**Correção em `src/components/fiscal/KanbanBoard.tsx`:**
+- Para `GroupItem`, novo cálculo:
+  - Se **todas** as tarefas estão `concluido` → `displayStatus = 'concluido'`.
+  - Senão, considerar apenas as tarefas não concluídas e aplicar a precedência atual (a_fazer → em_progresso → aguardando_cliente) para escolher o status do card.
+- Cards únicos (sem agrupamento) continuam seguindo o status da própria tarefa.
+- No `GroupedTaskCard` (visual), exibir um contador "X/Y concluídas" quando houver pelo menos uma concluída e o grupo ainda não estiver 100% concluído (sem mudar layout).
 
-**Remover do dashboard**
-- `RateKpiCard` ("Taxa de Cumprimento") + `computeComplianceRate`.
-- `ComparisonKpiCard` ("Comparativo Mês Anterior") + hook `useFiscalTasksPrevMonth`.
-- Gráfico "Tarefas por Colaborador" (bloco `BarChart` / `chartData`).
-- Box "Próximos Vencimentos (7 dias)" (tabela `upcoming` / `useUpcomingFiscalTasks`).
-- `<RevenueLimitsSection />` (migra para Monitor CNPJ — ver §2).
+## 2) Modal de Tarefa — Layout
 
-**Linha 2 — "Próximos Vencimentos" (substitui o "Nas próximas 48h")**
-- Renomear o box `tasks48h` para **Próximos Vencimentos**.
-- Filtro em botões (`ToggleGroup single`): `2 dias`, `7 dias`, `15 dias`, `30 dias`, `Personalizado`.
-- "Personalizado" → `Popover` com `Calendar mode="range"` (mesmo padrão do `DateRangePicker` usado em Transações).
-- Refatorar `useFiscalTasks48h` em `useFiscalUpcomingTasksRange(start, end)` parametrizando `gte/lte` de `fiscal_due_date`. Default = hoje → +2 dias. Limite 10 → 50.
+**Em `src/components/fiscal/TaskDetailModal.tsx`:**
+- Aumentar largura para `sm:max-w-3xl`, usar `max-h-[90vh]` com rolagem interna.
+- Reorganizar em seções com `space-y-6` e grid `md:grid-cols-2` para campos curtos (Status / Vencimento / Responsável / Cliente).
+- Garantir `Label` acima do campo (não sobreposto), `gap-2` em cada bloco e `Separator` entre seções (Informações, Anexo, Notas, Histórico).
+- Ajustar o `Popover` de menções (`@`) para não cobrir o textarea (posicionar `side="top" align="start"`).
+- Padding consistente (`px-6 py-5`) e remover `flex` sem `gap` que cause sobreposição.
 
-**Pendências por Cliente (`RiskRadarCard`)**
-- Clique no cliente navega para o Kanban com filtro do cliente: `navigate('/fiscal/tarefas?view=kanban&contact_id=<id>')`.
-- Em `FiscalTasks.tsx`, ler `contact_id` (e `view`) da query string no mount e setar o filtro/visão existente.
-- Cabeçalho fixo + rolagem interna (mesmo padrão das tabelas em Transações): wrapper `max-h-[420px] overflow-y-auto`, `<thead>` com `sticky top-0 bg-card z-10`. Remover `slice(0, 10)`.
+## 3) Remover sub-rota "Notificações" e melhorar o sininho
 
-## 2) Monitor CNPJ (`src/pages/MonitorCNPJ.tsx`)
+**Sidebar / Rotas:**
+- Remover entrada `'/fiscal/notificacoes'` em `src/components/layout/AppSidebar.tsx` (`menuEntries` Fiscal + filtros e o badge `unreadCount` ligado ao item).
+- Remover rota em `src/App.tsx` e arquivo `src/pages/FiscalNotifications.tsx`.
 
-- Envolver o conteúdo atual em `Tabs` (`@/components/ui/tabs`):
-  - **Monitor CNPJ** → conteúdo atual.
-  - **Faturamento e Teto SN — 2026** → `<RevenueLimitsSection />` (sem alterações de conteúdo).
-- Estado da aba com `useState`, default `"monitor"`.
+**Sininho (`src/components/notifications/NotificationBellDropdown.tsx` + `src/hooks/useNotifications.ts`):**
+- Já existe `markAsRead` e `markAllAsRead`. Garantir no dropdown:
+  - Botão "Marcar todas como lidas" no topo (já existe — manter / estilizar).
+  - Em cada item, ícone/botão "Marcar como lida" (check) visível quando `!read_at`, chamando `markAsRead(id)` sem fechar o popover.
+  - Clique no corpo do item: navega para `action_url` E marca como lida.
+- Listar tipos relevantes (`task_completed`, `task_assigned`, `task_mention`, `calendar_generated`, etc.) — o hook já busca tudo de `notifications`.
 
-## 3) Regra de conclusão de tarefa (`TaskDetailModal.tsx`)
+## 4) Edição em Lote — Clientes/Fornecedores
 
-Nova regra unificada: **toda conclusão exige justificativa** — anexo OU observação OU número de protocolo.
+**`src/components/contacts/ContactBulkEditDialog.tsx`** — adicionar novos toggles + campos (cada um com `Switch` "editar este campo"):
 
-Fluxo:
-1. Ao mudar `status` para "Concluído" (ou clicar "Concluir"):
-   - Se já existe `attachment_url` → conclui direto (`completion_type = 'attachment'`, `completed_at = now()`).
-   - Se **não** há anexo → abrir `Dialog` de confirmação com dois campos:
-     - **Número de protocolo** (opcional)
-     - **Observação** (opcional, textarea)
-   - Validação: pelo menos **um** dos dois deve estar preenchido (protocolo ≥ 1 caractere OU observação ≥ 10 caracteres). Caso contrário, toast de erro e bloqueia.
-   - Salvar:
-     - Se só protocolo → `completion_type = 'protocol'`, `protocol_number`, `completion_notes` (se houver).
-     - Se só observação → `completion_type = 'transmitted'`, `completion_notes`.
-     - Se ambos → `completion_type = 'protocol'`, grava `protocol_number` e `completion_notes`.
-   - Em todos os casos: `status='concluido'`, `completed_at = new Date().toISOString()`.
-2. O `RadioGroup` atual de 3 tipos é substituído por este modal único — não pedimos mais ao usuário "escolher o tipo"; o sistema infere pelos campos preenchidos.
+- **Porte**: select `mei | me | epp | medio | grande` → `contacts.porte`.
+- **Status do Cliente**: select `ativo | inativo | prospecto | suspenso` → `contacts.client_status` (ajustar para o enum existente em `contacts`).
+- **Obrigações Fiscais**: multi-select de `fiscal_obligations_catalog`. Aplicação: para cada contato selecionado, fazer upsert/delete em `client_obligations` (modo "substituir" — desmarca obrigações ausentes, insere novas).
+- **Categorias (controle de acesso)**: multi-select de `categories` → atualizar `contacts.allowed_category_ids` (array).
+- **Configurações de Cobrança**: agrupar todos os campos de `boleto_controls` editáveis em lote (status ativo, dia de vencimento, valor padrão, juros, multa, descrição padrão, instruções, etc.). Aplicação: upsert em `boleto_controls` por `contact_id`.
 
-## 4) FISCAL → Tarefas Fiscais → Modal (`TaskDetailModal.tsx`)
+Refatorar o diálogo:
+- Trocar para layout `sm:max-w-2xl` com `ScrollArea`.
+- Agrupar em seções colapsáveis: Dados Cadastrais, Acesso & Permissões, Fiscais, Cobrança.
+- Mantém o padrão "Switch + campo" para aplicar somente o que está marcado.
 
-**Layout**
-- Corrigir sobreposições no `SheetHeader`: `flex flex-col gap-2`, `Label` sempre acima do campo com `mb-1.5`, `space-y-4` por seção.
-- Ampliar para `sm:max-w-2xl`. Seções separadas por `border-t pt-4`.
-- Mover badge "Originalmente atribuída a …" para abaixo do header, dentro da seção de Responsável.
+## 5) Configurações > Minha Equipe — Editar senha do usuário
 
-**Menções `@` (somente notificar)**
-- Textarea de "Notas" detecta `@` na posição do cursor → abre `Popover` ancorado com lista filtrada de `profiles` (props).
-- Inserir `@Nome` no texto; armazenar `mentions: [{profile_id, name}]` na nota persistida (estender `TeamNote`).
-- Renderizar menções com destaque (`text-primary font-medium`).
-- Ao salvar, chamar nova função `notifyTaskMention` em `src/lib/fiscal-notifications.ts` que insere `notifications` `type='task_mention'` para cada mencionado (sem alterar responsável).
-- Adicionar `task_mention` em `TYPE_OPTIONS` de `src/pages/FiscalNotifications.tsx`.
+**`src/components/users/UserFormDialog.tsx`** (modo edição):
+- Adicionar seção "Redefinir senha (opcional)" com input de nova senha + `PasswordStrength`, botão olho, mesmo padrão do create.
+- Se preenchido no submit em edit, chamar nova edge function `admin-update-user-password`.
 
-## 5) Esclarecimento — sub-rota Notificações (`/fiscal/notificacoes`)
+**Nova edge function `supabase/functions/admin-update-user-password/index.ts`:**
+- `verify_jwt = false` (validar JWT em código).
+- Recebe `{ userId, newPassword }`, valida força mínima (Zod).
+- Verifica que o caller é `admin` ou `super_admin` da mesma `company_id` do `userId` alvo (consulta `profiles` com service role).
+- Chama `supabase.auth.admin.updateUserById(userId, { password })`.
+- Retorna sucesso/erro. CORS padrão.
 
-Sem mudança de código além do novo tipo `task_mention`. Como funciona hoje:
-- Lê `notifications` filtrando por `company_id` com filtros por tipo, colaborador, período e status (lida/não lida).
-- Tipos hoje produzidos automaticamente:
-  - `task_completed` — trigger DB `notify_task_completed` + helper `notifyTaskCompleted` (admins/super-admins, exceto quem concluiu).
-  - `task_assigned` — `notifyTaskAssigned` (novo responsável).
-  - `calendar_generated` — `notifyCalendarLaunched` após `generate_monthly_fiscal_tasks` (contagem por colaborador).
-  - `task_due` / `task_overdue` / `transfer_start` / `transfer_end` / `system` — previstos no filtro, sem produtor automático hoje (placeholders).
+Sem migrations necessárias.
 
-### Layout final do Dashboard
-````text
-[ KPIs: Pendente | Em Andamento | Atrasadas | Concluídas ]
-[ Próximos Vencimentos  (2d | 7d | 15d | 30d | Personalizado) ]
-[ Radar de Risco (clique → /fiscal/tarefas?view=kanban&contact_id=…) ]
-````
+## Arquivos alterados
 
-### Arquivos tocados
-- `src/pages/FiscalDashboard.tsx`
-- `src/hooks/useFiscalDashboard.ts` (`useFiscalTasks48h` → range; remover `useFiscalTasksPrevMonth`, `useUpcomingFiscalTasks`)
-- `src/pages/FiscalTasks.tsx` (deep-link `?contact_id` / `?view=kanban`)
-- `src/pages/MonitorCNPJ.tsx` (Tabs + Faturamento)
-- `src/components/fiscal/TaskDetailModal.tsx` (layout + nova regra de conclusão + menções)
-- `src/lib/fiscal-notifications.ts` (`notifyTaskMention`)
-- `src/pages/FiscalNotifications.tsx` (tipo `task_mention`)
+- `src/components/fiscal/KanbanBoard.tsx`
+- `src/components/fiscal/GroupedTaskCard.tsx`
+- `src/components/fiscal/TaskDetailModal.tsx`
+- `src/components/layout/AppSidebar.tsx`
+- `src/App.tsx` (remover rota)
+- `src/pages/FiscalNotifications.tsx` (delete)
+- `src/components/notifications/NotificationBellDropdown.tsx`
+- `src/components/contacts/ContactBulkEditDialog.tsx`
+- `src/components/users/UserFormDialog.tsx`
+- `supabase/functions/admin-update-user-password/index.ts` (novo)

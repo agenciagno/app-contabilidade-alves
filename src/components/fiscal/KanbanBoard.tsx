@@ -226,10 +226,19 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
         items.push({ type: 'single', id: t.id, dueDate: effDate(t), task: t });
       } else {
         const sorted = [...group].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-        let best = sorted[0].status as string;
-        for (const t of sorted) {
-          if ((STATUS_PRECEDENCE[t.status] ?? 0) > (STATUS_PRECEDENCE[best] ?? 0)) {
-            best = t.status;
+        // Concluído só quando TODAS as tarefas estiverem concluídas.
+        const allDone = sorted.every((t) => t.status === 'concluido');
+        let best: string;
+        if (allDone) {
+          best = 'concluido';
+        } else {
+          // Maior precedência entre as tarefas ainda não concluídas
+          const pending = sorted.filter((t) => t.status !== 'concluido');
+          best = pending[0].status as string;
+          for (const t of pending) {
+            if ((STATUS_PRECEDENCE[t.status] ?? 0) > (STATUS_PRECEDENCE[best] ?? 0)) {
+              best = t.status;
+            }
           }
         }
         const [contactId] = key.split('__');
