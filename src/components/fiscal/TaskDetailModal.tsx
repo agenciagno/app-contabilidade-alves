@@ -258,10 +258,11 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
       setNotesRaw(task.notes ?? null);
       setNewNote('');
       setAttachmentUrl(task.attachment_url);
-      setCompletionOpen(false);
-      setCompletionType('attachment');
+      setConfirmOpen(false);
       setProtocolNumber('');
       setCompletionNotesInput('');
+      setPendingMentions([]);
+      setMentionQuery(null);
     }
   }, [task]);
 
