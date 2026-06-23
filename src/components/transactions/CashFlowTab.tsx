@@ -431,9 +431,12 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
   const isReceivables = mode === 'receivables';
 
   // Pre-filter: in receivables mode, only "A Receber" entries (receita > 0)
+  // with Evento Contábil: Honorários Contábeis
   const transactions = useMemo(() => {
     if (!isReceivables) return transactionsRaw;
-    return transactionsRaw.filter(t => t.type === 'receita' && Number(t.amount) > 0);
+    return transactionsRaw.filter(
+      t => t.type === 'receita' && Number(t.amount) > 0 && t.category?.name === 'Honorários Contábeis'
+    );
   }, [transactionsRaw, isReceivables]);
 
   const [reportOpen, setReportOpen] = useState(false);
