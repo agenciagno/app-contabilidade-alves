@@ -479,7 +479,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
 
   // Filtered + sorted transactions
   const filtered = useMemo(() => {
-    let result = transactions.filter(t => !t.is_paid && t.expected_date);
+    let result = transactions.filter(t => !t.is_paid && (isReceivables ? (t.due_date || t.expected_date) : t.expected_date));
 
     // Global date filter
     if (globalStartDate || globalEndDate) {
