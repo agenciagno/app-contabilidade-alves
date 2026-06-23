@@ -794,6 +794,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
+                    {!isReceivables && (
                     <TableHead className="text-xs whitespace-nowrap">
                       <Popover>
                         <PopoverTrigger asChild>
@@ -816,6 +817,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                         </PopoverContent>
                       </Popover>
                     </TableHead>
+                    )}
                     <TableHead className="text-xs whitespace-nowrap">
                       <ContactEventMultiFilter
                         columnFilters={columnFilters}
