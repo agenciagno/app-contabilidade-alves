@@ -59,9 +59,6 @@ const MONTHS = [
 ];
 const YEARS = [2025, 2026, 2027];
 
-const COLOR_OK = 'hsl(142 71% 45%)';
-const COLOR_LATE = 'hsl(0 84% 60%)';
-
 const REGIMES = [
   { value: 'todos', label: 'Todos' },
   { value: 'Simples Nacional', label: 'Simples Nacional' },
@@ -74,124 +71,46 @@ const todayIso = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+const isoFromDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const inDaysIso = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return isoFromDate(d);
+};
+
 const isLateTask = (t: { status: string; due_date: string | null }, today: string) =>
   t.status !== 'concluido' && !!t.due_date && t.due_date < today;
-
-// "no prazo" = concluida com completed_at <= fiscal_due_date (data)
-const isOnTime = (t: FiscalTaskRow) => {
-  if (t.status !== 'concluido' || !t.completed_at || !t.fiscal_due_date) return false;
-  const completedDate = t.completed_at.slice(0, 10);
-  return completedDate <= t.fiscal_due_date;
-};
-
-const computeComplianceRate = (tasks: FiscalTaskRow[]): { rate: number; total: number } => {
-  const concluidas = tasks.filter((t) => t.status === 'concluido');
-  if (concluidas.length === 0) return { rate: 0, total: 0 };
-  const noPrazo = concluidas.filter(isOnTime).length;
-  return { rate: Math.round((noPrazo / concluidas.length) * 100), total: concluidas.length };
-};
-
-const complianceColor = (pct: number) => {
-  if (pct >= 90) return { border: 'border-l-green-500', text: 'text-green-600 dark:text-green-400', icon: 'text-green-500' };
-  if (pct >= 70) return { border: 'border-l-yellow-500', text: 'text-yellow-600 dark:text-yellow-400', icon: 'text-yellow-500' };
-  return { border: 'border-l-red-500', text: 'text-red-600 dark:text-red-400', icon: 'text-red-500' };
-};
 
 function KpiCard({
   label,
   value,
-  total,
   icon: Icon,
   borderClass,
   iconClass,
 }: {
   label: string;
   value: number;
-  total: number;
   icon: typeof ListChecks;
   borderClass: string;
   iconClass: string;
 }) {
-  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
   return (
     <Card className={cn('border-l-4', borderClass)}>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="text-3xl font-semibold mt-1">{value}</p>
-            <p className="text-xs text-muted-foreground mt-1">{pct}% do total</p>
+      <CardContent className="p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground truncate">{label}</p>
+            <p className="text-2xl font-semibold mt-0.5">{value}</p>
           </div>
-          <Icon className={cn('h-5 w-5', iconClass)} />
+          <Icon className={cn('h-4 w-4 shrink-0', iconClass)} />
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function RateKpiCard({
-  label,
-  rate,
-  subtitle,
-  icon: Icon,
-}: {
-  label: string;
-  rate: number;
-  subtitle: string;
-  icon: typeof TrendingUp;
-}) {
-  const c = complianceColor(rate);
-  return (
-    <Card className={cn('border-l-4', c.border)}>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className={cn('text-3xl font-semibold mt-1', c.text)}>{rate}%</p>
-            <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
-          </div>
-          <Icon className={cn('h-5 w-5', c.icon)} />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ComparisonKpiCard({
-  current,
-  previous,
-  hasPrevious,
-}: { current: number; previous: number; hasPrevious: boolean }) {
-  const diff = current - previous;
-  const isUp = diff > 0;
-  const isDown = diff < 0;
-  const colorClass = isUp ? 'text-green-600 dark:text-green-400' : isDown ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground';
-  const borderClass = isUp ? 'border-l-green-500' : isDown ? 'border-l-red-500' : 'border-l-muted';
-  const sign = diff > 0 ? '+' : '';
-
-  return (
-    <Card className={cn('border-l-4', borderClass)}>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">Comparativo Mês Anterior</p>
-            <div className="flex items-center gap-2 mt-1">
-              {hasPrevious && isUp && <ArrowUp className="h-6 w-6 text-green-500" />}
-              {hasPrevious && isDown && <ArrowDown className="h-6 w-6 text-red-500" />}
-              <p className={cn('text-3xl font-semibold', colorClass)}>
-                {hasPrevious ? `${sign}${diff}%` : '—'}
-              </p>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {hasPrevious ? `vs ${previous}% do mês anterior` : 'sem dados do mês anterior'}
-            </p>
-          </div>
-          <ArrowUpDown className="h-5 w-5 text-muted-foreground" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function StatusBadge({ status, isLate }: { status: string; isLate: boolean }) {
   if (isLate) {
