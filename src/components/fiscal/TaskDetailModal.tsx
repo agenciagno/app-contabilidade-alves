@@ -237,11 +237,16 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // Completion flow
-  const [completionOpen, setCompletionOpen] = useState(false);
-  const [completionType, setCompletionType] = useState<'attachment' | 'protocol' | 'transmitted'>('attachment');
+  // Completion flow (single confirm dialog)
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [protocolNumber, setProtocolNumber] = useState('');
   const [completionNotesInput, setCompletionNotesInput] = useState('');
+
+  // @ mentions state for the new note
+  const newNoteRef = useRef<HTMLTextAreaElement | null>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [pendingMentions, setPendingMentions] = useState<{ profile_id: string; name: string }[]>([]);
+
 
   useEffect(() => {
     if (task) {
