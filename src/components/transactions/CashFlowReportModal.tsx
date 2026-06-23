@@ -66,9 +66,9 @@ function getStatus(isPaid: boolean, dueDate: string | null): string {
 export function CashFlowReportModal({
   open, onOpenChange, transactions, categories, contacts, banks,
   initialStartDate = '', initialEndDate = '', initialCategoryIds = [], initialContactIds = [],
-  mode = 'all',
+  mode: variant = 'all',
 }: CashFlowReportModalProps) {
-  const isReceivables = mode === 'receivables';
+  const isReceivables = variant === 'receivables';
   const { company } = useCompany();
   const summaryRef = useRef<HTMLDivElement>(null);
 
