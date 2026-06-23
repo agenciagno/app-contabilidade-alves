@@ -484,7 +484,9 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
     // Global date filter
     if (globalStartDate || globalEndDate) {
       result = result.filter(t => {
-        const dateKey = t.expected_date || t.due_date || t.issue_date;
+        const dateKey = isReceivables
+          ? t.due_date
+          : (t.expected_date || t.due_date || t.issue_date);
         if (!dateKey) return true;
         if (globalStartDate && dateKey < globalStartDate) return false;
         if (globalEndDate && dateKey > globalEndDate) return false;
