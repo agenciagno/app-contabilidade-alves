@@ -597,7 +597,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
     });
 
     return result;
-  }, [transactions, globalStartDate, globalEndDate, columnFilters, sortField, sortOrder]);
+  }, [transactions, globalStartDate, globalEndDate, columnFilters, sortField, sortOrder, isReceivables]);
 
   // Category filter state (separate from contactEvent)
   const [categoryFilterIds, setCategoryFilterIds] = useState<string[]>([]);
