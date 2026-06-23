@@ -388,7 +388,7 @@ export function CashFlowReportModal({
     }
 
     return { groups, colTotals, grand };
-  }, [monthlyVersion, transactions, monthlyYear, monthlyStatus, expandedSelectedCategories, sortedSelectedMonths, categories]);
+  }, [monthlyVersion, txns, monthlyYear, monthlyStatus, expandedSelectedCategories, sortedSelectedMonths, categories, isReceivables]);
 
   const monthlyCategoryLabel = useMemo(() => {
     if (monthlySelectedCategories.size === 0) return 'Todas';
