@@ -891,11 +891,6 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                     </TableRow>
                   ) : rows.map(row => (
                     <TableRow key={row.id} className="text-xs">
-                      {/* Data Prevista */}
-                      <TableCell className="font-mono tabular-nums whitespace-nowrap">
-                        {(row.expected_date || row.due_date || row.issue_date) ? formatDate(row.expected_date || row.due_date || row.issue_date!) : '—'}
-                      </TableCell>
-
                       {/* Cliente/Fornecedor */}
                       <TableCell className="truncate max-w-[150px]"><Tooltip><TooltipTrigger asChild><span className="truncate block">{row.contact?.name ?? row.description}</span></TooltipTrigger><TooltipContent side="top" className="apple-tooltip"><p>{row.contact?.name ?? row.description}</p></TooltipContent></Tooltip></TableCell>
 
