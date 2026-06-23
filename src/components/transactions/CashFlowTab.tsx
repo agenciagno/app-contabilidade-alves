@@ -1036,6 +1036,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
         initialEndDate={globalEndDate}
         initialCategoryIds={categoryFilterIds}
         initialContactIds={columnFilters.contactIds || []}
+        mode={mode}
       />
     </div>
   );
