@@ -756,7 +756,8 @@ export function CashFlowReportModal({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `contas-pagar-receber-${startDate || 'geral'}-${endDate || 'geral'}.csv`;
+    const filePrefix = isReceivables ? 'a-receber' : 'contas-pagar-receber';
+    a.download = `${filePrefix}-${startDate || 'geral'}-${endDate || 'geral'}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
