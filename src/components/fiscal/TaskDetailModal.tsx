@@ -721,7 +721,9 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                           <Badge variant="outline" className="text-[9px] px-1.5 py-0">legado</Badge>
                         )}
                       </div>
-                      <p className="text-xs text-foreground whitespace-pre-wrap mt-0.5">{n.text}</p>
+                      <p className="text-xs text-foreground whitespace-pre-wrap mt-0.5">
+                        {renderNoteText(n.text, n.mentions ?? [])}
+                      </p>
                     </div>
                   </div>
                 ))
@@ -729,18 +731,61 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
             </div>
 
             <div className="flex gap-2 items-end">
-              <Textarea
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                rows={2}
-                placeholder="Escreva uma nota para a equipe..."
-                className="flex-1"
-              />
+              <Popover open={mentionQuery !== null} onOpenChange={(o) => !o && setMentionQuery(null)}>
+                <PopoverTrigger asChild>
+                  <div className="flex-1 relative">
+                    <Textarea
+                      ref={newNoteRef}
+                      value={newNote}
+                      onChange={handleNoteChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') setMentionQuery(null);
+                      }}
+                      rows={2}
+                      placeholder="Escreva uma nota — use @ para mencionar a equipe..."
+                      className="w-full"
+                    />
+                    <AtSign className="absolute right-2 top-2 h-3.5 w-3.5 text-muted-foreground/60 pointer-events-none" />
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  side="top"
+                  className="w-64 p-1"
+                  onOpenAutoFocus={(e) => e.preventDefault()}
+                >
+                  {(() => {
+                    const q = (mentionQuery ?? '').toLowerCase().trim();
+                    const filtered = profiles
+                      .filter((p) => (p.full_name ?? '').toLowerCase().includes(q))
+                      .slice(0, 6);
+                    if (filtered.length === 0) {
+                      return <div className="px-2 py-1.5 text-xs text-muted-foreground">Nenhum membro encontrado</div>;
+                    }
+                    return filtered.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => insertMention(p)}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/60 text-left"
+                      >
+                        <Avatar className="w-6 h-6">
+                          <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                            {initialsOf(p.full_name || '?')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm truncate">{p.full_name || 'Sem nome'}</span>
+                      </button>
+                    ));
+                  })()}
+                </PopoverContent>
+              </Popover>
               <Button size="sm" onClick={handleAddNote} disabled={!newNote.trim()} className="gap-1.5">
                 <Send className="w-3.5 h-3.5" /> Adicionar
               </Button>
             </div>
           </section>
+
 
           <Separator />
 
