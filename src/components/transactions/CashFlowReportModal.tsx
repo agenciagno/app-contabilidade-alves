@@ -1146,10 +1146,10 @@ export function CashFlowReportModal({
               style={{ fontFamily: 'sans-serif' }}
             >
               <div>
-                <h3 className="font-bold text-gray-900 text-sm">Relatório de Contas a Pagar/Receber</h3>
+                <h3 className="font-bold text-gray-900 text-sm">{isReceivables ? 'Relatório de A Receber' : 'Relatório de Contas a Pagar/Receber'}</h3>
                 <p className="text-[10px] text-gray-500">Período: {periodLabel}</p>
               </div>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className={`grid ${isReceivables ? 'grid-cols-3' : 'grid-cols-4'} gap-1.5`}>
                 <div className="bg-blue-50 rounded p-1.5 border-l-2 border-l-blue-500">
                   <p className="text-[9px] text-blue-700">Capital de Giro</p>
                   <p className={`font-bold text-[11px] ${kpis.capitalDeGiro >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatCurrency(kpis.capitalDeGiro)}</p>
@@ -1158,10 +1158,12 @@ export function CashFlowReportModal({
                   <p className="text-[9px] text-green-700">Entradas</p>
                   <p className="font-bold text-green-700 text-[11px]">{formatCurrency(kpis.entradas)}</p>
                 </div>
-                <div className="bg-red-50 rounded p-1.5 border-l-2 border-l-red-500">
-                  <p className="text-[9px] text-red-700">Saídas</p>
-                  <p className="font-bold text-red-700 text-[11px]">{formatCurrency(kpis.saidas)}</p>
-                </div>
+                {!isReceivables && (
+                  <div className="bg-red-50 rounded p-1.5 border-l-2 border-l-red-500">
+                    <p className="text-[9px] text-red-700">Saídas</p>
+                    <p className="font-bold text-red-700 text-[11px]">{formatCurrency(kpis.saidas)}</p>
+                  </div>
+                )}
                 <div className="bg-gray-50 rounded p-1.5 border-l-2 border-l-gray-400">
                   <p className="text-[9px] text-gray-600">Saldos Atuais</p>
                   <p className="font-bold text-gray-800 text-[11px]">{formatCurrency(kpis.totalBankBalance)}</p>
