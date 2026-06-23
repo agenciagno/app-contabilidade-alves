@@ -38,6 +38,7 @@ interface CashFlowReportModalProps {
   initialEndDate?: string;
   initialCategoryIds?: string[];
   initialContactIds?: string[];
+  mode?: 'all' | 'receivables';
 }
 
 function formatCurrency(value: number) {
@@ -65,7 +66,9 @@ function getStatus(isPaid: boolean, dueDate: string | null): string {
 export function CashFlowReportModal({
   open, onOpenChange, transactions, categories, contacts, banks,
   initialStartDate = '', initialEndDate = '', initialCategoryIds = [], initialContactIds = [],
+  mode: variant = 'all',
 }: CashFlowReportModalProps) {
+  const isReceivables = variant === 'receivables';
   const { company } = useCompany();
   const summaryRef = useRef<HTMLDivElement>(null);
 
@@ -116,7 +119,7 @@ export function CashFlowReportModal({
       setEndDate(initialEndDate);
       setCategoryId(initialCategoryIds.length === 1 ? initialCategoryIds[0] : 'all');
       setContactId(initialContactIds.length === 1 ? initialContactIds[0] : 'all');
-      setTypeFilter('all');
+      setTypeFilter(isReceivables ? 'receita' : 'all');
       setMonthlyYear(currentYear);
       setMonthlyStatus('pending');
       setMonthlySelectedCategories(new Set());
@@ -1056,6 +1059,7 @@ export function CashFlowReportModal({
                 </SelectContent>
               </Select>
             </div>
+            {!isReceivables && (
             <div>
               <Label className="text-sm font-semibold mb-1 block">Tipo</Label>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -1067,6 +1071,7 @@ export function CashFlowReportModal({
                 </SelectContent>
               </Select>
             </div>
+            )}
           </div>
 
           <Separator className="my-2" />

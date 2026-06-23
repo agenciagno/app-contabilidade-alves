@@ -5,6 +5,7 @@ import { useContacts } from '@/hooks/useContacts';
 import { CashFlowTab } from '@/components/transactions/CashFlowTab';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Info } from 'lucide-react';
 
 export default function PagarReceber() {
@@ -52,13 +53,33 @@ export default function PagarReceber() {
         </div>
       </div>
 
-      <CashFlowTab
-        transactions={transactions}
-        banks={banks}
-        categories={categories}
-        contacts={contacts}
-        togglePaid={togglePaid}
-      />
+      <Tabs defaultValue="all" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="all">Pagar / Receber</TabsTrigger>
+          <TabsTrigger value="receivables">A Receber</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="mt-0">
+          <CashFlowTab
+            transactions={transactions}
+            banks={banks}
+            categories={categories}
+            contacts={contacts}
+            togglePaid={togglePaid}
+          />
+        </TabsContent>
+
+        <TabsContent value="receivables" className="mt-0">
+          <CashFlowTab
+            transactions={transactions}
+            banks={banks}
+            categories={categories}
+            contacts={contacts}
+            togglePaid={togglePaid}
+            mode="receivables"
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

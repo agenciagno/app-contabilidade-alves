@@ -36,6 +36,7 @@ interface CashFlowTabProps {
   categories: Category[];
   contacts: Contact[];
   togglePaid: { mutate: (args: { id: string; is_paid: boolean }) => void };
+  mode?: 'all' | 'receivables';
 }
 
 function formatCurrency(value: number) {
@@ -426,7 +427,15 @@ function EventoMultiFilter({ selected, onChange, categories }: {
 
 // ─── Main Component ────────────────────────────────────────────────
 
-export function CashFlowTab({ transactions, banks, categories, contacts, togglePaid }: CashFlowTabProps) {
+export function CashFlowTab({ transactions: transactionsRaw, banks, categories, contacts, togglePaid, mode = 'all' }: CashFlowTabProps) {
+  const isReceivables = mode === 'receivables';
+
+  // Pre-filter: in receivables mode, only "A Receber" entries (receita > 0)
+  const transactions = useMemo(() => {
+    if (!isReceivables) return transactionsRaw;
+    return transactionsRaw.filter(t => t.type === 'receita' && Number(t.amount) > 0);
+  }, [transactionsRaw, isReceivables]);
+
   const [reportOpen, setReportOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; row: any | null }>({ open: false, row: null });
 
@@ -439,7 +448,7 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
 
   // Column filters
   const [columnFilters, setColumnFilters] = useState<CashFlowColumnFilters>({});
-  const [sortField, setSortField] = useState<SortField>('expected_date');
+  const [sortField, setSortField] = useState<SortField>(isReceivables ? 'due_date' : 'expected_date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
   const handleSort = (field: SortField, order: SortOrder) => {
@@ -470,12 +479,14 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
 
   // Filtered + sorted transactions
   const filtered = useMemo(() => {
-    let result = transactions.filter(t => !t.is_paid && t.expected_date);
+    let result = transactions.filter(t => !t.is_paid && (isReceivables ? (t.due_date || t.expected_date) : t.expected_date));
 
     // Global date filter
     if (globalStartDate || globalEndDate) {
       result = result.filter(t => {
-        const dateKey = t.expected_date || t.due_date || t.issue_date;
+        const dateKey = isReceivables
+          ? t.due_date
+          : (t.expected_date || t.due_date || t.issue_date);
         if (!dateKey) return true;
         if (globalStartDate && dateKey < globalStartDate) return false;
         if (globalEndDate && dateKey > globalEndDate) return false;
@@ -586,7 +597,7 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
     });
 
     return result;
-  }, [transactions, globalStartDate, globalEndDate, columnFilters, sortField, sortOrder]);
+  }, [transactions, globalStartDate, globalEndDate, columnFilters, sortField, sortOrder, isReceivables]);
 
   // Category filter state (separate from contactEvent)
   const [categoryFilterIds, setCategoryFilterIds] = useState<string[]>([]);
@@ -659,30 +670,35 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
     <div className="space-y-4">
       {/* Header: Global date filter + report button */}
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4 text-muted-foreground" />
-          <div className="flex items-center gap-1.5">
-            <Input
-              type="date"
-              value={globalStartDate}
-              onChange={e => setGlobalStartDate(e.target.value)}
-              max="9999-12-31"
-              className="h-8 text-xs w-[140px]"
-            />
-            <span className="text-xs text-muted-foreground">até</span>
-            <Input
-              type="date"
-              value={globalEndDate}
-              onChange={e => setGlobalEndDate(e.target.value)}
-              max="9999-12-31"
-              className="h-8 text-xs w-[140px]"
-            />
-          </div>
-          {(globalStartDate !== defaultStart || globalEndDate !== defaultEnd) && (
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setGlobalStartDate(defaultStart); setGlobalEndDate(defaultEnd); }}>
-              <X className="w-3.5 h-3.5" />
-            </Button>
+        <div className="flex flex-col gap-1">
+          {isReceivables && (
+            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Data de Vencimento</span>
           )}
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="date"
+                value={globalStartDate}
+                onChange={e => setGlobalStartDate(e.target.value)}
+                max="9999-12-31"
+                className="h-8 text-xs w-[140px]"
+              />
+              <span className="text-xs text-muted-foreground">até</span>
+              <Input
+                type="date"
+                value={globalEndDate}
+                onChange={e => setGlobalEndDate(e.target.value)}
+                max="9999-12-31"
+                className="h-8 text-xs w-[140px]"
+              />
+            </div>
+            {(globalStartDate !== defaultStart || globalEndDate !== defaultEnd) && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setGlobalStartDate(defaultStart); setGlobalEndDate(defaultEnd); }}>
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
         <div className="ml-auto">
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setReportOpen(true)}>
@@ -693,7 +709,7 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isReceivables ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
         {/* Capital de Giro */}
         <Card className="bg-card border-border/50 border-l-2 border-l-blue-500">
           <CardContent className="p-4">
@@ -727,6 +743,7 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
         </Card>
 
         {/* Saídas */}
+        {!isReceivables && (
         <Card className="bg-card border-border/50 border-l-2 border-l-red-500">
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
@@ -740,6 +757,7 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Saldos Atuais */}
         <Card className="bg-card border-border/50">
@@ -814,6 +832,7 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
                         values={receitaAmounts}
                       />
                     </TableHead>
+                    {!isReceivables && (
                     <TableHead className="text-xs whitespace-nowrap text-right">
                       <NumericMultiFilter
                         label="A Pagar"
@@ -822,6 +841,7 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
                         values={despesaAmounts}
                       />
                     </TableHead>
+                    )}
                     <TableHead className="text-xs whitespace-nowrap">
                       <Popover>
                         <PopoverTrigger asChild>
@@ -865,7 +885,7 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
                 <TableBody>
                   {rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={isReceivables ? 9 : 10} className="text-center text-muted-foreground py-8">
                         Nenhuma transação encontrada.
                       </TableCell>
                     </TableRow>
@@ -908,6 +928,7 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
                       </TableCell>
 
                       {/* A Pagar */}
+                      {!isReceivables && (
                       <TableCell className="text-right whitespace-nowrap">
                         {row.type === 'despesa' ? (
                           <span className="text-red-500 font-semibold">{formatCurrency(row.originalAmount)}</span>
@@ -915,6 +936,7 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
                           <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
+                      )}
 
                       {/* Vencimento */}
                       <TableCell className="font-mono tabular-nums whitespace-nowrap">{row.due_date ? formatDate(row.due_date) : '—'}</TableCell>
@@ -1014,6 +1036,7 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
         initialEndDate={globalEndDate}
         initialCategoryIds={categoryFilterIds}
         initialContactIds={columnFilters.contactIds || []}
+        mode={mode}
       />
     </div>
   );
