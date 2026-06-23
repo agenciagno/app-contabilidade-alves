@@ -845,6 +845,49 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
           </div>
         </div>
       </SheetContent>
+
+      {/* Dialog de confirmação de conclusão sem anexo */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Concluir tarefa</DialogTitle>
+            <DialogDescription>
+              Como esta tarefa não tem anexo, informe o <strong>número de protocolo</strong> e/ou
+              uma <strong>observação</strong> (mínimo 10 caracteres) para justificar a conclusão.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs">Número do protocolo (opcional)</Label>
+              <Input
+                value={protocolNumber}
+                onChange={(e) => setProtocolNumber(e.target.value)}
+                placeholder="Ex: 2.06.000.123456-7"
+                maxLength={100}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Observação (opcional)</Label>
+              <Textarea
+                value={completionNotesInput}
+                onChange={(e) => setCompletionNotesInput(e.target.value)}
+                rows={3}
+                placeholder="Descreva como/onde a obrigação foi cumprida..."
+                maxLength={1000}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Se não houver protocolo, a observação precisa ter pelo menos 10 caracteres.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
+            <Button onClick={handleConfirmCompletion} className="gap-1.5">
+              <CheckCircle className="w-4 h-4" /> Concluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }
