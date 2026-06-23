@@ -38,6 +38,7 @@ interface CashFlowReportModalProps {
   initialEndDate?: string;
   initialCategoryIds?: string[];
   initialContactIds?: string[];
+  mode?: 'all' | 'receivables';
 }
 
 function formatCurrency(value: number) {
