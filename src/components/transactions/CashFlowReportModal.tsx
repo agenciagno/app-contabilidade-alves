@@ -619,8 +619,19 @@ export function CashFlowReportModal({
 
   // ─── XLS Export ───────────────────────────────────────────────────
   const exportXLS = () => {
-    const headers = ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status'];
-    const tableRows = rowsWithBalance.map(r => [
+    const headers = isReceivables
+      ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']
+      : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status'];
+    const colSpan = headers.length;
+    const tableRows = rowsWithBalance.map(r => isReceivables ? [
+      r.contact?.name || r.description || '',
+      Number(r.amount).toFixed(2).replace('.', ','),
+      r.due_date ? formatDateBR(r.due_date) : '',
+      r.category?.name || '',
+      r.notes || '',
+      r.saldoAtual.toFixed(2).replace('.', ','),
+      getStatus(r.is_paid, r.due_date),
+    ] : [
       formatDateBR(r.expected_date || ''),
       r.contact?.name || r.description || '',
       r.type === 'receita' ? Number(r.amount).toFixed(2).replace('.', ',') : '',
@@ -633,11 +644,11 @@ export function CashFlowReportModal({
     ]);
 
     const headerRows = `
-      <tr><td colspan="9"><b>${company?.name || 'Empresa'}</b></td></tr>
-      <tr><td colspan="9">Período: ${periodLabel}</td></tr>
-      <tr><td colspan="9">Evento Contábil: ${categoryLabel}</td></tr>
-      <tr><td colspan="9">Cliente/Fornecedor: ${contactLabel}</td></tr>
-      <tr><td colspan="9"></td></tr>
+      <tr><td colspan="${colSpan}"><b>${company?.name || 'Empresa'}</b></td></tr>
+      <tr><td colspan="${colSpan}">Período: ${periodLabel}</td></tr>
+      <tr><td colspan="${colSpan}">Evento Contábil: ${categoryLabel}</td></tr>
+      <tr><td colspan="${colSpan}">Cliente/Fornecedor: ${contactLabel}</td></tr>
+      <tr><td colspan="${colSpan}"></td></tr>
     `;
 
     const eventSummary = buildEventSummary(filteredRows);
@@ -652,8 +663,8 @@ export function CashFlowReportModal({
     );
 
     const eventBlock = eventSummary.length > 0
-      ? `<tr><td colspan="9"></td></tr>
-         <tr><td colspan="9"><b>Resumo por Evento Contábil</b></td></tr>
+      ? `<tr><td colspan="${colSpan}"></td></tr>
+         <tr><td colspan="${colSpan}"><b>Resumo por Evento Contábil</b></td></tr>
          <tr>${['Evento','Qtd','A Receber','A Pagar','Saldo'].map(h => `<th>${h}</th>`).join('')}</tr>
          ${eventSummary.map(g => `<tr><td>${g.name}</td><td>${g.qty}</td><td>${g.receber.toFixed(2).replace('.', ',')}</td><td>${g.pagar.toFixed(2).replace('.', ',')}</td><td>${g.saldo.toFixed(2).replace('.', ',')}</td></tr>`).join('')}
          <tr><td><b>TOTAL</b></td><td><b>${eventTotals.qty}</b></td><td><b>${eventTotals.receber.toFixed(2).replace('.', ',')}</b></td><td><b>${eventTotals.pagar.toFixed(2).replace('.', ',')}</b></td><td><b>${eventTotals.saldo.toFixed(2).replace('.', ',')}</b></td></tr>`
@@ -666,7 +677,8 @@ export function CashFlowReportModal({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `contas-pagar-receber-${startDate || 'geral'}-${endDate || 'geral'}.xls`;
+    const filePrefix = isReceivables ? 'a-receber' : 'contas-pagar-receber';
+    a.download = `${filePrefix}-${startDate || 'geral'}-${endDate || 'geral'}.xls`;
     a.click();
     URL.revokeObjectURL(url);
   };
