@@ -464,7 +464,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
         <SheetHeader className="space-y-2 pb-4">
           <SheetTitle className="text-2xl">{contactName}</SheetTitle>
           <div className="flex flex-wrap items-center gap-2">
