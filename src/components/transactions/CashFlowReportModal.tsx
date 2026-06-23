@@ -414,20 +414,22 @@ export function CashFlowReportModal({
 
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
-    doc.text('Relatório de Contas a Pagar/Receber', 14, 18);
+    doc.text(isReceivables ? 'Relatório de A Receber' : 'Relatório de Contas a Pagar/Receber', 14, 18);
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.text(`Período: ${periodLabel}`, 14, 25);
 
-    // 4 KPI cards
-    const cardW = 63;
+    // KPI cards (4 for all, 3 for receivables)
+    const kpiCount = isReceivables ? 3 : 4;
     const cardH = 14;
     const cardY = 32;
     const gap = 2;
     const padX = 3;
     const labelOffsetY = 6;
     const valueOffsetY = 12;
+    const totalW = 283 - 14; // page content width
+    const cardW = (totalW - gap * (kpiCount - 1)) / kpiCount;
     const col1X = 14;
     const col2X = col1X + cardW + gap;
     const col3X = col2X + cardW + gap;
@@ -449,21 +451,24 @@ export function CashFlowReportModal({
     doc.setFontSize(8); doc.setFont('helvetica', 'bold');
     doc.text(formatCurrency(kpis.entradas), col2X + padX, cardY + valueOffsetY);
 
-    // Saídas
-    doc.setFillColor(255, 245, 245);
-    doc.roundedRect(col3X, cardY, cardW, cardH, 2, 2, 'F');
-    doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(220, 38, 38);
-    doc.text('Saídas', col3X + padX, cardY + labelOffsetY);
-    doc.setFontSize(8); doc.setFont('helvetica', 'bold');
-    doc.text(formatCurrency(kpis.saidas), col3X + padX, cardY + valueOffsetY);
+    if (!isReceivables) {
+      // Saídas
+      doc.setFillColor(255, 245, 245);
+      doc.roundedRect(col3X, cardY, cardW, cardH, 2, 2, 'F');
+      doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(220, 38, 38);
+      doc.text('Saídas', col3X + padX, cardY + labelOffsetY);
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+      doc.text(formatCurrency(kpis.saidas), col3X + padX, cardY + valueOffsetY);
+    }
 
     // Saldos Atuais (Bancos)
+    const lastX = isReceivables ? col3X : col4X;
     doc.setFillColor(245, 245, 255);
-    doc.roundedRect(col4X, cardY, cardW, cardH, 2, 2, 'F');
+    doc.roundedRect(lastX, cardY, cardW, cardH, 2, 2, 'F');
     doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100);
-    doc.text('Saldos Atuais (Bancos)', col4X + padX, cardY + labelOffsetY);
+    doc.text('Saldos Atuais (Bancos)', lastX + padX, cardY + labelOffsetY);
     doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(0);
-    doc.text(formatCurrency(kpis.totalBankBalance), col4X + padX, cardY + valueOffsetY);
+    doc.text(formatCurrency(kpis.totalBankBalance), lastX + padX, cardY + valueOffsetY);
 
     const sepY = cardY + cardH + 4;
     doc.setDrawColor(230, 230, 230); doc.setLineWidth(0.3);
@@ -473,37 +478,59 @@ export function CashFlowReportModal({
     doc.text(`${filteredRows.length} lançamentos • Gerado em ${pad2(today.getDate())}/${pad2(today.getMonth() + 1)}/${today.getFullYear()}`, 14, sepY + 5);
     doc.setTextColor(0);
 
-    // 9 columns: PREVISTA | CLIENTE | RECEBER | PAGAR | VENCIMENTO | EVENTO | HISTÓRICO | SALDO ATUAL | STATUS
+    // Table — in receivables, drop "Prevista" column and only show Vencimento
+    const head = isReceivables
+      ? [['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']]
+      : [['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']];
+    const body = rowsWithBalance.map(r => isReceivables ? [
+      r.contact?.name || r.description,
+      formatCurrency(Number(r.amount)),
+      r.due_date ? formatDateBR(r.due_date) : '',
+      r.category?.name || '',
+      r.notes || '',
+      formatCurrency(r.saldoAtual),
+      getStatus(r.is_paid, r.due_date),
+    ] : [
+      formatDateBR(r.expected_date || ''),
+      r.contact?.name || r.description,
+      r.type === 'receita' ? formatCurrency(Number(r.amount)) : '',
+      r.type === 'despesa' ? formatCurrency(Number(r.amount)) : '',
+      r.due_date ? formatDateBR(r.due_date) : '',
+      r.category?.name || '',
+      r.notes || '',
+      formatCurrency(r.saldoAtual),
+      getStatus(r.is_paid, r.due_date),
+    ]);
+    const columnStyles = isReceivables ? {
+      0: { cellWidth: 50, halign: 'center' as const },
+      1: { cellWidth: 32, halign: 'center' as const },
+      2: { cellWidth: 24, halign: 'center' as const },
+      3: { cellWidth: 36, halign: 'center' as const },
+      4: { cellWidth: 60, halign: 'center' as const },
+      5: { cellWidth: 32, halign: 'center' as const },
+      6: { cellWidth: 18, halign: 'center' as const },
+    } : {
+      0: { cellWidth: 22, halign: 'center' as const },
+      1: { cellWidth: 40, halign: 'center' as const },
+      2: { cellWidth: 26, halign: 'center' as const },
+      3: { cellWidth: 26, halign: 'center' as const },
+      4: { cellWidth: 22, halign: 'center' as const },
+      5: { cellWidth: 30, halign: 'center' as const },
+      6: { cellWidth: 40, halign: 'center' as const },
+      7: { cellWidth: 28, halign: 'center' as const },
+      8: { cellWidth: 18, halign: 'center' as const },
+    };
+
     autoTable(doc, {
       startY: sepY + 10,
-      head: [['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']],
-      body: rowsWithBalance.map(r => [
-        formatDateBR(r.expected_date || ''),
-        r.contact?.name || r.description,
-        r.type === 'receita' ? formatCurrency(Number(r.amount)) : '',
-        r.type === 'despesa' ? formatCurrency(Number(r.amount)) : '',
-        r.due_date ? formatDateBR(r.due_date) : '',
-        r.category?.name || '',
-        r.notes || '',
-        formatCurrency(r.saldoAtual),
-        getStatus(r.is_paid, r.due_date),
-      ]),
+      head,
+      body,
       theme: 'striped',
       styles: { fontSize: 7, cellPadding: 1.5, halign: 'center' },
       headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold', fontSize: 6.5, halign: 'center' },
       alternateRowStyles: { fillColor: [248, 248, 248] },
       rowPageBreak: 'avoid',
-      columnStyles: {
-        0: { cellWidth: 22, halign: 'center' },
-        1: { cellWidth: 40, halign: 'center' },
-        2: { cellWidth: 26, halign: 'center' },
-        3: { cellWidth: 26, halign: 'center' },
-        4: { cellWidth: 22, halign: 'center' },
-        5: { cellWidth: 30, halign: 'center' },
-        6: { cellWidth: 40, halign: 'center' },
-        7: { cellWidth: 28, halign: 'center' },
-        8: { cellWidth: 18, halign: 'center' },
-      },
+      columnStyles,
       didDrawPage: (data) => {
         const pageCount = (doc as any).internal.getNumberOfPages();
         const pageHeight = doc.internal.pageSize.height;
