@@ -164,16 +164,26 @@ export function CashFlowReportModal({
   const activeBanks = useMemo(() => banks.filter(b => b.is_active), [banks]);
   const totalBankBalance = useMemo(() => activeBanks.reduce((s, b) => s + Number(b.current_balance), 0), [activeBanks]);
 
-  // Filter: same strict rule as CashFlowTab — only !is_paid && expected_date not null
+  // Pre-filter: in receivables mode, only "A Receber" entries (receita > 0) — mirrors CashFlowTab
+  const txns = useMemo(() => {
+    if (!isReceivables) return transactions;
+    return transactions.filter(t => t.type === 'receita' && Number(t.amount) > 0);
+  }, [transactions, isReceivables]);
+
+  // Date key: receivables ranks by due_date (Vencimento); all ranks by expected_date (Data Prevista)
+  const dateKeyOf = (t: Transaction): string | null =>
+    isReceivables ? (t.due_date || t.expected_date || null) : (t.expected_date || null);
+
+  // Filter: same strict rule as CashFlowTab
   const filteredRows = useMemo(() => {
-    let result = transactions.filter(t => !t.is_paid && t.expected_date);
+    let result = txns.filter(t => !t.is_paid && (isReceivables ? (t.due_date || t.expected_date) : t.expected_date));
 
     if (startDate && endDate) {
       const s = parseISO(startDate);
       const e = parseISO(endDate);
       e.setHours(23, 59, 59, 999);
       result = result.filter(t => {
-        const dateKey = t.expected_date;
+        const dateKey = dateKeyOf(t);
         if (!dateKey) return false;
         const d = parseISO(dateKey);
         return isWithinInterval(d, { start: s, end: e });
@@ -184,9 +194,9 @@ export function CashFlowReportModal({
     if (contactId !== 'all') result = result.filter(t => t.contact_id === contactId);
     if (typeFilter !== 'all') result = result.filter(t => t.type === typeFilter);
 
-    result.sort((a, b) => (a.expected_date || '').localeCompare(b.expected_date || ''));
+    result.sort((a, b) => (dateKeyOf(a) || '').localeCompare(dateKeyOf(b) || ''));
     return result;
-  }, [transactions, startDate, endDate, categoryId, contactId, typeFilter]);
+  }, [txns, startDate, endDate, categoryId, contactId, typeFilter, isReceivables]);
 
   // Running balance rows
   const rowsWithBalance = useMemo(() => {
