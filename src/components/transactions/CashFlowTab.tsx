@@ -670,30 +670,35 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
     <div className="space-y-4">
       {/* Header: Global date filter + report button */}
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4 text-muted-foreground" />
-          <div className="flex items-center gap-1.5">
-            <Input
-              type="date"
-              value={globalStartDate}
-              onChange={e => setGlobalStartDate(e.target.value)}
-              max="9999-12-31"
-              className="h-8 text-xs w-[140px]"
-            />
-            <span className="text-xs text-muted-foreground">até</span>
-            <Input
-              type="date"
-              value={globalEndDate}
-              onChange={e => setGlobalEndDate(e.target.value)}
-              max="9999-12-31"
-              className="h-8 text-xs w-[140px]"
-            />
-          </div>
-          {(globalStartDate !== defaultStart || globalEndDate !== defaultEnd) && (
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setGlobalStartDate(defaultStart); setGlobalEndDate(defaultEnd); }}>
-              <X className="w-3.5 h-3.5" />
-            </Button>
+        <div className="flex flex-col gap-1">
+          {isReceivables && (
+            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Data de Vencimento</span>
           )}
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="date"
+                value={globalStartDate}
+                onChange={e => setGlobalStartDate(e.target.value)}
+                max="9999-12-31"
+                className="h-8 text-xs w-[140px]"
+              />
+              <span className="text-xs text-muted-foreground">até</span>
+              <Input
+                type="date"
+                value={globalEndDate}
+                onChange={e => setGlobalEndDate(e.target.value)}
+                max="9999-12-31"
+                className="h-8 text-xs w-[140px]"
+              />
+            </div>
+            {(globalStartDate !== defaultStart || globalEndDate !== defaultEnd) && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setGlobalStartDate(defaultStart); setGlobalEndDate(defaultEnd); }}>
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
         <div className="ml-auto">
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setReportOpen(true)}>
@@ -704,7 +709,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isReceivables ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
         {/* Capital de Giro */}
         <Card className="bg-card border-border/50 border-l-2 border-l-blue-500">
           <CardContent className="p-4">
