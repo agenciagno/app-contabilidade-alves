@@ -28,6 +28,7 @@ const TYPE_OPTIONS = [
   { value: 'task_overdue', label: 'Tarefa atrasada' },
   { value: 'task_completed', label: 'Tarefa concluída' },
   { value: 'task_assigned', label: 'Tarefa atribuída' },
+  { value: 'task_mention', label: 'Menção em tarefa' },
   { value: 'transfer_start', label: 'Início de cobertura' },
   { value: 'transfer_end', label: 'Fim de cobertura' },
   { value: 'calendar_generated', label: 'Calendário gerado' },
