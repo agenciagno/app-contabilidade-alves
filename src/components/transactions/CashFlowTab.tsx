@@ -427,7 +427,15 @@ function EventoMultiFilter({ selected, onChange, categories }: {
 
 // ─── Main Component ────────────────────────────────────────────────
 
-export function CashFlowTab({ transactions, banks, categories, contacts, togglePaid }: CashFlowTabProps) {
+export function CashFlowTab({ transactions: transactionsRaw, banks, categories, contacts, togglePaid, mode = 'all' }: CashFlowTabProps) {
+  const isReceivables = mode === 'receivables';
+
+  // Pre-filter: in receivables mode, only "A Receber" entries (receita > 0)
+  const transactions = useMemo(() => {
+    if (!isReceivables) return transactionsRaw;
+    return transactionsRaw.filter(t => t.type === 'receita' && Number(t.amount) > 0);
+  }, [transactionsRaw, isReceivables]);
+
   const [reportOpen, setReportOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; row: any | null }>({ open: false, row: null });
 
@@ -440,7 +448,7 @@ export function CashFlowTab({ transactions, banks, categories, contacts, toggleP
 
   // Column filters
   const [columnFilters, setColumnFilters] = useState<CashFlowColumnFilters>({});
-  const [sortField, setSortField] = useState<SortField>('expected_date');
+  const [sortField, setSortField] = useState<SortField>(isReceivables ? 'due_date' : 'expected_date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
   const handleSort = (field: SortField, order: SortOrder) => {
