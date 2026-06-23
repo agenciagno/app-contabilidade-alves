@@ -63,6 +63,8 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   const [allowedModules, setAllowedModules] = useState<string[]>(ALL_MODULES.map(m => m.key));
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -72,6 +74,8 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
       setRole(editUser.role);
       setStatusActive(editUser.statusActive);
       setAllowedModules(editUser.allowedModules);
+      setNewPassword('');
+      setShowNewPassword(false);
       setErrors({});
     } else if (open && !editUser) {
       resetForm();
@@ -89,6 +93,8 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
     setEmail('');
     setPassword('');
     setShowPassword(false);
+    setNewPassword('');
+    setShowNewPassword(false);
     setRole('colaborador');
     setStatusActive(true);
     setAllowedModules(ALL_MODULES.map(m => m.key));
@@ -148,6 +154,21 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
           .eq('user_id', editUser!.userId);
 
         if (updateError) throw new Error(updateError.message || 'Erro ao atualizar usuário');
+
+        // Atualizar senha (opcional)
+        if (newPassword) {
+          if (!isPasswordStrong(newPassword)) {
+            toast.error('A nova senha não atende aos requisitos mínimos');
+            setIsLoading(false);
+            return;
+          }
+          const { data: pwData, error: pwErr } = await supabase.functions.invoke('admin-update-user-password', {
+            body: { userId: editUser!.userId, newPassword },
+          });
+          if (pwErr) throw new Error(pwErr.message || 'Erro ao atualizar senha');
+          if (pwData?.error) throw new Error(pwData.error);
+          toast.success('Senha atualizada com sucesso!');
+        }
 
         toast.success('Usuário atualizado com sucesso!');
         onSuccess();
