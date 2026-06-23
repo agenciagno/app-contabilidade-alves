@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, differenceInDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   ArrowUpDown,
+  CalendarIcon,
   CheckCircle2,
   ChevronDown,
   Clock,
@@ -14,24 +14,12 @@ import {
   ListChecks,
   RefreshCw,
   ShieldAlert,
-  TrendingUp,
 } from 'lucide-react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
@@ -51,19 +39,19 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 
 import { useUserRole } from '@/hooks/useUserRole';
 import {
   useFiscalTasksOfMonth,
-  useFiscalTasksPrevMonth,
   useFiscalCollaborators,
-  useUpcomingFiscalTasks,
-  useFiscalTasks48h,
+  useFiscalUpcomingTasksRange,
   FiscalTaskRow,
 } from '@/hooks/useFiscalDashboard';
-import { RevenueLimitsSection } from '@/components/fiscal/RevenueLimitsSection';
+
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
