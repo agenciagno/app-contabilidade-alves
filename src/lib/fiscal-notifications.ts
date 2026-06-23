@@ -99,6 +99,42 @@ export async function notifyTaskAssigned(params: {
 }
 
 /**
+ * Notifies each mentioned collaborator in a task note.
+ */
+export async function notifyTaskMention(params: {
+  taskId: string;
+  taskTitle: string;
+  contactName: string;
+  mentionedProfileIds: string[];
+  mentionedByName: string;
+  companyId: string | null;
+  actorUserId?: string | null;
+}) {
+  const { taskId, taskTitle, contactName, mentionedProfileIds, mentionedByName, companyId, actorUserId } = params;
+  if (!companyId || !mentionedProfileIds.length) return;
+
+  const { data: profiles, error } = await (supabase as any)
+    .from('profiles')
+    .select('id, user_id')
+    .in('id', mentionedProfileIds);
+  if (error || !profiles) return;
+
+  const rows: NotifRow[] = (profiles as any[])
+    .filter((p) => p.user_id && p.user_id !== actorUserId)
+    .map((p) => ({
+      user_id: p.user_id,
+      company_id: companyId,
+      type: 'task_mention',
+      title: 'Você foi mencionado',
+      body: `${mentionedByName} mencionou você em ${taskTitle} — ${contactName}`,
+      action_url: '/fiscal/tarefas',
+      reference_type: 'fiscal_task',
+      reference_id: taskId,
+    }));
+  await insertNotifications(rows);
+}
+
+/**
  * After a monthly calendar launch, notifies each collaborator about the count of tasks assigned.
  */
 export async function notifyCalendarLaunched(params: {

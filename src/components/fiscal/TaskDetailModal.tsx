@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { format, parseISO, differenceInCalendarDays, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -7,6 +7,15 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,11 +25,10 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Upload, Paperclip, CheckCircle, Trash2, Send,
   Clock, AlertTriangle, CheckCircle2, ExternalLink,
-  Plus, ArrowRight, UserCog, Hash, X,
+  Plus, ArrowRight, UserCog, Hash, AtSign,
 } from 'lucide-react';
 import { FiscalTask } from '@/hooks/useFiscalTasks';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -29,6 +37,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
+import { notifyTaskMention } from '@/lib/fiscal-notifications';
 
 // ---- SLA helper ----
 type SlaInfo = {
@@ -132,6 +141,7 @@ interface TeamNote {
   profile_name: string;
   text: string;
   created_at: string;
+  mentions?: { profile_id: string; name: string }[];
   legacy?: boolean;
 }
 
@@ -147,6 +157,7 @@ function parseNotes(raw: string | null, legacyDate: string): TeamNote[] {
         profile_name: n.profile_name || '—',
         text: String(n.text),
         created_at: n.created_at || legacyDate,
+        mentions: Array.isArray(n.mentions) ? n.mentions : undefined,
       }));
     }
   } catch { /* fallthrough to legacy */ }
@@ -155,6 +166,31 @@ function parseNotes(raw: string | null, legacyDate: string): TeamNote[] {
 
 function initialsOf(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
+}
+
+// Renders note text with @mentions highlighted
+function renderNoteText(text: string, mentions: { name: string }[] = []) {
+  if (!mentions.length) return <>{text}</>;
+  const names = mentions.map((m) => m.name).sort((a, b) => b.length - a.length);
+  const pattern = new RegExp(`@(${names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'g');
+  const parts: (string | { mention: string })[] = [];
+  let lastIdx = 0;
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(text)) !== null) {
+    if (m.index > lastIdx) parts.push(text.slice(lastIdx, m.index));
+    parts.push({ mention: m[0] });
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) parts.push(text.slice(lastIdx));
+  return (
+    <>
+      {parts.map((p, i) =>
+        typeof p === 'string'
+          ? <span key={i}>{p}</span>
+          : <span key={i} className="text-primary font-medium">{p.mention}</span>
+      )}
+    </>
+  );
 }
 
 interface TaskDetailModalProps {
@@ -201,11 +237,16 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // Completion flow
-  const [completionOpen, setCompletionOpen] = useState(false);
-  const [completionType, setCompletionType] = useState<'attachment' | 'protocol' | 'transmitted'>('attachment');
+  // Completion flow (single confirm dialog)
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [protocolNumber, setProtocolNumber] = useState('');
   const [completionNotesInput, setCompletionNotesInput] = useState('');
+
+  // @ mentions state for the new note
+  const newNoteRef = useRef<HTMLTextAreaElement | null>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [pendingMentions, setPendingMentions] = useState<{ profile_id: string; name: string }[]>([]);
+
 
   useEffect(() => {
     if (task) {
@@ -217,10 +258,11 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
       setNotesRaw(task.notes ?? null);
       setNewNote('');
       setAttachmentUrl(task.attachment_url);
-      setCompletionOpen(false);
-      setCompletionType('attachment');
+      setConfirmOpen(false);
       setProtocolNumber('');
       setCompletionNotesInput('');
+      setPendingMentions([]);
+      setMentionQuery(null);
     }
   }, [task]);
 
@@ -277,8 +319,9 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
 
   const handleSaveTaskInfo = () => {
     if (!canEdit) return;
-    if (status === 'concluido' && !attachmentUrl) {
-      toast({ title: 'Anexo obrigatório para concluir', variant: 'destructive' });
+    if (status === 'concluido' && !attachmentUrl && task.status !== 'concluido') {
+      // Open confirm dialog to capture protocol/notes
+      setConfirmOpen(true);
       return;
     }
     onUpdate(task.id, {
@@ -291,73 +334,113 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     toast({ title: '✅ Tarefa atualizada.' });
   };
 
-  const handleAddNote = () => {
+  // --- Mentions: detect @ and show popover ---
+  const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setNewNote(value);
+    const caret = e.target.selectionStart ?? value.length;
+    const upto = value.slice(0, caret);
+    const m = upto.match(/(?:^|\s)@([\p{L}\p{N} ]{0,30})$/u);
+    setMentionQuery(m ? m[1] : null);
+  };
+
+  const insertMention = (profile: { id: string; full_name: string | null }) => {
+    const name = profile.full_name || 'Usuário';
+    const ta = newNoteRef.current;
+    const caret = ta?.selectionStart ?? newNote.length;
+    const before = newNote.slice(0, caret);
+    const after = newNote.slice(caret);
+    const replaced = before.replace(/(?:^|\s)@([\p{L}\p{N} ]{0,30})$/u, (full, _q) => {
+      const lead = full.startsWith(' ') ? ' ' : (full.startsWith('@') ? '' : '');
+      return `${lead}@${name} `;
+    });
+    const next = replaced + after;
+    setNewNote(next);
+    setMentionQuery(null);
+    setPendingMentions((prev) =>
+      prev.some((p) => p.profile_id === profile.id) ? prev : [...prev, { profile_id: profile.id, name }]
+    );
+    setTimeout(() => {
+      ta?.focus();
+      const pos = replaced.length;
+      ta?.setSelectionRange(pos, pos);
+    }, 0);
+  };
+
+  const handleAddNote = async () => {
     const text = newNote.trim();
     if (!text) return;
     const authorName = currentProfile?.full_name || currentProfile?.email?.split('@')[0] || 'Usuário';
+    // Keep only mentions still present in text
+    const effectiveMentions = pendingMentions.filter((m) => text.includes(`@${m.name}`));
     const entry: TeamNote = {
       profile_id: currentProfile?.id ?? null,
       profile_name: authorName,
       text,
       created_at: new Date().toISOString(),
+      mentions: effectiveMentions.length ? effectiveMentions : undefined,
     };
-    const next = [...teamNotes.filter((n) => !n.legacy || true), entry];
-    // Persist as JSON array (legacy item is included so it survives)
+    const next = [...teamNotes, entry];
     const serializable = next.map(({ legacy, ...rest }) => rest);
     const json = JSON.stringify(serializable);
     setNotesRaw(json);
     setNewNote('');
+    setPendingMentions([]);
+    setMentionQuery(null);
     onUpdate(task.id, { notes: json });
     toast({ title: '✅ Nota adicionada.' });
+
+    if (effectiveMentions.length && companyId) {
+      const contactName = contacts.find((c) => c.id === task.contact_id)?.name || '—';
+      await notifyTaskMention({
+        taskId: task.id,
+        taskTitle: task.title,
+        contactName,
+        mentionedProfileIds: effectiveMentions.map((m) => m.profile_id),
+        mentionedByName: authorName,
+        companyId,
+        actorUserId: user?.id ?? null,
+      });
+    }
   };
 
   const handleOpenCompletion = () => {
-    setCompletionType(attachmentUrl ? 'attachment' : 'attachment');
-    setProtocolNumber('');
-    setCompletionNotesInput('');
-    setCompletionOpen(true);
-  };
-
-  const handleConfirmCompletion = () => {
-    if (completionType === 'attachment') {
-      if (!attachmentUrl) {
-        toast({ title: 'Anexe um arquivo antes de concluir', variant: 'destructive' });
-        return;
-      }
+    if (attachmentUrl) {
       onUpdate(task.id, {
         status: 'concluido',
         completion_type: 'attachment',
         completed_at: new Date().toISOString(),
       } as any);
-    } else if (completionType === 'protocol') {
-      const proto = protocolNumber.trim();
-      if (!proto) {
-        toast({ title: 'Informe o número de protocolo', variant: 'destructive' });
-        return;
-      }
-      onUpdate(task.id, {
-        status: 'concluido',
-        completion_type: 'protocol',
-        protocol_number: proto,
-        completion_notes: completionNotesInput.trim() || null,
-        completed_at: new Date().toISOString(),
-      } as any);
-    } else if (completionType === 'transmitted') {
-      const notes = completionNotesInput.trim();
-      if (notes.length < 10) {
-        toast({ title: 'Descreva com pelo menos 10 caracteres', variant: 'destructive' });
-        return;
-      }
-      onUpdate(task.id, {
-        status: 'concluido',
-        completion_type: 'transmitted',
-        completion_notes: notes,
-        completed_at: new Date().toISOString(),
-      } as any);
+      onOpenChange(false);
+      return;
     }
-    setCompletionOpen(false);
+    setProtocolNumber('');
+    setCompletionNotesInput('');
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmCompletion = () => {
+    const proto = protocolNumber.trim();
+    const obs = completionNotesInput.trim();
+    if (!proto && obs.length < 10) {
+      toast({
+        title: 'Informe um protocolo ou uma observação com pelo menos 10 caracteres',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const completion_type = proto ? 'protocol' : 'transmitted';
+    onUpdate(task.id, {
+      status: 'concluido',
+      completion_type,
+      protocol_number: proto || null,
+      completion_notes: obs || null,
+      completed_at: new Date().toISOString(),
+    } as any);
+    setConfirmOpen(false);
     onOpenChange(false);
   };
+
 
 
 
@@ -381,7 +464,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
         <SheetHeader className="space-y-2 pb-4">
           <SheetTitle className="text-2xl">{contactName}</SheetTitle>
           <div className="flex flex-wrap items-center gap-2">
@@ -608,103 +691,8 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
             )}
           </section>
 
-          {/* Painel de Conclusão (3 opções) */}
-          {completionOpen && task.status !== 'concluido' && (
-            <section className="space-y-3 rounded-md border border-primary/30 bg-primary/5 p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">Como deseja concluir esta tarefa?</h3>
-                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setCompletionOpen(false)}>
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-              <RadioGroup
-                value={completionType}
-                onValueChange={(v) => setCompletionType(v as any)}
-                className="space-y-2"
-              >
-                <label className="flex items-start gap-2 cursor-pointer p-2 rounded hover:bg-muted/40">
-                  <RadioGroupItem value="attachment" id="ct-att" className="mt-0.5" />
-                  <div className="text-sm">📎 Anexar comprovante</div>
-                </label>
-                <label className="flex items-start gap-2 cursor-pointer p-2 rounded hover:bg-muted/40">
-                  <RadioGroupItem value="protocol" id="ct-prot" className="mt-0.5" />
-                  <div className="text-sm">🔢 Informar protocolo</div>
-                </label>
-                <label className="flex items-start gap-2 cursor-pointer p-2 rounded hover:bg-muted/40">
-                  <RadioGroupItem value="transmitted" id="ct-trans" className="mt-0.5" />
-                  <div className="text-sm">✅ Marcar como transmitido</div>
-                </label>
-              </RadioGroup>
+          {/* Painel de Conclusão antigo removido — agora usa Dialog (ver final do componente) */}
 
-              {completionType === 'attachment' && (
-                <div className="space-y-2">
-                  {attachmentUrl ? (
-                    <div className="text-xs text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-1">
-                      <CheckCircle className="w-3.5 h-3.5" /> Arquivo já anexado.
-                    </div>
-                  ) : (
-                    <Label htmlFor="task-attachment-confirm" className="cursor-pointer">
-                      <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded border border-dashed border-border hover:bg-muted/50 text-xs">
-                        <Upload className="w-3.5 h-3.5" />
-                        {uploading ? 'Enviando...' : 'Selecionar arquivo'}
-                      </div>
-                      <input
-                        id="task-attachment-confirm"
-                        type="file"
-                        className="hidden"
-                        onChange={handleUpload}
-                        disabled={uploading}
-                      />
-                    </Label>
-                  )}
-                </div>
-              )}
-
-              {completionType === 'protocol' && (
-                <div className="space-y-2">
-                  <div>
-                    <Label className="text-xs">Número do protocolo</Label>
-                    <Input
-                      value={protocolNumber}
-                      onChange={(e) => setProtocolNumber(e.target.value)}
-                      placeholder="Ex: 2.06.000.123456-7"
-                      maxLength={100}
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Observações (opcional)</Label>
-                    <Textarea
-                      value={completionNotesInput}
-                      onChange={(e) => setCompletionNotesInput(e.target.value)}
-                      rows={2}
-                      maxLength={1000}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {completionType === 'transmitted' && (
-                <div>
-                  <Label className="text-xs">Observações</Label>
-                  <Textarea
-                    value={completionNotesInput}
-                    onChange={(e) => setCompletionNotesInput(e.target.value)}
-                    rows={3}
-                    placeholder="Descreva como e onde foi transmitido..."
-                    maxLength={1000}
-                  />
-                  <p className="text-[10px] text-muted-foreground mt-1">Mínimo de 10 caracteres.</p>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button size="sm" variant="ghost" onClick={() => setCompletionOpen(false)}>Cancelar</Button>
-                <Button size="sm" onClick={handleConfirmCompletion} className="gap-1.5">
-                  <CheckCircle className="w-4 h-4" /> Concluir
-                </Button>
-              </div>
-            </section>
-          )}
 
           <Separator />
 
@@ -733,7 +721,9 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                           <Badge variant="outline" className="text-[9px] px-1.5 py-0">legado</Badge>
                         )}
                       </div>
-                      <p className="text-xs text-foreground whitespace-pre-wrap mt-0.5">{n.text}</p>
+                      <p className="text-xs text-foreground whitespace-pre-wrap mt-0.5">
+                        {renderNoteText(n.text, n.mentions ?? [])}
+                      </p>
                     </div>
                   </div>
                 ))
@@ -741,18 +731,61 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
             </div>
 
             <div className="flex gap-2 items-end">
-              <Textarea
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                rows={2}
-                placeholder="Escreva uma nota para a equipe..."
-                className="flex-1"
-              />
+              <Popover open={mentionQuery !== null} onOpenChange={(o) => !o && setMentionQuery(null)}>
+                <PopoverTrigger asChild>
+                  <div className="flex-1 relative">
+                    <Textarea
+                      ref={newNoteRef}
+                      value={newNote}
+                      onChange={handleNoteChange}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') setMentionQuery(null);
+                      }}
+                      rows={2}
+                      placeholder="Escreva uma nota — use @ para mencionar a equipe..."
+                      className="w-full"
+                    />
+                    <AtSign className="absolute right-2 top-2 h-3.5 w-3.5 text-muted-foreground/60 pointer-events-none" />
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  side="top"
+                  className="w-64 p-1"
+                  onOpenAutoFocus={(e) => e.preventDefault()}
+                >
+                  {(() => {
+                    const q = (mentionQuery ?? '').toLowerCase().trim();
+                    const filtered = profiles
+                      .filter((p) => (p.full_name ?? '').toLowerCase().includes(q))
+                      .slice(0, 6);
+                    if (filtered.length === 0) {
+                      return <div className="px-2 py-1.5 text-xs text-muted-foreground">Nenhum membro encontrado</div>;
+                    }
+                    return filtered.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => insertMention(p)}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/60 text-left"
+                      >
+                        <Avatar className="w-6 h-6">
+                          <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                            {initialsOf(p.full_name || '?')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm truncate">{p.full_name || 'Sem nome'}</span>
+                      </button>
+                    ));
+                  })()}
+                </PopoverContent>
+              </Popover>
               <Button size="sm" onClick={handleAddNote} disabled={!newNote.trim()} className="gap-1.5">
                 <Send className="w-3.5 h-3.5" /> Adicionar
               </Button>
             </div>
           </section>
+
 
           <Separator />
 
@@ -812,6 +845,49 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
           </div>
         </div>
       </SheetContent>
+
+      {/* Dialog de confirmação de conclusão sem anexo */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Concluir tarefa</DialogTitle>
+            <DialogDescription>
+              Como esta tarefa não tem anexo, informe o <strong>número de protocolo</strong> e/ou
+              uma <strong>observação</strong> (mínimo 10 caracteres) para justificar a conclusão.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label className="text-xs">Número do protocolo (opcional)</Label>
+              <Input
+                value={protocolNumber}
+                onChange={(e) => setProtocolNumber(e.target.value)}
+                placeholder="Ex: 2.06.000.123456-7"
+                maxLength={100}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Observação (opcional)</Label>
+              <Textarea
+                value={completionNotesInput}
+                onChange={(e) => setCompletionNotesInput(e.target.value)}
+                rows={3}
+                placeholder="Descreva como/onde a obrigação foi cumprida..."
+                maxLength={1000}
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Se não houver protocolo, a observação precisa ter pelo menos 10 caracteres.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
+            <Button onClick={handleConfirmCompletion} className="gap-1.5">
+              <CheckCircle className="w-4 h-4" /> Concluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }

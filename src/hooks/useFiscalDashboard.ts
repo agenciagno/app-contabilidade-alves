@@ -108,18 +108,16 @@ export function useFiscalTasksPrevMonth(year: number, month: number) {
   return useFiscalTasksOfMonth(prev.y, prev.m);
 }
 
-export function useFiscalTasks48h() {
+export function useFiscalUpcomingTasksRange(startDate: string, endDate: string) {
   const { company } = useCompany();
   const companyId = (company as any)?.id;
   const { isColaborador } = useUserRole();
   const { data: profileId } = useCurrentProfileId();
 
   return useQuery<Task48hRow[]>({
-    queryKey: ['fiscal-dashboard', 'tasks-48h', companyId, isColaborador, profileId],
+    queryKey: ['fiscal-dashboard', 'tasks-upcoming', companyId, startDate, endDate, isColaborador, profileId],
     enabled: !!companyId && (!isColaborador || !!profileId),
     queryFn: async () => {
-      const start = today();
-      const end = inDays(2);
       let q = (supabase as any)
         .from('fiscal_tasks')
         .select(
@@ -127,10 +125,10 @@ export function useFiscalTasks48h() {
         )
         .eq('company_id', companyId)
         .neq('status', 'concluido')
-        .gte('fiscal_due_date', start)
-        .lte('fiscal_due_date', end)
+        .gte('fiscal_due_date', startDate)
+        .lte('fiscal_due_date', endDate)
         .order('fiscal_due_date', { ascending: true })
-        .limit(10);
+        .limit(100);
       if (isColaborador && profileId) {
         q = q.eq('responsible_id', profileId);
       }
@@ -139,6 +137,11 @@ export function useFiscalTasks48h() {
       return (data ?? []) as Task48hRow[];
     },
   });
+}
+
+// Backward-compat alias (default 48h window)
+export function useFiscalTasks48h() {
+  return useFiscalUpcomingTasksRange(today(), inDays(2));
 }
 
 export function useFiscalCollaborators() {
