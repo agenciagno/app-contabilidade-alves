@@ -319,8 +319,9 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
 
   const handleSaveTaskInfo = () => {
     if (!canEdit) return;
-    if (status === 'concluido' && !attachmentUrl) {
-      toast({ title: 'Anexo obrigatório para concluir', variant: 'destructive' });
+    if (status === 'concluido' && !attachmentUrl && task.status !== 'concluido') {
+      // Open confirm dialog to capture protocol/notes
+      setConfirmOpen(true);
       return;
     }
     onUpdate(task.id, {
@@ -333,73 +334,113 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     toast({ title: '✅ Tarefa atualizada.' });
   };
 
-  const handleAddNote = () => {
+  // --- Mentions: detect @ and show popover ---
+  const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setNewNote(value);
+    const caret = e.target.selectionStart ?? value.length;
+    const upto = value.slice(0, caret);
+    const m = upto.match(/(?:^|\s)@([\p{L}\p{N} ]{0,30})$/u);
+    setMentionQuery(m ? m[1] : null);
+  };
+
+  const insertMention = (profile: { id: string; full_name: string | null }) => {
+    const name = profile.full_name || 'Usuário';
+    const ta = newNoteRef.current;
+    const caret = ta?.selectionStart ?? newNote.length;
+    const before = newNote.slice(0, caret);
+    const after = newNote.slice(caret);
+    const replaced = before.replace(/(?:^|\s)@([\p{L}\p{N} ]{0,30})$/u, (full, _q) => {
+      const lead = full.startsWith(' ') ? ' ' : (full.startsWith('@') ? '' : '');
+      return `${lead}@${name} `;
+    });
+    const next = replaced + after;
+    setNewNote(next);
+    setMentionQuery(null);
+    setPendingMentions((prev) =>
+      prev.some((p) => p.profile_id === profile.id) ? prev : [...prev, { profile_id: profile.id, name }]
+    );
+    setTimeout(() => {
+      ta?.focus();
+      const pos = replaced.length;
+      ta?.setSelectionRange(pos, pos);
+    }, 0);
+  };
+
+  const handleAddNote = async () => {
     const text = newNote.trim();
     if (!text) return;
     const authorName = currentProfile?.full_name || currentProfile?.email?.split('@')[0] || 'Usuário';
+    // Keep only mentions still present in text
+    const effectiveMentions = pendingMentions.filter((m) => text.includes(`@${m.name}`));
     const entry: TeamNote = {
       profile_id: currentProfile?.id ?? null,
       profile_name: authorName,
       text,
       created_at: new Date().toISOString(),
+      mentions: effectiveMentions.length ? effectiveMentions : undefined,
     };
-    const next = [...teamNotes.filter((n) => !n.legacy || true), entry];
-    // Persist as JSON array (legacy item is included so it survives)
+    const next = [...teamNotes, entry];
     const serializable = next.map(({ legacy, ...rest }) => rest);
     const json = JSON.stringify(serializable);
     setNotesRaw(json);
     setNewNote('');
+    setPendingMentions([]);
+    setMentionQuery(null);
     onUpdate(task.id, { notes: json });
     toast({ title: '✅ Nota adicionada.' });
+
+    if (effectiveMentions.length && companyId) {
+      const contactName = contacts.find((c) => c.id === task.contact_id)?.name || '—';
+      await notifyTaskMention({
+        taskId: task.id,
+        taskTitle: task.title,
+        contactName,
+        mentionedProfileIds: effectiveMentions.map((m) => m.profile_id),
+        mentionedByName: authorName,
+        companyId,
+        actorUserId: user?.id ?? null,
+      });
+    }
   };
 
   const handleOpenCompletion = () => {
-    setCompletionType(attachmentUrl ? 'attachment' : 'attachment');
-    setProtocolNumber('');
-    setCompletionNotesInput('');
-    setCompletionOpen(true);
-  };
-
-  const handleConfirmCompletion = () => {
-    if (completionType === 'attachment') {
-      if (!attachmentUrl) {
-        toast({ title: 'Anexe um arquivo antes de concluir', variant: 'destructive' });
-        return;
-      }
+    if (attachmentUrl) {
       onUpdate(task.id, {
         status: 'concluido',
         completion_type: 'attachment',
         completed_at: new Date().toISOString(),
       } as any);
-    } else if (completionType === 'protocol') {
-      const proto = protocolNumber.trim();
-      if (!proto) {
-        toast({ title: 'Informe o número de protocolo', variant: 'destructive' });
-        return;
-      }
-      onUpdate(task.id, {
-        status: 'concluido',
-        completion_type: 'protocol',
-        protocol_number: proto,
-        completion_notes: completionNotesInput.trim() || null,
-        completed_at: new Date().toISOString(),
-      } as any);
-    } else if (completionType === 'transmitted') {
-      const notes = completionNotesInput.trim();
-      if (notes.length < 10) {
-        toast({ title: 'Descreva com pelo menos 10 caracteres', variant: 'destructive' });
-        return;
-      }
-      onUpdate(task.id, {
-        status: 'concluido',
-        completion_type: 'transmitted',
-        completion_notes: notes,
-        completed_at: new Date().toISOString(),
-      } as any);
+      onOpenChange(false);
+      return;
     }
-    setCompletionOpen(false);
+    setProtocolNumber('');
+    setCompletionNotesInput('');
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmCompletion = () => {
+    const proto = protocolNumber.trim();
+    const obs = completionNotesInput.trim();
+    if (!proto && obs.length < 10) {
+      toast({
+        title: 'Informe um protocolo ou uma observação com pelo menos 10 caracteres',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const completion_type = proto ? 'protocol' : 'transmitted';
+    onUpdate(task.id, {
+      status: 'concluido',
+      completion_type,
+      protocol_number: proto || null,
+      completion_notes: obs || null,
+      completed_at: new Date().toISOString(),
+    } as any);
+    setConfirmOpen(false);
     onOpenChange(false);
   };
+
 
 
 
