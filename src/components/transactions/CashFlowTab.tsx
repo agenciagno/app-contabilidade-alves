@@ -928,6 +928,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                       </TableCell>
 
                       {/* A Pagar */}
+                      {!isReceivables && (
                       <TableCell className="text-right whitespace-nowrap">
                         {row.type === 'despesa' ? (
                           <span className="text-red-500 font-semibold">{formatCurrency(row.originalAmount)}</span>
@@ -935,6 +936,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                           <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
+                      )}
 
                       {/* Vencimento */}
                       <TableCell className="font-mono tabular-nums whitespace-nowrap">{row.due_date ? formatDate(row.due_date) : '—'}</TableCell>
