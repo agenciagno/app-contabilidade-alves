@@ -36,6 +36,13 @@ Espelhar no modal as mesmas regras que `CashFlowTab` aplica quando `mode === 're
 - `CashFlowTab.tsx` e `PagarReceber.tsx` **não mudam**.
 - KPIs, totais, fontes do PDF/XLS/CSV permanecem com a mesma formatação e estilos.
 
+## Ajuste final
+
+Na sub-aba "A Receber" (`mode='receivables'`), além do pré-filtro de receitas, restringir a exibição apenas às transações cujo **Evento Contábil** seja **Honorários Contábeis**:
+
+- Em `CashFlowTab.tsx`, o `useMemo` de pré-filtro agora inclui `t.category?.name === 'Honorários Contábeis'`.
+- Em `CashFlowReportModal.tsx`, o mesmo filtro é espelhado no pré-filtro `txns` para que o relatório da aba "A Receber" também contenha somente essas transações.
+
 ## Fora do escopo
 
 - Aba "Pagar / Receber" (`mode='all'`): nenhuma mudança visual ou de cálculo.

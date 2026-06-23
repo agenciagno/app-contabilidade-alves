@@ -164,10 +164,13 @@ export function CashFlowReportModal({
   const activeBanks = useMemo(() => banks.filter(b => b.is_active), [banks]);
   const totalBankBalance = useMemo(() => activeBanks.reduce((s, b) => s + Number(b.current_balance), 0), [activeBanks]);
 
-  // Pre-filter: in receivables mode, only "A Receber" entries (receita > 0) — mirrors CashFlowTab
+  // Pre-filter: in receivables mode, only "A Receber" entries (receita > 0)
+  // with Evento Contábil: Honorários Contábeis — mirrors CashFlowTab
   const txns = useMemo(() => {
     if (!isReceivables) return transactions;
-    return transactions.filter(t => t.type === 'receita' && Number(t.amount) > 0);
+    return transactions.filter(
+      t => t.type === 'receita' && Number(t.amount) > 0 && t.category?.name === 'Honorários Contábeis'
+    );
   }, [transactions, isReceivables]);
 
   // Date key: receivables ranks by due_date (Vencimento); all ranks by expected_date (Data Prevista)
