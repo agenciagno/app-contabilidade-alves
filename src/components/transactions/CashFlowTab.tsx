@@ -794,6 +794,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-card">
                   <TableRow>
+                    {!isReceivables && (
                     <TableHead className="text-xs whitespace-nowrap">
                       <Popover>
                         <PopoverTrigger asChild>
@@ -816,6 +817,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                         </PopoverContent>
                       </Popover>
                     </TableHead>
+                    )}
                     <TableHead className="text-xs whitespace-nowrap">
                       <ContactEventMultiFilter
                         columnFilters={columnFilters}
@@ -885,17 +887,12 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                 <TableBody>
                   {rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isReceivables ? 9 : 10} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={isReceivables ? 8 : 10} className="text-center text-muted-foreground py-8">
                         Nenhuma transação encontrada.
                       </TableCell>
                     </TableRow>
                   ) : rows.map(row => (
                     <TableRow key={row.id} className="text-xs">
-                      {/* Data Prevista */}
-                      <TableCell className="font-mono tabular-nums whitespace-nowrap">
-                        {(row.expected_date || row.due_date || row.issue_date) ? formatDate(row.expected_date || row.due_date || row.issue_date!) : '—'}
-                      </TableCell>
-
                       {/* Cliente/Fornecedor */}
                       <TableCell className="truncate max-w-[150px]"><Tooltip><TooltipTrigger asChild><span className="truncate block">{row.contact?.name ?? row.description}</span></TooltipTrigger><TooltipContent side="top" className="apple-tooltip"><p>{row.contact?.name ?? row.description}</p></TooltipContent></Tooltip></TableCell>
 
