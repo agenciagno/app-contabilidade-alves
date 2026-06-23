@@ -1059,6 +1059,7 @@ export function CashFlowReportModal({
                 </SelectContent>
               </Select>
             </div>
+            {!isReceivables && (
             <div>
               <Label className="text-sm font-semibold mb-1 block">Tipo</Label>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -1070,6 +1071,7 @@ export function CashFlowReportModal({
                 </SelectContent>
               </Select>
             </div>
+            )}
           </div>
 
           <Separator className="my-2" />
