@@ -885,7 +885,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                 <TableBody>
                   {rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isReceivables ? 9 : 10} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={isReceivables ? 8 : 10} className="text-center text-muted-foreground py-8">
                         Nenhuma transação encontrada.
                       </TableCell>
                     </TableRow>
