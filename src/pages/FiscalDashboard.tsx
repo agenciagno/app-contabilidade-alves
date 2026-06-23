@@ -301,6 +301,16 @@ function RiskRadarCard({
   );
 }
 
+type UpcomingPreset = '2' | '7' | '15' | '30' | 'custom';
+
+const PRESET_OPTIONS: { value: UpcomingPreset; label: string }[] = [
+  { value: '2', label: '2 dias' },
+  { value: '7', label: '7 dias' },
+  { value: '15', label: '15 dias' },
+  { value: '30', label: '30 dias' },
+  { value: 'custom', label: 'Personalizado' },
+];
+
 export default function FiscalDashboard() {
   const { isAdmin, isSuperAdmin, isLoading: roleLoading } = useUserRole();
   const qc = useQueryClient();
@@ -311,86 +321,51 @@ export default function FiscalDashboard() {
   const [month, setMonth] = useState<number>(now.getMonth() + 1);
   const [regime, setRegime] = useState<string>('todos');
 
+  // Próximos Vencimentos – filtro
+  const [upcomingPreset, setUpcomingPreset] = useState<UpcomingPreset>('2');
+  const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
+  const [customOpen, setCustomOpen] = useState(false);
+
+  const { upcomingStart, upcomingEnd } = useMemo(() => {
+    if (upcomingPreset === 'custom') {
+      const from = customRange.from ? isoFromDate(customRange.from) : todayIso();
+      const to = customRange.to
+        ? isoFromDate(customRange.to)
+        : (customRange.from ? isoFromDate(customRange.from) : inDaysIso(7));
+      return { upcomingStart: from, upcomingEnd: to };
+    }
+    return { upcomingStart: todayIso(), upcomingEnd: inDaysIso(Number(upcomingPreset)) };
+  }, [upcomingPreset, customRange]);
+
   const tasksQ = useFiscalTasksOfMonth(year, month);
-  const prevTasksQ = useFiscalTasksPrevMonth(year, month);
   const collabsQ = useFiscalCollaborators();
-  const upcomingQ = useUpcomingFiscalTasks();
-  const tasks48hQ = useFiscalTasks48h();
+  const upcomingTasksQ = useFiscalUpcomingTasksRange(upcomingStart, upcomingEnd);
 
   const today = todayIso();
 
-  // Helper: filter tasks by regime
   const filterByRegime = <T extends { contacts?: { tax_regime?: string | null } | null }>(arr: T[]): T[] => {
     if (regime === 'todos') return arr;
     return arr.filter((t) => (t.contacts?.tax_regime ?? '') === regime);
   };
 
   const tasks = useMemo(() => filterByRegime(tasksQ.data ?? []), [tasksQ.data, regime]);
-  const prevTasks = useMemo(() => filterByRegime(prevTasksQ.data ?? []), [prevTasksQ.data, regime]);
-  const tasks48h = useMemo(() => filterByRegime(tasks48hQ.data ?? []), [tasks48hQ.data, regime]);
-  const upcoming = useMemo(() => (upcomingQ.data ?? []), [upcomingQ.data]);
+  const upcomingTasks = useMemo(
+    () => filterByRegime(upcomingTasksQ.data ?? []),
+    [upcomingTasksQ.data, regime],
+  );
 
   const kpis = useMemo(() => {
-    const total = tasks.length;
     const concluidas = tasks.filter((t) => t.status === 'concluido').length;
     const atrasadas = tasks.filter((t) => isLateTask(t, today)).length;
     const pendentes = tasks.filter((t) => t.status === 'a_fazer' && (!t.due_date || t.due_date >= today)).length;
     const emAndamento = tasks.filter((t) => t.status === 'em_progresso').length;
-    return { total, concluidas, pendentes, atrasadas, emAndamento };
+    return { concluidas, pendentes, atrasadas, emAndamento };
   }, [tasks, today]);
-
-  const compliance = useMemo(() => computeComplianceRate(tasks), [tasks]);
-  const prevCompliance = useMemo(() => computeComplianceRate(prevTasks), [prevTasks]);
 
   const semResponsavel = useMemo(
     () => tasks.filter((t) => !t.responsible_id && t.status !== 'concluido').length,
     [tasks]
   );
-
-  const chartData = useMemo(() => {
-    const collabs = collabsQ.data ?? [];
-    const map = new Map<string, { name: string; concluidas: number; pendentes: number; emAndamento: number; atrasadas: number }>();
-    collabs.forEach((c) => map.set(c.id, { name: c.full_name ?? '—', concluidas: 0, pendentes: 0, emAndamento: 0, atrasadas: 0 }));
-    map.set('__none__', { name: 'Sem responsável', concluidas: 0, pendentes: 0, emAndamento: 0, atrasadas: 0 });
-
-    tasks.forEach((t) => {
-      const key = t.responsible_id ?? '__none__';
-      const entry = map.get(key);
-      if (!entry) return;
-      if (isLateTask(t, today)) entry.atrasadas += 1;
-      else if (t.status === 'concluido') entry.concluidas += 1;
-      else if (t.status === 'em_progresso') entry.emAndamento += 1;
-      else if (t.status === 'a_fazer') entry.pendentes += 1;
-    });
-
-    return Array.from(map.values()).filter(
-      (e) => e.concluidas + e.pendentes + e.emAndamento + e.atrasadas > 0 || e.name !== 'Sem responsável'
-    );
-  }, [tasks, collabsQ.data, today]);
-
-  const progressList = useMemo(() => {
-    const collabs = collabsQ.data ?? [];
-    return collabs.map((c) => {
-      const own = tasks.filter((t) => t.responsible_id === c.id);
-      const total = own.length;
-      const concluidas = own.filter((t) => t.status === 'concluido');
-      const concluidasCount = concluidas.length;
-      const atrasadas = own.filter((t) => isLateTask(t, today)).length;
-      const pct = total > 0 ? Math.round((concluidasCount / total) * 100) : 0;
-
-      const noPrazoCount = concluidas.filter(isOnTime).length;
-      const noPrazoPct = concluidasCount > 0 ? Math.round((noPrazoCount / concluidasCount) * 100) : null;
-
-      const days = concluidas
-        .filter((t) => t.completed_at && t.created_at)
-        .map((t) => differenceInDays(parseISO(t.completed_at!), parseISO(t.created_at!)));
-      const mediaDias = days.length > 0
-        ? Math.round((days.reduce((a, b) => a + b, 0) / days.length) * 10) / 10
-        : null;
-
-      return { id: c.id, name: c.full_name ?? '—', total, concluidas: concluidasCount, atrasadas, pct, noPrazoPct, mediaDias };
-    });
-  }, [tasks, collabsQ.data, today]);
 
   if (roleLoading) return null;
   if (!isAdmin && !isSuperAdmin) return <Navigate to="/fiscal/tarefas" replace />;
@@ -398,12 +373,12 @@ export default function FiscalDashboard() {
   const handleRefresh = () => qc.invalidateQueries({ queryKey: ['fiscal-dashboard'] });
   const handleExport = () => window.print();
 
-  const fmt = (s: string | null) => (s ? format(parseISO(s), 'dd/MM/yyyy') : '—');
-  const fmtTime = (s: string | null) => {
-    if (!s) return '—';
-    // fiscal_due_date is `date`, sem hora; mostra como dd/MM
-    return format(parseISO(s), 'dd/MM');
-  };
+  const fmtTime = (s: string | null) => (s ? format(parseISO(s), 'dd/MM') : '—');
+
+  const goToKanbanByContact = (contactId: string) =>
+    navigate(`/fiscal/tarefas?view=kanban&contact_id=${contactId}`);
+
+  const upcomingCount = upcomingTasks.length;
 
   return (
     <div className="p-6 space-y-6">
@@ -470,66 +445,73 @@ export default function FiscalDashboard() {
         </Alert>
       )}
 
-      {/* KPIs row 1 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Pendentes" value={kpis.pendentes} total={kpis.total} icon={Clock} borderClass="border-l-blue-500" iconClass="text-blue-500" />
-        <KpiCard label="Em andamento" value={kpis.emAndamento} total={kpis.total} icon={ListChecks} borderClass="border-l-orange-500" iconClass="text-orange-500" />
-        <KpiCard label="Atrasadas" value={kpis.atrasadas} total={kpis.total} icon={AlertTriangle} borderClass="border-l-red-500" iconClass="text-red-500" />
-        <KpiCard label="Concluídas" value={kpis.concluidas} total={kpis.total} icon={CheckCircle2} borderClass="border-l-green-500" iconClass="text-green-500" />
+      {/* KPIs row 1 — 4 cards compactos */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard label="Pendentes" value={kpis.pendentes} icon={Clock} borderClass="border-l-blue-500" iconClass="text-blue-500" />
+        <KpiCard label="Em andamento" value={kpis.emAndamento} icon={ListChecks} borderClass="border-l-orange-500" iconClass="text-orange-500" />
+        <KpiCard label="Atrasadas" value={kpis.atrasadas} icon={AlertTriangle} borderClass="border-l-red-500" iconClass="text-red-500" />
+        <KpiCard label="Concluídas" value={kpis.concluidas} icon={CheckCircle2} borderClass="border-l-green-500" iconClass="text-green-500" />
       </div>
 
-      {/* KPIs row 2 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <RateKpiCard
-          label="Taxa de Cumprimento"
-          rate={compliance.rate}
-          subtitle={compliance.total > 0 ? `${compliance.total} concluída(s) avaliada(s)` : 'sem tarefas concluídas'}
-          icon={TrendingUp}
-        />
-        <ComparisonKpiCard
-          current={compliance.rate}
-          previous={prevCompliance.rate}
-          hasPrevious={prevCompliance.total > 0}
-        />
-      </div>
-
-      {/* Risk Radar */}
-      <RiskRadarCard
-        tasks={tasks}
-        today={today}
-        onClientClick={(id) => navigate(`/fiscal/tarefas?contact=${id}`)}
-        onSeeAll={() => navigate('/fiscal/tarefas?filter=atrasadas')}
-      />
-
-      {/* 48h widget */}
+      {/* Próximos Vencimentos */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardHeader className="flex flex-col gap-3 space-y-0 pb-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-base flex items-center gap-2">
-            Vencendo nas Próximas 48h
-            <Badge variant="secondary">{tasks48h.length}</Badge>
+            Próximos Vencimentos
+            <Badge variant="secondary">{upcomingCount}</Badge>
           </CardTitle>
-          {tasks48h.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="no-print"
-              onClick={() => navigate('/fiscal/tarefas?filter=48h')}
+          <div className="flex flex-wrap items-center gap-2 no-print">
+            <ToggleGroup
+              type="single"
+              value={upcomingPreset}
+              onValueChange={(v) => {
+                if (!v) return;
+                setUpcomingPreset(v as UpcomingPreset);
+                if (v === 'custom') setCustomOpen(true);
+              }}
+              className="flex-wrap"
             >
-              Ver todas
-            </Button>
-          )}
+              {PRESET_OPTIONS.map((p) => (
+                <ToggleGroupItem key={p.value} value={p.value} className="text-xs h-8">
+                  {p.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            {upcomingPreset === 'custom' && (
+              <Popover open={customOpen} onOpenChange={setCustomOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                    <CalendarIcon className="h-3.5 w-3.5" />
+                    {customRange.from && customRange.to
+                      ? `${format(customRange.from, 'dd/MM', { locale: ptBR })} – ${format(customRange.to, 'dd/MM', { locale: ptBR })}`
+                      : 'Escolher datas'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="range"
+                    selected={customRange as any}
+                    onSelect={(r: any) => setCustomRange(r ?? {})}
+                    numberOfMonths={2}
+                    locale={ptBR}
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          {tasks48hQ.isLoading ? (
+          {upcomingTasksQ.isLoading ? (
             <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-          ) : tasks48h.length === 0 ? (
+          ) : upcomingTasks.length === 0 ? (
             <div className="flex items-center gap-3 py-6 text-muted-foreground">
               <CheckCircle2 className="h-5 w-5 text-green-500" />
-              <span>Nenhuma obrigação vencendo nas próximas 48 horas</span>
+              <span>Nenhuma obrigação vencendo no período selecionado</span>
             </div>
           ) : (
-            <div className="divide-y">
-              {tasks48h.map((t) => (
+            <div className="max-h-[420px] overflow-y-auto divide-y">
+              {upcomingTasks.map((t) => (
                 <div key={t.id} className="flex items-center gap-3 py-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{t.contacts?.name ?? '—'}</p>
@@ -551,139 +533,20 @@ export default function FiscalDashboard() {
         </CardContent>
       </Card>
 
-      {/* Chart */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">Tarefas por Colaborador</CardTitle></CardHeader>
-        <CardContent>
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" tickLine={false} axisLine={false} />
-                <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="concluidas" name="Concluídas" stackId="a" fill={COLOR_OK} />
-                <Bar dataKey="pendentes" name="Pendentes" stackId="a" fill="hsl(217 91% 60%)" />
-                <Bar dataKey="emAndamento" name="Em andamento" stackId="a" fill="hsl(25 95% 53%)" />
-                <Bar dataKey="atrasadas" name="Atrasadas" stackId="a" fill={COLOR_LATE} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Progress per collaborator */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Progresso por Colaborador</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {collabsQ.isLoading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i}><CardContent className="p-4"><Skeleton className="h-20 w-full" /></CardContent></Card>
-            ))
-          ) : progressList.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum colaborador ativo.</p>
-          ) : (
-            progressList.map((c) => {
-              const borderColor = c.noPrazoPct === null
-                ? ''
-                : c.noPrazoPct >= 90 ? 'border-l-4 border-l-green-500'
-                : c.noPrazoPct >= 70 ? 'border-l-4 border-l-yellow-500'
-                : 'border-l-4 border-l-red-500';
-              return (
-                <Card key={c.id} className={cn(borderColor)}>
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                            {(c.name || 'U').charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium truncate">{c.name}</span>
-                      </div>
-                      {c.atrasadas > 0 && <Badge variant="destructive">{c.atrasadas} atrasada(s)</Badge>}
-                    </div>
-                    <Progress value={c.pct} />
-                    <p className="text-xs text-muted-foreground">
-                      {c.concluidas} de {c.total} tarefas — {c.pct}%
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">No prazo</p>
-                        <p className="text-sm font-medium">{c.noPrazoPct !== null ? `${c.noPrazoPct}%` : '—'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Média dias</p>
-                        <p className="text-sm font-medium">{c.mediaDias !== null ? `${c.mediaDias}` : '—'}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
-        </div>
-      </div>
+      {/* Risk Radar */}
+      <RiskRadarCard
+        tasks={tasks}
+        today={today}
+        onClientClick={goToKanbanByContact}
+        onSeeAll={() => navigate('/fiscal/tarefas?filter=atrasadas')}
+      />
 
       {/* Pendências por Cliente */}
-      <ClientPendenciesSection tasks={tasks} today={today} onClientClick={(id) => navigate(`/fiscal/tarefas?contact=${id}`)} />
-
-      {/* Faturamento e Teto SN */}
-      <RevenueLimitsSection year={year} regime={regime} />
-
-      {/* Upcoming */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">Próximos Vencimentos (7 dias)</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Obrigação</TableHead>
-                <TableHead>Entrega Interna</TableHead>
-                <TableHead>Vencimento Fiscal</TableHead>
-                <TableHead>Responsável</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {upcomingQ.isLoading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 6 }).map((_, j) => (
-                      <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : upcoming.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                    Nenhum vencimento nos próximos 7 dias
-                  </TableCell>
-                </TableRow>
-              ) : (
-                upcoming.map((r) => {
-                  const late = isLateTask({ status: r.status, due_date: r.due_date }, today);
-                  return (
-                    <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.contacts?.name ?? '—'}</TableCell>
-                      <TableCell>{r.fiscal_obligations_catalog?.name ?? r.title ?? '—'}</TableCell>
-                      <TableCell>{fmt(r.due_date)}</TableCell>
-                      <TableCell>{fmt(r.fiscal_due_date)}</TableCell>
-                      <TableCell>{r.responsible?.full_name ?? '—'}</TableCell>
-                      <TableCell><StatusBadge status={r.status} isLate={late} /></TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <ClientPendenciesSection tasks={tasks} today={today} onClientClick={goToKanbanByContact} />
     </div>
   );
 }
+
 
 // ---- Pendências por Cliente ----
 type ClientRow = {
