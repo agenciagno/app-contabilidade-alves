@@ -163,19 +163,35 @@ export default function FiscalTasks() {
   });
   const myProfileId = currentProfile?.id ?? null;
 
-  // Pre-populate responsible from URL (?responsible=<profileId>)
+  // Pre-populate from URL (?responsible=… | ?contact_id=… | ?view=kanban)
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     const r = searchParams.get('responsible');
-    if (r && r !== filterResponsible) {
+    const c = searchParams.get('contact_id') ?? searchParams.get('contact');
+    const v = searchParams.get('view') as ViewMode | null;
+    let mutated = false;
+    const next = new URLSearchParams(searchParams);
+    if (r) {
       setFilterResponsible(r);
       setViewMode('list');
-      const next = new URLSearchParams(searchParams);
       next.delete('responsible');
-      setSearchParams(next, { replace: true });
+      mutated = true;
     }
+    if (c) {
+      setFilterContact(c);
+      next.delete('contact_id');
+      next.delete('contact');
+      mutated = true;
+    }
+    if (v && ['myday', 'kanban', 'list', 'calendar'].includes(v)) {
+      setViewMode(v);
+      next.delete('view');
+      mutated = true;
+    }
+    if (mutated) setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   // Modals
   const [createOpen, setCreateOpen] = useState(false);
