@@ -317,9 +317,9 @@ export function CashFlowReportModal({
     const isPaid = monthlyStatus === 'paid';
     const catMap = new Map(categories.map(c => [c.id, c]));
 
-    const rows = transactions.filter(t => {
+    const rows = txns.filter(t => {
       if (t.is_paid !== isPaid) return false;
-      const ref = isPaid ? t.date : t.expected_date;
+      const ref = isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
       if (!ref) return false;
       if (parseInt(ref.slice(0, 4), 10) !== monthlyYear) return false;
       if (expandedSelectedCategories.size > 0 && !expandedSelectedCategories.has(t.category_id)) return false;
