@@ -259,9 +259,9 @@ export function CashFlowReportModal({
   const monthlyMatrix = useMemo(() => {
     // Filter rows by year + status + category
     const isPaid = monthlyStatus === 'paid';
-    const rows = transactions.filter(t => {
+    const rows = txns.filter(t => {
       if (t.is_paid !== isPaid) return false;
-      const ref = isPaid ? t.date : t.expected_date;
+      const ref = isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
       if (!ref) return false;
       if (parseInt(ref.slice(0, 4), 10) !== monthlyYear) return false;
       if (expandedSelectedCategories.size > 0 && !expandedSelectedCategories.has(t.category_id)) return false;
@@ -271,7 +271,7 @@ export function CashFlowReportModal({
     // Aggregate by event/category name
     const map = new Map<string, { name: string; color: string | null; monthly: number[]; total: number }>();
     for (const t of rows) {
-      const ref = isPaid ? t.date : t.expected_date;
+      const ref = isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
       if (!ref) continue;
       const month = parseInt(ref.slice(5, 7), 10) - 1;
       if (!sortedSelectedMonths.includes(month)) continue;
@@ -300,7 +300,7 @@ export function CashFlowReportModal({
       grand += e.total;
     }
     return { events, colTotals, grand };
-  }, [transactions, monthlyYear, monthlyStatus, expandedSelectedCategories, sortedSelectedMonths]);
+  }, [txns, monthlyYear, monthlyStatus, expandedSelectedCategories, sortedSelectedMonths, isReceivables]);
 
   // ─── Hierarchical matrix for "Versão Completa" (Evento → Cliente/Fornecedor) ──
   type HierarchicalEvent = {
