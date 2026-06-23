@@ -693,8 +693,18 @@ export function CashFlowReportModal({
       '',
     ];
 
-    const headers = ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status'];
-    const dataLines = rowsWithBalance.map(r => [
+    const headers = isReceivables
+      ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']
+      : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status'];
+    const dataLines = rowsWithBalance.map(r => (isReceivables ? [
+      `"${(r.contact?.name || r.description || '').replace(/"/g, '""')}"`,
+      Number(r.amount).toFixed(2).replace('.', ','),
+      r.due_date ? formatDateBR(r.due_date) : '',
+      r.category?.name || '',
+      `"${(r.notes || '').replace(/"/g, '""')}"`,
+      r.saldoAtual.toFixed(2).replace('.', ','),
+      getStatus(r.is_paid, r.due_date),
+    ] : [
       formatDateBR(r.expected_date || ''),
       `"${(r.contact?.name || r.description || '').replace(/"/g, '""')}"`,
       r.type === 'receita' ? Number(r.amount).toFixed(2).replace('.', ',') : '',
@@ -704,7 +714,7 @@ export function CashFlowReportModal({
       `"${(r.notes || '').replace(/"/g, '""')}"`,
       r.saldoAtual.toFixed(2).replace('.', ','),
       getStatus(r.is_paid, r.due_date),
-    ].join(';'));
+    ]).join(';'));
 
     const eventSummary = buildEventSummary(filteredRows);
     const eventTotals = eventSummary.reduce(
