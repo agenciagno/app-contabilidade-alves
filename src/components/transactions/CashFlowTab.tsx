@@ -832,6 +832,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                         values={receitaAmounts}
                       />
                     </TableHead>
+                    {!isReceivables && (
                     <TableHead className="text-xs whitespace-nowrap text-right">
                       <NumericMultiFilter
                         label="A Pagar"
@@ -840,6 +841,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                         values={despesaAmounts}
                       />
                     </TableHead>
+                    )}
                     <TableHead className="text-xs whitespace-nowrap">
                       <Popover>
                         <PopoverTrigger asChild>
