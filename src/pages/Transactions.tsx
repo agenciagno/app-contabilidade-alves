@@ -11,7 +11,7 @@ import {
   Building2, CheckCircle2, Search, Filter, X, ArrowUpDown, CircleDollarSign
 } from 'lucide-react';
 import { useTransactions, Transaction, TransactionInsert } from '@/hooks/useTransactions';
-import { useServerTransactions, useTransactionKPIs, PAGE_SIZE, ServerFilters, IS_EMPTY } from '@/hooks/useServerTransactions';
+import { useServerTransactions, useTransactionKPIs, useDistinctTransactionValues, PAGE_SIZE, ServerFilters, IS_EMPTY } from '@/hooks/useServerTransactions';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
 import { useCategories } from '@/hooks/useCategories';
 import { useBanks } from '@/hooks/useBanks';
