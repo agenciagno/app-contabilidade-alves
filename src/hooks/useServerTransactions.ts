@@ -121,7 +121,7 @@ function applyFilters(
   query = applyDateFilter(query, 'date', cf.date, cf.date_empty);
 
   // Amount filters with IS_EMPTY support
-  if (cf.amounts && cf.amounts.length > 0) {
+  if (excludeColumn !== 'amount' && cf.amounts && cf.amounts.length > 0) {
     const hasEmpty = cf.amounts.includes(IS_EMPTY);
     const realVals = cf.amounts.filter(v => v !== IS_EMPTY) as number[];
     if (hasEmpty && realVals.length) {
@@ -132,7 +132,7 @@ function applyFilters(
       query = query.in('amount', realVals);
     }
   }
-  if (cf.paidAmounts && cf.paidAmounts.length > 0) {
+  if (excludeColumn !== 'paid_amount' && cf.paidAmounts && cf.paidAmounts.length > 0) {
     const hasEmpty = cf.paidAmounts.includes(IS_EMPTY);
     const realVals = cf.paidAmounts.filter(v => v !== IS_EMPTY) as number[];
     if (hasEmpty && realVals.length) {
@@ -143,6 +143,7 @@ function applyFilters(
       query = query.in('paid_amount', realVals);
     }
   }
+
 
   // Contact multi-select + event names with OR logic + IS_EMPTY support
   const allContactIds = cf.contactIds || [];
