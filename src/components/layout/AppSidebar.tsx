@@ -326,7 +326,9 @@ export function AppSidebar() {
             <SidebarMenu>
               {entry.items
                 .filter((item) => (!['/fiscal/calendario', '/fiscal/dashboard', '/fiscal/colaboradores', '/fiscal/monitor-cnpj'].includes(item.url)) || isAdmin || isSuperAdmin)
+                .filter((item) => isSubItemVisible(entry.moduleKey, item.subKey))
                 .map((item) => (
+
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild tooltip={item.title}>
                     <NavLink onClick={handleMobileNav}
