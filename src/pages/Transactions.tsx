@@ -662,13 +662,17 @@ export default function Transactions() {
     sortOrder,
   }), [typeFilter, categoryFilters, bankFilter, searchTerm, invisibleBankIds, columnFilters, sortField, sortOrder]);
 
-  // Reset page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [typeFilter, categoryFilters, bankFilter, searchTerm, columnFilters, sortField, sortOrder]);
-
   // Server-side paginated data
   const { transactions, totalCount, totalPages, isLoading, isFetching } = useServerTransactions(currentPage, serverFilters);
+
+  // Clamp page when it exceeds total pages (after filters reduce result set).
+  // Does NOT auto-reset to page 1 when filters change — user stays where they are.
+  useEffect(() => {
+    if (!isLoading && totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage, isLoading]);
+
 
   // Independent KPIs (no pagination)
   const { kpis } = useTransactionKPIs(serverFilters);
