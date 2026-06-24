@@ -5,23 +5,32 @@ import { useCompany } from '@/hooks/useCompany';
 
 const MODULE_ROUTE_MAP: Record<string, string> = {
   home: '/',
+  tech: '/disparos',
   financeiro: '/painel-financeiro',
   fiscal: '/fiscal/tarefas',
-  clientes: '/contatos',
+  contatos: '/contatos',
   legalizacao: '/legalizacao',
   pessoal_rh: '/pessoal-rh',
   acessos: '/acessos',
   configuracoes: '/configuracoes',
 };
 
-const MODULE_PRIORITY = ['home', 'financeiro', 'fiscal', 'clientes', 'legalizacao', 'pessoal_rh', 'acessos', 'configuracoes'];
+const MODULE_PRIORITY = ['home', 'tech', 'financeiro', 'fiscal', 'contatos', 'legalizacao', 'pessoal_rh', 'acessos', 'configuracoes'];
 
 // Sub-module keys grouped by parent module — used for backward compatibility:
 // users that have the parent module but no sub-keys at all keep full access.
 const SUB_MODULES_BY_PARENT: Record<string, string[]> = {
   fiscal: ['fiscal_dashboard', 'fiscal_tarefas', 'fiscal_calendario', 'fiscal_colaboradores', 'fiscal_monitor_cnpj'],
   financeiro: ['financeiro_dashboard', 'financeiro_lancamentos', 'financeiro_pagar_receber', 'financeiro_boletos', 'financeiro_conta_corrente', 'financeiro_eventos_contabeis', 'financeiro_dre'],
-  clientes: ['clientes_cliente_fornecedor', 'clientes_disparos'],
+  tech: ['tech_disparos'],
+};
+
+// Legacy module/sub-module aliases — keeps users with old keys working until they're re-saved.
+const LEGACY_MODULE_ALIASES: Record<string, string[]> = {
+  contatos: ['clientes'],
+};
+const LEGACY_SUBMODULE_ALIASES: Record<string, string[]> = {
+  tech_disparos: ['clientes_disparos'],
 };
 
 interface ModuleGuardProps {
@@ -40,20 +49,25 @@ export function ModuleGuard({ moduleName, subModule, children, requireAdmin = fa
   if (isSuperAdmin) return <>{children}</>;
 
   const planModules: string[] = (company as any)?.plan_modules ?? [
-    'home', 'legalizacao', 'fiscal', 'pessoal_rh', 'financeiro', 'clientes', 'acessos', 'configuracoes',
+    'home', 'tech', 'legalizacao', 'fiscal', 'pessoal_rh', 'financeiro', 'contatos', 'acessos', 'configuracoes',
   ];
 
-  let hasAccess = planModules.includes(moduleName) && allowedModules.includes(moduleName);
+  const moduleKeysToCheck = [moduleName, ...(LEGACY_MODULE_ALIASES[moduleName] ?? [])];
+  const userHasModule = moduleKeysToCheck.some((k) => allowedModules.includes(k));
+  const planHasModule = moduleKeysToCheck.some((k) => planModules.includes(k));
+  let hasAccess = planHasModule && userHasModule;
 
   // Sub-module check with backward compatibility: if the user has the parent
   // but none of its sub-keys, treat as full access (pre-migration users).
   if (hasAccess && subModule) {
+    const subKeysToCheck = [subModule, ...(LEGACY_SUBMODULE_ALIASES[subModule] ?? [])];
     const siblings = SUB_MODULES_BY_PARENT[moduleName] ?? [];
     const hasAnySibling = siblings.some((k) => allowedModules.includes(k));
-    if (hasAnySibling && !allowedModules.includes(subModule)) {
+    if (hasAnySibling && !subKeysToCheck.some((k) => allowedModules.includes(k))) {
       hasAccess = false;
     }
   }
+
 
   if (!hasAccess) {
     const firstAccessible = MODULE_PRIORITY.find(
