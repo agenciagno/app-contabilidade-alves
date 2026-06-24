@@ -331,24 +331,82 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
                 <ShieldCheck className="w-4 h-4 text-primary" />
                 <Label className="font-semibold">Módulos de Acesso</Label>
               </div>
-              <div className="grid grid-cols-2 gap-2 rounded-lg border border-border p-3 bg-muted/30">
-                {ALL_MODULES.map(mod => (
-                  <label key={mod.key} className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={allowedModules.includes(mod.key)}
-                      onChange={() => toggleModule(mod.key)}
-                      className="rounded border-border"
-                    />
-                    <span className="text-sm">{mod.label}</span>
-                    {mod.soon && (
-                      <Badge variant="outline" className="text-xs px-1 py-0 h-4">Em breve</Badge>
-                    )}
-                  </label>
-                ))}
+              <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/30 max-h-[320px] overflow-y-auto">
+                {MODULE_TREE.map((mod) => {
+                  const childKeys = mod.children?.map((c) => c.key) ?? [];
+                  const checkedChildren = childKeys.filter((k) => allowedModules.includes(k));
+                  const parentChecked = allowedModules.includes(mod.key);
+                  const allChildrenChecked = childKeys.length > 0 && checkedChildren.length === childKeys.length;
+                  const someChildrenChecked = checkedChildren.length > 0 && !allChildrenChecked;
+
+                  const toggleParent = () => {
+                    setAllowedModules((prev) => {
+                      const set = new Set(prev);
+                      if (parentChecked) {
+                        // Uncheck parent + all children
+                        set.delete(mod.key);
+                        childKeys.forEach((k) => set.delete(k));
+                      } else {
+                        set.add(mod.key);
+                        childKeys.forEach((k) => set.add(k));
+                      }
+                      return Array.from(set);
+                    });
+                  };
+
+                  const toggleChild = (childKey: string) => {
+                    setAllowedModules((prev) => {
+                      const set = new Set(prev);
+                      if (set.has(childKey)) {
+                        set.delete(childKey);
+                        // If no children remain, also remove parent
+                        const remaining = childKeys.filter((k) => k !== childKey && set.has(k));
+                        if (remaining.length === 0) set.delete(mod.key);
+                      } else {
+                        set.add(childKey);
+                        set.add(mod.key); // ensure parent
+                      }
+                      return Array.from(set);
+                    });
+                  };
+
+                  return (
+                    <div key={mod.key} className="space-y-1.5">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={parentChecked}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someChildrenChecked && !parentChecked ? true : someChildrenChecked;
+                          }}
+                          onChange={toggleParent}
+                          className="rounded border-border"
+                        />
+                        <span className="text-sm font-medium">{mod.label}</span>
+                      </label>
+
+                      {mod.children && (
+                        <div className="ml-6 grid grid-cols-2 gap-1.5">
+                          {mod.children.map((child) => (
+                            <label key={child.key} className="flex items-center gap-2 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={allowedModules.includes(child.key)}
+                                onChange={() => toggleChild(child.key)}
+                                className="rounded border-border"
+                              />
+                              <span className="text-sm text-muted-foreground">{child.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
+
 
           {!isEditMode && (
             <div className="space-y-2">
