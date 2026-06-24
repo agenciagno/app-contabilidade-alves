@@ -103,7 +103,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('colaborador');
   const [statusActive, setStatusActive] = useState(true);
-  const [allowedModules, setAllowedModules] = useState<string[]>(ALL_MODULES.map(m => m.key));
+  const [allowedModules, setAllowedModules] = useState<string[]>(ALL_MODULE_KEYS);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -140,7 +140,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
     setShowNewPassword(false);
     setRole('colaborador');
     setStatusActive(true);
-    setAllowedModules(ALL_MODULES.map(m => m.key));
+    setAllowedModules(ALL_MODULE_KEYS);
     setErrors({});
   };
 
@@ -183,7 +183,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
     try {
 
       if (isEditMode) {
-        const resolvedModules = role === 'colaborador' ? allowedModules : ALL_MODULES.map(m => m.key);
+        const resolvedModules = role === 'colaborador' ? allowedModules : ALL_MODULE_KEYS;
 
         const { error: updateError } = await supabase
           .from('profiles')
@@ -218,7 +218,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
         handleClose();
       } else {
         // CREATE MODE
-        const resolvedModules = role === 'colaborador' ? allowedModules : ALL_MODULES.map(m => m.key);
+        const resolvedModules = role === 'colaborador' ? allowedModules : ALL_MODULE_KEYS;
         const { data, error: fnError } = await supabase.functions.invoke('create-user-v2', {
           body: {
             email,
