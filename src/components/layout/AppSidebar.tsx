@@ -307,7 +307,7 @@ export function AppSidebar() {
     </SidebarGroup>
   );
 
-  const renderCollapsibleEntry = (entry: CollapsibleModule) => (
+  const renderCollapsibleEntry = (entry: CollapsibleModuleExt) => (
     <SidebarGroup key={entry.title}>
       <Collapsible open={openModules[entry.title]} onOpenChange={() => handleToggleModule(entry.title)}>
         <CollapsibleTrigger asChild>
