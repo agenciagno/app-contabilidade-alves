@@ -70,8 +70,9 @@ const App = () => (
               <Route path="/dre" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_dre"><DRE /></ModuleGuard></AppLayout>} />
               
               <Route path="/configuracoes" element={<AppLayout><ModuleGuard moduleName="configuracoes"><SettingsPage /></ModuleGuard></AppLayout>} />
-              <Route path="/disparos" element={<AppLayout><ModuleGuard moduleName="clientes" subModule="clientes_disparos"><CrmDispatches /></ModuleGuard></AppLayout>} />
-              <Route path="/relatorio-clientes" element={<AppLayout><ModuleGuard moduleName="clientes" subModule="clientes_cliente_fornecedor"><ClientReport /></ModuleGuard></AppLayout>} />
+              <Route path="/disparos" element={<AppLayout><ModuleGuard moduleName="tech" subModule="tech_disparos"><CrmDispatches /></ModuleGuard></AppLayout>} />
+              <Route path="/relatorio-clientes" element={<AppLayout><ModuleGuard moduleName="contatos"><ClientReport /></ModuleGuard></AppLayout>} />
+
               <Route path="/boletos" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_boletos"><Boletos /></ModuleGuard></AppLayout>} />
               <Route path="/fiscal/tarefas" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_tarefas"><FiscalTasks /></ModuleGuard></AppLayout>} />
               <Route path="/fiscal/calendario" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_calendario" requireAdmin><FiscalCalendar /></ModuleGuard></AppLayout>} />
