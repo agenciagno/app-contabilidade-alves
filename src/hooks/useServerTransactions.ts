@@ -61,8 +61,10 @@ function applyDateFilter(
 
 function applyFilters(
   query: any,
-  filters: ServerFilters
+  filters: ServerFilters,
+  excludeColumn?: 'amount' | 'paid_amount'
 ) {
+
   // Always exclude soft-deleted records
   query = query.is('deleted_at', null);
 
