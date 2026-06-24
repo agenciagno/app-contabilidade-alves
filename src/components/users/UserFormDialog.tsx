@@ -21,6 +21,13 @@ interface ModuleNode {
 
 const MODULE_TREE: ModuleNode[] = [
   { key: 'home', label: 'Home' },
+  {
+    key: 'tech',
+    label: 'Tech',
+    children: [
+      { key: 'tech_disparos', label: 'Disparos' },
+    ],
+  },
   { key: 'legalizacao', label: 'Legalização' },
   {
     key: 'fiscal',
@@ -47,17 +54,11 @@ const MODULE_TREE: ModuleNode[] = [
       { key: 'financeiro_dre', label: 'DRE' },
     ],
   },
-  {
-    key: 'clientes',
-    label: 'Clientes',
-    children: [
-      { key: 'clientes_cliente_fornecedor', label: 'Cliente/Fornecedor' },
-      { key: 'clientes_disparos', label: 'Disparos' },
-    ],
-  },
+  { key: 'contatos', label: 'Contatos' },
   { key: 'acessos', label: 'Acessos' },
   { key: 'configuracoes', label: 'Configurações' },
 ];
+
 
 // Flat list of every valid key (parents + children) — used for defaults / full-access roles.
 const ALL_MODULE_KEYS: string[] = MODULE_TREE.flatMap((m) => [m.key, ...(m.children?.map((c) => c.key) ?? [])]);
