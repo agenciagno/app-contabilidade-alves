@@ -1,63 +1,67 @@
-## Objetivo
+## Problemas identificados em `Lançamentos` (Transações)
 
-Reorganizar a navegação:
-- Renomear módulo **Clientes → Contatos** e eliminar sua sub-rota; o conteúdo de `/contatos` passa a ser a página principal do módulo.
-- Criar novo módulo **Tech** logo abaixo de Home, contendo a sub-rota **Disparos** (movida de Clientes).
+### 1. Filtros de coluna mostram só valores da página atual
+Os filtros de **Valor** e **Recebido** (`NumericMultiFilter`) recebem `uniqueAmounts` / `uniquePaidAmounts` calculados a partir de `transactions`, que vem paginado (99 linhas por página). Por isso só aparecem valores da página visível.
 
-## 1. Sidebar (`AppSidebar.tsx`)
+Colunas que **já usam universo completo** (não precisam mudar):
+- Cliente → vem de `contacts`
+- Evento Contábil → vem de `categories`
+- Status → enum fixo (Pago / Pendente)
+- Datas (Vencimento, Prevista, Pagamento, Emissão) → filtro por range, não por lista
 
-- Adicionar entrada **Tech** logo após Home, como módulo `collapsible` com `moduleKey: 'tech'` e sub-item `Disparos` (`/disparos`, `subKey: 'tech_disparos'`).
-- Substituir a entrada `Clientes` (collapsible) por uma entrada `simple` chamada **Contatos** (`/contatos`, `moduleKey: 'contatos'`, ícone `Users`).
-- Remover do bloco Clientes os sub-itens `Cliente/Fornecedor` e `Disparos`.
-- Atualizar `SUB_MODULES_BY_PARENT`: remover entrada `clientes`, adicionar `tech: ['tech_disparos']`.
-- Incluir `'contatos'` e `'tech'` no fallback `planModules` e na `MODULE_PRIORITY`.
+Colunas que **precisam ser corrigidas**:
+- **Valor** (`amount`)
+- **Recebido** (`paid_amount`)
 
-## 2. ModuleGuard (`ModuleGuard.tsx`)
+### 2. Limpar um filtro volta para página 1
+Em `Transactions.tsx` há um `useEffect` que reseta `currentPage = 1` sempre que **qualquer** filtro muda — inclusive ao limpar. O usuário quer permanecer na página atual ao limpar/alterar um filtro existente (e que a página seja ajustada apenas se ficar fora do `totalPages`).
 
-- Em `MODULE_ROUTE_MAP`: remover `clientes`, adicionar `contatos: '/contatos'` e `tech: '/disparos'`.
-- Em `MODULE_PRIORITY`: substituir `'clientes'` por `'contatos'` e adicionar `'tech'` (depois de Home).
-- `SUB_MODULES_BY_PARENT`: remover `clientes`, adicionar `tech: ['tech_disparos']`.
-- Atualizar `planModules` default trocando `'clientes'` → `'contatos'` e adicionando `'tech'`.
+---
 
-## 3. Rotas (`App.tsx`)
+## Solução proposta
 
-- `/contatos`, `/crm/cliente/:id`, `/relatorio-clientes` → `<ModuleGuard moduleName="contatos">` (sem subModule, pois não há mais sub-rotas).
-- `/disparos` → `<ModuleGuard moduleName="tech" subModule="tech_disparos">`.
+### A) Buscar valores distintos do servidor para os filtros numéricos
 
-## 4. Modal de Usuário (`UserFormDialog.tsx`)
+Criar um novo hook `useDistinctTransactionValues(column, filters)` em `src/hooks/useServerTransactions.ts` que:
 
-`MODULE_TREE` passa a ser:
+- Recebe `column: 'amount' | 'paid_amount'` e o mesmo `ServerFilters` da listagem **excluindo o filtro da própria coluna** (padrão Excel — o filtro não se restringe a si mesmo).
+- Faz `select(column)` com `applyFilters(...)`, sem paginação, mas com `.limit(5000)` por segurança.
+- Retorna lista única ordenada de valores não-nulos + flag `hasEmpty` se houver `null`.
+- `staleTime: 30s`, habilitado apenas quando o popover do filtro estiver aberto (passar `enabled`).
 
-```text
-Home
-Tech
-  └ Disparos
-Legalização
-Fiscal
-  └ Dashboard, Tarefas Fiscais, Calendário Fiscal, Colaboradores, Monitor CNPJ
-Pessoal / RH
-Financeiro
-  └ Dashboard, Lançamentos, Pagar/Receber, Boletos, Conta Corrente, Eventos Contábeis, DRE
-Contatos
-Acessos
-Configurações
-```
+Em `Transactions.tsx`:
+- Adicionar estado `openColumnFilter: 'amount' | 'paid_amount' | null` controlado pelo `NumericMultiFilter` (passar prop `onOpenChange`).
+- Substituir `uniqueAmounts` / `uniquePaidAmounts` pelos dados retornados do hook (só fetch quando o popover correspondente abrir).
+- Exibir “Carregando…” enquanto `isFetching`.
 
-- Remover o nó `clientes` (e seus filhos `clientes_cliente_fornecedor` / `clientes_disparos`).
-- Adicionar nó `contatos` (sem filhos).
-- Adicionar nó `tech` com filho `tech_disparos` (label "Disparos").
+`applyFilters` precisa ganhar a opção de pular a coluna sendo filtrada (ex.: param `excludeColumn?: 'amount' | 'paid_amount'`) para não auto-restringir.
 
-## 5. Compatibilidade com usuários existentes
+### B) Manter a página ao limpar/alterar filtros
 
-Tabela `profiles.allowed_modules` é `text[]` — sem migração. Para evitar que colaboradores percam acesso após o rename:
+Em `src/pages/Transactions.tsx`:
 
-- No `ModuleGuard` e na sidebar, ao avaliar `contatos`, considerar também a chave legada `clientes` como equivalente (se o usuário tem `clientes`, vê `contatos`).
-- Ao avaliar `tech_disparos`, considerar também a chave legada `clientes_disparos` como equivalente.
-- Esse mapeamento legado é apenas leitura. Quando o admin salvar o usuário pelo novo modal, as chaves novas substituem as antigas.
+1. **Remover** o `useEffect` que faz `setCurrentPage(1)` em qualquer mudança de filtro (linhas 658-661).
+2. Adicionar um `useEffect` de “clamp” que ajusta a página somente quando ela passa do total disponível:
+   ```ts
+   useEffect(() => {
+     if (!isLoading && totalPages > 0 && currentPage > totalPages) {
+       setCurrentPage(totalPages);
+     }
+   }, [totalPages, currentPage, isLoading]);
+   ```
+3. Resultado: aplicar/limpar filtros mantém o usuário na mesma página; só recua se a página atual ficar vazia.
 
-## Arquivos a tocar
+---
 
-- `src/components/users/UserFormDialog.tsx` — novo MODULE_TREE.
-- `src/components/auth/ModuleGuard.tsx` — mapas, prioridade, compatibilidade legada.
-- `src/components/layout/AppSidebar.tsx` — nova entrada Tech, Contatos como simples, fallback `planModules`, compatibilidade legada.
-- `src/App.tsx` — guards das rotas `/contatos`, `/crm/cliente/:id`, `/relatorio-clientes`, `/disparos`.
+## Arquivos a alterar
+
+- `src/hooks/useServerTransactions.ts` — adicionar `useDistinctTransactionValues` e suportar `excludeColumn` em `applyFilters`.
+- `src/pages/Transactions.tsx` — trocar fonte dos valores únicos, controlar `open` dos popovers numéricos, remover reset de página, adicionar clamp.
+- `src/components/transactions/TransactionFilters.tsx` — não precisa (é o filtro superior, não os de coluna). Sem alterações.
+- O `NumericMultiFilter` em `Transactions.tsx` (linha 148) ganha props `loading?: boolean` e `onOpenChange?: (open: boolean) => void`.
+
+## Observações
+
+- Mantemos a lógica atual de paginação no servidor (99/página) — performance preservada.
+- O limite de 5000 valores distintos por filtro evita payloads gigantes; para a base atual (~4.288 transações) cobre tudo. Se um dia ultrapassar, exibimos um aviso “mostrando os primeiros 5000”.
+- A correção do reset de página vale para todos os filtros (topo e coluna).
