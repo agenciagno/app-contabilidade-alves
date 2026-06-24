@@ -58,29 +58,30 @@ const App = () => (
               <Route path="/newsletter/:slug" element={<Newsletter />} />
               <Route path="/sem-acesso" element={<NoAccess />} />
               <Route path="/" element={<AppLayout><ModuleGuard moduleName="home"><Home /></ModuleGuard></AppLayout>} />
-              <Route path="/painel-financeiro" element={<AppLayout><ModuleGuard moduleName="financeiro"><Dashboard /></ModuleGuard></AppLayout>} />
-              <Route path="/movimentacoes" element={<AppLayout><ModuleGuard moduleName="financeiro"><Transactions /></ModuleGuard></AppLayout>} />
-              <Route path="/financeiro/pagar-receber" element={<AppLayout><ModuleGuard moduleName="financeiro"><PagarReceber /></ModuleGuard></AppLayout>} />
+              <Route path="/painel-financeiro" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_dashboard"><Dashboard /></ModuleGuard></AppLayout>} />
+              <Route path="/movimentacoes" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_lancamentos"><Transactions /></ModuleGuard></AppLayout>} />
+              <Route path="/financeiro/pagar-receber" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_pagar_receber"><PagarReceber /></ModuleGuard></AppLayout>} />
               
-              <Route path="/contatos" element={<AppLayout><ModuleGuard moduleName="clientes"><Contacts /></ModuleGuard></AppLayout>} />
-              <Route path="/crm/cliente/:id" element={<AppLayout><ModuleGuard moduleName="clientes"><ContactProfile /></ModuleGuard></AppLayout>} />
-              <Route path="/bancos" element={<AppLayout><ModuleGuard moduleName="financeiro"><Banks /></ModuleGuard></AppLayout>} />
-              <Route path="/categorias" element={<AppLayout><ModuleGuard moduleName="financeiro"><Categories /></ModuleGuard></AppLayout>} />
-              <Route path="/dre" element={<AppLayout><ModuleGuard moduleName="financeiro"><DRE /></ModuleGuard></AppLayout>} />
+              <Route path="/contatos" element={<AppLayout><ModuleGuard moduleName="clientes" subModule="clientes_cliente_fornecedor"><Contacts /></ModuleGuard></AppLayout>} />
+              <Route path="/crm/cliente/:id" element={<AppLayout><ModuleGuard moduleName="clientes" subModule="clientes_cliente_fornecedor"><ContactProfile /></ModuleGuard></AppLayout>} />
+              <Route path="/bancos" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_conta_corrente"><Banks /></ModuleGuard></AppLayout>} />
+              <Route path="/categorias" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_eventos_contabeis"><Categories /></ModuleGuard></AppLayout>} />
+              <Route path="/dre" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_dre"><DRE /></ModuleGuard></AppLayout>} />
               
               <Route path="/configuracoes" element={<AppLayout><ModuleGuard moduleName="configuracoes"><SettingsPage /></ModuleGuard></AppLayout>} />
-              <Route path="/disparos" element={<AppLayout><ModuleGuard moduleName="clientes"><CrmDispatches /></ModuleGuard></AppLayout>} />
-              <Route path="/relatorio-clientes" element={<AppLayout><ModuleGuard moduleName="clientes"><ClientReport /></ModuleGuard></AppLayout>} />
-              <Route path="/boletos" element={<AppLayout><ModuleGuard moduleName="financeiro"><Boletos /></ModuleGuard></AppLayout>} />
-              <Route path="/fiscal/tarefas" element={<AppLayout><ModuleGuard moduleName="fiscal"><FiscalTasks /></ModuleGuard></AppLayout>} />
-              <Route path="/fiscal/calendario" element={<AppLayout><ModuleGuard moduleName="fiscal" requireAdmin><FiscalCalendar /></ModuleGuard></AppLayout>} />
-              <Route path="/fiscal/dashboard" element={<AppLayout><ModuleGuard moduleName="fiscal" requireAdmin><FiscalDashboard /></ModuleGuard></AppLayout>} />
-              <Route path="/fiscal/colaboradores" element={<AppLayout><ModuleGuard moduleName="fiscal" requireAdmin><FiscalCollaborators /></ModuleGuard></AppLayout>} />
+              <Route path="/disparos" element={<AppLayout><ModuleGuard moduleName="clientes" subModule="clientes_disparos"><CrmDispatches /></ModuleGuard></AppLayout>} />
+              <Route path="/relatorio-clientes" element={<AppLayout><ModuleGuard moduleName="clientes" subModule="clientes_cliente_fornecedor"><ClientReport /></ModuleGuard></AppLayout>} />
+              <Route path="/boletos" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_boletos"><Boletos /></ModuleGuard></AppLayout>} />
+              <Route path="/fiscal/tarefas" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_tarefas"><FiscalTasks /></ModuleGuard></AppLayout>} />
+              <Route path="/fiscal/calendario" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_calendario" requireAdmin><FiscalCalendar /></ModuleGuard></AppLayout>} />
+              <Route path="/fiscal/dashboard" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_dashboard" requireAdmin><FiscalDashboard /></ModuleGuard></AppLayout>} />
+              <Route path="/fiscal/colaboradores" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_colaboradores" requireAdmin><FiscalCollaborators /></ModuleGuard></AppLayout>} />
               
-              <Route path="/fiscal/monitor-cnpj" element={<AppLayout><ModuleGuard moduleName="fiscal" requireAdmin><MonitorCNPJ /></ModuleGuard></AppLayout>} />
+              <Route path="/fiscal/monitor-cnpj" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_monitor_cnpj" requireAdmin><MonitorCNPJ /></ModuleGuard></AppLayout>} />
               <Route path="/legalizacao" element={<AppLayout><ModuleGuard moduleName="legalizacao"><Legalizacao /></ModuleGuard></AppLayout>} />
               <Route path="/pessoal-rh" element={<AppLayout><ModuleGuard moduleName="pessoal_rh"><PessoalRH /></ModuleGuard></AppLayout>} />
-              <Route path="/acessos" element={<AppLayout><CofreGlobal /></AppLayout>} />
+              <Route path="/acessos" element={<AppLayout><ModuleGuard moduleName="acessos"><CofreGlobal /></ModuleGuard></AppLayout>} />
+
               <Route path="*" element={<NotFound />} />
               </Routes>
             </NotificationProvider>
