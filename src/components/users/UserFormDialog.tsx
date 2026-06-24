@@ -13,15 +13,58 @@ import { useNotifications } from '@/contexts/NotificationContext';
 import { z } from 'zod';
 import { PasswordStrength, isPasswordStrong } from '@/components/ui/PasswordStrength';
 
-const ALL_MODULES = [
-  { key: 'home', label: 'Home', soon: false },
-  { key: 'legalizacao', label: 'Legalização', soon: false },
-  { key: 'fiscal', label: 'Fiscal', soon: false },
-  { key: 'pessoal_rh', label: 'Pessoal / RH', soon: false },
-  { key: 'financeiro', label: 'Financeiro', soon: false },
-  { key: 'clientes', label: 'Clientes', soon: false },
-  { key: 'configuracoes', label: 'Configurações', soon: false },
+interface ModuleNode {
+  key: string;
+  label: string;
+  children?: { key: string; label: string }[];
+}
+
+const MODULE_TREE: ModuleNode[] = [
+  { key: 'home', label: 'Home' },
+  { key: 'legalizacao', label: 'Legalização' },
+  {
+    key: 'fiscal',
+    label: 'Fiscal',
+    children: [
+      { key: 'fiscal_dashboard', label: 'Dashboard' },
+      { key: 'fiscal_tarefas', label: 'Tarefas Fiscais' },
+      { key: 'fiscal_calendario', label: 'Calendário Fiscal' },
+      { key: 'fiscal_colaboradores', label: 'Colaboradores' },
+      { key: 'fiscal_monitor_cnpj', label: 'Monitor CNPJ' },
+    ],
+  },
+  { key: 'pessoal_rh', label: 'Pessoal / RH' },
+  {
+    key: 'financeiro',
+    label: 'Financeiro',
+    children: [
+      { key: 'financeiro_dashboard', label: 'Dashboard' },
+      { key: 'financeiro_lancamentos', label: 'Lançamentos' },
+      { key: 'financeiro_pagar_receber', label: 'Pagar/Receber' },
+      { key: 'financeiro_boletos', label: 'Boletos' },
+      { key: 'financeiro_conta_corrente', label: 'Conta Corrente' },
+      { key: 'financeiro_eventos_contabeis', label: 'Eventos Contábeis' },
+      { key: 'financeiro_dre', label: 'DRE' },
+    ],
+  },
+  {
+    key: 'clientes',
+    label: 'Clientes',
+    children: [
+      { key: 'clientes_cliente_fornecedor', label: 'Cliente/Fornecedor' },
+      { key: 'clientes_disparos', label: 'Disparos' },
+    ],
+  },
+  { key: 'acessos', label: 'Acessos' },
+  { key: 'configuracoes', label: 'Configurações' },
 ];
+
+// Flat list of every valid key (parents + children) — used for defaults / full-access roles.
+const ALL_MODULE_KEYS: string[] = MODULE_TREE.flatMap((m) => [m.key, ...(m.children?.map((c) => c.key) ?? [])]);
+
+// Legacy export name kept for compatibility with the original code paths below.
+const ALL_MODULES = MODULE_TREE.map((m) => ({ key: m.key, label: m.label, soon: false }));
+
 
 const ROLE_OPTIONS = [
   { value: 'colaborador', label: 'Colaborador' },
@@ -60,7 +103,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('colaborador');
   const [statusActive, setStatusActive] = useState(true);
-  const [allowedModules, setAllowedModules] = useState<string[]>(ALL_MODULES.map(m => m.key));
+  const [allowedModules, setAllowedModules] = useState<string[]>(ALL_MODULE_KEYS);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -97,7 +140,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
     setShowNewPassword(false);
     setRole('colaborador');
     setStatusActive(true);
-    setAllowedModules(ALL_MODULES.map(m => m.key));
+    setAllowedModules(ALL_MODULE_KEYS);
     setErrors({});
   };
 
@@ -140,7 +183,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
     try {
 
       if (isEditMode) {
-        const resolvedModules = role === 'colaborador' ? allowedModules : ALL_MODULES.map(m => m.key);
+        const resolvedModules = role === 'colaborador' ? allowedModules : ALL_MODULE_KEYS;
 
         const { error: updateError } = await supabase
           .from('profiles')
@@ -175,7 +218,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
         handleClose();
       } else {
         // CREATE MODE
-        const resolvedModules = role === 'colaborador' ? allowedModules : ALL_MODULES.map(m => m.key);
+        const resolvedModules = role === 'colaborador' ? allowedModules : ALL_MODULE_KEYS;
         const { data, error: fnError } = await supabase.functions.invoke('create-user-v2', {
           body: {
             email,
@@ -288,24 +331,82 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
                 <ShieldCheck className="w-4 h-4 text-primary" />
                 <Label className="font-semibold">Módulos de Acesso</Label>
               </div>
-              <div className="grid grid-cols-2 gap-2 rounded-lg border border-border p-3 bg-muted/30">
-                {ALL_MODULES.map(mod => (
-                  <label key={mod.key} className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={allowedModules.includes(mod.key)}
-                      onChange={() => toggleModule(mod.key)}
-                      className="rounded border-border"
-                    />
-                    <span className="text-sm">{mod.label}</span>
-                    {mod.soon && (
-                      <Badge variant="outline" className="text-xs px-1 py-0 h-4">Em breve</Badge>
-                    )}
-                  </label>
-                ))}
+              <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/30 max-h-[320px] overflow-y-auto">
+                {MODULE_TREE.map((mod) => {
+                  const childKeys = mod.children?.map((c) => c.key) ?? [];
+                  const checkedChildren = childKeys.filter((k) => allowedModules.includes(k));
+                  const parentChecked = allowedModules.includes(mod.key);
+                  const allChildrenChecked = childKeys.length > 0 && checkedChildren.length === childKeys.length;
+                  const someChildrenChecked = checkedChildren.length > 0 && !allChildrenChecked;
+
+                  const toggleParent = () => {
+                    setAllowedModules((prev) => {
+                      const set = new Set(prev);
+                      if (parentChecked) {
+                        // Uncheck parent + all children
+                        set.delete(mod.key);
+                        childKeys.forEach((k) => set.delete(k));
+                      } else {
+                        set.add(mod.key);
+                        childKeys.forEach((k) => set.add(k));
+                      }
+                      return Array.from(set);
+                    });
+                  };
+
+                  const toggleChild = (childKey: string) => {
+                    setAllowedModules((prev) => {
+                      const set = new Set(prev);
+                      if (set.has(childKey)) {
+                        set.delete(childKey);
+                        // If no children remain, also remove parent
+                        const remaining = childKeys.filter((k) => k !== childKey && set.has(k));
+                        if (remaining.length === 0) set.delete(mod.key);
+                      } else {
+                        set.add(childKey);
+                        set.add(mod.key); // ensure parent
+                      }
+                      return Array.from(set);
+                    });
+                  };
+
+                  return (
+                    <div key={mod.key} className="space-y-1.5">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={parentChecked}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someChildrenChecked && !parentChecked ? true : someChildrenChecked;
+                          }}
+                          onChange={toggleParent}
+                          className="rounded border-border"
+                        />
+                        <span className="text-sm font-medium">{mod.label}</span>
+                      </label>
+
+                      {mod.children && (
+                        <div className="ml-6 grid grid-cols-2 gap-1.5">
+                          {mod.children.map((child) => (
+                            <label key={child.key} className="flex items-center gap-2 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={allowedModules.includes(child.key)}
+                                onChange={() => toggleChild(child.key)}
+                                className="rounded border-border"
+                              />
+                              <span className="text-sm text-muted-foreground">{child.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
+
 
           {!isEditMode && (
             <div className="space-y-2">
