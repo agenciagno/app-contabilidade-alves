@@ -1,75 +1,87 @@
-## 1) Kanban — Conclusão de cards agrupados (checklist)
+## Objetivo
 
-**Problema:** `KanbanBoard.tsx` calcula `displayStatus` do grupo via `STATUS_PRECEDENCE` (status mais avançado vence). Se uma tarefa do grupo é concluída, o card inteiro pula para "Concluído".
+Expandir o controle de acesso por usuário no modal "Novo/Editar Usuário" para incluir o módulo principal **Acessos** e adicionar permissões granulares por **sub-rotas** de Fiscal, Financeiro e Clientes.
 
-**Correção em `src/components/fiscal/KanbanBoard.tsx`:**
-- Para `GroupItem`, novo cálculo:
-  - Se **todas** as tarefas estão `concluido` → `displayStatus = 'concluido'`.
-  - Senão, considerar apenas as tarefas não concluídas e aplicar a precedência atual (a_fazer → em_progresso → aguardando_cliente) para escolher o status do card.
-- Cards únicos (sem agrupamento) continuam seguindo o status da própria tarefa.
-- No `GroupedTaskCard` (visual), exibir um contador "X/Y concluídas" quando houver pelo menos uma concluída e o grupo ainda não estiver 100% concluído (sem mudar layout).
+## 1. Estrutura de módulos (UserFormDialog.tsx)
 
-## 2) Modal de Tarefa — Layout
+Reorganizar a lista em dois níveis: módulos principais + sub-rotas agrupadas por módulo.
 
-**Em `src/components/fiscal/TaskDetailModal.tsx`:**
-- Aumentar largura para `sm:max-w-3xl`, usar `max-h-[90vh]` com rolagem interna.
-- Reorganizar em seções com `space-y-6` e grid `md:grid-cols-2` para campos curtos (Status / Vencimento / Responsável / Cliente).
-- Garantir `Label` acima do campo (não sobreposto), `gap-2` em cada bloco e `Separator` entre seções (Informações, Anexo, Notas, Histórico).
-- Ajustar o `Popover` de menções (`@`) para não cobrir o textarea (posicionar `side="top" align="start"`).
-- Padding consistente (`px-6 py-5`) e remover `flex` sem `gap` que cause sobreposição.
+**Principais** (mantidos + Acessos adicionado):
+- `home` Home
+- `legalizacao` Legalização
+- `fiscal` Fiscal
+- `pessoal_rh` Pessoal/RH
+- `financeiro` Financeiro
+- `clientes` Clientes
+- `acessos` Acessos *(novo)*
+- `configuracoes` Configurações
 
-## 3) Remover sub-rota "Notificações" e melhorar o sininho
+**Sub-rotas** (novas chaves, agrupadas por pai):
+- Fiscal: `fiscal_dashboard`, `fiscal_tarefas`, `fiscal_calendario`, `fiscal_colaboradores`, `fiscal_monitor_cnpj`
+- Financeiro: `financeiro_dashboard`, `financeiro_lancamentos`, `financeiro_pagar_receber`, `financeiro_boletos`, `financeiro_conta_corrente`, `financeiro_eventos_contabeis`, `financeiro_dre`
+- Clientes: `clientes_cliente_fornecedor`, `clientes_disparos`
 
-**Sidebar / Rotas:**
-- Remover entrada `'/fiscal/notificacoes'` em `src/components/layout/AppSidebar.tsx` (`menuEntries` Fiscal + filtros e o badge `unreadCount` ligado ao item).
-- Remover rota em `src/App.tsx` e arquivo `src/pages/FiscalNotifications.tsx`.
+## 2. UI do modal
 
-**Sininho (`src/components/notifications/NotificationBellDropdown.tsx` + `src/hooks/useNotifications.ts`):**
-- Já existe `markAsRead` e `markAllAsRead`. Garantir no dropdown:
-  - Botão "Marcar todas como lidas" no topo (já existe — manter / estilizar).
-  - Em cada item, ícone/botão "Marcar como lida" (check) visível quando `!read_at`, chamando `markAsRead(id)` sem fechar o popover.
-  - Clique no corpo do item: navega para `action_url` E marca como lida.
-- Listar tipos relevantes (`task_completed`, `task_assigned`, `task_mention`, `calendar_generated`, etc.) — o hook já busca tudo de `notifications`.
+Substituir o grid plano por um layout em seções colapsáveis/agrupadas:
 
-## 4) Edição em Lote — Clientes/Fornecedores
+```text
+[✓] Fiscal                      ── pai
+    [✓] Dashboard
+    [✓] Tarefas Fiscais
+    [✓] Calendário Fiscal
+    [✓] Colaboradores
+    [✓] Monitor CNPJ
+[✓] Financeiro                  ── pai
+    [✓] Dashboard
+    [✓] Lançamentos
+    ...
+```
 
-**`src/components/contacts/ContactBulkEditDialog.tsx`** — adicionar novos toggles + campos (cada um com `Switch` "editar este campo"):
+Regras de interação:
+- Marcar/desmarcar o pai marca/desmarca todas as sub-rotas.
+- Desmarcar a última sub-rota desmarca o pai automaticamente.
+- Marcar qualquer sub-rota com pai desmarcado, marca o pai.
+- Módulos sem sub-rotas (Home, Legalização, Pessoal/RH, Acessos, Configurações) ficam como checkbox simples.
+- Mantém visível apenas para `role === 'colaborador'` (Admin/Super Admin seguem com acesso total).
 
-- **Porte**: select `mei | me | epp | medio | grande` → `contacts.porte`.
-- **Status do Cliente**: select `ativo | inativo | prospecto | suspenso` → `contacts.client_status` (ajustar para o enum existente em `contacts`).
-- **Obrigações Fiscais**: multi-select de `fiscal_obligations_catalog`. Aplicação: para cada contato selecionado, fazer upsert/delete em `client_obligations` (modo "substituir" — desmarca obrigações ausentes, insere novas).
-- **Categorias (controle de acesso)**: multi-select de `categories` → atualizar `contacts.allowed_category_ids` (array).
-- **Configurações de Cobrança**: agrupar todos os campos de `boleto_controls` editáveis em lote (status ativo, dia de vencimento, valor padrão, juros, multa, descrição padrão, instruções, etc.). Aplicação: upsert em `boleto_controls` por `contact_id`.
+## 3. Aplicação das permissões (ModuleGuard.tsx + App.tsx)
 
-Refatorar o diálogo:
-- Trocar para layout `sm:max-w-2xl` com `ScrollArea`.
-- Agrupar em seções colapsáveis: Dados Cadastrais, Acesso & Permissões, Fiscais, Cobrança.
-- Mantém o padrão "Switch + campo" para aplicar somente o que está marcado.
+- Adicionar `acessos` ao `MODULE_ROUTE_MAP` e ao fallback `planModules`.
+- Envolver a rota `/acessos` com `<ModuleGuard moduleName="acessos">`.
+- Adicionar uma prop opcional `subModule` ao `ModuleGuard`. Quando informada, o guard exige que `allowedModules` contenha tanto o módulo pai quanto a sub-rota. Compatibilidade: se o usuário tiver o pai mas nenhuma sub-rota do pai marcada (cenário de usuários antigos antes desta mudança), considerar como acesso total ao pai (não bloquear) — isto evita quebrar contas existentes.
+- Aplicar `subModule` nas rotas:
+  - `/fiscal/dashboard` → `fiscal_dashboard`
+  - `/fiscal/tarefas` → `fiscal_tarefas`
+  - `/fiscal/calendario` → `fiscal_calendario`
+  - `/fiscal/colaboradores` → `fiscal_colaboradores`
+  - `/fiscal/monitor-cnpj` → `fiscal_monitor_cnpj`
+  - `/painel-financeiro` → `financeiro_dashboard`
+  - `/movimentacoes` → `financeiro_lancamentos`
+  - `/financeiro/pagar-receber` → `financeiro_pagar_receber`
+  - `/boletos` → `financeiro_boletos`
+  - `/bancos` → `financeiro_conta_corrente`
+  - `/categorias` → `financeiro_eventos_contabeis`
+  - `/dre` → `financeiro_dre`
+  - `/contatos` (+ `/crm/cliente/:id`, `/relatorio-clientes`) → `clientes_cliente_fornecedor`
+  - `/disparos` → `clientes_disparos`
 
-## 5) Configurações > Minha Equipe — Editar senha do usuário
+## 4. Sidebar (AppSidebar.tsx)
 
-**`src/components/users/UserFormDialog.tsx`** (modo edição):
-- Adicionar seção "Redefinir senha (opcional)" com input de nova senha + `PasswordStrength`, botão olho, mesmo padrão do create.
-- Se preenchido no submit em edit, chamar nova edge function `admin-update-user-password`.
+Filtrar itens de sub-menu conforme `allowedModules` para esconder links que o usuário não pode acessar (mantendo o item pai visível quando houver pelo menos uma sub-rota permitida).
 
-**Nova edge function `supabase/functions/admin-update-user-password/index.ts`:**
-- `verify_jwt = false` (validar JWT em código).
-- Recebe `{ userId, newPassword }`, valida força mínima (Zod).
-- Verifica que o caller é `admin` ou `super_admin` da mesma `company_id` do `userId` alvo (consulta `profiles` com service role).
-- Chama `supabase.auth.admin.updateUserById(userId, { password })`.
-- Retorna sucesso/erro. CORS padrão.
+## 5. Persistência
 
-Sem migrations necessárias.
+`allowed_modules` continua sendo `text[]` em `profiles` — sem migração. As novas chaves de sub-rota são armazenadas no mesmo array. Usuários existentes mantêm comportamento atual graças à regra de compatibilidade do item 3.
 
-## Arquivos alterados
+## Arquivos a tocar
 
-- `src/components/fiscal/KanbanBoard.tsx`
-- `src/components/fiscal/GroupedTaskCard.tsx`
-- `src/components/fiscal/TaskDetailModal.tsx`
-- `src/components/layout/AppSidebar.tsx`
-- `src/App.tsx` (remover rota)
-- `src/pages/FiscalNotifications.tsx` (delete)
-- `src/components/notifications/NotificationBellDropdown.tsx`
-- `src/components/contacts/ContactBulkEditDialog.tsx`
-- `src/components/users/UserFormDialog.tsx`
-- `supabase/functions/admin-update-user-password/index.ts` (novo)
+- `src/components/users/UserFormDialog.tsx` — nova estrutura `MODULE_TREE`, UI agrupada, lógica pai/filho.
+- `src/components/auth/ModuleGuard.tsx` — suporte a `subModule` + `acessos`.
+- `src/App.tsx` — `subModule` em cada rota e guard em `/acessos`.
+- `src/components/layout/AppSidebar.tsx` — filtro de sub-itens por permissão.
+
+## Confirmações antes de implementar
+
+1. **Mapeamentos**: "Conta Corrente" = `/bancos`, "Eventos Contábeis" = `/categorias`, "Lançamentos" = `/movimentacoes`. Confere?
+2. **Compatibilidade**: usuários atuais que têm o pai (ex.: `fiscal`) mas nenhuma sub-rota marcada continuam com acesso a tudo do pai. Ok?
