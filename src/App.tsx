@@ -62,8 +62,9 @@ const App = () => (
               <Route path="/movimentacoes" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_lancamentos"><Transactions /></ModuleGuard></AppLayout>} />
               <Route path="/financeiro/pagar-receber" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_pagar_receber"><PagarReceber /></ModuleGuard></AppLayout>} />
               
-              <Route path="/contatos" element={<AppLayout><ModuleGuard moduleName="clientes" subModule="clientes_cliente_fornecedor"><Contacts /></ModuleGuard></AppLayout>} />
-              <Route path="/crm/cliente/:id" element={<AppLayout><ModuleGuard moduleName="clientes" subModule="clientes_cliente_fornecedor"><ContactProfile /></ModuleGuard></AppLayout>} />
+              <Route path="/contatos" element={<AppLayout><ModuleGuard moduleName="contatos"><Contacts /></ModuleGuard></AppLayout>} />
+              <Route path="/crm/cliente/:id" element={<AppLayout><ModuleGuard moduleName="contatos"><ContactProfile /></ModuleGuard></AppLayout>} />
+
               <Route path="/bancos" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_conta_corrente"><Banks /></ModuleGuard></AppLayout>} />
               <Route path="/categorias" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_eventos_contabeis"><Categories /></ModuleGuard></AppLayout>} />
               <Route path="/dre" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_dre"><DRE /></ModuleGuard></AppLayout>} />
