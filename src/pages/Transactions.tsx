@@ -1106,14 +1106,19 @@ export default function Transactions() {
                   label="Valor"
                   selected={columnFilters.amounts || []}
                   onChange={v => updateColumnFilter('amounts', v.length > 0 ? v : undefined)}
-                  values={uniqueAmounts}
+                  values={distinctAmounts}
+                  loading={amountsFetching}
+                  onOpenChange={(o) => setOpenAmountFilter(o ? 'amount' : null)}
                 />
                 <NumericMultiFilter
                   label="Recebido"
                   selected={columnFilters.paidAmounts || []}
                   onChange={v => updateColumnFilter('paidAmounts', v.length > 0 ? v : undefined)}
-                  values={uniquePaidAmounts}
+                  values={distinctPaidAmounts}
+                  loading={paidAmountsFetching}
+                  onOpenChange={(o) => setOpenAmountFilter(o ? 'paid_amount' : null)}
                 />
+
                 <div className="text-center">Ações</div>
               </div>
 
