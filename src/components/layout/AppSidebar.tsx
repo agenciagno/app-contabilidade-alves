@@ -227,12 +227,15 @@ export function AppSidebar() {
   const { pendingCount } = usePendingApprovals();
   
 
-  const planModules: string[] = (company as any)?.plan_modules ?? ['home', 'legalizacao', 'fiscal', 'pessoal_rh', 'financeiro', 'clientes', 'acessos', 'configuracoes'];
+  const planModules: string[] = (company as any)?.plan_modules ?? ['home', 'tech', 'legalizacao', 'fiscal', 'pessoal_rh', 'financeiro', 'contatos', 'acessos', 'configuracoes'];
   const logoUrl: string | null = (company as any)?.logo_url ?? null;
 
   const isModuleVisible = (moduleKey: string) => {
     if (isSuperAdmin) return true;
-    return planModules.includes(moduleKey) && allowedModules.includes(moduleKey);
+    const keys = [moduleKey, ...(LEGACY_MODULE_ALIASES[moduleKey] ?? [])];
+    const planOk = keys.some((k) => planModules.includes(k));
+    const userOk = keys.some((k) => allowedModules.includes(k));
+    return planOk && userOk;
   };
 
   // For collaborators, hide sub-items they don't have permission for.
@@ -244,8 +247,10 @@ export function AppSidebar() {
     const siblings = SUB_MODULES_BY_PARENT[parentKey] ?? [];
     const hasAnySibling = siblings.some((k) => allowedModules.includes(k));
     if (!hasAnySibling) return true;
-    return allowedModules.includes(subKey);
+    const keys = [subKey, ...(LEGACY_SUBMODULE_ALIASES[subKey] ?? [])];
+    return keys.some((k) => allowedModules.includes(k));
   };
+
 
   const visibleEntries = menuEntries.filter(e => isModuleVisible(e.moduleKey));
 
