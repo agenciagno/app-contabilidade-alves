@@ -99,7 +99,20 @@ interface CollapsibleModule {
 
 type MenuEntry = SimpleModule | CollapsibleModule;
 
-const menuEntries: MenuEntry[] = [
+interface SubMenuItem extends MenuItem {
+  subKey?: string;
+}
+
+interface CollapsibleModuleExt {
+  kind: 'collapsible';
+  title: string;
+  icon: LucideIcon;
+  moduleKey: string;
+  defaultOpen?: boolean;
+  items: SubMenuItem[];
+}
+
+const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
   {
     kind: 'simple',
     title: 'Home',
@@ -122,11 +135,11 @@ const menuEntries: MenuEntry[] = [
     icon: FileCheck,
     moduleKey: 'fiscal',
     items: [
-      { title: 'Dashboard', url: '/fiscal/dashboard', icon: LayoutDashboard, iconName: 'layout-dashboard' },
-      { title: 'Tarefas Fiscais', url: '/fiscal/tarefas', icon: CalendarClock, iconName: 'calendar-clock' },
-      { title: 'Calendário Fiscal', url: '/fiscal/calendario', icon: CalendarClock, iconName: 'calendar-clock' },
-      { title: 'Colaboradores', url: '/fiscal/colaboradores', icon: UsersRound, iconName: 'users-round' },
-      { title: 'Monitor CNPJ', url: '/fiscal/monitor-cnpj', icon: Shield, iconName: 'shield' },
+      { title: 'Dashboard', url: '/fiscal/dashboard', icon: LayoutDashboard, iconName: 'layout-dashboard', subKey: 'fiscal_dashboard' },
+      { title: 'Tarefas Fiscais', url: '/fiscal/tarefas', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_tarefas' },
+      { title: 'Calendário Fiscal', url: '/fiscal/calendario', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_calendario' },
+      { title: 'Colaboradores', url: '/fiscal/colaboradores', icon: UsersRound, iconName: 'users-round', subKey: 'fiscal_colaboradores' },
+      { title: 'Monitor CNPJ', url: '/fiscal/monitor-cnpj', icon: Shield, iconName: 'shield', subKey: 'fiscal_monitor_cnpj' },
     ],
 
   },
@@ -145,13 +158,13 @@ const menuEntries: MenuEntry[] = [
     moduleKey: 'financeiro',
     defaultOpen: true,
     items: [
-      { title: 'Dashboard', url: '/painel-financeiro', icon: LayoutDashboard, iconName: 'layout-dashboard' },
-      { title: 'Lançamentos', url: '/movimentacoes', icon: ArrowLeftRight, iconName: 'arrow-left-right' },
-      { title: 'Pagar/Receber', url: '/financeiro/pagar-receber', icon: ArrowUpDown, iconName: 'arrow-up-down' },
-      { title: 'Boletos', url: '/boletos', icon: FileCheck, iconName: 'file-check' },
-      { title: 'Conta Corrente', url: '/bancos', icon: Building2, iconName: 'building-2' },
-      { title: 'Eventos Contábeis', url: '/categorias', icon: Tags, iconName: 'tags' },
-      { title: 'DRE', url: '/dre', icon: FileBarChart, iconName: 'file-bar-chart' },
+      { title: 'Dashboard', url: '/painel-financeiro', icon: LayoutDashboard, iconName: 'layout-dashboard', subKey: 'financeiro_dashboard' },
+      { title: 'Lançamentos', url: '/movimentacoes', icon: ArrowLeftRight, iconName: 'arrow-left-right', subKey: 'financeiro_lancamentos' },
+      { title: 'Pagar/Receber', url: '/financeiro/pagar-receber', icon: ArrowUpDown, iconName: 'arrow-up-down', subKey: 'financeiro_pagar_receber' },
+      { title: 'Boletos', url: '/boletos', icon: FileCheck, iconName: 'file-check', subKey: 'financeiro_boletos' },
+      { title: 'Conta Corrente', url: '/bancos', icon: Building2, iconName: 'building-2', subKey: 'financeiro_conta_corrente' },
+      { title: 'Eventos Contábeis', url: '/categorias', icon: Tags, iconName: 'tags', subKey: 'financeiro_eventos_contabeis' },
+      { title: 'DRE', url: '/dre', icon: FileBarChart, iconName: 'file-bar-chart', subKey: 'financeiro_dre' },
     ],
   },
   {
@@ -160,11 +173,26 @@ const menuEntries: MenuEntry[] = [
     icon: Users,
     moduleKey: 'clientes',
     items: [
-      { title: 'Cliente/Fornecedor', url: '/contatos', icon: UserCircle, iconName: 'user-circle' },
-      { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send' },
+      { title: 'Cliente/Fornecedor', url: '/contatos', icon: UserCircle, iconName: 'user-circle', subKey: 'clientes_cliente_fornecedor' },
+      { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'clientes_disparos' },
     ],
   },
+  {
+    kind: 'simple',
+    title: 'Acessos',
+    url: '/acessos',
+    icon: LockKeyhole,
+    iconName: 'lock-keyhole',
+    moduleKey: 'acessos',
+  },
 ];
+
+const SUB_MODULES_BY_PARENT: Record<string, string[]> = {
+  fiscal: ['fiscal_dashboard', 'fiscal_tarefas', 'fiscal_calendario', 'fiscal_colaboradores', 'fiscal_monitor_cnpj'],
+  financeiro: ['financeiro_dashboard', 'financeiro_lancamentos', 'financeiro_pagar_receber', 'financeiro_boletos', 'financeiro_conta_corrente', 'financeiro_eventos_contabeis', 'financeiro_dre'],
+  clientes: ['clientes_cliente_fornecedor', 'clientes_disparos'],
+};
+
 
 export function AppSidebar() {
   const { signOut } = useAuth();
