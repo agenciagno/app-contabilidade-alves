@@ -122,6 +122,15 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
     moduleKey: 'home',
   },
   {
+    kind: 'collapsible',
+    title: 'Tech',
+    icon: Send,
+    moduleKey: 'tech',
+    items: [
+      { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'tech_disparos' },
+    ],
+  },
+  {
     kind: 'simple',
     title: 'Legalização',
     url: '/legalizacao',
@@ -168,14 +177,12 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
     ],
   },
   {
-    kind: 'collapsible',
-    title: 'Clientes',
+    kind: 'simple',
+    title: 'Contatos',
+    url: '/contatos',
     icon: Users,
-    moduleKey: 'clientes',
-    items: [
-      { title: 'Cliente/Fornecedor', url: '/contatos', icon: UserCircle, iconName: 'user-circle', subKey: 'clientes_cliente_fornecedor' },
-      { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'clientes_disparos' },
-    ],
+    iconName: 'users',
+    moduleKey: 'contatos',
   },
   {
     kind: 'simple',
@@ -190,8 +197,17 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
 const SUB_MODULES_BY_PARENT: Record<string, string[]> = {
   fiscal: ['fiscal_dashboard', 'fiscal_tarefas', 'fiscal_calendario', 'fiscal_colaboradores', 'fiscal_monitor_cnpj'],
   financeiro: ['financeiro_dashboard', 'financeiro_lancamentos', 'financeiro_pagar_receber', 'financeiro_boletos', 'financeiro_conta_corrente', 'financeiro_eventos_contabeis', 'financeiro_dre'],
-  clientes: ['clientes_cliente_fornecedor', 'clientes_disparos'],
+  tech: ['tech_disparos'],
 };
+
+// Legacy aliases — keep old saved keys working until users are re-saved.
+const LEGACY_MODULE_ALIASES: Record<string, string[]> = {
+  contatos: ['clientes'],
+};
+const LEGACY_SUBMODULE_ALIASES: Record<string, string[]> = {
+  tech_disparos: ['clientes_disparos'],
+};
+
 
 
 export function AppSidebar() {
