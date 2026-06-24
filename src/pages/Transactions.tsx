@@ -146,12 +146,14 @@ function TextColumnFilter({ values, selected, onChange }: { values: string[]; se
 }
 
 function NumericMultiFilter({
-  label, selected, onChange, values,
+  label, selected, onChange, values, onOpenChange, loading,
 }: {
   label: string;
   selected: (number | string)[];
   onChange: (v: (number | string)[]) => void;
   values: number[];
+  onOpenChange?: (open: boolean) => void;
+  loading?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -183,7 +185,9 @@ function NumericMultiFilter({
       setSearch('');
     }
     setOpen(nextOpen);
+    onOpenChange?.(nextOpen);
   };
+
 
   const displaySelected = open ? temp : selected;
   const displayActive = displaySelected.length > 0;
