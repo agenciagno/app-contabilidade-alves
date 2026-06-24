@@ -211,7 +211,7 @@ export function AppSidebar() {
   const { pendingCount } = usePendingApprovals();
   
 
-  const planModules: string[] = (company as any)?.plan_modules ?? ['home', 'legalizacao', 'fiscal', 'pessoal_rh', 'financeiro', 'clientes', 'configuracoes'];
+  const planModules: string[] = (company as any)?.plan_modules ?? ['home', 'legalizacao', 'fiscal', 'pessoal_rh', 'financeiro', 'clientes', 'acessos', 'configuracoes'];
   const logoUrl: string | null = (company as any)?.logo_url ?? null;
 
   const isModuleVisible = (moduleKey: string) => {
@@ -219,7 +219,20 @@ export function AppSidebar() {
     return planModules.includes(moduleKey) && allowedModules.includes(moduleKey);
   };
 
+  // For collaborators, hide sub-items they don't have permission for.
+  // Backward compat: if the user has the parent module but no sub-keys at all,
+  // show every sub-item (legacy users keep full access until the admin re-saves them).
+  const isSubItemVisible = (parentKey: string, subKey?: string) => {
+    if (isSuperAdmin || isAdmin) return true;
+    if (!subKey) return true;
+    const siblings = SUB_MODULES_BY_PARENT[parentKey] ?? [];
+    const hasAnySibling = siblings.some((k) => allowedModules.includes(k));
+    if (!hasAnySibling) return true;
+    return allowedModules.includes(subKey);
+  };
+
   const visibleEntries = menuEntries.filter(e => isModuleVisible(e.moduleKey));
+
   const showSettings = isSuperAdmin || (!isColaborador && isModuleVisible('configuracoes'));
 
   const [openModules, setOpenModules] = useState<Record<string, boolean>>(() => {
