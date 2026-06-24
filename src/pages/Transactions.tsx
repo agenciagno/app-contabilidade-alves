@@ -216,7 +216,9 @@ function NumericMultiFilter({
               <Checkbox checked={displaySelected.includes(IS_EMPTY)} onCheckedChange={() => toggle(IS_EMPTY)} className="h-3.5 w-3.5" />
               <span className="truncate italic text-muted-foreground">(Vazio)</span>
             </label>
-            {filtered.length > 0 ? filtered.map(v => (
+            {loading ? (
+              <p className="text-xs text-muted-foreground text-center py-4">Carregando...</p>
+            ) : filtered.length > 0 ? filtered.map(v => (
               <label key={v} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-xs">
                 <Checkbox checked={displaySelected.includes(v)} onCheckedChange={() => toggle(v)} className="h-3.5 w-3.5" />
                 <span className="truncate font-mono tabular-nums">{formatCurrency(v)}</span>
@@ -224,6 +226,7 @@ function NumericMultiFilter({
             )) : (
               <p className="text-xs text-muted-foreground text-center py-4">Nenhum valor</p>
             )}
+
           </div>
           {displayActive && (
             <div className="p-2 border-t border-border/40">
