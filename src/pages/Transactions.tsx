@@ -733,15 +733,13 @@ export default function Transactions() {
     return categories.map(c => ({ id: c.id, name: c.name, color: c.color || '#3B82F6' }));
   }, [categories]);
 
-  // Unique amounts for NumericMultiFilter
-  const uniqueAmounts = useMemo(() => transactions.map(t => Number(t.amount)), [transactions]);
-  const uniquePaidAmounts = useMemo(() => {
-    return transactions
-      .filter(t => isEffectivelyPaid(t) && t.paid_amount != null)
-      .map(t => Number(t.paid_amount));
-  }, [transactions]);
+  // Distinct values for NumericMultiFilter (full dataset, fetched only when popover opens)
+  const [openAmountFilter, setOpenAmountFilter] = useState<'amount' | 'paid_amount' | null>(null);
+  const { values: distinctAmounts, isFetching: amountsFetching } = useDistinctTransactionValues('amount', serverFilters, openAmountFilter === 'amount');
+  const { values: distinctPaidAmounts, isFetching: paidAmountsFetching } = useDistinctTransactionValues('paid_amount', serverFilters, openAmountFilter === 'paid_amount');
 
   const uniqueStatuses = ['Pago', 'Pendente'];
+
 
   const handleSubmit = async (data: TransactionInsert, pendingFiles?: File[], shouldClose?: boolean) => {
     if (editingTransaction) {
