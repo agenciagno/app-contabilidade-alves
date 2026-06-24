@@ -11,7 +11,7 @@ import {
   Building2, CheckCircle2, Search, Filter, X, ArrowUpDown, CircleDollarSign
 } from 'lucide-react';
 import { useTransactions, Transaction, TransactionInsert } from '@/hooks/useTransactions';
-import { useServerTransactions, useTransactionKPIs, PAGE_SIZE, ServerFilters, IS_EMPTY } from '@/hooks/useServerTransactions';
+import { useServerTransactions, useTransactionKPIs, useDistinctTransactionValues, PAGE_SIZE, ServerFilters, IS_EMPTY } from '@/hooks/useServerTransactions';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
 import { useCategories } from '@/hooks/useCategories';
 import { useBanks } from '@/hooks/useBanks';
@@ -146,12 +146,14 @@ function TextColumnFilter({ values, selected, onChange }: { values: string[]; se
 }
 
 function NumericMultiFilter({
-  label, selected, onChange, values,
+  label, selected, onChange, values, onOpenChange, loading,
 }: {
   label: string;
   selected: (number | string)[];
   onChange: (v: (number | string)[]) => void;
   values: number[];
+  onOpenChange?: (open: boolean) => void;
+  loading?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -183,7 +185,9 @@ function NumericMultiFilter({
       setSearch('');
     }
     setOpen(nextOpen);
+    onOpenChange?.(nextOpen);
   };
+
 
   const displaySelected = open ? temp : selected;
   const displayActive = displaySelected.length > 0;
@@ -212,7 +216,9 @@ function NumericMultiFilter({
               <Checkbox checked={displaySelected.includes(IS_EMPTY)} onCheckedChange={() => toggle(IS_EMPTY)} className="h-3.5 w-3.5" />
               <span className="truncate italic text-muted-foreground">(Vazio)</span>
             </label>
-            {filtered.length > 0 ? filtered.map(v => (
+            {loading ? (
+              <p className="text-xs text-muted-foreground text-center py-4">Carregando...</p>
+            ) : filtered.length > 0 ? filtered.map(v => (
               <label key={v} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-xs">
                 <Checkbox checked={displaySelected.includes(v)} onCheckedChange={() => toggle(v)} className="h-3.5 w-3.5" />
                 <span className="truncate font-mono tabular-nums">{formatCurrency(v)}</span>
@@ -220,6 +226,7 @@ function NumericMultiFilter({
             )) : (
               <p className="text-xs text-muted-foreground text-center py-4">Nenhum valor</p>
             )}
+
           </div>
           {displayActive && (
             <div className="p-2 border-t border-border/40">
@@ -655,13 +662,17 @@ export default function Transactions() {
     sortOrder,
   }), [typeFilter, categoryFilters, bankFilter, searchTerm, invisibleBankIds, columnFilters, sortField, sortOrder]);
 
-  // Reset page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [typeFilter, categoryFilters, bankFilter, searchTerm, columnFilters, sortField, sortOrder]);
-
   // Server-side paginated data
   const { transactions, totalCount, totalPages, isLoading, isFetching } = useServerTransactions(currentPage, serverFilters);
+
+  // Clamp page when it exceeds total pages (after filters reduce result set).
+  // Does NOT auto-reset to page 1 when filters change — user stays where they are.
+  useEffect(() => {
+    if (!isLoading && totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage, isLoading]);
+
 
   // Independent KPIs (no pagination)
   const { kpis } = useTransactionKPIs(serverFilters);
@@ -722,15 +733,13 @@ export default function Transactions() {
     return categories.map(c => ({ id: c.id, name: c.name, color: c.color || '#3B82F6' }));
   }, [categories]);
 
-  // Unique amounts for NumericMultiFilter
-  const uniqueAmounts = useMemo(() => transactions.map(t => Number(t.amount)), [transactions]);
-  const uniquePaidAmounts = useMemo(() => {
-    return transactions
-      .filter(t => isEffectivelyPaid(t) && t.paid_amount != null)
-      .map(t => Number(t.paid_amount));
-  }, [transactions]);
+  // Distinct values for NumericMultiFilter (full dataset, fetched only when popover opens)
+  const [openAmountFilter, setOpenAmountFilter] = useState<'amount' | 'paid_amount' | null>(null);
+  const { values: distinctAmounts, isFetching: amountsFetching } = useDistinctTransactionValues('amount', serverFilters, openAmountFilter === 'amount');
+  const { values: distinctPaidAmounts, isFetching: paidAmountsFetching } = useDistinctTransactionValues('paid_amount', serverFilters, openAmountFilter === 'paid_amount');
 
   const uniqueStatuses = ['Pago', 'Pendente'];
+
 
   const handleSubmit = async (data: TransactionInsert, pendingFiles?: File[], shouldClose?: boolean) => {
     if (editingTransaction) {
@@ -1097,14 +1106,19 @@ export default function Transactions() {
                   label="Valor"
                   selected={columnFilters.amounts || []}
                   onChange={v => updateColumnFilter('amounts', v.length > 0 ? v : undefined)}
-                  values={uniqueAmounts}
+                  values={distinctAmounts}
+                  loading={amountsFetching}
+                  onOpenChange={(o) => setOpenAmountFilter(o ? 'amount' : null)}
                 />
                 <NumericMultiFilter
                   label="Recebido"
                   selected={columnFilters.paidAmounts || []}
                   onChange={v => updateColumnFilter('paidAmounts', v.length > 0 ? v : undefined)}
-                  values={uniquePaidAmounts}
+                  values={distinctPaidAmounts}
+                  loading={paidAmountsFetching}
+                  onOpenChange={(o) => setOpenAmountFilter(o ? 'paid_amount' : null)}
                 />
+
                 <div className="text-center">Ações</div>
               </div>
 

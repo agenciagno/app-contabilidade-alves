@@ -61,8 +61,10 @@ function applyDateFilter(
 
 function applyFilters(
   query: any,
-  filters: ServerFilters
+  filters: ServerFilters,
+  excludeColumn?: 'amount' | 'paid_amount'
 ) {
+
   // Always exclude soft-deleted records
   query = query.is('deleted_at', null);
 
@@ -119,7 +121,7 @@ function applyFilters(
   query = applyDateFilter(query, 'date', cf.date, cf.date_empty);
 
   // Amount filters with IS_EMPTY support
-  if (cf.amounts && cf.amounts.length > 0) {
+  if (excludeColumn !== 'amount' && cf.amounts && cf.amounts.length > 0) {
     const hasEmpty = cf.amounts.includes(IS_EMPTY);
     const realVals = cf.amounts.filter(v => v !== IS_EMPTY) as number[];
     if (hasEmpty && realVals.length) {
@@ -130,7 +132,7 @@ function applyFilters(
       query = query.in('amount', realVals);
     }
   }
-  if (cf.paidAmounts && cf.paidAmounts.length > 0) {
+  if (excludeColumn !== 'paid_amount' && cf.paidAmounts && cf.paidAmounts.length > 0) {
     const hasEmpty = cf.paidAmounts.includes(IS_EMPTY);
     const realVals = cf.paidAmounts.filter(v => v !== IS_EMPTY) as number[];
     if (hasEmpty && realVals.length) {
@@ -141,6 +143,7 @@ function applyFilters(
       query = query.in('paid_amount', realVals);
     }
   }
+
 
   // Contact multi-select + event names with OR logic + IS_EMPTY support
   const allContactIds = cf.contactIds || [];
@@ -295,3 +298,42 @@ export function useTransactionKPIs(filters: ServerFilters) {
     isLoading,
   };
 }
+
+// Distinct values for column filters (e.g. Valor, Recebido) — full dataset, not paginated.
+// Excludes the column's own filter to avoid self-restriction (Excel-style).
+export function useDistinctTransactionValues(
+  column: 'amount' | 'paid_amount',
+  filters: ServerFilters,
+  enabled: boolean
+) {
+  const { data, isFetching } = useQuery({
+    queryKey: ['distinct-transaction-values', column, filters],
+    enabled,
+    queryFn: async () => {
+      let query = supabase.from('transactions').select(column);
+      query = applyFilters(query, filters, column);
+      query = query.limit(5000);
+      const { data, error } = await query;
+      if (error) throw error;
+      const rows = (data ?? []) as Array<Record<string, number | null>>;
+      const set = new Set<number>();
+      let hasEmpty = false;
+      for (const r of rows) {
+        const v = r[column];
+        if (v == null) hasEmpty = true;
+        else set.add(Number(v));
+      }
+      const values = Array.from(set).sort((a, b) => a - b);
+      return { values, hasEmpty };
+    },
+    staleTime: 1000 * 30,
+    gcTime: 1000 * 60 * 5,
+  });
+
+  return {
+    values: data?.values ?? [],
+    hasEmpty: data?.hasEmpty ?? false,
+    isFetching,
+  };
+}
+
