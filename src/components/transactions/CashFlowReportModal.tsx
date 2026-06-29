@@ -637,8 +637,8 @@ export function CashFlowReportModal({
   // ─── XLS Export ───────────────────────────────────────────────────
   const exportXLS = () => {
     const headers = isReceivables
-      ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']
-      : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status'];
+      ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia']
+      : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia'];
     const colSpan = headers.length;
     const tableRows = rowsWithBalance.map(r => isReceivables ? [
       r.contact?.name || r.description || '',
@@ -648,6 +648,7 @@ export function CashFlowReportModal({
       r.notes || '',
       r.saldoAtual.toFixed(2).replace('.', ','),
       getStatus(r.is_paid, r.due_date),
+      weekdayOf(r.due_date || r.expected_date),
     ] : [
       formatDateBR(r.expected_date || ''),
       r.contact?.name || r.description || '',
@@ -658,6 +659,7 @@ export function CashFlowReportModal({
       r.notes || '',
       r.saldoAtual.toFixed(2).replace('.', ','),
       getStatus(r.is_paid, r.due_date),
+      weekdayOf(r.due_date || r.expected_date),
     ]);
 
     const headerRows = `
