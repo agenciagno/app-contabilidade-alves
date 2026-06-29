@@ -1,67 +1,43 @@
-## Problemas identificados em `Lançamentos` (Transações)
+## Adicionar coluna "Dia da Semana" no Relatório Pagar/Receber
 
-### 1. Filtros de coluna mostram só valores da página atual
-Os filtros de **Valor** e **Recebido** (`NumericMultiFilter`) recebem `uniqueAmounts` / `uniquePaidAmounts` calculados a partir de `transactions`, que vem paginado (99 linhas por página). Por isso só aparecem valores da página visível.
+Adicionar uma nova coluna à direita (última) chamada **"Dia"** na tabela principal do "Gerar Relatório" do `CashFlowTab`, válida para ambas as sub-abas: **Pagar/Receber** e **A Receber**.
 
-Colunas que **já usam universo completo** (não precisam mudar):
-- Cliente → vem de `contacts`
-- Evento Contábil → vem de `categories`
-- Status → enum fixo (Pago / Pendente)
-- Datas (Vencimento, Prevista, Pagamento, Emissão) → filtro por range, não por lista
+### Onde alterar
+Arquivo único: `src/components/transactions/CashFlowReportModal.tsx`
 
-Colunas que **precisam ser corrigidas**:
-- **Valor** (`amount`)
-- **Recebido** (`paid_amount`)
+A mesma tabela é renderizada em três formatos de export — atualizar os três para manter consistência:
 
-### 2. Limpar um filtro volta para página 1
-Em `Transactions.tsx` há um `useEffect` que reseta `currentPage = 1` sempre que **qualquer** filtro muda — inclusive ao limpar. O usuário quer permanecer na página atual ao limpar/alterar um filtro existente (e que a página seja ajustada apenas se ficar fora do `totalPages`).
+1. **PDF** (`autoTable`, linhas ~484-536)
+   - `head`: acrescentar `'Dia'` ao final de ambos os arrays (receivables e all).
+   - `body`: acrescentar `weekdayOf(ref)` ao final de cada linha, onde `ref = r.due_date || r.expected_date` (mesma data-base já usada para Vencimento/Prevista).
+   - `columnStyles`: adicionar largura curta (~10mm) e `halign: 'center'` para o novo índice.
 
----
+2. **XLS** (linhas ~625-677)
+   - Acrescentar `'Dia'` nos headers e o valor correspondente em cada `tableRows`.
+   - Atualizar `colSpan` (já calculado via `headers.length`, então fica automático).
 
-## Solução proposta
+3. **CSV** (linhas ~699-756)
+   - Acrescentar `'Dia'` nos headers e o valor em `dataLines`.
 
-### A) Buscar valores distintos do servidor para os filtros numéricos
+A tabela de "Consulta Mensal" (linhas ~862+) **não** é afetada — é uma matriz mensal por evento, não por linha com data.
 
-Criar um novo hook `useDistinctTransactionValues(column, filters)` em `src/hooks/useServerTransactions.ts` que:
+### Detalhe técnico — helper
 
-- Recebe `column: 'amount' | 'paid_amount'` e o mesmo `ServerFilters` da listagem **excluindo o filtro da própria coluna** (padrão Excel — o filtro não se restringe a si mesmo).
-- Faz `select(column)` com `applyFilters(...)`, sem paginação, mas com `.limit(5000)` por segurança.
-- Retorna lista única ordenada de valores não-nulos + flag `hasEmpty` se houver `null`.
-- `staleTime: 30s`, habilitado apenas quando o popover do filtro estiver aberto (passar `enabled`).
+Adicionar utilitário no topo do arquivo:
 
-Em `Transactions.tsx`:
-- Adicionar estado `openColumnFilter: 'amount' | 'paid_amount' | null` controlado pelo `NumericMultiFilter` (passar prop `onOpenChange`).
-- Substituir `uniqueAmounts` / `uniquePaidAmounts` pelos dados retornados do hook (só fetch quando o popover correspondente abrir).
-- Exibir “Carregando…” enquanto `isFetching`.
+```ts
+const WEEKDAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const weekdayOf = (iso?: string | null) => {
+  if (!iso) return '';
+  // iso vem como 'YYYY-MM-DD' → parse local para evitar shift de timezone
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return WEEKDAYS_PT[new Date(y, m - 1, d).getDay()];
+};
+```
 
-`applyFilters` precisa ganhar a opção de pular a coluna sendo filtrada (ex.: param `excludeColumn?: 'amount' | 'paid_amount'`) para não auto-restringir.
+A data-fonte é a mesma já usada para ordenação/exibição: `due_date` quando existir, senão `expected_date` (em pagamentos já efetuados, `date`). Isso mantém a coluna coerente com Vencimento/Prevista exibidos na linha.
 
-### B) Manter a página ao limpar/alterar filtros
-
-Em `src/pages/Transactions.tsx`:
-
-1. **Remover** o `useEffect` que faz `setCurrentPage(1)` em qualquer mudança de filtro (linhas 658-661).
-2. Adicionar um `useEffect` de “clamp” que ajusta a página somente quando ela passa do total disponível:
-   ```ts
-   useEffect(() => {
-     if (!isLoading && totalPages > 0 && currentPage > totalPages) {
-       setCurrentPage(totalPages);
-     }
-   }, [totalPages, currentPage, isLoading]);
-   ```
-3. Resultado: aplicar/limpar filtros mantém o usuário na mesma página; só recua se a página atual ficar vazia.
-
----
-
-## Arquivos a alterar
-
-- `src/hooks/useServerTransactions.ts` — adicionar `useDistinctTransactionValues` e suportar `excludeColumn` em `applyFilters`.
-- `src/pages/Transactions.tsx` — trocar fonte dos valores únicos, controlar `open` dos popovers numéricos, remover reset de página, adicionar clamp.
-- `src/components/transactions/TransactionFilters.tsx` — não precisa (é o filtro superior, não os de coluna). Sem alterações.
-- O `NumericMultiFilter` em `Transactions.tsx` (linha 148) ganha props `loading?: boolean` e `onOpenChange?: (open: boolean) => void`.
-
-## Observações
-
-- Mantemos a lógica atual de paginação no servidor (99/página) — performance preservada.
-- O limite de 5000 valores distintos por filtro evita payloads gigantes; para a base atual (~4.288 transações) cobre tudo. Se um dia ultrapassar, exibimos um aviso “mostrando os primeiros 5000”.
-- A correção do reset de página vale para todos os filtros (topo e coluna).
+### Fora do escopo
+- Tabela em tela (UI do CashFlowTab) — não solicitada.
+- Outros relatórios (DRE, Banks, ContactProfile).
