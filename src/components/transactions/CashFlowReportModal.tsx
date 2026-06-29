@@ -713,8 +713,8 @@ export function CashFlowReportModal({
     ];
 
     const headers = isReceivables
-      ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']
-      : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status'];
+      ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia']
+      : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia'];
     const dataLines = rowsWithBalance.map(r => (isReceivables ? [
       `"${(r.contact?.name || r.description || '').replace(/"/g, '""')}"`,
       Number(r.amount).toFixed(2).replace('.', ','),
@@ -723,6 +723,7 @@ export function CashFlowReportModal({
       `"${(r.notes || '').replace(/"/g, '""')}"`,
       r.saldoAtual.toFixed(2).replace('.', ','),
       getStatus(r.is_paid, r.due_date),
+      weekdayOf(r.due_date || r.expected_date),
     ] : [
       formatDateBR(r.expected_date || ''),
       `"${(r.contact?.name || r.description || '').replace(/"/g, '""')}"`,
@@ -733,6 +734,7 @@ export function CashFlowReportModal({
       `"${(r.notes || '').replace(/"/g, '""')}"`,
       r.saldoAtual.toFixed(2).replace('.', ','),
       getStatus(r.is_paid, r.due_date),
+      weekdayOf(r.due_date || r.expected_date),
     ]).join(';'));
 
     const eventSummary = buildEventSummary(filteredRows);
