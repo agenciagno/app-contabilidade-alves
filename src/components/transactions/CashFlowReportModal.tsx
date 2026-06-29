@@ -52,6 +52,16 @@ function formatDateBR(dateStr: string) {
   return `${d}/${m}/${y}`;
 }
 
+const WEEKDAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+function weekdayOf(iso?: string | null): string {
+  if (!iso) return '';
+  const src = iso.includes('/') ? iso.split('/').reverse().join('-') : iso;
+  const [y, m, d] = src.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return WEEKDAYS_PT[new Date(y, m - 1, d).getDay()];
+}
+
+
 function pad2(n: number) { return String(n).padStart(2, '0'); }
 
 function getStatus(isPaid: boolean, dueDate: string | null): string {
