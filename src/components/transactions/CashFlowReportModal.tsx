@@ -52,6 +52,16 @@ function formatDateBR(dateStr: string) {
   return `${d}/${m}/${y}`;
 }
 
+const WEEKDAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+function weekdayOf(iso?: string | null): string {
+  if (!iso) return '';
+  const src = iso.includes('/') ? iso.split('/').reverse().join('-') : iso;
+  const [y, m, d] = src.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return WEEKDAYS_PT[new Date(y, m - 1, d).getDay()];
+}
+
+
 function pad2(n: number) { return String(n).padStart(2, '0'); }
 
 function getStatus(isPaid: boolean, dueDate: string | null): string {
@@ -483,8 +493,8 @@ export function CashFlowReportModal({
 
     // Table — in receivables, drop "Prevista" column and only show Vencimento
     const head = isReceivables
-      ? [['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']]
-      : [['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']];
+      ? [['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia']]
+      : [['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia']];
     const body = rowsWithBalance.map(r => isReceivables ? [
       r.contact?.name || r.description,
       formatCurrency(Number(r.amount)),
@@ -493,6 +503,7 @@ export function CashFlowReportModal({
       r.notes || '',
       formatCurrency(r.saldoAtual),
       getStatus(r.is_paid, r.due_date),
+      weekdayOf(r.due_date || r.expected_date),
     ] : [
       formatDateBR(r.expected_date || ''),
       r.contact?.name || r.description,
@@ -503,25 +514,28 @@ export function CashFlowReportModal({
       r.notes || '',
       formatCurrency(r.saldoAtual),
       getStatus(r.is_paid, r.due_date),
+      weekdayOf(r.due_date || r.expected_date),
     ]);
     const columnStyles = isReceivables ? {
       0: { cellWidth: 50, halign: 'center' as const },
       1: { cellWidth: 32, halign: 'center' as const },
       2: { cellWidth: 24, halign: 'center' as const },
       3: { cellWidth: 36, halign: 'center' as const },
-      4: { cellWidth: 60, halign: 'center' as const },
-      5: { cellWidth: 32, halign: 'center' as const },
-      6: { cellWidth: 18, halign: 'center' as const },
-    } : {
-      0: { cellWidth: 22, halign: 'center' as const },
-      1: { cellWidth: 40, halign: 'center' as const },
-      2: { cellWidth: 26, halign: 'center' as const },
-      3: { cellWidth: 26, halign: 'center' as const },
-      4: { cellWidth: 22, halign: 'center' as const },
+      4: { cellWidth: 56, halign: 'center' as const },
       5: { cellWidth: 30, halign: 'center' as const },
-      6: { cellWidth: 40, halign: 'center' as const },
-      7: { cellWidth: 28, halign: 'center' as const },
+      6: { cellWidth: 16, halign: 'center' as const },
+      7: { cellWidth: 12, halign: 'center' as const },
+    } : {
+      0: { cellWidth: 20, halign: 'center' as const },
+      1: { cellWidth: 38, halign: 'center' as const },
+      2: { cellWidth: 24, halign: 'center' as const },
+      3: { cellWidth: 24, halign: 'center' as const },
+      4: { cellWidth: 22, halign: 'center' as const },
+      5: { cellWidth: 28, halign: 'center' as const },
+      6: { cellWidth: 38, halign: 'center' as const },
+      7: { cellWidth: 26, halign: 'center' as const },
       8: { cellWidth: 18, halign: 'center' as const },
+      9: { cellWidth: 12, halign: 'center' as const },
     };
 
     autoTable(doc, {
@@ -623,8 +637,8 @@ export function CashFlowReportModal({
   // ─── XLS Export ───────────────────────────────────────────────────
   const exportXLS = () => {
     const headers = isReceivables
-      ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']
-      : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status'];
+      ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia']
+      : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia'];
     const colSpan = headers.length;
     const tableRows = rowsWithBalance.map(r => isReceivables ? [
       r.contact?.name || r.description || '',
@@ -634,6 +648,7 @@ export function CashFlowReportModal({
       r.notes || '',
       r.saldoAtual.toFixed(2).replace('.', ','),
       getStatus(r.is_paid, r.due_date),
+      weekdayOf(r.due_date || r.expected_date),
     ] : [
       formatDateBR(r.expected_date || ''),
       r.contact?.name || r.description || '',
@@ -644,6 +659,7 @@ export function CashFlowReportModal({
       r.notes || '',
       r.saldoAtual.toFixed(2).replace('.', ','),
       getStatus(r.is_paid, r.due_date),
+      weekdayOf(r.due_date || r.expected_date),
     ]);
 
     const headerRows = `
@@ -697,8 +713,8 @@ export function CashFlowReportModal({
     ];
 
     const headers = isReceivables
-      ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status']
-      : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status'];
+      ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia']
+      : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia'];
     const dataLines = rowsWithBalance.map(r => (isReceivables ? [
       `"${(r.contact?.name || r.description || '').replace(/"/g, '""')}"`,
       Number(r.amount).toFixed(2).replace('.', ','),
@@ -707,6 +723,7 @@ export function CashFlowReportModal({
       `"${(r.notes || '').replace(/"/g, '""')}"`,
       r.saldoAtual.toFixed(2).replace('.', ','),
       getStatus(r.is_paid, r.due_date),
+      weekdayOf(r.due_date || r.expected_date),
     ] : [
       formatDateBR(r.expected_date || ''),
       `"${(r.contact?.name || r.description || '').replace(/"/g, '""')}"`,
@@ -717,6 +734,7 @@ export function CashFlowReportModal({
       `"${(r.notes || '').replace(/"/g, '""')}"`,
       r.saldoAtual.toFixed(2).replace('.', ','),
       getStatus(r.is_paid, r.due_date),
+      weekdayOf(r.due_date || r.expected_date),
     ]).join(';'));
 
     const eventSummary = buildEventSummary(filteredRows);
