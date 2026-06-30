@@ -1017,6 +1017,7 @@ export type Database = {
           data_encerramento_rf: string | null
           data_inicio_contrato: string | null
           data_saida_cliente: string | null
+          display_name: string | null
           document: string | null
           email: string | null
           enviar_cobranca_auto: boolean
@@ -1088,6 +1089,7 @@ export type Database = {
           data_encerramento_rf?: string | null
           data_inicio_contrato?: string | null
           data_saida_cliente?: string | null
+          display_name?: string | null
           document?: string | null
           email?: string | null
           enviar_cobranca_auto?: boolean
@@ -1159,6 +1161,7 @@ export type Database = {
           data_encerramento_rf?: string | null
           data_inicio_contrato?: string | null
           data_saida_cliente?: string | null
+          display_name?: string | null
           document?: string | null
           email?: string | null
           enviar_cobranca_auto?: boolean
