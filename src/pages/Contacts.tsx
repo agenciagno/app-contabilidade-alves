@@ -445,6 +445,8 @@ export default function Contacts() {
                   <SelectItem value="lucro_real">Lucro Real</SelectItem>
                   <SelectItem value="mei">MEI</SelectItem>
                   <SelectItem value="nao_aplica">Isento / Não contribuinte</SelectItem>
+                  <SelectItem value="ausente">Ausente / Não informado</SelectItem>
+
                 </SelectContent>
               </Select>
               {hasActiveFilters && (
