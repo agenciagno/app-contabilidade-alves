@@ -23,6 +23,7 @@ import {
   LockKeyhole,
   
   Shield,
+  BookOpen,
   type LucideIcon,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
