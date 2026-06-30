@@ -306,7 +306,7 @@ export function ContactFormDialog({
                   id="phone"
                   value={phone}
                   onChange={(e) => setPhone(maskPhone(e.target.value))}
-                  placeholder="(00) 00000-0000"
+                  placeholder="(XX) XXXXX-XXXX"
                   maxLength={15}
                 />
               </div>
@@ -316,7 +316,7 @@ export function ContactFormDialog({
                   id="whatsapp"
                   value={whatsapp}
                   onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
-                  placeholder="(00) 00000-0000"
+                  placeholder="(XX) XXXXX-XXXX"
                   maxLength={15}
                 />
               </div>
