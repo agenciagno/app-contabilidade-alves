@@ -1,43 +1,30 @@
-## Adicionar coluna "Dia da Semana" no Relatório Pagar/Receber
+## Problema
 
-Adicionar uma nova coluna à direita (última) chamada **"Dia"** na tabela principal do "Gerar Relatório" do `CashFlowTab`, válida para ambas as sub-abas: **Pagar/Receber** e **A Receber**.
+O filtro de Regime Tributário em `/clientes` compara o valor selecionado diretamente com `contact.tax_regime`, mas os valores armazenados no banco não batem com os valores das opções do `Select`:
 
-### Onde alterar
-Arquivo único: `src/components/transactions/CashFlowReportModal.tsx`
+- Banco: `simples_nacional` (208), `isento` (42), `NULL` (3)
+- Filtro envia: `simples_nacional`, `lucro_presumido`, `lucro_real`, `mei`, `nao_aplica`
 
-A mesma tabela é renderizada em três formatos de export — atualizar os três para manter consistência:
+Resultado: só "Simples Nacional" funciona (é o único valor que casa). "Isento / Não contribuinte" envia `nao_aplica`, mas o banco tem `isento` → 0 resultados. Não existe opção para clientes com regime **ausente** (NULL).
 
-1. **PDF** (`autoTable`, linhas ~484-536)
-   - `head`: acrescentar `'Dia'` ao final de ambos os arrays (receivables e all).
-   - `body`: acrescentar `weekdayOf(ref)` ao final de cada linha, onde `ref = r.due_date || r.expected_date` (mesma data-base já usada para Vencimento/Prevista).
-   - `columnStyles`: adicionar largura curta (~10mm) e `halign: 'center'` para o novo índice.
+## Correção (somente frontend — `src/pages/Contacts.tsx`)
 
-2. **XLS** (linhas ~625-677)
-   - Acrescentar `'Dia'` nos headers e o valor correspondente em cada `tableRows`.
-   - Atualizar `colSpan` (já calculado via `headers.length`, então fica automático).
+1. **Mapear o valor do filtro** para os valores reais do banco antes de comparar. Tratar `isento` e `nao_aplica` como sinônimos para a opção "Isento / Não contribuinte":
+   ```ts
+   if (filterRegime !== 'all') {
+     const regime = ((c as any).tax_regime || '').toString().toLowerCase().trim();
+     if (filterRegime === 'ausente') {
+       matchesRegime = regime === '';
+     } else if (filterRegime === 'nao_aplica') {
+       matchesRegime = regime === 'nao_aplica' || regime === 'isento';
+     } else {
+       matchesRegime = regime === filterRegime;
+     }
+   }
+   ```
 
-3. **CSV** (linhas ~699-756)
-   - Acrescentar `'Dia'` nos headers e o valor em `dataLines`.
+2. **Adicionar a opção "Ausente / Não informado"** no `SelectContent` (valor `ausente`) para localizar clientes sem regime definido.
 
-A tabela de "Consulta Mensal" (linhas ~862+) **não** é afetada — é uma matriz mensal por evento, não por linha com data.
+3. Manter as demais opções (Lucro Presumido / Lucro Real / MEI) — hoje retornam vazio simplesmente porque não há clientes com esses valores no banco; após o ajuste continuarão funcionando assim que existir algum cliente cadastrado nessas faixas.
 
-### Detalhe técnico — helper
-
-Adicionar utilitário no topo do arquivo:
-
-```ts
-const WEEKDAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const weekdayOf = (iso?: string | null) => {
-  if (!iso) return '';
-  // iso vem como 'YYYY-MM-DD' → parse local para evitar shift de timezone
-  const [y, m, d] = iso.split('-').map(Number);
-  if (!y || !m || !d) return '';
-  return WEEKDAYS_PT[new Date(y, m - 1, d).getDay()];
-};
-```
-
-A data-fonte é a mesma já usada para ordenação/exibição: `due_date` quando existir, senão `expected_date` (em pagamentos já efetuados, `date`). Isso mantém a coluna coerente com Vencimento/Prevista exibidos na linha.
-
-### Fora do escopo
-- Tabela em tela (UI do CashFlowTab) — não solicitada.
-- Outros relatórios (DRE, Banks, ContactProfile).
+Sem mudanças em banco, hooks, ou demais módulos.
