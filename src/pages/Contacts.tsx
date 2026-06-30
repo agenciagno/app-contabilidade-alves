@@ -77,7 +77,13 @@ export default function Contacts() {
 
   const filteredContacts = useMemo(() => {
     return contacts.filter(c => {
-      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.document?.toLowerCase().includes(searchTerm.toLowerCase());
+      const q = searchTerm.toLowerCase();
+      const matchesSearch =
+        c.name.toLowerCase().includes(q) ||
+        (getContactDisplayName(c) || '').toLowerCase().includes(q) ||
+        (c.razao_social || '').toLowerCase().includes(q) ||
+        (c.nome_fantasia || '').toLowerCase().includes(q) ||
+        (c.document || '').toLowerCase().includes(q);
       let matchesFinancialStatus = true;
       if (filterFinancialStatus !== 'all') {
         const { isInadimplente } = getFinancialStatus(c.id);
