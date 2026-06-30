@@ -31,6 +31,7 @@ import FiscalTasks from "@/pages/FiscalTasks";
 import FiscalCalendar from "@/pages/FiscalCalendar";
 import FiscalDashboard from "@/pages/FiscalDashboard";
 import FiscalCollaborators from "@/pages/FiscalCollaborators";
+import FiscalObrigacoes from "@/pages/FiscalObrigacoes";
 
 import MonitorCNPJ from "@/pages/MonitorCNPJ";
 import Legalizacao from "@/pages/Legalizacao";
