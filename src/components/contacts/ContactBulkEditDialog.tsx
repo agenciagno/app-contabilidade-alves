@@ -210,7 +210,7 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] p-0 flex flex-col">
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] p-0 flex flex-col">
         <DialogHeader className="px-6 pt-5 pb-3 border-b">
           <DialogTitle>Editar {selectedIds.length} Cliente(s) em Lote</DialogTitle>
         </DialogHeader>
