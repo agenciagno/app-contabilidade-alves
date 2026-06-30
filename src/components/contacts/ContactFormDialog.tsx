@@ -214,8 +214,9 @@ export function ContactFormDialog({
       document: document.trim() || null,
       tax_regime: null,
       email: email.trim() || null,
-      phone: phone.trim() || null,
-      whatsapp: whatsapp.trim() || null,
+      phone: unmaskPhone(phone) || null,
+      whatsapp: unmaskPhone(whatsapp) || null,
+
       cep: cep.trim() || null,
       address: address.trim() || null,
       address_number: addressNumber.trim() || null,
