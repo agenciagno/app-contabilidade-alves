@@ -254,7 +254,7 @@ export default function Contacts() {
                   onClick={() => copyToClipboard(contact.phone!, 'Telefone')}
                   className="group flex items-center gap-2 w-full hover:text-primary transition-colors text-left"
                 >
-                  <span className="flex-1 text-xs">{contact.phone}</span>
+                  <span className="flex-1 text-xs">{maskPhone(contact.phone)}</span>
                   <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                 </button>
               ) : (
@@ -329,7 +329,7 @@ export default function Contacts() {
             <TableCell className="text-muted-foreground text-sm">
               {contact.phone ? (
                 <button onClick={() => copyToClipboard(contact.phone!, 'Telefone')} className="group flex items-center gap-1 hover:text-primary transition-colors">
-                  {contact.phone}
+                  {maskPhone(contact.phone)}
                   <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
               ) : <span className="text-muted-foreground/30">—</span>}
@@ -417,6 +417,19 @@ export default function Contacts() {
                   <SelectItem value="fornecedor">Fornecedores</SelectItem>
                   <SelectItem value="colaborador">Colaboradores</SelectItem>
                   <SelectItem value="outros">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filterRegime} onValueChange={setFilterRegime}>
+                <SelectTrigger className="w-[180px] h-9 bg-background/50 border-border/50">
+                  <SelectValue placeholder="Regime Tributário" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os regimes</SelectItem>
+                  <SelectItem value="simples_nacional">Simples Nacional</SelectItem>
+                  <SelectItem value="lucro_presumido">Lucro Presumido</SelectItem>
+                  <SelectItem value="lucro_real">Lucro Real</SelectItem>
+                  <SelectItem value="mei">MEI</SelectItem>
+                  <SelectItem value="nao_aplica">Isento / Não contribuinte</SelectItem>
                 </SelectContent>
               </Select>
               {hasActiveFilters && (
