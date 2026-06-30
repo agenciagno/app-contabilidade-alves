@@ -21,6 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { NewClients2026Tab } from '@/components/contacts/NewClients2026Tab';
 import { useUserRole } from '@/hooks/useUserRole';
 import { maskPhone } from '@/lib/utils';
+import { getContactDisplayName } from '@/lib/contact-display';
 
 
 type ViewMode = 'card' | 'list';
@@ -76,7 +77,13 @@ export default function Contacts() {
 
   const filteredContacts = useMemo(() => {
     return contacts.filter(c => {
-      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.document?.toLowerCase().includes(searchTerm.toLowerCase());
+      const q = searchTerm.toLowerCase();
+      const matchesSearch =
+        c.name.toLowerCase().includes(q) ||
+        (getContactDisplayName(c) || '').toLowerCase().includes(q) ||
+        (c.razao_social || '').toLowerCase().includes(q) ||
+        (c.nome_fantasia || '').toLowerCase().includes(q) ||
+        (c.document || '').toLowerCase().includes(q);
       let matchesFinancialStatus = true;
       if (filterFinancialStatus !== 'all') {
         const { isInadimplente } = getFinancialStatus(c.id);
@@ -215,10 +222,10 @@ export default function Contacts() {
                 <User className="h-5 w-5 text-primary" />
               </div>
               <button
-                onClick={() => copyToClipboard(contact.name, 'Nome')}
+                onClick={() => copyToClipboard(getContactDisplayName(contact), 'Nome')}
                 className="group flex items-center gap-2 hover:text-primary transition-colors text-left min-w-0"
               >
-                <h3 className="font-semibold text-foreground truncate">{contact.name}</h3>
+                <h3 className="font-semibold text-foreground truncate">{getContactDisplayName(contact)}</h3>
                 <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground flex-shrink-0" />
               </button>
               <CategoryBadges contact={contact} />
@@ -309,10 +316,10 @@ export default function Contacts() {
             <TableCell className="font-medium">
               <div className="flex items-center gap-2 flex-wrap">
                 <button
-                  onClick={() => copyToClipboard(contact.name, 'Nome')}
+                  onClick={() => copyToClipboard(getContactDisplayName(contact), 'Nome')}
                   className="group flex items-center gap-2 hover:text-primary transition-colors text-left"
                 >
-                  <span>{contact.name}</span>
+                  <span>{getContactDisplayName(contact)}</span>
                   <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
                 </button>
                 <CategoryBadges contact={contact} />

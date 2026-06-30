@@ -39,6 +39,7 @@ export interface Contact {
   // Dados empresariais
   razao_social: string | null;
   nome_fantasia: string | null;
+  display_name: string | null;
   cnae_principal: any | null;
   cnaes_secundarios: any | null;
   natureza_juridica: string | null;
@@ -87,7 +88,7 @@ export interface Contact {
 }
 
 type ContactOptionalKeys =
-  | 'razao_social' | 'nome_fantasia' | 'cnae_principal' | 'cnaes_secundarios'
+  | 'razao_social' | 'nome_fantasia' | 'display_name' | 'cnae_principal' | 'cnaes_secundarios'
   | 'natureza_juridica' | 'situacao_cadastral' | 'data_abertura_receita'
   | 'complemento' | 'segundo_email_contato'
   | 'ie' | 'im' | 'regime_apuracao' | 'numero_alvara' | 'validade_alvara'
