@@ -20,6 +20,8 @@ import { ContactBulkEditDialog } from '@/components/contacts/ContactBulkEditDial
 import { useToast } from '@/hooks/use-toast';
 import { NewClients2026Tab } from '@/components/contacts/NewClients2026Tab';
 import { useUserRole } from '@/hooks/useUserRole';
+import { maskPhone } from '@/lib/utils';
+
 
 type ViewMode = 'card' | 'list';
 
@@ -36,6 +38,8 @@ export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterFinancialStatus, setFilterFinancialStatus] = useState('all');
   const [filterCategoria, setFilterCategoria] = useState('all');
+  const [filterRegime, setFilterRegime] = useState('all');
+
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
@@ -83,19 +87,26 @@ export default function Contacts() {
         const cats = (c.categorias || []).map(x => (x || '').toLowerCase());
         matchesCategoria = cats.includes(filterCategoria);
       }
-      return matchesSearch && matchesFinancialStatus && matchesCategoria;
+      let matchesRegime = true;
+      if (filterRegime !== 'all') {
+        matchesRegime = ((c as any).tax_regime || '') === filterRegime;
+      }
+      return matchesSearch && matchesFinancialStatus && matchesCategoria && matchesRegime;
     });
-  }, [contacts, searchTerm, filterFinancialStatus, filterCategoria, transactions]);
+  }, [contacts, searchTerm, filterFinancialStatus, filterCategoria, filterRegime, transactions]);
+
 
   const activeContacts = filteredContacts.filter(c => c.is_active);
   const inactiveContacts = filteredContacts.filter(c => !c.is_active);
-  const hasActiveFilters = searchTerm || filterFinancialStatus !== 'all' || filterCategoria !== 'all';
+  const hasActiveFilters = searchTerm || filterFinancialStatus !== 'all' || filterCategoria !== 'all' || filterRegime !== 'all';
 
   const clearFilters = () => {
     setSearchTerm('');
     setFilterFinancialStatus('all');
     setFilterCategoria('all');
+    setFilterRegime('all');
   };
+
 
   const toggleSelectContact = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
