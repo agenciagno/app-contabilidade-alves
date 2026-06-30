@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Contact, ContactInsert } from '@/hooks/useContacts';
-import { maskCPFCNPJ, maskPhone } from '@/lib/utils';
+import { maskCPFCNPJ, maskPhone, unmaskPhone } from '@/lib/utils';
 import { Search, Loader2 } from 'lucide-react';
 import { lookupCnpj, pickEmptyFields } from '@/lib/cnpj-lookup';
 import { useToast } from '@/hooks/use-toast';
@@ -62,8 +62,9 @@ export function ContactFormDialog({
       setName(contact.name);
       setDocument(contact.document || '');
       setEmail(contact.email || '');
-      setPhone(contact.phone || '');
-      setWhatsapp((contact as any).whatsapp || '');
+      setPhone(maskPhone(contact.phone || ''));
+      setWhatsapp(maskPhone((contact as any).whatsapp || ''));
+
       setCep(contact.cep || '');
       setAddress(contact.address || '');
       setAddressNumber(contact.address_number || '');
