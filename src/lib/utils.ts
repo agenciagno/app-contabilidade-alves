@@ -67,11 +67,18 @@ export function isValidDateString(value: string): boolean {
   return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
-// Máscara para telefone: (00) 00000-0000
+// Máscara adaptiva para telefone: fixo (XX) XXXX-XXXX (10 dígitos) ou celular (XX) XXXXX-XXXX (11 dígitos)
 export function maskPhone(value: string): string {
-  return value
-    .replace(/\D/g, '')
-    .replace(/^(\d{2})(\d)/, '($1) $2')
-    .replace(/(\d{5})(\d)/, '$1-$2')
-    .slice(0, 15);
+  const d = (value || '').replace(/\D/g, '').slice(0, 11);
+  if (d.length === 0) return '';
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
+
+// Retorna apenas os dígitos do telefone (para persistência)
+export function unmaskPhone(value: string): string {
+  return (value || '').replace(/\D/g, '');
+}
+

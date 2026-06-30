@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Contact, ContactInsert } from '@/hooks/useContacts';
-import { maskCPFCNPJ, maskPhone } from '@/lib/utils';
+import { maskCPFCNPJ, maskPhone, unmaskPhone } from '@/lib/utils';
 import { Search, Loader2 } from 'lucide-react';
 import { lookupCnpj, pickEmptyFields } from '@/lib/cnpj-lookup';
 import { useToast } from '@/hooks/use-toast';
@@ -62,8 +62,9 @@ export function ContactFormDialog({
       setName(contact.name);
       setDocument(contact.document || '');
       setEmail(contact.email || '');
-      setPhone(contact.phone || '');
-      setWhatsapp((contact as any).whatsapp || '');
+      setPhone(maskPhone(contact.phone || ''));
+      setWhatsapp(maskPhone((contact as any).whatsapp || ''));
+
       setCep(contact.cep || '');
       setAddress(contact.address || '');
       setAddressNumber(contact.address_number || '');
@@ -213,8 +214,9 @@ export function ContactFormDialog({
       document: document.trim() || null,
       tax_regime: null,
       email: email.trim() || null,
-      phone: phone.trim() || null,
-      whatsapp: whatsapp.trim() || null,
+      phone: unmaskPhone(phone) || null,
+      whatsapp: unmaskPhone(whatsapp) || null,
+
       cep: cep.trim() || null,
       address: address.trim() || null,
       address_number: addressNumber.trim() || null,
@@ -304,7 +306,7 @@ export function ContactFormDialog({
                   id="phone"
                   value={phone}
                   onChange={(e) => setPhone(maskPhone(e.target.value))}
-                  placeholder="(00) 00000-0000"
+                  placeholder="(XX) XXXXX-XXXX"
                   maxLength={15}
                 />
               </div>
@@ -314,7 +316,7 @@ export function ContactFormDialog({
                   id="whatsapp"
                   value={whatsapp}
                   onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
-                  placeholder="(00) 00000-0000"
+                  placeholder="(XX) XXXXX-XXXX"
                   maxLength={15}
                 />
               </div>
