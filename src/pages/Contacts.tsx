@@ -96,8 +96,16 @@ export default function Contacts() {
       }
       let matchesRegime = true;
       if (filterRegime !== 'all') {
-        matchesRegime = ((c as any).tax_regime || '') === filterRegime;
+        const regime = ((c as any).tax_regime || '').toString().toLowerCase().trim();
+        if (filterRegime === 'ausente') {
+          matchesRegime = regime === '';
+        } else if (filterRegime === 'nao_aplica') {
+          matchesRegime = regime === 'nao_aplica' || regime === 'isento';
+        } else {
+          matchesRegime = regime === filterRegime;
+        }
       }
+
       return matchesSearch && matchesFinancialStatus && matchesCategoria && matchesRegime;
     });
   }, [contacts, searchTerm, filterFinancialStatus, filterCategoria, filterRegime, transactions]);
@@ -437,6 +445,8 @@ export default function Contacts() {
                   <SelectItem value="lucro_real">Lucro Real</SelectItem>
                   <SelectItem value="mei">MEI</SelectItem>
                   <SelectItem value="nao_aplica">Isento / Não contribuinte</SelectItem>
+                  <SelectItem value="ausente">Ausente / Não informado</SelectItem>
+
                 </SelectContent>
               </Select>
               {hasActiveFilters && (
