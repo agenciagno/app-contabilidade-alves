@@ -184,6 +184,28 @@ export function ContactCadastroTab({ contactId }: Props) {
             <Field label="Nome Fantasia" autofill>
               <Input value={form.nome_fantasia || ''} onChange={e => set('nome_fantasia', e.target.value)} />
             </Field>
+            <Field label="Nome de Exibição">
+              <Select
+                value={
+                  form.display_name && form.display_name === (form.razao_social || '')
+                    ? 'razao_social'
+                    : 'nome_fantasia'
+                }
+                onValueChange={(v) => {
+                  const novo = v === 'razao_social' ? (form.razao_social || '') : (form.nome_fantasia || '');
+                  set('display_name', novo || null);
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nome_fantasia">Nome Fantasia</SelectItem>
+                  <SelectItem value="razao_social">Razão Social</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Este é o nome exibido na listagem de contatos
+              </p>
+            </Field>
             <Field label="Porte">
               <Select value={form.porte || ''} onValueChange={v => set('porte', v)}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
@@ -238,7 +260,7 @@ export function ContactCadastroTab({ contactId }: Props) {
         </Card>
         <div className="flex justify-end">
           <Button onClick={() => saveSection([
-            'document', 'razao_social', 'nome_fantasia', 'porte', 'natureza_juridica',
+            'document', 'razao_social', 'nome_fantasia', 'display_name', 'porte', 'natureza_juridica',
             'data_abertura_receita', 'situacao_cadastral', 'email', 'phone', 'whatsapp', 'notes',
             'cnae_principal', 'cnaes_secundarios',
             'tipo_estabelecimento', 'representative_legal', 'segundo_email_contato',
