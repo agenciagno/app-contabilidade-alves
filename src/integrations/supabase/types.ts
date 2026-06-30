@@ -1603,12 +1603,14 @@ export type Database = {
           description: string | null
           due_rule: string
           frequency: string
+          google_calendar_event_id: string | null
           holiday_adjustment: string
           id: string
           is_custom: boolean
           jurisdiction: string | null
           name: string
           requires_employees: boolean | null
+          source: string | null
           uf: string | null
           updated_at: string
           valid_from: string | null
@@ -1623,12 +1625,14 @@ export type Database = {
           description?: string | null
           due_rule: string
           frequency: string
+          google_calendar_event_id?: string | null
           holiday_adjustment: string
           id?: string
           is_custom?: boolean
           jurisdiction?: string | null
           name: string
           requires_employees?: boolean | null
+          source?: string | null
           uf?: string | null
           updated_at?: string
           valid_from?: string | null
@@ -1643,12 +1647,14 @@ export type Database = {
           description?: string | null
           due_rule?: string
           frequency?: string
+          google_calendar_event_id?: string | null
           holiday_adjustment?: string
           id?: string
           is_custom?: boolean
           jurisdiction?: string | null
           name?: string
           requires_employees?: boolean | null
+          source?: string | null
           uf?: string | null
           updated_at?: string
           valid_from?: string | null

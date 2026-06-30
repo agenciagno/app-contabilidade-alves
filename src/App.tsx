@@ -31,6 +31,7 @@ import FiscalTasks from "@/pages/FiscalTasks";
 import FiscalCalendar from "@/pages/FiscalCalendar";
 import FiscalDashboard from "@/pages/FiscalDashboard";
 import FiscalCollaborators from "@/pages/FiscalCollaborators";
+import FiscalObrigacoes from "@/pages/FiscalObrigacoes";
 
 import MonitorCNPJ from "@/pages/MonitorCNPJ";
 import Legalizacao from "@/pages/Legalizacao";
@@ -78,6 +79,7 @@ const App = () => (
               <Route path="/fiscal/calendario" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_calendario" requireAdmin><FiscalCalendar /></ModuleGuard></AppLayout>} />
               <Route path="/fiscal/dashboard" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_dashboard" requireAdmin><FiscalDashboard /></ModuleGuard></AppLayout>} />
               <Route path="/fiscal/colaboradores" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_colaboradores" requireAdmin><FiscalCollaborators /></ModuleGuard></AppLayout>} />
+              <Route path="/fiscal/obrigacoes" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_calendario" requireAdmin><FiscalObrigacoes /></ModuleGuard></AppLayout>} />
               
               <Route path="/fiscal/monitor-cnpj" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_monitor_cnpj" requireAdmin><MonitorCNPJ /></ModuleGuard></AppLayout>} />
               <Route path="/legalizacao" element={<AppLayout><ModuleGuard moduleName="legalizacao"><Legalizacao /></ModuleGuard></AppLayout>} />
