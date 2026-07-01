@@ -27,7 +27,7 @@ interface Props {
 
 const STATUS_CLIENTE = ['Prospect', 'Ativo', 'Inativo', 'Encerrado'];
 const TIPO_ESTABELECIMENTO = ['Matriz', 'Filial'];
-const REGIME_APURACAO = ['Mensal', 'Trimestral', 'Anual'];
+const REGIME_APURACAO = ['Mensal', 'Trimestral'];
 const TIPO_CARTAO_PONTO = ['Manual', 'Mecânico', 'Eletrônico', 'Biométrico', 'Não possui'];
 
 const AutofillBadge = () => (

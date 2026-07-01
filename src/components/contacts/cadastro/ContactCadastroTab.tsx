@@ -28,13 +28,13 @@ import { useCompany } from '@/hooks/useCompany';
 import { maskPhone } from '@/lib/utils';
 import { toast } from 'sonner';
 import { TAX_REGIMES } from '@/constants/taxRegimes';
+import { PORTE_OPTIONS } from '@/constants/porte';
 
 interface Props {
   contactId: string;
 }
 
 const STATUS_CLIENTE = ['Prospect', 'Ativo', 'Inativo', 'Suspenso', 'Encerrado'];
-const PORTE_OPTIONS = ['MEI', 'ME', 'EPP', 'Médio', 'Grande'];
 const BR_STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
 const AutofillBadge = () => (
@@ -201,7 +201,7 @@ export function ContactCadastroTab({ contactId }: Props) {
               <Select value={form.porte || ''} onValueChange={v => set('porte', v)}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
-                  {PORTE_OPTIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  {PORTE_OPTIONS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </Field>
