@@ -186,18 +186,12 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
       if (isEditMode) {
         const resolvedModules = role === 'colaborador' ? allowedModules : ALL_MODULE_KEYS;
 
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            full_name: fullName,
-            role,
-            status_active: statusActive,
-            is_super_admin: role === 'super_admin',
-            allowed_modules: resolvedModules,
-          })
-          .eq('user_id', editUser!.userId);
-
+        const { data: updateData, error: updateError } = await supabase.functions.invoke(
+          'admin-update-user',
+          { body: { userId: editUser!.userId, fullName, role, statusActive, allowedModules: resolvedModules } }
+        );
         if (updateError) throw new Error(updateError.message || 'Erro ao atualizar usuário');
+        if (updateData?.error) throw new Error(updateData.error);
 
         // Atualizar senha (opcional)
         if (newPassword) {
