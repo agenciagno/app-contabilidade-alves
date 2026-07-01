@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { TAX_REGIMES } from '@/constants/taxRegimes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -260,11 +261,9 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
                   <Select value={taxRegime} onValueChange={setTaxRegime}>
                     <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="mei">MEI</SelectItem>
-                      <SelectItem value="simples_nacional">Simples Nacional</SelectItem>
-                      <SelectItem value="lucro_presumido">Lucro Presumido</SelectItem>
-                      <SelectItem value="lucro_real">Lucro Real</SelectItem>
-                      <SelectItem value="nao_aplica">Não se aplica</SelectItem>
+                      {TAX_REGIMES.map(o => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}

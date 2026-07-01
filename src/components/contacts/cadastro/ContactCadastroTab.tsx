@@ -27,20 +27,11 @@ import { ContactObligationsSelector } from '@/components/fiscal/ContactObligatio
 import { useCompany } from '@/hooks/useCompany';
 import { maskPhone } from '@/lib/utils';
 import { toast } from 'sonner';
+import { TAX_REGIMES } from '@/constants/taxRegimes';
 
 interface Props {
   contactId: string;
 }
-
-const TAX_REGIMES = [
-  { value: 'simples_nacional', label: 'Simples Nacional' },
-  { value: 'lucro_presumido', label: 'Lucro Presumido' },
-  { value: 'lucro_real', label: 'Lucro Real' },
-  { value: 'mei', label: 'MEI' },
-  { value: 'imune', label: 'Imune' },
-  { value: 'isento', label: 'Isento' },
-  { value: 'nao_aplica', label: 'Pessoa Física' },
-];
 
 const STATUS_CLIENTE = ['Prospect', 'Ativo', 'Inativo', 'Suspenso', 'Encerrado'];
 const PORTE_OPTIONS = ['MEI', 'ME', 'EPP', 'Médio', 'Grande'];

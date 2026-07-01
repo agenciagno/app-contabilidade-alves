@@ -19,16 +19,11 @@ import { useToast } from '@/hooks/use-toast';
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
+import { TAX_REGIMES } from '@/constants/taxRegimes';
 
 interface Props {
   contactId: string;
 }
-
-const TAX_REGIMES = [
-  { value: 'simples_nacional', label: 'Simples Nacional' },
-  { value: 'lucro_presumido', label: 'Lucro Presumido' },
-  { value: 'lucro_real', label: 'Lucro Real' },
-];
 
 const STATUS_CLIENTE = ['Prospect', 'Ativo', 'Inativo', 'Encerrado'];
 const TIPO_ESTABELECIMENTO = ['Matriz', 'Filial'];
