@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TAX_REGIMES } from '@/constants/taxRegimes';
+import { PORTE_OPTIONS } from '@/constants/porte';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,14 +21,6 @@ interface ContactBulkEditDialogProps {
   selectedIds: string[];
   onDone: () => void;
 }
-
-const PORTE_OPTIONS = [
-  { value: 'mei', label: 'MEI' },
-  { value: 'me', label: 'ME' },
-  { value: 'epp', label: 'EPP' },
-  { value: 'medio', label: 'Médio' },
-  { value: 'grande', label: 'Grande' },
-];
 
 const STATUS_OPTIONS = [
   { value: 'ativo', label: 'Ativo' },
