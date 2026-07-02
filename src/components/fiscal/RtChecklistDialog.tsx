@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronRight, Circle } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { CheckCircle2, ChevronDown, ChevronRight, Circle, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -13,29 +13,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
 import { cn } from '@/lib/utils';
+import {
+  defaultRtState,
+  useRtChecklist,
+  type RtItems,
+  type RtState,
+  type RtStatus,
+} from '@/hooks/useRtChecklist';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-type RtStatus = 'nao_iniciado' | 'em_analise' | 'adequado' | 'acao_necessaria';
-
-interface RtItems {
-  cnae_compat: boolean;
-  cadastro_ok: boolean;
-  simulacao: boolean;
-  informado: boolean;
-  regime_revisado: boolean;
-}
-
-interface RtState {
-  status: RtStatus;
-  items: RtItems;
-  updated_at: string;
 }
 
 const STATUS_META: Record<RtStatus, { label: string; className: string }> = {
@@ -56,37 +48,6 @@ const CHECKLIST_ITEMS: { key: keyof RtItems; label: string }[] = [
   { key: 'regime_revisado', label: 'Regime tributário revisado pós-RT' },
 ];
 
-const emptyItems = (): RtItems => ({
-  cnae_compat: false,
-  cadastro_ok: false,
-  simulacao: false,
-  informado: false,
-  regime_revisado: false,
-});
-
-const keyFor = (companyId: string, contactId: string) => `rt-checklist:${companyId}:${contactId}`;
-
-function loadState(companyId: string, contactId: string): RtState {
-  try {
-    const raw = localStorage.getItem(keyFor(companyId, contactId));
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return {
-        status: parsed.status ?? 'nao_iniciado',
-        items: { ...emptyItems(), ...(parsed.items ?? {}) },
-        updated_at: parsed.updated_at ?? new Date().toISOString(),
-      };
-    }
-  } catch {}
-  return { status: 'nao_iniciado', items: emptyItems(), updated_at: new Date().toISOString() };
-}
-
-function saveState(companyId: string, contactId: string, state: RtState) {
-  try {
-    localStorage.setItem(keyFor(companyId, contactId), JSON.stringify(state));
-  } catch {}
-}
-
 interface ContactRow {
   id: string;
   name: string;
@@ -99,14 +60,6 @@ export function RtChecklistDialog({ open, onOpenChange }: Props) {
   const companyId = company?.id ?? '';
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [states, setStates] = useState<Record<string, RtState>>({});
-
-  useEffect(() => {
-    if (open) {
-      // eslint-disable-next-line no-console
-      console.log('RtChecklistDialog companyId:', companyId, 'companyLoading:', companyLoading);
-    }
-  }, [open, companyId, companyLoading]);
 
   const { data: contacts = [], isLoading } = useQuery<ContactRow[]>({
     queryKey: ['rt-checklist-contacts', companyId],
@@ -123,14 +76,7 @@ export function RtChecklistDialog({ open, onOpenChange }: Props) {
     enabled: !!companyId && open,
   });
 
-  useEffect(() => {
-    if (!open || !companyId) return;
-    const next: Record<string, RtState> = {};
-    contacts.forEach((c) => {
-      next[c.id] = loadState(companyId, c.id);
-    });
-    setStates(next);
-  }, [open, companyId, contacts]);
+  const { states, isLoading: statesLoading, upsert, savingContactId } = useRtChecklist(companyId);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -143,24 +89,31 @@ export function RtChecklistDialog({ open, onOpenChange }: Props) {
     );
   }, [contacts, search]);
 
-  const verifiedCount = Object.values(states).filter((s) => s.status !== 'nao_iniciado').length;
+  const getState = (contactId: string): RtState => states[contactId] ?? defaultRtState();
+
+  const verifiedCount = contacts.reduce(
+    (acc, c) => (states[c.id] && states[c.id].status !== 'nao_iniciado' ? acc + 1 : acc),
+    0,
+  );
   const totalCount = contacts.length;
   const pct = totalCount > 0 ? (verifiedCount / totalCount) * 100 : 0;
 
   const updateState = (contactId: string, patch: Partial<RtState>) => {
-    setStates((prev) => {
-      const current = prev[contactId] ?? loadState(companyId, contactId);
-      const merged: RtState = {
-        status: patch.status ?? current.status,
-        items: patch.items ?? current.items,
-        updated_at: new Date().toISOString(),
-      };
-      // Auto-promote to 'adequado' when all items are true
-      const allDone = Object.values(merged.items).every(Boolean);
-      if (allDone) merged.status = 'adequado';
-      saveState(companyId, contactId, merged);
-      return { ...prev, [contactId]: merged };
-    });
+    const current = getState(contactId);
+    const nextItems = patch.items ?? current.items;
+    let nextStatus = patch.status ?? current.status;
+    const allDone = Object.values(nextItems).every(Boolean);
+    if (allDone) nextStatus = 'adequado';
+
+    upsert(
+      { contactId, status: nextStatus, items: nextItems },
+      {
+        onError: (err: unknown) => {
+          const message = err instanceof Error ? err.message : 'Erro ao salvar checklist';
+          toast.error(message);
+        },
+      },
+    );
   };
 
   return (
@@ -169,8 +122,8 @@ export function RtChecklistDialog({ open, onOpenChange }: Props) {
         <DialogHeader className="px-6 pt-6 pb-3">
           <DialogTitle>Checklist de Adequação à Reforma Tributária</DialogTitle>
           <DialogDescription>
-            Acompanhe a adequação de cada cliente aos requisitos do IBS/CBS. Os dados são salvos localmente neste
-            navegador.
+            Acompanhe a adequação de cada cliente aos requisitos do IBS/CBS. Os dados são compartilhados com toda a
+            equipe.
           </DialogDescription>
         </DialogHeader>
 
@@ -194,16 +147,17 @@ export function RtChecklistDialog({ open, onOpenChange }: Props) {
         <div className="px-6 pb-6 overflow-y-auto space-y-1.5">
           {companyLoading || !companyId ? (
             <p className="text-sm text-muted-foreground py-8 text-center">Carregando empresa...</p>
-          ) : isLoading ? (
+          ) : isLoading || statesLoading ? (
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)
           ) : filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">Nenhum cliente encontrado.</p>
           ) : (
             filtered.map((c) => {
-              const s = states[c.id] ?? loadState(companyId, c.id);
+              const s = getState(c.id);
               const meta = STATUS_META[s.status];
               const isOpen = expanded === c.id;
               const doneCount = Object.values(s.items).filter(Boolean).length;
+              const isSaving = savingContactId === c.id;
 
               return (
                 <div key={c.id} className="border rounded-md overflow-hidden">
@@ -221,7 +175,8 @@ export function RtChecklistDialog({ open, onOpenChange }: Props) {
                         <span className="text-xs text-muted-foreground">
                           {doneCount}/{CHECKLIST_ITEMS.length}
                         </span>
-                        <Badge variant="outline" className={cn('text-[10px]', meta.className)}>
+                        <Badge variant="outline" className={cn('text-[10px] gap-1', meta.className)}>
+                          {isSaving && <Loader2 className="h-3 w-3 animate-spin" />}
                           {meta.label}
                         </Badge>
                       </div>
