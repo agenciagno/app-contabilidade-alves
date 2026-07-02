@@ -440,6 +440,73 @@ export type Database = {
         }
         Relationships: []
       }
+      client_rt_checklist: {
+        Row: {
+          cadastro_ok: boolean
+          cnae_compat: boolean
+          company_id: string
+          contact_id: string
+          created_at: string
+          id: string
+          informado: boolean
+          regime_revisado: boolean
+          simulacao: boolean
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          cadastro_ok?: boolean
+          cnae_compat?: boolean
+          company_id: string
+          contact_id: string
+          created_at?: string
+          id?: string
+          informado?: boolean
+          regime_revisado?: boolean
+          simulacao?: boolean
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          cadastro_ok?: boolean
+          cnae_compat?: boolean
+          company_id?: string
+          contact_id?: string
+          created_at?: string
+          id?: string
+          informado?: boolean
+          regime_revisado?: boolean
+          simulacao?: boolean
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_rt_checklist_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_rt_checklist_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_rt_checklist_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
       cnds: {
         Row: {
           arquivo_url: string | null
