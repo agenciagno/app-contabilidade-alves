@@ -312,9 +312,21 @@ export function useDREData(startDate: string, endDate: string) {
       realizado: empRecebidos.realizado - Math.abs(despEmprestimos.realizado),
     };
 
+    // Movimento Financeiro = Movimento Entrada - ABS(Movimento Saída) (net, not sum)
+    const movFinSection = buildSection('Movimento Financeiro');
+    const movEntrada = movFinSection.children.find(c => c.name.toLowerCase().includes('entrada'));
+    const movSaida = movFinSection.children.find(c => c.name.toLowerCase().includes('saída') || c.name.toLowerCase().includes('saida'));
+    const movimentoFinanceiro = {
+      previsto: (movEntrada?.previsto ?? 0) - Math.abs(movSaida?.previsto ?? 0),
+      realizado: (movEntrada?.realizado ?? 0) - Math.abs(movSaida?.realizado ?? 0),
+    };
+    calculatedTotals['movimento_financeiro'] = movimentoFinanceiro;
+    // Override section total so second pass renders the net
+    sectionTotals['movimento financeiro'] = movimentoFinanceiro;
+
     calculatedTotals['lucro_liquido'] = {
-      previsto: calculatedTotals['lucro_operacional_2'].previsto + calculatedTotals['despesas_receitas_nao_op'].previsto,
-      realizado: calculatedTotals['lucro_operacional_2'].realizado + calculatedTotals['despesas_receitas_nao_op'].realizado,
+      previsto: calculatedTotals['lucro_operacional_2'].previsto + calculatedTotals['despesas_receitas_nao_op'].previsto + movimentoFinanceiro.previsto,
+      realizado: calculatedTotals['lucro_operacional_2'].realizado + calculatedTotals['despesas_receitas_nao_op'].realizado + movimentoFinanceiro.realizado,
     };
 
     // Fluxo de Caixa = ALL inflows - ALL outflows in period (including non-DRE categories)
