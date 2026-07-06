@@ -22,6 +22,7 @@ import { NewClients2026Tab } from '@/components/contacts/NewClients2026Tab';
 import { useUserRole } from '@/hooks/useUserRole';
 import { maskPhone } from '@/lib/utils';
 import { getContactDisplayName } from '@/lib/contact-display';
+import { useAllFiscalProfiles } from '@/hooks/useCollaboratorCoverage';
 
 
 type ViewMode = 'card' | 'list';
