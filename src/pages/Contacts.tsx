@@ -473,6 +473,7 @@ export default function Contacts() {
                   ))}
                 </SelectContent>
               </Select>
+              {hasActiveFilters && (
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 gap-1.5 text-muted-foreground">
                   <X className="h-3.5 w-3.5" />
                   Limpar
