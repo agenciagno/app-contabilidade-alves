@@ -22,6 +22,7 @@ import { NewClients2026Tab } from '@/components/contacts/NewClients2026Tab';
 import { useUserRole } from '@/hooks/useUserRole';
 import { maskPhone } from '@/lib/utils';
 import { getContactDisplayName } from '@/lib/contact-display';
+import { useAllFiscalProfiles } from '@/hooks/useCollaboratorCoverage';
 
 
 type ViewMode = 'card' | 'list';
@@ -40,6 +41,8 @@ export default function Contacts() {
   const [filterFinancialStatus, setFilterFinancialStatus] = useState('all');
   const [filterCategoria, setFilterCategoria] = useState('all');
   const [filterRegime, setFilterRegime] = useState('all');
+  const [filterResponsible, setFilterResponsible] = useState('all');
+  const { data: fiscalProfiles = [] } = useAllFiscalProfiles();
 
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -106,20 +109,27 @@ export default function Contacts() {
         }
       }
 
-      return matchesSearch && matchesFinancialStatus && matchesCategoria && matchesRegime;
+      let matchesResponsible = true;
+      if (filterResponsible !== 'all') {
+        const rid = (c as any).responsible_id ?? null;
+        matchesResponsible = filterResponsible === 'none' ? !rid : rid === filterResponsible;
+      }
+
+      return matchesSearch && matchesFinancialStatus && matchesCategoria && matchesRegime && matchesResponsible;
     });
-  }, [contacts, searchTerm, filterFinancialStatus, filterCategoria, filterRegime, transactions]);
+  }, [contacts, searchTerm, filterFinancialStatus, filterCategoria, filterRegime, filterResponsible, transactions]);
 
 
   const activeContacts = filteredContacts.filter(c => c.is_active);
   const inactiveContacts = filteredContacts.filter(c => !c.is_active);
-  const hasActiveFilters = searchTerm || filterFinancialStatus !== 'all' || filterCategoria !== 'all' || filterRegime !== 'all';
+  const hasActiveFilters = searchTerm || filterFinancialStatus !== 'all' || filterCategoria !== 'all' || filterRegime !== 'all' || filterResponsible !== 'all';
 
   const clearFilters = () => {
     setSearchTerm('');
     setFilterFinancialStatus('all');
     setFilterCategoria('all');
     setFilterRegime('all');
+    setFilterResponsible('all');
   };
 
 
@@ -447,6 +457,20 @@ export default function Contacts() {
                   <SelectItem value="nao_aplica">Isento / Não contribuinte</SelectItem>
                   <SelectItem value="ausente">Ausente / Não informado</SelectItem>
 
+                </SelectContent>
+              </Select>
+              <Select value={filterResponsible} onValueChange={setFilterResponsible}>
+                <SelectTrigger className="w-[200px] h-9 bg-background/50 border-border/50">
+                  <SelectValue placeholder="Responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos responsáveis</SelectItem>
+                  <SelectItem value="none">Sem responsável</SelectItem>
+                  {fiscalProfiles.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.full_name || p.email}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {hasActiveFilters && (
