@@ -27,7 +27,7 @@ export const DRE_STRUCTURE: DREStructureItem[] = [
   { type: 'calculated', key: 'despesas_receitas_nao_op', label: 'Despesas/Receitas não Operacionais' },
   { type: 'section', name: 'Movimento Financeiro' },
   { type: 'calculated', key: 'lucro_liquido', label: 'Lucro/Prejuízo Líquido' },
-  { type: 'calculated', key: 'fluxo_caixa', label: 'Fluxo de Caixa' },
+  { type: 'calculated', key: 'fluxo_caixa', label: 'Saldo em Conta Corrente' },
 ];
 
 export type DREStructureItem =
@@ -103,9 +103,19 @@ async function fetchAllPaged<T>(
 export function useDREData(startDate: string, endDate: string) {
   const { categories } = useCategories();
 
-  // Query for ALL paid transactions in period (for Fluxo de Caixa - no show_in_dre filter)
-  const { data: allPaidTxns = [] } = useQuery({
-    queryKey: ['dre-fluxo-caixa', startDate, endDate],
+  // Query for saldo em conta corrente: soma inicial dos bancos + todas as transações pagas até endDate
+  const { data: banksInitialTotal = 0 } = useQuery({
+    queryKey: ['dre-banks-initial'],
+    queryFn: async () => {
+      const rows = await fetchAllPaged<{ initial_balance: number | null }>(() =>
+        supabase.from('banks').select('id, initial_balance')
+      );
+      return rows.reduce((s, b) => s + Number(b.initial_balance ?? 0), 0);
+    },
+  });
+
+  const { data: paidUntilEnd = [] } = useQuery({
+    queryKey: ['dre-paid-until', endDate],
     queryFn: async () => {
       return await fetchAllPaged<{ paid_amount: number | null; amount: number; type: string }>(() =>
         supabase
@@ -114,11 +124,10 @@ export function useDREData(startDate: string, endDate: string) {
           .is('deleted_at', null)
           .eq('is_paid', true)
           .not('date', 'is', null)
-          .gte('date', startDate)
           .lte('date', endDate)
       );
     },
-    enabled: !!startDate && !!endDate,
+    enabled: !!endDate,
   });
 
   const { data: previstoTxnsRaw = [] } = useQuery({
@@ -329,14 +338,14 @@ export function useDREData(startDate: string, endDate: string) {
       realizado: calculatedTotals['lucro_operacional_2'].realizado + calculatedTotals['despesas_receitas_nao_op'].realizado + movimentoFinanceiro.realizado,
     };
 
-    // Fluxo de Caixa = ALL inflows - ALL outflows in period (including non-DRE categories)
-    const entradas = allPaidTxns
+    // Saldo em Conta Corrente = saldo inicial dos bancos + todas transações pagas até endDate
+    const entradas = paidUntilEnd
       .filter(t => t.type === 'receita')
       .reduce((s, t) => s + Math.abs(Number(t.paid_amount ?? t.amount)), 0);
-    const saidas = allPaidTxns
+    const saidas = paidUntilEnd
       .filter(t => t.type === 'despesa')
       .reduce((s, t) => s + Math.abs(Number(t.paid_amount ?? t.amount)), 0);
-    const fluxoCaixaTotal = entradas - saidas;
+    const fluxoCaixaTotal = Number(banksInitialTotal) + entradas - saidas;
     calculatedTotals['fluxo_caixa'] = { previsto: fluxoCaixaTotal, realizado: fluxoCaixaTotal };
 
     // Receita Líquida for % calculations
