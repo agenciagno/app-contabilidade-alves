@@ -25,6 +25,7 @@ export const DRE_STRUCTURE: DREStructureItem[] = [
   { type: 'section', name: 'Empréstimos Recebidos PF/PJ' },
   { type: 'section', name: 'Despesas Empréstimos' },
   { type: 'calculated', key: 'despesas_receitas_nao_op', label: 'Despesas/Receitas não Operacionais' },
+  { type: 'section', name: 'Movimento Financeiro' },
   { type: 'calculated', key: 'lucro_liquido', label: 'Lucro/Prejuízo Líquido' },
   { type: 'calculated', key: 'fluxo_caixa', label: 'Fluxo de Caixa' },
 ];
@@ -221,6 +222,21 @@ export function useDREData(startDate: string, endDate: string) {
       };
     });
 
+    // Include transactions posted directly to the parent macro (not to any sub)
+    const parentPrevisto = sumPrevisto(macro.id);
+    const parentRealizado = sumRealizado(macro.id);
+    if (parentPrevisto !== 0 || parentRealizado !== 0) {
+      children.push({
+        id: macro.id,
+        name: `${macro.name} (direto)`,
+        previsto: parentPrevisto,
+        realizado: parentRealizado,
+        rxp: parentRealizado - parentPrevisto,
+        percPrevisto: 0,
+        percRealizado: 0,
+      });
+    }
+
     const totalPrevisto = children.reduce((s, c) => s + c.previsto, 0);
     const totalRealizado = children.reduce((s, c) => s + c.realizado, 0);
 
@@ -296,9 +312,21 @@ export function useDREData(startDate: string, endDate: string) {
       realizado: empRecebidos.realizado - Math.abs(despEmprestimos.realizado),
     };
 
+    // Movimento Financeiro = Movimento Entrada - ABS(Movimento Saída) (net, not sum)
+    const movFinSection = buildSection('Movimento Financeiro');
+    const movEntrada = movFinSection.children.find(c => c.name.toLowerCase().includes('entrada'));
+    const movSaida = movFinSection.children.find(c => c.name.toLowerCase().includes('saída') || c.name.toLowerCase().includes('saida'));
+    const movimentoFinanceiro = {
+      previsto: (movEntrada?.previsto ?? 0) - Math.abs(movSaida?.previsto ?? 0),
+      realizado: (movEntrada?.realizado ?? 0) - Math.abs(movSaida?.realizado ?? 0),
+    };
+    calculatedTotals['movimento_financeiro'] = movimentoFinanceiro;
+    // Override section total so second pass renders the net
+    sectionTotals['movimento financeiro'] = movimentoFinanceiro;
+
     calculatedTotals['lucro_liquido'] = {
-      previsto: calculatedTotals['lucro_operacional_2'].previsto + calculatedTotals['despesas_receitas_nao_op'].previsto,
-      realizado: calculatedTotals['lucro_operacional_2'].realizado + calculatedTotals['despesas_receitas_nao_op'].realizado,
+      previsto: calculatedTotals['lucro_operacional_2'].previsto + calculatedTotals['despesas_receitas_nao_op'].previsto + movimentoFinanceiro.previsto,
+      realizado: calculatedTotals['lucro_operacional_2'].realizado + calculatedTotals['despesas_receitas_nao_op'].realizado + movimentoFinanceiro.realizado,
     };
 
     // Fluxo de Caixa = ALL inflows - ALL outflows in period (including non-DRE categories)
@@ -323,7 +351,11 @@ export function useDREData(startDate: string, endDate: string) {
     for (const item of DRE_STRUCTURE) {
       if (item.type === 'section') {
         const data = buildSection(item.name);
-        const rxp = data.realizado - data.previsto;
+        // Use possibly-overridden section total (e.g. Movimento Financeiro is a net)
+        const overridden = sec(item.name);
+        const sectionPrevisto = overridden.previsto;
+        const sectionRealizado = overridden.realizado;
+        const rxp = sectionRealizado - sectionPrevisto;
 
         // Add % to children
         const childrenWithPerc = data.children.map(c => ({
@@ -336,11 +368,11 @@ export function useDREData(startDate: string, endDate: string) {
           type: 'section',
           macroName: item.name,
           macroId: data.macroId,
-          previsto: data.previsto,
-          realizado: data.realizado,
+          previsto: sectionPrevisto,
+          realizado: sectionRealizado,
           rxp,
-          percPrevisto: perc(data.previsto, rlPrevisto),
-          percRealizado: perc(data.realizado, rlRealizado),
+          percPrevisto: perc(sectionPrevisto, rlPrevisto),
+          percRealizado: perc(sectionRealizado, rlRealizado),
           children: childrenWithPerc,
         });
       } else {
