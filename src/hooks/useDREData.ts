@@ -222,6 +222,21 @@ export function useDREData(startDate: string, endDate: string) {
       };
     });
 
+    // Include transactions posted directly to the parent macro (not to any sub)
+    const parentPrevisto = sumPrevisto(macro.id);
+    const parentRealizado = sumRealizado(macro.id);
+    if (parentPrevisto !== 0 || parentRealizado !== 0) {
+      children.push({
+        id: macro.id,
+        name: `${macro.name} (direto)`,
+        previsto: parentPrevisto,
+        realizado: parentRealizado,
+        rxp: parentRealizado - parentPrevisto,
+        percPrevisto: 0,
+        percRealizado: 0,
+      });
+    }
+
     const totalPrevisto = children.reduce((s, c) => s + c.previsto, 0);
     const totalRealizado = children.reduce((s, c) => s + c.realizado, 0);
 
