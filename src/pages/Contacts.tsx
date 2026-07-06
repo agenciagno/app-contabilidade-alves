@@ -459,7 +459,20 @@ export default function Contacts() {
 
                 </SelectContent>
               </Select>
-              {hasActiveFilters && (
+              <Select value={filterResponsible} onValueChange={setFilterResponsible}>
+                <SelectTrigger className="w-[200px] h-9 bg-background/50 border-border/50">
+                  <SelectValue placeholder="Responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos responsáveis</SelectItem>
+                  <SelectItem value="none">Sem responsável</SelectItem>
+                  {fiscalProfiles.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.full_name || p.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 gap-1.5 text-muted-foreground">
                   <X className="h-3.5 w-3.5" />
                   Limpar
