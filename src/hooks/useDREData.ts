@@ -338,14 +338,14 @@ export function useDREData(startDate: string, endDate: string) {
       realizado: calculatedTotals['lucro_operacional_2'].realizado + calculatedTotals['despesas_receitas_nao_op'].realizado + movimentoFinanceiro.realizado,
     };
 
-    // Fluxo de Caixa = ALL inflows - ALL outflows in period (including non-DRE categories)
-    const entradas = allPaidTxns
+    // Saldo em Conta Corrente = saldo inicial dos bancos + todas transações pagas até endDate
+    const entradas = paidUntilEnd
       .filter(t => t.type === 'receita')
       .reduce((s, t) => s + Math.abs(Number(t.paid_amount ?? t.amount)), 0);
-    const saidas = allPaidTxns
+    const saidas = paidUntilEnd
       .filter(t => t.type === 'despesa')
       .reduce((s, t) => s + Math.abs(Number(t.paid_amount ?? t.amount)), 0);
-    const fluxoCaixaTotal = entradas - saidas;
+    const fluxoCaixaTotal = Number(banksInitialTotal) + entradas - saidas;
     calculatedTotals['fluxo_caixa'] = { previsto: fluxoCaixaTotal, realizado: fluxoCaixaTotal };
 
     // Receita Líquida for % calculations
