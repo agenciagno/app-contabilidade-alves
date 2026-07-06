@@ -351,7 +351,11 @@ export function useDREData(startDate: string, endDate: string) {
     for (const item of DRE_STRUCTURE) {
       if (item.type === 'section') {
         const data = buildSection(item.name);
-        const rxp = data.realizado - data.previsto;
+        // Use possibly-overridden section total (e.g. Movimento Financeiro is a net)
+        const overridden = sec(item.name);
+        const sectionPrevisto = overridden.previsto;
+        const sectionRealizado = overridden.realizado;
+        const rxp = sectionRealizado - sectionPrevisto;
 
         // Add % to children
         const childrenWithPerc = data.children.map(c => ({
@@ -364,11 +368,11 @@ export function useDREData(startDate: string, endDate: string) {
           type: 'section',
           macroName: item.name,
           macroId: data.macroId,
-          previsto: data.previsto,
-          realizado: data.realizado,
+          previsto: sectionPrevisto,
+          realizado: sectionRealizado,
           rxp,
-          percPrevisto: perc(data.previsto, rlPrevisto),
-          percRealizado: perc(data.realizado, rlRealizado),
+          percPrevisto: perc(sectionPrevisto, rlPrevisto),
+          percRealizado: perc(sectionRealizado, rlRealizado),
           children: childrenWithPerc,
         });
       } else {
