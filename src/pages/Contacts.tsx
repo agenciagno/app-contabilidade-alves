@@ -41,6 +41,8 @@ export default function Contacts() {
   const [filterFinancialStatus, setFilterFinancialStatus] = useState('all');
   const [filterCategoria, setFilterCategoria] = useState('all');
   const [filterRegime, setFilterRegime] = useState('all');
+  const [filterResponsible, setFilterResponsible] = useState('all');
+  const { data: fiscalProfiles = [] } = useAllFiscalProfiles();
 
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
