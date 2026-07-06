@@ -25,6 +25,7 @@ export const DRE_STRUCTURE: DREStructureItem[] = [
   { type: 'section', name: 'Empréstimos Recebidos PF/PJ' },
   { type: 'section', name: 'Despesas Empréstimos' },
   { type: 'calculated', key: 'despesas_receitas_nao_op', label: 'Despesas/Receitas não Operacionais' },
+  { type: 'section', name: 'Movimento Financeiro' },
   { type: 'calculated', key: 'lucro_liquido', label: 'Lucro/Prejuízo Líquido' },
   { type: 'calculated', key: 'fluxo_caixa', label: 'Fluxo de Caixa' },
 ];
