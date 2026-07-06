@@ -109,20 +109,27 @@ export default function Contacts() {
         }
       }
 
-      return matchesSearch && matchesFinancialStatus && matchesCategoria && matchesRegime;
+      let matchesResponsible = true;
+      if (filterResponsible !== 'all') {
+        const rid = (c as any).responsible_id ?? null;
+        matchesResponsible = filterResponsible === 'none' ? !rid : rid === filterResponsible;
+      }
+
+      return matchesSearch && matchesFinancialStatus && matchesCategoria && matchesRegime && matchesResponsible;
     });
-  }, [contacts, searchTerm, filterFinancialStatus, filterCategoria, filterRegime, transactions]);
+  }, [contacts, searchTerm, filterFinancialStatus, filterCategoria, filterRegime, filterResponsible, transactions]);
 
 
   const activeContacts = filteredContacts.filter(c => c.is_active);
   const inactiveContacts = filteredContacts.filter(c => !c.is_active);
-  const hasActiveFilters = searchTerm || filterFinancialStatus !== 'all' || filterCategoria !== 'all' || filterRegime !== 'all';
+  const hasActiveFilters = searchTerm || filterFinancialStatus !== 'all' || filterCategoria !== 'all' || filterRegime !== 'all' || filterResponsible !== 'all';
 
   const clearFilters = () => {
     setSearchTerm('');
     setFilterFinancialStatus('all');
     setFilterCategoria('all');
     setFilterRegime('all');
+    setFilterResponsible('all');
   };
 
 
