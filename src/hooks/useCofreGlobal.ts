@@ -5,7 +5,6 @@ import { PortalTipo } from './useAcessosCliente';
 export interface CofreGlobalRow {
   contact_id: string;
   nome_cliente: string;
-  company_id: string;
   acesso_id: string;
   portal: PortalTipo;
   portal_label: string | null;
@@ -23,9 +22,9 @@ export function useCofreGlobal() {
       const { data, error } = await (supabase as any)
         .from('vw_cofre_global')
         .select(
-          'contact_id, nome_cliente, company_id, acesso_id, portal, portal_label, login, observacao, validade_certificado, senha_atualizada_em, alerta_vencimento'
+          'contact_id, nome_cliente:cliente_nome, acesso_id, portal, portal_label, login, observacao, validade_certificado, senha_atualizada_em, alerta_vencimento'
         )
-        .order('nome_cliente', { ascending: true });
+        .order('cliente_nome', { ascending: true });
       if (error) throw error;
       return (data ?? []) as CofreGlobalRow[];
     },

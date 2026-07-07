@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       acessos_portais: {
         Row: {
+          anexo_url: string | null
           atualizado_por: string | null
           company_id: string
           contact_id: string
@@ -30,6 +31,7 @@ export type Database = {
           validade_certificado: string | null
         }
         Insert: {
+          anexo_url?: string | null
           atualizado_por?: string | null
           company_id: string
           contact_id: string
@@ -44,6 +46,7 @@ export type Database = {
           validade_certificado?: string | null
         }
         Update: {
+          anexo_url?: string | null
           atualizado_por?: string | null
           company_id?: string
           contact_id?: string
