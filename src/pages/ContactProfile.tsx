@@ -30,8 +30,8 @@ export default function ContactProfile() {
   const { contacts, isLoading: isLoadingContacts } = useContacts();
   const { data: transactions } = useContactTransactions(id);
   const { documents, getDocumentCounts } = useContactDocuments(id);
-  const { isAdmin, isSuperAdmin } = useUserRole();
-  const canViewAcessos = isAdmin || isSuperAdmin;
+  const { isAdmin, isSuperAdmin, allowedModules } = useUserRole();
+  const canViewAcessos = isSuperAdmin || allowedModules.includes('acessos');
   const contact = contacts.find(c => c.id === id);
   const { isInadimplente } = useContactFinancialStatus(id, transactions);
 
