@@ -71,8 +71,8 @@ interface ClienteAgrupado {
 
 export default function CofreGlobal() {
   const navigate = useNavigate();
-  const { isAdmin, isSuperAdmin, isLoading: roleLoading } = useUserRole();
-  const podeAcessar = isAdmin || isSuperAdmin;
+  const { isAdmin, isSuperAdmin, isLoading: roleLoading, allowedModules } = useUserRole();
+  const podeAcessar = isSuperAdmin || allowedModules.includes('acessos');
 
   useEffect(() => {
     if (!roleLoading && !podeAcessar) {
