@@ -5,7 +5,6 @@ import { PortalTipo } from './useAcessosCliente';
 export interface CofreGlobalRow {
   contact_id: string;
   nome_cliente: string;
-  
   acesso_id: string;
   portal: PortalTipo;
   portal_label: string | null;
