@@ -71,9 +71,19 @@ export function useSalvarAcesso() {
         body: input,
       });
       if (error) {
-        const mensagem = (error as any)?.context?.json?.error
-          ?? (error as any)?.message
-          ?? 'Falha ao chamar Edge Function cofre-salvar.';
+        let mensagem = 'Falha ao chamar Edge Function cofre-salvar.';
+        const ctx = (error as any)?.context;
+        if (ctx && typeof ctx.json === 'function') {
+          try {
+            const body = await ctx.json();
+            if (body?.error) mensagem = body.error;
+          } catch {
+            // corpo não é JSON válido, ignora e usa fallback
+          }
+        }
+        if (mensagem === 'Falha ao chamar Edge Function cofre-salvar.' && (error as any)?.message) {
+          mensagem = (error as any).message;
+        }
         throw new Error(mensagem);
       }
       if (!data?.success) throw new Error(data?.error ?? 'Falha ao salvar acesso.');
