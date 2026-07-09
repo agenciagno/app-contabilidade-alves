@@ -122,14 +122,14 @@ export function AttachmentUpload({
                 className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/30 rounded px-2 py-1"
               >
                 {getFileIcon(attachment.file_type)}
-                <a
-                  href={attachment.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 truncate hover:text-primary"
+                <button
+                  type="button"
+                  onClick={() => abrirDocumentoViaEdge('transaction-attachments', attachment.file_url)}
+                  className="flex-1 truncate text-left hover:text-primary"
                 >
                   {attachment.file_name}
-                </a>
+                </button>
+
                 <X
                   className="w-3 h-3 cursor-pointer hover:text-destructive"
                   onClick={() => onDeleteAttachment(attachment)}
