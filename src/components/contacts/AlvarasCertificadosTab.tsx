@@ -187,18 +187,9 @@ function AlvarasSection({ contactId }: Props) {
   });
 
   const download = async (a: Alvara) => {
-    const { data, error } = await supabase.storage
-      .from('contact-documents').download(a.file_url);
-    if (error) return toast.error('Erro ao baixar');
-    const url = URL.createObjectURL(data);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = a.file_name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    await abrirDocumentoViaEdge('contact-documents', a.file_url);
   };
+
 
   const parseMeta = (name: string) => {
     const validadeMatch = name.match(/\[validade:(\d{4}-\d{2}-\d{2})\]/);
