@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { createAuditLog } from './useAuditLog';
+import { baixarDocumentoUrl } from '@/lib/documento-baixar';
+
 
 export type DocumentCategory = 'atos_constitutivos' | 'impostos_guias' | 'fiscal' | 'dp_rh' | 'certidoes';
 
