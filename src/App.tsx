@@ -42,6 +42,8 @@ import Newsletter from "@/pages/Newsletter";
 import CofreGlobal from "@/pages/CofreGlobal";
 import AdminProvisionarCliente from "@/pages/AdminProvisionarCliente";
 import TechOperacao from "@/pages/TechOperacao";
+import TechLGPD from "@/pages/TechLGPD";
+
 
 const queryClient = new QueryClient();
 
