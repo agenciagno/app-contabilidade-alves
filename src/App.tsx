@@ -40,6 +40,7 @@ import NoAccess from "@/pages/NoAccess";
 import NotFound from "@/pages/NotFound";
 import Newsletter from "@/pages/Newsletter";
 import CofreGlobal from "@/pages/CofreGlobal";
+import AdminProvisionarCliente from "@/pages/AdminProvisionarCliente";
 
 const queryClient = new QueryClient();
 
