@@ -1063,6 +1063,7 @@ export type Database = {
         Row: {
           address: string | null
           address_number: string | null
+          anonimizado_em: string | null
           boleto_active: boolean
           boleto_due_day: number | null
           boleto_start_date: string | null
@@ -1118,6 +1119,8 @@ export type Database = {
           registro_saidas: boolean | null
           representative_legal: string | null
           responsible_id: string | null
+          retencao_bloqueada: boolean
+          retencao_bloqueio_motivo: string | null
           segundo_email_contato: string | null
           siare_senha_encrypted: string | null
           situacao_cadastral: string | null
@@ -1135,6 +1138,7 @@ export type Database = {
         Insert: {
           address?: string | null
           address_number?: string | null
+          anonimizado_em?: string | null
           boleto_active?: boolean
           boleto_due_day?: number | null
           boleto_start_date?: string | null
@@ -1190,6 +1194,8 @@ export type Database = {
           registro_saidas?: boolean | null
           representative_legal?: string | null
           responsible_id?: string | null
+          retencao_bloqueada?: boolean
+          retencao_bloqueio_motivo?: string | null
           segundo_email_contato?: string | null
           siare_senha_encrypted?: string | null
           situacao_cadastral?: string | null
@@ -1207,6 +1213,7 @@ export type Database = {
         Update: {
           address?: string | null
           address_number?: string | null
+          anonimizado_em?: string | null
           boleto_active?: boolean
           boleto_due_day?: number | null
           boleto_start_date?: string | null
@@ -1262,6 +1269,8 @@ export type Database = {
           registro_saidas?: boolean | null
           representative_legal?: string | null
           responsible_id?: string | null
+          retencao_bloqueada?: boolean
+          retencao_bloqueio_motivo?: string | null
           segundo_email_contato?: string | null
           siare_senha_encrypted?: string | null
           situacao_cadastral?: string | null
@@ -2665,6 +2674,72 @@ export type Database = {
           },
         ]
       }
+      retencao_execucoes: {
+        Row: {
+          acao: string | null
+          company_id: string | null
+          contact_id: string | null
+          detalhe: string | null
+          executed_at: string
+          id: string
+          politica_id: string | null
+        }
+        Insert: {
+          acao?: string | null
+          company_id?: string | null
+          contact_id?: string | null
+          detalhe?: string | null
+          executed_at?: string
+          id?: string
+          politica_id?: string | null
+        }
+        Update: {
+          acao?: string | null
+          company_id?: string | null
+          contact_id?: string | null
+          detalhe?: string | null
+          executed_at?: string
+          id?: string
+          politica_id?: string | null
+        }
+        Relationships: []
+      }
+      retencao_politicas: {
+        Row: {
+          acao: string
+          ancora: string
+          ativo: boolean
+          classe: string
+          created_at: string
+          descricao: string | null
+          id: string
+          prazo_meses: number
+          updated_at: string
+        }
+        Insert: {
+          acao: string
+          ancora: string
+          ativo?: boolean
+          classe: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          prazo_meses: number
+          updated_at?: string
+        }
+        Update: {
+          acao?: string
+          ancora?: string
+          ativo?: boolean
+          classe?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          prazo_meses?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       support_sessions: {
         Row: {
           ended_at: string | null
@@ -3019,6 +3094,11 @@ export type Database = {
         Returns: string
       }
       end_support_session: { Args: { _session_id: string }; Returns: undefined }
+      fn_anonimizar_contato: {
+        Args: { p_contact_id: string }
+        Returns: undefined
+      }
+      fn_executar_retencao: { Args: never; Returns: number }
       generate_monthly_fiscal_tasks: {
         Args: { p_month: number; p_year: number }
         Returns: Json
