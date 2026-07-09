@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Paperclip, X, FileText, Image, File, Loader2 } from 'lucide-react';
 import { TransactionAttachment } from '@/hooks/useTransactionAttachments';
+import { abrirDocumentoViaEdge } from '@/lib/documento-baixar';
+
 
 interface AttachmentUploadProps {
   attachments: TransactionAttachment[];
