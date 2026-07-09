@@ -21,7 +21,7 @@ import {
   Scale,
   UsersRound,
   LockKeyhole,
-  
+  UserPlus,
   Shield,
   BookOpen,
   type LucideIcon,
