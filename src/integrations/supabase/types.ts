@@ -1453,6 +1453,45 @@ export type Database = {
         }
         Relationships: []
       }
+      data_access_log: {
+        Row: {
+          acao: string
+          company_id: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          recurso: string
+          recurso_id: string | null
+          titular_id: string | null
+          titular_tipo: string | null
+          usuario_id: string
+        }
+        Insert: {
+          acao: string
+          company_id: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          recurso: string
+          recurso_id?: string | null
+          titular_id?: string | null
+          titular_tipo?: string | null
+          usuario_id: string
+        }
+        Update: {
+          acao?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          recurso?: string
+          recurso_id?: string | null
+          titular_id?: string | null
+          titular_tipo?: string | null
+          usuario_id?: string
+        }
+        Relationships: []
+      }
       dre_budgets: {
         Row: {
           budget_value: number
@@ -2087,6 +2126,51 @@ export type Database = {
             referencedColumns: ["contact_id"]
           },
         ]
+      }
+      lgpd_tratamentos: {
+        Row: {
+          base_legal: string
+          company_id: string
+          consentimento_em: string | null
+          created_at: string
+          evidencia_url: string | null
+          finalidade: string
+          id: string
+          registrado_por: string | null
+          titular_id: string
+          titular_tipo: string
+          updated_at: string
+          versao_termo: string | null
+        }
+        Insert: {
+          base_legal: string
+          company_id: string
+          consentimento_em?: string | null
+          created_at?: string
+          evidencia_url?: string | null
+          finalidade: string
+          id?: string
+          registrado_por?: string | null
+          titular_id: string
+          titular_tipo: string
+          updated_at?: string
+          versao_termo?: string | null
+        }
+        Update: {
+          base_legal?: string
+          company_id?: string
+          consentimento_em?: string | null
+          created_at?: string
+          evidencia_url?: string | null
+          finalidade?: string
+          id?: string
+          registrado_por?: string | null
+          titular_id?: string
+          titular_tipo?: string
+          updated_at?: string
+          versao_termo?: string | null
+        }
+        Relationships: []
       }
       metrics_monthly: {
         Row: {
@@ -3007,6 +3091,16 @@ export type Database = {
       }
       is_company_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      log_data_access: {
+        Args: {
+          p_acao: string
+          p_recurso: string
+          p_recurso_id: string
+          p_titular_id: string
+          p_titular_tipo: string
+        }
+        Returns: undefined
+      }
       revert_transfer: { Args: { p_transfer_log_id: string }; Returns: Json }
       start_support_session: {
         Args: { _motivo: string; _target_company_id: string }
