@@ -129,8 +129,10 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
     moduleKey: 'tech',
     items: [
       { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'tech_disparos' },
+      { title: 'Operação Interna', url: '/tech/operacao', icon: Gauge, iconName: 'gauge' },
     ],
   },
+
   {
     kind: 'simple',
     title: 'Legalização',
