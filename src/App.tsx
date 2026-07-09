@@ -41,6 +41,7 @@ import NotFound from "@/pages/NotFound";
 import Newsletter from "@/pages/Newsletter";
 import CofreGlobal from "@/pages/CofreGlobal";
 import AdminProvisionarCliente from "@/pages/AdminProvisionarCliente";
+import TechOperacao from "@/pages/TechOperacao";
 
 const queryClient = new QueryClient();
 
