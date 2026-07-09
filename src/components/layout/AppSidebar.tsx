@@ -243,8 +243,18 @@ export function AppSidebar() {
   // For collaborators, hide sub-items they don't have permission for.
   // Backward compat: if the user has the parent module but no sub-keys at all,
   // show every sub-item (legacy users keep full access until the admin re-saves them).
+  const subEnabledByPlan = (parentKey: string, subKey?: string) => {
+    if (!subKey) return true;
+    const siblings = SUB_MODULES_BY_PARENT[parentKey] ?? [];
+    const explicit = siblings.filter((k) => planModules.includes(k));
+    if (explicit.length === 0) return true; // plano "grosso" (ex.: CA) => todos os submódulos habilitados
+    return planModules.includes(subKey);    // plano com recorte => só os submódulos contratados
+  };
+
   const isSubItemVisible = (parentKey: string, subKey?: string) => {
-    if (isSuperAdmin || isAdmin) return true;
+    if (isSuperAdmin) return true;
+    if (!subEnabledByPlan(parentKey, subKey)) return false;
+    if (isAdmin) return true;
     if (!subKey) return true;
     const siblings = SUB_MODULES_BY_PARENT[parentKey] ?? [];
     const hasAnySibling = siblings.some((k) => allowedModules.includes(k));
@@ -252,6 +262,7 @@ export function AppSidebar() {
     const keys = [subKey, ...(LEGACY_SUBMODULE_ALIASES[subKey] ?? [])];
     return keys.some((k) => allowedModules.includes(k));
   };
+
 
 
   const visibleEntries = menuEntries.filter(e => isModuleVisible(e.moduleKey));
