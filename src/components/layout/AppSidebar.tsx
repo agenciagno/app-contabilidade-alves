@@ -24,6 +24,8 @@ import {
   UserPlus,
   Shield,
   BookOpen,
+  Gauge,
+
   type LucideIcon,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
