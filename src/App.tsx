@@ -86,6 +86,7 @@ const App = () => (
               <Route path="/legalizacao" element={<AppLayout><ModuleGuard moduleName="legalizacao"><Legalizacao /></ModuleGuard></AppLayout>} />
               <Route path="/pessoal-rh" element={<AppLayout><ModuleGuard moduleName="pessoal_rh"><PessoalRH /></ModuleGuard></AppLayout>} />
               <Route path="/acessos" element={<AppLayout><ModuleGuard moduleName="acessos"><CofreGlobal /></ModuleGuard></AppLayout>} />
+              <Route path="/admin/provisionar-cliente" element={<AppLayout><AdminProvisionarCliente /></AppLayout>} />
 
               <Route path="*" element={<NotFound />} />
               </Routes>
