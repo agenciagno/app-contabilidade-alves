@@ -176,6 +176,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return { error: err };
         }
 
+        if (profile?.company_id) {
+          const { data: companyRow } = await supabase
+            .from('companies')
+            .select('status')
+            .eq('id', profile.company_id)
+            .maybeSingle();
+          if ((companyRow as any)?.status === 'suspended') {
+            await supabase.auth.signOut();
+            const err = new Error('O acesso desta empresa está suspenso. Fale com o suporte.');
+            (err as any).code = 'COMPANY_SUSPENDED';
+            return { error: err };
+          }
+        }
+
+
         // Register active session
         if (profile?.company_id) {
           const sessionUuid = crypto.randomUUID();

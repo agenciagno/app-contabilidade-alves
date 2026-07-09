@@ -24,6 +24,8 @@ import {
   UserPlus,
   Shield,
   BookOpen,
+  Gauge,
+
   type LucideIcon,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
@@ -129,8 +131,10 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
     moduleKey: 'tech',
     items: [
       { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'tech_disparos' },
+      { title: 'Operação Interna', url: '/tech/operacao', icon: Gauge, iconName: 'gauge' },
     ],
   },
+
   {
     kind: 'simple',
     title: 'Legalização',
@@ -359,6 +363,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {entry.items
+                .filter((item) => item.url !== '/tech/operacao' || isSuperAdmin)
                 .filter((item) => (!['/fiscal/calendario', '/fiscal/dashboard', '/fiscal/colaboradores', '/fiscal/monitor-cnpj'].includes(item.url)) || isAdmin || isSuperAdmin)
                 .filter((item) => isSubItemVisible(entry.moduleKey, item.subKey))
                 .map((item) => (
