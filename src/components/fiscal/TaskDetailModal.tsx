@@ -930,14 +930,14 @@ function ChecklistRow({
         </span>
       </div>
       {done && task.attachment_url ? (
-        <a
-          href={task.attachment_url}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => abrirDocumentoViaEdge('transaction-attachments', task.attachment_url!)}
           className="text-xs text-primary underline shrink-0 inline-flex items-center gap-1"
         >
           <Paperclip className="w-3 h-3" /> Ver anexo
-        </a>
+        </button>
+
       ) : done ? (
         <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 shrink-0">
           ✅ Anexado
