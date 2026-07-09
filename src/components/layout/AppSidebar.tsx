@@ -429,6 +429,22 @@ export function AppSidebar() {
 
         <SidebarFooter className="p-4">
           <SidebarMenu>
+            {isSuperAdmin && (
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Provisionar Cliente">
+                  <NavLink onClick={handleMobileNav}
+                    to="/admin/provisionar-cliente"
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+                    activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                  >
+                    <UserPlus className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
+                    {showLabels && (
+                      <span className="flex-1">Provisionar Cliente</span>
+                    )}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
             {showSettings && (
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Configurações">
