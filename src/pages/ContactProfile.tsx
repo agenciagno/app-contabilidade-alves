@@ -38,6 +38,20 @@ export default function ContactProfile() {
   const contact = contacts.find(c => c.id === id);
   const { isInadimplente } = useContactFinancialStatus(id, transactions);
 
+  useEffect(() => {
+    if (!id) return;
+    supabase.rpc('log_data_access', {
+      p_titular_tipo: 'contato',
+      p_titular_id: id,
+      p_recurso: 'ficha_contato',
+      p_recurso_id: id,
+      p_acao: 'view',
+    }).then(({ error }) => {
+      if (error) console.warn('log_data_access failed:', error.message);
+    });
+  }, [id]);
+
+
   const handleGenerateReport = () => {
     if (!contact) return;
 
