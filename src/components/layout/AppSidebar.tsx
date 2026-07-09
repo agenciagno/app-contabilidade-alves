@@ -134,6 +134,8 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
     items: [
       { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'tech_disparos' },
       { title: 'Operação Interna', url: '/tech/operacao', icon: Gauge, iconName: 'gauge' },
+      { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check' },
+
     ],
   },
 
