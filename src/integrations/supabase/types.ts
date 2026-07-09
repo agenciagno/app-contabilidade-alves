@@ -2581,6 +2581,44 @@ export type Database = {
           },
         ]
       }
+      support_sessions: {
+        Row: {
+          ended_at: string | null
+          expires_at: string
+          id: string
+          motivo: string
+          started_at: string
+          support_user_id: string
+          target_company_id: string
+        }
+        Insert: {
+          ended_at?: string | null
+          expires_at?: string
+          id?: string
+          motivo: string
+          started_at?: string
+          support_user_id: string
+          target_company_id: string
+        }
+        Update: {
+          ended_at?: string | null
+          expires_at?: string
+          id?: string
+          motivo?: string
+          started_at?: string
+          support_user_id?: string
+          target_company_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_sessions_target_company_id_fkey"
+            columns: ["target_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transaction_attachments: {
         Row: {
           company_id: string
@@ -2887,6 +2925,7 @@ export type Database = {
       }
     }
     Functions: {
+      can_access_company: { Args: { _company_id: string }; Returns: boolean }
       cofre_decrypt_internal: {
         Args: { p_encrypted: string; p_key: string }
         Returns: string
@@ -2895,6 +2934,7 @@ export type Database = {
         Args: { p_key: string; p_plaintext: string }
         Returns: string
       }
+      end_support_session: { Args: { _session_id: string }; Returns: undefined }
       generate_monthly_fiscal_tasks: {
         Args: { p_month: number; p_year: number }
         Returns: Json
@@ -2965,8 +3005,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_company_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       revert_transfer: { Args: { p_transfer_log_id: string }; Returns: Json }
+      start_support_session: {
+        Args: { _motivo: string; _target_company_id: string }
+        Returns: string
+      }
       transfer_clients_with_log: {
         Args: { p_from_profile_id: string; p_to_profile_id: string }
         Returns: Json
