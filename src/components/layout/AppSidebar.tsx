@@ -25,6 +25,8 @@ import {
   Shield,
   BookOpen,
   Gauge,
+  ShieldCheck,
+
 
   type LucideIcon,
 } from 'lucide-react';
