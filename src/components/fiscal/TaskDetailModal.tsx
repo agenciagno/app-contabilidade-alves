@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { abrirDocumentoViaEdge } from '@/lib/documento-baixar';
+
 import { format, parseISO, differenceInCalendarDays, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
