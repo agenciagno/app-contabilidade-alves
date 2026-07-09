@@ -368,6 +368,8 @@ export function AppSidebar() {
             <SidebarMenu>
               {entry.items
                 .filter((item) => item.url !== '/tech/operacao' || isSuperAdmin)
+                .filter((item) => item.url !== '/tech/lgpd' || isAdmin || isSuperAdmin)
+
                 .filter((item) => (!['/fiscal/calendario', '/fiscal/dashboard', '/fiscal/colaboradores', '/fiscal/monitor-cnpj'].includes(item.url)) || isAdmin || isSuperAdmin)
                 .filter((item) => isSubItemVisible(entry.moduleKey, item.subKey))
                 .map((item) => (
