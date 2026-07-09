@@ -633,14 +633,14 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                     <span className="text-sm truncate">{title}</span>
                   </div>
                   {attachmentUrl ? (
-                    <a
-                      href={attachmentUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => abrirDocumentoViaEdge('transaction-attachments', attachmentUrl)}
                       className="text-xs text-primary underline shrink-0 inline-flex items-center gap-1"
                     >
                       <Paperclip className="w-3 h-3" /> Ver anexo
-                    </a>
+                    </button>
+
                   ) : (
                     <Label htmlFor="task-attachment-detail" className="cursor-pointer shrink-0">
                       <div className="inline-flex items-center gap-1 px-2 py-1 rounded border border-dashed border-border hover:bg-muted/50 text-xs">
