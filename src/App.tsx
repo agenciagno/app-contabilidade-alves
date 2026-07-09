@@ -42,6 +42,8 @@ import Newsletter from "@/pages/Newsletter";
 import CofreGlobal from "@/pages/CofreGlobal";
 import AdminProvisionarCliente from "@/pages/AdminProvisionarCliente";
 import TechOperacao from "@/pages/TechOperacao";
+import TechLGPD from "@/pages/TechLGPD";
+
 
 const queryClient = new QueryClient();
 
@@ -89,6 +91,8 @@ const App = () => (
               <Route path="/acessos" element={<AppLayout><ModuleGuard moduleName="acessos"><CofreGlobal /></ModuleGuard></AppLayout>} />
               <Route path="/admin/provisionar-cliente" element={<AppLayout><AdminProvisionarCliente /></AppLayout>} />
               <Route path="/tech/operacao" element={<AppLayout><TechOperacao /></AppLayout>} />
+              <Route path="/tech/lgpd" element={<AppLayout><TechLGPD /></AppLayout>} />
+
 
               <Route path="*" element={<NotFound />} />
               </Routes>

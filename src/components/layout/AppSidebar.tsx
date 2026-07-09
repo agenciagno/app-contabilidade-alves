@@ -25,6 +25,8 @@ import {
   Shield,
   BookOpen,
   Gauge,
+  ShieldCheck,
+
 
   type LucideIcon,
 } from 'lucide-react';
@@ -132,6 +134,8 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
     items: [
       { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'tech_disparos' },
       { title: 'Operação Interna', url: '/tech/operacao', icon: Gauge, iconName: 'gauge' },
+      { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check' },
+
     ],
   },
 
@@ -364,6 +368,8 @@ export function AppSidebar() {
             <SidebarMenu>
               {entry.items
                 .filter((item) => item.url !== '/tech/operacao' || isSuperAdmin)
+                .filter((item) => item.url !== '/tech/lgpd' || isAdmin || isSuperAdmin)
+
                 .filter((item) => (!['/fiscal/calendario', '/fiscal/dashboard', '/fiscal/colaboradores', '/fiscal/monitor-cnpj'].includes(item.url)) || isAdmin || isSuperAdmin)
                 .filter((item) => isSubItemVisible(entry.moduleKey, item.subKey))
                 .map((item) => (

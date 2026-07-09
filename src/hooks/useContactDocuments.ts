@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { createAuditLog } from './useAuditLog';
+import { baixarDocumentoUrl } from '@/lib/documento-baixar';
+
 
 export type DocumentCategory = 'atos_constitutivos' | 'impostos_guias' | 'fiscal' | 'dp_rh' | 'certidoes';
 
@@ -181,42 +183,15 @@ export function useContactDocuments(contactId: string | undefined) {
   });
 
   const downloadDocument = async (document: ContactDocument) => {
-    const { data, error } = await supabase.storage
-      .from('contact-documents')
-      .download(document.file_url);
-
-    if (error) {
-      toast({
-        title: 'Erro ao baixar documento',
-        description: error.message,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Create download link
-    const url = URL.createObjectURL(data);
-    const a = window.document.createElement('a');
-    a.href = url;
-    a.download = document.file_name;
-    window.document.body.appendChild(a);
-    a.click();
-    window.document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const url = await baixarDocumentoUrl('contact-documents', document.file_url);
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const getPreviewUrl = async (document: ContactDocument): Promise<string | null> => {
-    const { data, error } = await supabase.storage
-      .from('contact-documents')
-      .createSignedUrl(document.file_url, 3600); // 1 hour expiry
-
-    if (error) {
-      console.error('Error creating signed URL:', error);
-      return null;
-    }
-
-    return data.signedUrl;
+    return await baixarDocumentoUrl('contact-documents', document.file_url);
   };
+
 
   return {
     documents,

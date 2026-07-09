@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays, format } from 'date-fns';
 import { Plus, Upload, Loader2, Download, Trash2, ShieldCheck, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import { abrirDocumentoViaEdge } from '@/lib/documento-baixar';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -187,18 +189,9 @@ function AlvarasSection({ contactId }: Props) {
   });
 
   const download = async (a: Alvara) => {
-    const { data, error } = await supabase.storage
-      .from('contact-documents').download(a.file_url);
-    if (error) return toast.error('Erro ao baixar');
-    const url = URL.createObjectURL(data);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = a.file_name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    await abrirDocumentoViaEdge('contact-documents', a.file_url);
   };
+
 
   const parseMeta = (name: string) => {
     const validadeMatch = name.match(/\[validade:(\d{4}-\d{2}-\d{2})\]/);
