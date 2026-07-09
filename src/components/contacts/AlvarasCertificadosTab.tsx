@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays, format } from 'date-fns';
 import { Plus, Upload, Loader2, Download, Trash2, ShieldCheck, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import { abrirDocumentoViaEdge } from '@/lib/documento-baixar';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
