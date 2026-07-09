@@ -209,51 +209,50 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
     try { return differenceInDays(parseISO(effDate(t)), today) < 0; } catch { return false; }
   };
 
-  // Build items: group by (contact_id + due_date) when 2+ tasks share the pair
+  // Build items: 1 card per contact within the current period (competence)
   const itemsByStatus = useMemo(() => {
     const groupsMap = new Map<string, FiscalTask[]>();
     for (const t of tasks) {
-      const key = `${t.contact_id}__${t.due_date}`;
+      const key = t.contact_id;
       const arr = groupsMap.get(key) ?? [];
       arr.push(t);
       groupsMap.set(key, arr);
     }
 
     const items: KanbanItem[] = [];
-    for (const [key, group] of groupsMap.entries()) {
-      if (group.length === 1) {
-        const t = group[0];
-        items.push({ type: 'single', id: t.id, dueDate: effDate(t), task: t });
-      } else {
-        const sorted = [...group].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-        // Concluído só quando TODAS as tarefas estiverem concluídas.
-        const allDone = sorted.every((t) => t.status === 'concluido');
-        let best: string;
-        if (allDone) {
-          best = 'concluido';
-        } else {
-          // Maior precedência entre as tarefas ainda não concluídas
-          const pending = sorted.filter((t) => t.status !== 'concluido');
-          best = pending[0].status as string;
-          for (const t of pending) {
-            if ((STATUS_PRECEDENCE[t.status] ?? 0) > (STATUS_PRECEDENCE[best] ?? 0)) {
-              best = t.status;
-            }
-          }
-        }
-        const [contactId] = key.split('__');
-        // min effective date across the group
-        const minDue = sorted.map(effDate).sort()[0];
-        items.push({
-          type: 'group',
-          id: `group-${contactId}-${sorted[0].due_date}`,
-          contactId,
-          dueDate: minDue,
-          tasks: sorted,
-          displayStatus: best,
-        });
-      }
+    for (const [contactId, group] of groupsMap.entries()) {
+      const sorted = [...group].sort((a, b) => {
+        const da = effDate(a);
+        const db = effDate(b);
+        if (da !== db) return da.localeCompare(db);
+        return (a.title || '').localeCompare(b.title || '');
+      });
+      // Priority: aguardando_cliente > all done → concluido > some done → em_progresso > a_fazer
+      const hasWaiting = sorted.some((t) => t.status === 'aguardando_cliente');
+      const allDone = sorted.every((t) => t.status === 'concluido');
+      const someDone = sorted.some((t) => t.status === 'concluido');
+      let best: string;
+      if (hasWaiting) best = 'aguardando_cliente';
+      else if (allDone) best = 'concluido';
+      else if (someDone) best = 'em_progresso';
+      else best = 'a_fazer';
+
+      // Badge date: min due date among pending tasks; if all done, use max completed date
+      const pending = sorted.filter((t) => t.status !== 'concluido');
+      const badgeDate = pending.length > 0
+        ? pending.map(effDate).sort()[0]
+        : sorted.map(effDate).sort().slice(-1)[0];
+
+      items.push({
+        type: 'group',
+        id: `group-${contactId}`,
+        contactId,
+        dueDate: badgeDate,
+        tasks: sorted,
+        displayStatus: best,
+      });
     }
+
 
     // Distribute into columns: overdue first (always), then by effective due date
     return COLUMNS.reduce((acc, col) => {
