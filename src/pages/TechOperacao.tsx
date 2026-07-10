@@ -419,6 +419,15 @@ export default function TechOperacao() {
                               <DropdownMenuItem onClick={() => setUsersTarget(c)}>
                                 Usuários
                               </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                disabled={matriz}
+                                onClick={() => { setDeleteCompanyInput(''); setDeleteCompanyTarget(c); }}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Excluir empresa
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
