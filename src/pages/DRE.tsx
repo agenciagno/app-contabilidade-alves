@@ -34,26 +34,26 @@ function SummaryCard({ title, previsto, realizado, icon: Icon, color }: {
   color: string;
 }) {
   return (
-    <Card className="bg-card border-border/50">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-3 mb-2">
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center gap-3 mb-3">
           <div className={cn('p-2 rounded-lg', color)}>
             <Icon className="h-4 w-4 text-white" />
           </div>
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</span>
+          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">{title}</span>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Previsto</span>
-            <span className="font-semibold">{formatCurrency(previsto)}</span>
+            <span className="font-semibold tabular-nums">{formatCurrency(previsto)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Realizado</span>
-            <span className={cn('font-semibold', valueColor(realizado))}>{formatCurrency(realizado)}</span>
+            <span className={cn('font-semibold tabular-nums', valueColor(realizado))}>{formatCurrency(realizado)}</span>
           </div>
-          <div className="flex justify-between text-sm border-t border-border/50 pt-1 mt-1">
+          <div className="flex justify-between text-sm border-t border-border pt-1.5 mt-1">
             <span className="text-muted-foreground">RXP</span>
-            <span className={cn('font-semibold', valueColor(realizado - previsto))}>{formatCurrency(realizado - previsto)}</span>
+            <span className={cn('font-semibold tabular-nums', valueColor(realizado - previsto))}>{formatCurrency(realizado - previsto)}</span>
           </div>
         </div>
       </CardContent>

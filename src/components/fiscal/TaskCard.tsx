@@ -98,7 +98,7 @@ export function TaskCard({
     <>
       <Card
         className={cn(
-          'group cursor-pointer hover:shadow-md transition-shadow border-border/50 bg-card relative overflow-hidden',
+          'group cursor-pointer hover:shadow-md transition-shadow bg-card relative overflow-hidden',
           isWaiting && 'border-l-4 border-l-amber-500',
         )}
         onClick={onClick}
