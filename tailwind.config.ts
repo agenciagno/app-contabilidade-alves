@@ -17,8 +17,9 @@ export default {
         'xs': '420px',
       },
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+        sans: ['sf-pro', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
+
       colors: {
         success: {
           DEFAULT: "hsl(var(--success))",
