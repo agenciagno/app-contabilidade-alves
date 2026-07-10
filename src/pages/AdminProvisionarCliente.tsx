@@ -147,7 +147,7 @@ export default function AdminProvisionarCliente() {
       <div className="w-full max-w-2xl">
         <Card>
           <CardHeader>
-            <CardTitle>Provisionar Cliente</CardTitle>
+            <CardTitle>Cadastrar Cliente</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-5">
