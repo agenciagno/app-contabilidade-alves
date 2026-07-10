@@ -1051,12 +1051,12 @@ export default function Transactions() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="bg-card border-border/50 overflow-hidden min-w-0">
+        <Card className="overflow-hidden min-w-0">
           <CardContent className="p-0 min-w-0">
             <div ref={tableScrollRef} className="table-scroll-container max-h-[70vh] overflow-auto scrollbar-thin" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="min-w-[1100px]">
               {/* Table Header */}
-              <div className="grid grid-cols-[18px_minmax(120px,1fr)_minmax(120px,1fr)_96px_96px_96px_80px_100px_100px_90px] gap-2 px-4 py-2 bg-card border-b border-border/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider sticky top-0 z-10">
+              <div className="grid grid-cols-[18px_minmax(120px,1fr)_minmax(120px,1fr)_96px_96px_96px_80px_100px_100px_90px] gap-2 px-4 py-2.5 bg-card border-b border-border text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em] sticky top-0 z-10">
                 <div className="flex items-center justify-center">
                   <Checkbox checked={selectedIds.size === transactions.length && transactions.length > 0} onCheckedChange={toggleSelectAll} className="h-3.5 w-3.5" />
                 </div>
