@@ -352,6 +352,7 @@ export function TransactionFormDialog({
         category_id: categoryId || (isEditing ? transaction?.category_id : null) || null,
         bank_id: bankId || (isEditing ? transaction?.bank_id : null) || null,
         contact_id: contactId || (isEditing ? transaction?.contact_id : null) || null,
+        party_id: partyId || null,
         is_paid: false,
         notes: notes || null,
       } as TransactionInsert;
