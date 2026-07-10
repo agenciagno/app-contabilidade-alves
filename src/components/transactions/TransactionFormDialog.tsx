@@ -77,6 +77,9 @@ export function TransactionFormDialog({
   const [categoryId, setCategoryId] = useState<string>('');
   const [bankId, setBankId] = useState<string>('');
   const [contactId, setContactId] = useState<string>('');
+  const [partyId, setPartyId] = useState<string>('');
+  const { data: parties = [] } = useParties();
+  const activeParties = parties.filter((p) => p.is_active);
   const [notes, setNotes] = useState('');
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [yearWarningDates, setYearWarningDates] = useState<{ label: string; value: string }[]>([]);
