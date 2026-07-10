@@ -265,15 +265,14 @@
 
 /* ─── Apple Global Styles ─── */
 
-/* Sidebar glass effect */
+/* Sidebar surface */
 aside,
 nav[data-sidebar],
 [data-sidebar] {
   background: var(--apple-mat-sidebar);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-right-color: var(--apple-border-hair);
 }
+
 
 /* Navigation items */
 [data-nav-item] {
