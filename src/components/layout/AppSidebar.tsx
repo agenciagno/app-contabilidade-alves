@@ -460,8 +460,9 @@ export function AppSidebar() {
                 <SidebarMenuButton asChild tooltip="Cadastrar Cliente">
                   <NavLink onClick={handleMobileNav}
                     to="/admin/provisionar-cliente"
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
-                    activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] text-muted-foreground hover:bg-accent hover:text-foreground transition-[background,color] duration-[120ms]"
+                    activeClassName="bg-accent text-foreground font-semibold"
+
                   >
                     <UserPlus className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
                     {showLabels && (
