@@ -72,6 +72,20 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        paper: 'var(--paper)',
+        ink: 'var(--ink)',
+        'ink-2': 'var(--ink-2)',
+        brand: 'var(--brand)',
+        line: 'var(--line)',
+        'line-2': 'var(--line-2)',
+        bg: 'var(--bg)',
+        'bg-2': 'var(--bg-2)',
+        'bg-3': 'var(--bg-3)',
+      },
+      boxShadow: {
+        'sc-sm': 'var(--shadow-sm)',
+        'sc-md': 'var(--shadow-md)',
+        'sc-lg': 'var(--shadow-lg)',
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -80,26 +94,29 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        'card-fade-in': {
+          '0%': { opacity: '0.9' },
+          '100%': { opacity: '1' },
+        },
+        'page-fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        'card-in': 'card-fade-in 0.3s ease',
+        'page-in': 'page-fade-in 0.3s ease',
       },
+
     },
   },
   plugins: [require("tailwindcss-animate")],
