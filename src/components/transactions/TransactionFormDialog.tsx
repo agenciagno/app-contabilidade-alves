@@ -376,6 +376,7 @@ export function TransactionFormDialog({
         category_id: categoryId || transaction?.category_id || null,
         bank_id: bankId || transaction?.bank_id || null,
         contact_id: contactId || transaction?.contact_id || null,
+        party_id: partyId || null,
         is_paid: transaction?.is_paid ?? false,
         notes: notes || null,
       } as TransactionInsert;
