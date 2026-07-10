@@ -164,235 +164,225 @@ export function UnifiedFilterBox({
   };
 
   return (
-    <Card className="bg-card border-border/50">
-      <CardContent className="p-4 space-y-4">
-        {/* Row 1: Search and Period */}
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              value={searchTerm} 
-              onChange={(e) => onSearchChange(e.target.value)} 
-              placeholder="Buscar por descrição..." 
-              className="pl-9"
-            />
-          </div>
+    <div className="space-y-3">
+      {/* Row 1: Search and Period */}
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+        {/* Search Input */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            value={searchTerm} 
+            onChange={(e) => onSearchChange(e.target.value)} 
+            placeholder="Buscar por descrição..." 
+            className="pl-9 h-10 rounded-xl border-border bg-card focus:border-primary transition-colors duration-100"
+          />
+        </div>
 
-          {/* Period Selector - Smart Datepicker */}
-          <Popover open={periodPopoverOpen} onOpenChange={setPeriodPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full md:w-[220px] justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="truncate">{formatPeriodDisplay()}</span>
-                </div>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <div className="p-3 space-y-3">
-                {/* Quick shortcuts */}
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground px-2">Atalhos Rápidos</p>
-                  <div className="grid grid-cols-2 gap-1">
-                    {periodOptions.filter(o => o.value !== 'custom' && o.value !== 'all').map((option) => (
-                      <Button
-                        key={option.value}
-                        variant={period === option.value ? 'default' : 'ghost'}
-                        size="sm"
-                        className="justify-start text-xs h-8"
-                        onClick={() => handlePeriodSelect(option.value)}
-                      >
-                        {option.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="border-t border-border" />
-
-                {/* Custom range */}
-                <div className="space-y-2">
-                  <Button
-                    variant={period === 'custom' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="w-full justify-start text-xs h-8"
-                    onClick={() => handlePeriodSelect('custom')}
-                  >
-                    Personalizado
-                  </Button>
-                  
-                  {period === 'custom' && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Início</p>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className={cn(
-                                "w-full justify-start text-left text-xs h-8",
-                                !customStartDate && "text-muted-foreground"
-                              )}
-                            >
-                              {customStartDate ? format(customStartDate, 'dd/MM/yy') : 'Selecione'}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <CalendarComponent
-                              mode="single"
-                              selected={customStartDate || undefined}
-                              onSelect={(date) => onCustomStartDateChange(date || null)}
-                              initialFocus
-                              className="pointer-events-auto"
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Fim</p>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className={cn(
-                                "w-full justify-start text-left text-xs h-8",
-                                !customEndDate && "text-muted-foreground"
-                              )}
-                            >
-                              {customEndDate ? format(customEndDate, 'dd/MM/yy') : 'Selecione'}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <CalendarComponent
-                              mode="single"
-                              selected={customEndDate || undefined}
-                              onSelect={(date) => onCustomEndDateChange(date || null)}
-                              initialFocus
-                              className="pointer-events-auto"
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </div>
-                  )}
+        {/* Period Selector - Smart Datepicker */}
+        <Popover open={periodPopoverOpen} onOpenChange={setPeriodPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-full md:w-[220px] justify-between gap-2 h-10">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="truncate">{formatPeriodDisplay()}</span>
+              </div>
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <div className="p-3 space-y-3">
+              {/* Quick shortcuts */}
+              <div className="space-y-1">
+                <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground px-2">Atalhos Rápidos</p>
+                <div className="grid grid-cols-2 gap-1">
+                  {periodOptions.filter(o => o.value !== 'custom' && o.value !== 'all').map((option) => (
+                    <Button
+                      key={option.value}
+                      variant={period === option.value ? 'default' : 'ghost'}
+                      size="sm"
+                      className="justify-start text-xs h-8"
+                      onClick={() => handlePeriodSelect(option.value)}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
                 </div>
               </div>
-            </PopoverContent>
-          </Popover>
-        </div>
 
-        {/* Row 2: Dimension Filters (4-5 columns) */}
-        <div className={cn(
-          "grid gap-4",
-          showTypeFilter 
-            ? "grid-cols-2 md:grid-cols-5" 
-            : "grid-cols-2 md:grid-cols-4"
-        )}>
-          {/* Bank Filter */}
-          <Select value={bankId} onValueChange={onBankChange}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Conta Bancária" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as Contas</SelectItem>
-              {banks.filter(b => b.is_active).map((bank) => (
-                <SelectItem key={bank.id} value={bank.id}>
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-2 h-2 rounded-full flex-shrink-0" 
-                      style={{ backgroundColor: bank.color || '#3B82F6' }} 
-                    />
-                    {bank.name}
+              {/* Divider */}
+              <div className="border-t border-border" />
+
+              {/* Custom range */}
+              <div className="space-y-2">
+                <Button
+                  variant={period === 'custom' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="w-full justify-start text-xs h-8"
+                  onClick={() => handlePeriodSelect('custom')}
+                >
+                  Personalizado
+                </Button>
+                
+                {period === 'custom' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Início</p>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className={cn(
+                              "w-full justify-start text-left text-xs h-8",
+                              !customStartDate && "text-muted-foreground"
+                            )}
+                          >
+                            {customStartDate ? format(customStartDate, 'dd/MM/yy') : 'Selecione'}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={customStartDate || undefined}
+                            onSelect={(date) => onCustomStartDateChange(date || null)}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Fim</p>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className={cn(
+                              "w-full justify-start text-left text-xs h-8",
+                              !customEndDate && "text-muted-foreground"
+                            )}
+                          >
+                            {customEndDate ? format(customEndDate, 'dd/MM/yy') : 'Selecione'}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={customEndDate || undefined}
+                            onSelect={(date) => onCustomEndDateChange(date || null)}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                   </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                )}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
 
-          {/* Category Filter */}
-          <Select value={categoryId} onValueChange={onCategoryChange}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Evento Contábil" />
+      {/* Row 2: Dimension Filters — inline chips */}
+      <div className="flex flex-wrap gap-2 items-center">
+        {/* Bank Filter */}
+        <Select value={bankId} onValueChange={onBankChange}>
+          <SelectTrigger className="w-auto min-w-[140px] h-9 text-[13px] rounded-lg border-border bg-card">
+            <SelectValue placeholder="Conta Bancária" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as Contas</SelectItem>
+            {banks.filter(b => b.is_active).map((bank) => (
+              <SelectItem key={bank.id} value={bank.id}>
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-2 h-2 rounded-full flex-shrink-0" 
+                    style={{ backgroundColor: bank.color || '#3B82F6' }} 
+                  />
+                  {bank.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Category Filter */}
+        <Select value={categoryId} onValueChange={onCategoryChange}>
+          <SelectTrigger className="w-auto min-w-[140px] h-9 text-[13px] rounded-lg border-border bg-card">
+            <SelectValue placeholder="Evento Contábil" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os Eventos Contábeis</SelectItem>
+            {categories.map((cat) => (
+              <SelectItem key={cat.id} value={cat.id}>
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-2 h-2 rounded-full flex-shrink-0" 
+                    style={{ backgroundColor: cat.color || '#6B7280' }} 
+                  />
+                  {cat.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Status Filter */}
+        <Select value={paymentStatus} onValueChange={onPaymentStatusChange}>
+          <SelectTrigger className="w-auto min-w-[140px] h-9 text-[13px] rounded-lg border-border bg-card">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os Status</SelectItem>
+            <SelectItem value="paid">Pago</SelectItem>
+            <SelectItem value="pending">Pendente</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Contact Filter */}
+        <Select value={contactId} onValueChange={onContactChange}>
+          <SelectTrigger className="w-auto min-w-[140px] h-9 text-[13px] rounded-lg border-border bg-card">
+            <SelectValue placeholder="Participante" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os Participantes</SelectItem>
+            {contacts.filter(c => c.is_active).map((contact) => (
+              <SelectItem key={contact.id} value={contact.id}>
+                {contact.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Type Filter (only for Transactions page) */}
+        {showTypeFilter && onTypeChange && (
+          <Select value={type || 'all'} onValueChange={onTypeChange}>
+            <SelectTrigger className="w-auto min-w-[120px] h-9 text-[13px] rounded-lg border-border bg-card">
+              <SelectValue placeholder="Tipo" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os Eventos Contábeis</SelectItem>
-              {categories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-2 h-2 rounded-full flex-shrink-0" 
-                      style={{ backgroundColor: cat.color || '#6B7280' }} 
-                    />
-                    {cat.name}
-                  </div>
-                </SelectItem>
-              ))}
+              <SelectItem value="all">Todos os Tipos</SelectItem>
+              <SelectItem value="receita">Receitas</SelectItem>
+              <SelectItem value="despesa">Despesas</SelectItem>
             </SelectContent>
           </Select>
-
-          {/* Status Filter */}
-          <Select value={paymentStatus} onValueChange={onPaymentStatusChange}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Status</SelectItem>
-              <SelectItem value="paid">Pago</SelectItem>
-              <SelectItem value="pending">Pendente</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Contact Filter */}
-          <Select value={contactId} onValueChange={onContactChange}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Participante" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Participantes</SelectItem>
-              {contacts.filter(c => c.is_active).map((contact) => (
-                <SelectItem key={contact.id} value={contact.id}>
-                  {contact.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Type Filter (only for Transactions page) */}
-          {showTypeFilter && onTypeChange && (
-            <Select value={type || 'all'} onValueChange={onTypeChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Tipos</SelectItem>
-                <SelectItem value="receita">Receitas</SelectItem>
-                <SelectItem value="despesa">Despesas</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-
-        {/* Footer: Clear Filters */}
-        {hasActiveFilters && (
-          <div className="flex justify-end">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={onClearFilters} 
-              className="gap-1 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-              Limpar Filtros
-            </Button>
-          </div>
         )}
-      </CardContent>
-    </Card>
+
+        {hasActiveFilters && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onClearFilters} 
+            className="gap-1 text-muted-foreground hover:text-foreground h-9"
+          >
+            <X className="h-3.5 w-3.5" />
+            Limpar
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 
