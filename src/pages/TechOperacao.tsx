@@ -223,6 +223,101 @@ export default function TechOperacao() {
     }
   };
 
+  const isValidEmail = (v: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
+  const refetchAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['tech-operacao-companies'] });
+    queryClient.invalidateQueries({ queryKey: ['tech-operacao-profiles'] });
+  };
+
+  const handleDeleteCompany = async () => {
+    if (!deleteCompanyTarget) return;
+    if (deleteCompanyInput.trim() !== deleteCompanyTarget.name) return;
+    setDeletingCompany(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-tenant', {
+        body: { company_id: deleteCompanyTarget.id },
+      });
+      if (error) throw new Error(error.message || 'Falha ao excluir empresa.');
+      if (data && (data as any).error) throw new Error((data as any).error);
+      toast.success('Empresa excluída definitivamente.');
+      refetchAll();
+      setDeleteCompanyTarget(null);
+      setDeleteCompanyInput('');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao excluir empresa.');
+    } finally {
+      setDeletingCompany(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteUserTarget) return;
+    setDeletingUser(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-tenant-user', {
+        body: { user_id: deleteUserTarget.user_id },
+      });
+      if (error) throw new Error(error.message || 'Falha ao excluir usuário.');
+      if (data && (data as any).error) throw new Error((data as any).error);
+      toast.success('Usuário excluído.');
+      queryClient.invalidateQueries({ queryKey: ['tech-operacao-profiles'] });
+      setDeleteUserTarget(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao excluir usuário.');
+    } finally {
+      setDeletingUser(false);
+    }
+  };
+
+  const resetAddUserForm = () => {
+    setNewUserName('');
+    setNewUserEmail('');
+    setNewUserRole('colaborador');
+    setCreatedCreds(null);
+    setCopiedCreds(false);
+  };
+
+  const handleCreateUser = async () => {
+    if (!usersTarget) return;
+    if (!newUserName.trim()) { toast.error('Informe o nome.'); return; }
+    if (!isValidEmail(newUserEmail)) { toast.error('E-mail inválido.'); return; }
+    setCreatingUser(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-tenant-user', {
+        body: {
+          company_id: usersTarget.id,
+          email: newUserEmail.trim(),
+          name: newUserName.trim(),
+          role: newUserRole,
+        },
+      });
+      if (error) throw new Error(error.message || 'Falha ao criar funcionário.');
+      const payload = data as { provisional_password?: string; error?: string } | null;
+      if (!payload || payload.error) throw new Error(payload?.error || 'Falha ao criar funcionário.');
+      if (!payload.provisional_password) throw new Error('Resposta sem senha provisória.');
+      setCreatedCreds({ email: newUserEmail.trim(), password: payload.provisional_password });
+      toast.success('Funcionário criado.');
+      queryClient.invalidateQueries({ queryKey: ['tech-operacao-profiles'] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao criar funcionário.');
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  const handleCopyCreds = async () => {
+    if (!createdCreds) return;
+    try {
+      await navigator.clipboard.writeText(`E-mail: ${createdCreds.email} | Senha provisória: ${createdCreds.password}`);
+      setCopiedCreds(true);
+      toast.success('Credenciais copiadas.');
+    } catch {
+      toast.error('Não foi possível copiar.');
+    }
+  };
+
+
   const isMatriz = (id: string) => matrizId === id;
 
   return (
