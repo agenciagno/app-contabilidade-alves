@@ -46,7 +46,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { DashboardWidgetsConfig, useDashboardWidgets } from '@/components/dashboard/DashboardWidgets';
 import { TransactionFormDialog } from '@/components/transactions/TransactionFormDialog';
 import { BankFormDialog } from '@/components/banks/BankFormDialog';
-import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
+import { PartyFormDialog } from '@/components/parties/PartyFormDialog';
+import { useParties, type PartyInput } from '@/hooks/useParties';
 import { CategoryFormDialog } from '@/components/categories/CategoryFormDialog';
 import { TransactionInsert } from '@/hooks/useTransactions';
 import { UnifiedFilterBox, PeriodFilter, getDateRangeFromPeriod } from '@/components/filters/UnifiedFilterBox';
@@ -103,7 +104,8 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const { banks, isLoading: loadingBanks, createBank } = useBanks();
   const { recurringTransactions } = useRecurringTransactions();
-  const { contacts, createContact } = useContacts();
+  const { contacts } = useContacts();
+  const { create: createParty } = useParties();
   const { categories, createCategory } = useCategories();
 
   // Inline createTransaction mutation (was previously from useTransactions)
@@ -353,8 +355,8 @@ export default function Dashboard() {
     });
   };
 
-  const handleContactSubmit = (data: any) => {
-    createContact.mutate(data, {
+  const handleContactSubmit = (data: PartyInput) => {
+    createParty.mutate(data, {
       onSuccess: () => setContactDialogOpen(false),
     });
   };
@@ -984,11 +986,11 @@ export default function Dashboard() {
         isLoading={createBank.isPending}
       />
 
-      <ContactFormDialog
+      <PartyFormDialog
         open={contactDialogOpen}
         onOpenChange={setContactDialogOpen}
         onSubmit={handleContactSubmit}
-        isLoading={createContact.isPending}
+        isLoading={createParty.isPending}
       />
 
       <CategoryFormDialog
