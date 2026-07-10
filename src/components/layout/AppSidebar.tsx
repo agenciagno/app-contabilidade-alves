@@ -310,10 +310,10 @@ export function AppSidebar() {
         <SidebarMenuButton asChild tooltip={shortcut.title}>
           <NavLink onClick={handleMobileNav}
             to={shortcut.url}
-            className="flex items-center gap-2 pl-8 pr-3 py-1.5 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors group text-sm"
-            activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+            className="flex items-center gap-2 pl-8 pr-3 py-1.5 rounded-lg text-[13px] text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-[background,color] duration-[120ms] group"
+            activeClassName="bg-accent text-primary font-medium"
           >
-            <IconComponent className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+            <IconComponent className="w-[16px] h-[16px] shrink-0 opacity-60" strokeWidth={1.75} />
             {showLabels && (
               <>
                 <span className="flex-1 truncate">{shortcut.title}</span>
@@ -340,10 +340,10 @@ export function AppSidebar() {
               <NavLink onClick={handleMobileNav}
                 to={entry.url}
                 end={entry.url === '/'}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
-                activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] text-muted-foreground hover:bg-accent hover:text-foreground transition-[background,color] duration-[120ms]"
+                activeClassName="bg-accent text-foreground font-semibold [&_svg]:opacity-100"
               >
-                <entry.icon className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
+                <entry.icon className="w-[18px] h-[18px] shrink-0 opacity-60" strokeWidth={1.75} />
                 {showLabels && <span>{entry.title}</span>}
               </NavLink>
             </SidebarMenuButton>
@@ -357,13 +357,13 @@ export function AppSidebar() {
     <SidebarGroup key={entry.title}>
       <Collapsible open={openModules[entry.title]} onOpenChange={() => handleToggleModule(entry.title)}>
         <CollapsibleTrigger asChild>
-          <SidebarGroupLabel className="flex items-center justify-between cursor-pointer hover:bg-sidebar-accent rounded-lg px-3 py-2.5 transition-colors">
-            <div className="flex items-center gap-3 text-sidebar-foreground">
-              <entry.icon className="w-[18px] h-[18px]" strokeWidth={1.5} />
-              {showLabels && <span className="text-sm font-semibold">{entry.title}</span>}
+          <SidebarGroupLabel className="flex items-center justify-between cursor-pointer hover:bg-accent rounded-lg px-3 py-2 transition-[background,color] duration-[120ms] h-auto">
+            <div className="flex items-center gap-2.5 text-muted-foreground">
+              <entry.icon className="w-[18px] h-[18px] opacity-60" strokeWidth={1.75} />
+              {showLabels && <span className="text-[13.5px] font-medium text-foreground">{entry.title}</span>}
             </div>
             {showLabels && (
-              <ChevronDown className={cn("w-4 h-4 text-sidebar-foreground/50 transition-transform duration-200", openModules[entry.title] && "rotate-180")} />
+              <ChevronDown className={cn("w-4 h-4 text-muted-foreground/60 transition-transform duration-[120ms]", openModules[entry.title] && "rotate-180")} />
             )}
           </SidebarGroupLabel>
         </CollapsibleTrigger>
@@ -382,10 +382,10 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild tooltip={item.title}>
                     <NavLink onClick={handleMobileNav}
                       to={item.url}
-                      className="flex items-center gap-2 pl-8 pr-3 py-1.5 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors group text-sm"
-                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                      className="flex items-center gap-2 pl-8 pr-3 py-1.5 rounded-lg text-[13px] text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-[background,color] duration-[120ms] group"
+                      activeClassName="bg-accent text-primary font-medium"
                     >
-                      <item.icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+                      <item.icon className="w-[16px] h-[16px] shrink-0 opacity-60" strokeWidth={1.75} />
                       {showLabels && (
                         <>
                           <span className="flex-1 truncate">{item.title}</span>
@@ -408,7 +408,7 @@ export function AppSidebar() {
 
   return (
     <>
-      <Sidebar collapsible="icon" className="border-r border-sidebar-border/40">
+      <Sidebar collapsible="icon" className="border-r border-border">
         <SidebarHeader className="p-3">
           <div className="flex items-center gap-3 justify-center">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary shrink-0 overflow-hidden">
@@ -433,7 +433,7 @@ export function AppSidebar() {
           {/* Atalhos Fixados */}
           {pinnedShortcuts.length > 0 && (
             <SidebarGroup>
-              <SidebarGroupLabel className="text-sidebar-foreground/50 text-xs uppercase tracking-wider px-3 py-2">
+              <SidebarGroupLabel className="text-muted-foreground text-[11px] uppercase tracking-[0.05em] px-3 py-2 font-medium">
                 <Pin className="w-3 h-3 inline mr-1.5" />
                 Atalhos
               </SidebarGroupLabel>
@@ -460,8 +460,9 @@ export function AppSidebar() {
                 <SidebarMenuButton asChild tooltip="Cadastrar Cliente">
                   <NavLink onClick={handleMobileNav}
                     to="/admin/provisionar-cliente"
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
-                    activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] text-muted-foreground hover:bg-accent hover:text-foreground transition-[background,color] duration-[120ms]"
+                    activeClassName="bg-accent text-foreground font-semibold"
+
                   >
                     <UserPlus className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
                     {showLabels && (
@@ -476,8 +477,9 @@ export function AppSidebar() {
                 <SidebarMenuButton asChild tooltip="Configurações">
                   <NavLink onClick={handleMobileNav}
                     to="/configuracoes"
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
-                    activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] text-muted-foreground hover:bg-accent hover:text-foreground transition-[background,color] duration-[120ms]"
+                    activeClassName="bg-accent text-foreground font-semibold"
+
                   >
                     <Settings className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
                     {showLabels && (
