@@ -230,7 +230,7 @@ export default function AdminProvisionarCliente() {
 
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Provisionar cliente
+                Cadastrar cliente
               </Button>
             </form>
           </CardContent>
