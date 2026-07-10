@@ -986,11 +986,11 @@ export default function Dashboard() {
         isLoading={createBank.isPending}
       />
 
-      <ContactFormDialog
+      <PartyFormDialog
         open={contactDialogOpen}
         onOpenChange={setContactDialogOpen}
         onSubmit={handleContactSubmit}
-        isLoading={createContact.isPending}
+        isLoading={createParty.isPending}
       />
 
       <CategoryFormDialog
