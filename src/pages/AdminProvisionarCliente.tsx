@@ -92,7 +92,7 @@ export default function AdminProvisionarCliente() {
 
       let payload = data as ProvisionResponse | null;
       if (error) {
-        let msg = error.message || 'Falha ao provisionar cliente.';
+        let msg = error.message || 'Falha ao cadastrar cliente.';
         const ctx = (error as any)?.context;
         if (ctx && typeof ctx.json === 'function') {
           try {
