@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Search, Calendar, X, ChevronDown } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
