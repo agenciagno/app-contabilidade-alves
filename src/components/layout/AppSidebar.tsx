@@ -433,7 +433,7 @@ export function AppSidebar() {
           {/* Atalhos Fixados */}
           {pinnedShortcuts.length > 0 && (
             <SidebarGroup>
-              <SidebarGroupLabel className="text-sidebar-foreground/50 text-xs uppercase tracking-wider px-3 py-2">
+              <SidebarGroupLabel className="text-muted-foreground text-[11px] uppercase tracking-[0.05em] px-3 py-2 font-medium">
                 <Pin className="w-3 h-3 inline mr-1.5" />
                 Atalhos
               </SidebarGroupLabel>
