@@ -69,6 +69,7 @@ const App = () => (
               <Route path="/movimentacoes" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_lancamentos"><Transactions /></ModuleGuard></AppLayout>} />
               <Route path="/financeiro/pagar-receber" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_pagar_receber"><PagarReceber /></ModuleGuard></AppLayout>} />
               <Route path="/financeiro/clientes-fornecedores" element={<AppLayout><ModuleGuard moduleName="financeiro"><Parties /></ModuleGuard></AppLayout>} />
+              <Route path="/financeiro/fluxo-caixa" element={<AppLayout><ModuleGuard moduleName="financeiro"><CashFlow /></ModuleGuard></AppLayout>} />
               
               <Route path="/contatos" element={<AppLayout><ModuleGuard moduleName="contatos"><Contacts /></ModuleGuard></AppLayout>} />
               <Route path="/crm/cliente/:id" element={<AppLayout><ModuleGuard moduleName="contatos"><ContactProfile /></ModuleGuard></AppLayout>} />
