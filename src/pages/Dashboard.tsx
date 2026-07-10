@@ -568,62 +568,62 @@ export default function Dashboard() {
       </Collapsible>
 
       {/* KPI Cards - 3 columns matching Transactions page style */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        <Card className="border-border/30">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <Card>
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Receitas Recebidas</p>
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Receitas Recebidas</p>
                 {isLoading ? (
                   <Skeleton className="h-10 w-32" />
                 ) : (
-                  <p className="text-3xl font-semibold tracking-tight text-emerald-500">{formatCurrency(summary.receitasPagas)}</p>
+                  <p className="text-[2rem] font-bold tracking-tight text-emerald-600 leading-none">{formatCurrency(summary.receitasPagas)}</p>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  A Receber: <span className="text-emerald-400">{formatCurrency(summary.aReceber)}</span>
+                <p className="text-[13px] text-muted-foreground pt-1">
+                  A Receber: <span className="text-emerald-600 font-medium">{formatCurrency(summary.aReceber)}</span>
                 </p>
               </div>
               <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
-                <TrendingUp className="w-5 h-5 text-emerald-500" />
+                <TrendingUp className="w-5 h-5 text-emerald-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border/30">
+        <Card>
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Contas Pagas</p>
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Contas Pagas</p>
                 {isLoading ? (
                   <Skeleton className="h-10 w-32" />
                 ) : (
-                  <p className="text-3xl font-semibold tracking-tight text-red-500">{formatCurrency(summary.despesasPagas)}</p>
+                  <p className="text-[2rem] font-bold tracking-tight text-destructive leading-none">{formatCurrency(summary.despesasPagas)}</p>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  A Pagar: <span className="text-red-400">{formatCurrency(summary.aPagar)}</span>
+                <p className="text-[13px] text-muted-foreground pt-1">
+                  A Pagar: <span className="text-destructive font-medium">{formatCurrency(summary.aPagar)}</span>
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
-                <TrendingDown className="w-5 h-5 text-red-500" />
+              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                <TrendingDown className="w-5 h-5 text-destructive" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border/30">
+        <Card>
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Saldo Bancário</p>
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Saldo Bancário</p>
                 {isLoading ? (
                   <Skeleton className="h-10 w-32" />
                 ) : (
-                  <p className={`text-3xl font-semibold tracking-tight ${summary.saldoBancario >= 0 ? 'text-primary' : 'text-red-500'}`}>
+                  <p className={`text-[2rem] font-bold tracking-tight leading-none ${summary.saldoBancario >= 0 ? 'text-foreground' : 'text-destructive'}`}>
                     {formatCurrency(summary.saldoBancario)}
                   </p>
                 )}
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[13px] text-muted-foreground pt-1">
                   Total bancos visíveis
                 </p>
               </div>
@@ -637,58 +637,59 @@ export default function Dashboard() {
 
       {/* Annual Ticker Cards - 4 columns */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        <Card className="border-border/30 border-l-2 border-l-emerald-500">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <BarChart3 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <p className="text-xs text-muted-foreground">Lucro Previsto — {annualMetrics.year}</p>
+        <Card className="shadow-[inset_3px_0_0_0_theme(colors.emerald.500)]">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1.5">
+              <BarChart3 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <p className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground font-medium">Lucro Previsto — {annualMetrics.year}</p>
             </div>
-            <p className={`text-base font-bold ${annualMetrics.lucroPrevisto >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+            <p className={`text-lg font-bold ${annualMetrics.lucroPrevisto >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
               {formatCurrency(annualMetrics.lucroPrevisto)}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Receitas − Despesas (ano)</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Receitas − Despesas (ano)</p>
           </CardContent>
         </Card>
 
-        <Card className="border-border/30 border-l-2 border-l-amber-500">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-1">
+        <Card className="shadow-[inset_3px_0_0_0_theme(colors.amber.500)]">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1.5">
               <CalendarCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <p className="text-xs text-muted-foreground">Lucro Realizado — {annualMetrics.year}</p>
+              <p className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground font-medium">Lucro Realizado — {annualMetrics.year}</p>
             </div>
-            <p className={`text-base font-bold ${annualMetrics.lucroRealizado >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+            <p className={`text-lg font-bold ${annualMetrics.lucroRealizado >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
               {formatCurrency(annualMetrics.lucroRealizado)}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Realizado no ano corrente</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Realizado no ano corrente</p>
           </CardContent>
         </Card>
 
-        <Card className="border-border/30 border-l-2 border-l-green-500">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="w-3.5 h-3.5 text-green-500 shrink-0" />
-              <p className="text-xs text-muted-foreground">Receitas Acumuladas — {annualMetrics.year}</p>
+        <Card className="shadow-[inset_3px_0_0_0_theme(colors.emerald.600)]">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1.5">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <p className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground font-medium">Receitas Acumuladas — {annualMetrics.year}</p>
             </div>
-            <p className="text-base font-bold text-emerald-500">
+            <p className="text-lg font-bold text-emerald-600">
               {formatCurrency(annualMetrics.receitasAcumuladas)}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Receitas já realizadas</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Receitas já realizadas</p>
           </CardContent>
         </Card>
 
-        <Card className="border-border/30 border-l-2 border-l-red-500">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingDown className="w-3.5 h-3.5 text-red-500 shrink-0" />
-              <p className="text-xs text-muted-foreground">Despesas Acumuladas — {annualMetrics.year}</p>
+        <Card className="shadow-[inset_3px_0_0_0_hsl(var(--destructive))]">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1.5">
+              <TrendingDown className="w-3.5 h-3.5 text-destructive shrink-0" />
+              <p className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground font-medium">Despesas Acumuladas — {annualMetrics.year}</p>
             </div>
-            <p className="text-base font-bold text-red-500">
+            <p className="text-lg font-bold text-destructive">
               {formatCurrency(annualMetrics.despesasAcumuladas)}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Despesas já realizadas</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Despesas já realizadas</p>
           </CardContent>
         </Card>
       </div>
+
 
       {/* Lista Unificada de Contas Pendentes - moved above evolution */}
       {isWidgetEnabled('pendingList') && (
