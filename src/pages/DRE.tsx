@@ -150,10 +150,11 @@ export default function DRE() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between py-4 flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">DRE - Demonstração do Resultado do Exercício</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Visão gerencial do resultado operacional • <span className="font-medium capitalize">{monthLabel}</span>
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Financeiro · Relatórios</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">DRE.</h1>
+          <p className="text-[14px] text-muted-foreground">
+            Demonstração do Resultado do Exercício • <span className="font-medium capitalize">{monthLabel}</span>
           </p>
         </div>
 
