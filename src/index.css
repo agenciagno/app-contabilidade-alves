@@ -4,9 +4,9 @@
 
 @layer base {
   :root {
-    /* ─── Apple Design System — MODO CLARO ─── */
-    --font-system: -apple-system, system-ui, 'SF Pro Display', 'Inter', sans-serif;
-    --spring: 220ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    /* ─── StayCloud Design Tokens — MODO CLARO ─── */
+    --font-system: sf-pro, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    --spring: 120ms ease;
 
     /* Raios */
     --r-sm: 8px;
@@ -15,165 +15,191 @@
     --r-xl: 18px;
     --r-pill: 9999px;
 
-    /* Apple Backgrounds */
-    --apple-bg-base: #F2F2F7;
-    --apple-bg-surface: #FFFFFF;
-    --apple-bg-elevated: #F2F2F7;
-    --apple-mat-sidebar: rgba(242,242,247,0.95);
-    --apple-mat-card: rgba(255,255,255,0.96);
-    --apple-mat-modal: rgba(255,255,255,0.98);
+    /* Semantic surfaces */
+    --paper: #ffffff;
+    --bg: #f7f7f5;
+    --bg-2: #f1f1ef;
+    --bg-3: #e6e6e3;
 
-    /* Apple Text */
-    --apple-text-primary: rgba(0,0,0,1.0);
-    --apple-text-secondary: rgba(60,60,67,0.6);
-    --apple-text-tertiary: rgba(60,60,67,0.3);
+    /* Semantic text */
+    --ink: #0B141F;
+    --ink-2: #27272a;
 
-    /* Apple Borders */
-    --apple-border-hair: rgba(60,60,67,0.14);
-    --apple-border-subtle: rgba(60,60,67,0.20);
-    --apple-border-default: rgba(60,60,67,0.29);
+    /* Semantic lines */
+    --line: #e4e4e7;
+    --line-2: #ededed;
 
-    /* Apple System Colors */
-    --apple-blue: #007AFF;
-    --apple-green: #34C759;
-    --apple-red: #FF3B30;
-    --apple-yellow: #FF9500;
-    --apple-purple: #AF52DE;
+    /* Brand */
+    --brand: #545dff;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 0 #e4e4e7;
+    --shadow-md: 0 1px 0 #e4e4e7, 0 8px 24px -10px rgb(0 0 0 / .08);
+    --shadow-lg: 0 1px 0 #e4e4e7, 0 16px 48px -12px rgb(0 0 0 / .12);
+
+    /* Backward-compat (renamed from Apple tokens) */
+    --apple-bg-base: #f7f7f5;
+    --apple-bg-surface: #ffffff;
+    --apple-bg-elevated: #f1f1ef;
+    --apple-mat-sidebar: #ffffff;
+    --apple-mat-card: #ffffff;
+    --apple-mat-modal: #ffffff;
+
+    --apple-text-primary: #0B141F;
+    --apple-text-secondary: #71717a;
+    --apple-text-tertiary: #a1a1aa;
+
+    --apple-border-hair: #ededed;
+    --apple-border-subtle: #e4e4e7;
+    --apple-border-default: #d4d4d8;
+
+    --apple-blue: #545dff;
+    --apple-green: #1a9f63;
+    --apple-red: #dc2626;
+    --apple-yellow: #f59e0b;
+    --apple-purple: #545dff;
 
     /* Badges */
-    --badge-success-bg: rgba(52,199,89,0.12);
-    --badge-success-text: #1a7a38;
-    --badge-danger-bg: rgba(255,59,48,0.11);
-    --badge-danger-text: #c0281f;
-    --badge-warning-bg: rgba(255,149,0,0.12);
+    --badge-success-bg: rgba(26,159,99,0.10);
+    --badge-success-text: #1a9f63;
+    --badge-danger-bg: rgba(220,38,38,0.08);
+    --badge-danger-text: #dc2626;
+    --badge-warning-bg: rgba(245,158,11,0.10);
     --badge-warning-text: #a05c00;
-    --badge-info-bg: rgba(0,122,255,0.11);
-    --badge-info-text: #004fad;
+    --badge-info-bg: rgba(84,93,255,0.10);
+    --badge-info-text: #545dff;
 
     /* Sidebar navigation */
-    --nav-active-bg: rgba(0,0,0,0.06);
-    --nav-active-text: #000000;
-    --nav-hover-bg: rgba(0,0,0,0.04);
-    --nav-idle-text: rgba(60,60,67,0.5);
+    --nav-active-bg: #f1f1ef;
+    --nav-active-text: #0B141F;
+    --nav-hover-bg: #f7f7f5;
+    --nav-idle-text: #71717a;
 
     /* Modal overlay */
     --modal-overlay: rgba(0,0,0,0.45);
 
     /* ─── shadcn/ui variables — Light ─── */
-    --background: 240 5% 96%;
-    --foreground: 0 0% 0%;
+    --background: 40 7% 96%;
+    --foreground: 213 52% 8%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
+    --card-foreground: 213 52% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 0%;
+    --popover-foreground: 213 52% 8%;
 
-    --primary: 211 100% 50%;
+    --primary: 237 100% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 5% 94%;
-    --secondary-foreground: 0 0% 0%;
+    --secondary: 40 5% 94%;
+    --secondary-foreground: 213 52% 8%;
 
-    --muted: 240 5% 94%;
+    --muted: 40 5% 94%;
     --muted-foreground: 240 4% 46%;
 
-    --accent: 240 5% 94%;
-    --accent-foreground: 0 0% 0%;
+    --accent: 40 5% 94%;
+    --accent-foreground: 213 52% 8%;
 
-    --destructive: 4 100% 59%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 70% 36%;
+    --success: 152 72% 38%;
     --success-foreground: 0 0% 100%;
 
     --warning: 35 100% 50%;
     --warning-foreground: 0 0% 13%;
 
-    --border: 240 4% 86%;
-    --input: 240 4% 86%;
-    --ring: 211 100% 50%;
+    --border: 240 5% 90%;
+    --input: 240 5% 90%;
+    --ring: 237 100% 58%;
 
-    --radius: 1rem;
+    --radius: 0.875rem;
 
-    --sidebar-background: 240 5% 96%;
-    --sidebar-foreground: 0 0% 0%;
-    --sidebar-primary: 211 100% 50%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 213 52% 8%;
+    --sidebar-primary: 237 100% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 5% 95%;
-    --sidebar-accent-foreground: 0 0% 0%;
-    --sidebar-border: 240 4% 90%;
-    --sidebar-ring: 211 100% 50%;
+    --sidebar-accent: 40 7% 94%;
+    --sidebar-accent-foreground: 213 52% 8%;
+    --sidebar-border: 240 5% 90%;
+    --sidebar-ring: 237 100% 58%;
   }
 
+
   .dark {
-    /* ─── Apple Design System — MODO ESCURO ─── */
+    /* ─── StayCloud Design Tokens — MODO ESCURO ─── */
+    --paper: #161616;
+    --bg: #0a0a0a;
+    --bg-2: #111111;
+    --bg-3: #1f1f1f;
+    --ink: #fafafa;
+    --ink-2: #e4e4e7;
+    --line: #262626;
+    --line-2: #1f1f1f;
+    --brand: #545dff;
 
-    /* Apple Backgrounds */
-    --apple-bg-base: #0f0f0f;
-    --apple-bg-surface: #1C1C1E;
-    --apple-bg-elevated: #2C2C2E;
-    --apple-mat-sidebar: rgba(28,28,28,0.94);
-    --apple-mat-card: rgba(28,28,30,0.88);
-    --apple-mat-modal: rgba(38,38,40,0.96);
+    --shadow-sm: 0 1px 0 #262626;
+    --shadow-md: 0 1px 0 #262626, 0 8px 24px -10px rgb(0 0 0 / .3);
+    --shadow-lg: 0 1px 0 #262626, 0 16px 48px -12px rgb(0 0 0 / .4);
 
-    /* Apple Text */
-    --apple-text-primary: rgba(235,235,245,1.0);
-    --apple-text-secondary: rgba(235,235,245,0.55);
-    --apple-text-tertiary: rgba(235,235,245,0.30);
+    --apple-bg-base: #0a0a0a;
+    --apple-bg-surface: #161616;
+    --apple-bg-elevated: #1f1f1f;
+    --apple-mat-sidebar: #161616;
+    --apple-mat-card: #161616;
+    --apple-mat-modal: #1f1f1f;
 
-    /* Apple Borders */
-    --apple-border-hair: rgba(255,255,255,0.06);
-    --apple-border-subtle: rgba(255,255,255,0.09);
-    --apple-border-default: rgba(255,255,255,0.13);
+    --apple-text-primary: #fafafa;
+    --apple-text-secondary: #a1a1aa;
+    --apple-text-tertiary: #71717a;
 
-    /* Apple System Colors — dark (more vibrant) */
-    --apple-blue: #0A84FF;
+    --apple-border-hair: #1f1f1f;
+    --apple-border-subtle: #262626;
+    --apple-border-default: #333333;
+
+    --apple-blue: #545dff;
     --apple-green: #30D158;
     --apple-red: #FF453A;
     --apple-yellow: #FF9F0A;
-    --apple-purple: #BF5AF2;
+    --apple-purple: #545dff;
 
-    /* Badges */
     --badge-success-bg: rgba(48,209,88,0.14);
     --badge-success-text: #30D158;
     --badge-danger-bg: rgba(255,69,58,0.14);
     --badge-danger-text: #FF453A;
     --badge-warning-bg: rgba(255,159,10,0.14);
     --badge-warning-text: #FF9F0A;
-    --badge-info-bg: rgba(10,132,255,0.14);
-    --badge-info-text: #0A84FF;
+    --badge-info-bg: rgba(84,93,255,0.14);
+    --badge-info-text: #6B73FF;
 
-    /* Sidebar navigation */
-    --nav-active-bg: rgba(255,255,255,0.08);
-    --nav-active-text: rgba(235,235,245,1.0);
-    --nav-hover-bg: rgba(255,255,255,0.05);
-    --nav-idle-text: rgba(235,235,245,0.45);
+    --nav-active-bg: #1f1f1f;
+    --nav-active-text: #fafafa;
+    --nav-hover-bg: #161616;
+    --nav-idle-text: #71717a;
 
-    /* Modal overlay */
     --modal-overlay: rgba(0,0,0,0.65);
 
     /* ─── shadcn/ui variables — Dark ─── */
-    --background: 0 0% 5.9%;
-    --foreground: 240 6% 93%;
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
 
-    --card: 240 4% 11%;
-    --card-foreground: 240 6% 93%;
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 240 4% 11%;
-    --popover-foreground: 240 6% 93%;
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 211 100% 52%;
+    --primary: 237 100% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 3% 18%;
-    --secondary-foreground: 240 6% 93%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 240 3% 16%;
-    --muted-foreground: 240 3% 62%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 240 5% 65%;
 
-    --accent: 240 3% 18%;
-    --accent-foreground: 240 6% 93%;
+    --accent: 0 0% 12%;
+    --accent-foreground: 0 0% 98%;
 
     --destructive: 3 100% 61%;
     --destructive-foreground: 0 0% 100%;
@@ -184,19 +210,20 @@
     --warning: 37 100% 53%;
     --warning-foreground: 0 0% 13%;
 
-    --border: 240 3% 16%;
-    --input: 240 3% 16%;
-    --ring: 211 100% 52%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 237 100% 58%;
 
-    --sidebar-background: 240 6% 6%;
-    --sidebar-foreground: 240 6% 93%;
-    --sidebar-primary: 211 100% 52%;
+    --sidebar-background: 0 0% 9%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 237 100% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3% 14%;
-    --sidebar-accent-foreground: 240 6% 93%;
-    --sidebar-border: 240 3% 14%;
-    --sidebar-ring: 211 100% 52%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 237 100% 58%;
   }
+
 }
 
 @layer base {
@@ -238,15 +265,14 @@
 
 /* ─── Apple Global Styles ─── */
 
-/* Sidebar glass effect */
+/* Sidebar surface */
 aside,
 nav[data-sidebar],
 [data-sidebar] {
   background: var(--apple-mat-sidebar);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-right-color: var(--apple-border-hair);
 }
+
 
 /* Navigation items */
 [data-nav-item] {
