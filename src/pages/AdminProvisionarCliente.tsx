@@ -115,7 +115,7 @@ export default function AdminProvisionarCliente() {
       setSuccessOpen(true);
       setCopied(false);
     } catch (err: any) {
-      toast.error(err?.message ?? 'Erro ao provisionar cliente.');
+      toast.error(err?.message ?? 'Erro ao cadastrar cliente.');
     } finally {
       setSubmitting(false);
     }
