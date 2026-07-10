@@ -27,6 +27,7 @@ import {
   Gauge,
   ShieldCheck,
   Contact,
+  TrendingUp,
 
 
   type LucideIcon,
@@ -182,6 +183,7 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
       { title: 'Lançamentos', url: '/movimentacoes', icon: ArrowLeftRight, iconName: 'arrow-left-right', subKey: 'financeiro_lancamentos' },
       { title: 'Pagar/Receber', url: '/financeiro/pagar-receber', icon: ArrowUpDown, iconName: 'arrow-up-down', subKey: 'financeiro_pagar_receber' },
       { title: 'Clientes & Fornecedores', url: '/financeiro/clientes-fornecedores', icon: Contact, iconName: 'contact' },
+      { title: 'Fluxo de Caixa', url: '/financeiro/fluxo-caixa', icon: TrendingUp, iconName: 'trending-up' },
       { title: 'Boletos', url: '/boletos', icon: FileCheck, iconName: 'file-check', subKey: 'financeiro_boletos' },
       { title: 'Conta Corrente', url: '/bancos', icon: Building2, iconName: 'building-2', subKey: 'financeiro_conta_corrente' },
       { title: 'Eventos Contábeis', url: '/categorias', icon: Tags, iconName: 'tags', subKey: 'financeiro_eventos_contabeis' },
