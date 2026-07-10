@@ -345,15 +345,15 @@ function KpiCard({ icon, title, value, loading, valueClass }: KpiCardProps) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+        <CardTitle className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em] flex items-center gap-2">
           {icon} {title}
         </CardTitle>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <Skeleton className="h-7 w-32" />
+          <Skeleton className="h-8 w-32" />
         ) : (
-          <div className={cn('text-2xl font-bold tabular-nums', valueClass)}>{brl(value)}</div>
+          <div className={cn('text-[1.75rem] font-bold tracking-tight tabular-nums leading-none', valueClass)}>{brl(value)}</div>
         )}
       </CardContent>
     </Card>
