@@ -26,6 +26,7 @@ import {
   BookOpen,
   Gauge,
   ShieldCheck,
+  Contact,
 
 
   type LucideIcon,
