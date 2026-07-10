@@ -98,11 +98,11 @@ function KpiCard({
 }) {
   return (
     <Card className={cn('border-l-4', borderClass)}>
-      <CardContent className="p-3">
+      <CardContent className="p-4">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-xs text-muted-foreground truncate">{label}</p>
-            <p className="text-2xl font-semibold mt-0.5">{value}</p>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.05em] font-medium truncate">{label}</p>
+            <p className="text-[1.75rem] font-bold tracking-tight mt-1 leading-none">{value}</p>
           </div>
           <Icon className={cn('h-4 w-4 shrink-0', iconClass)} />
         </div>

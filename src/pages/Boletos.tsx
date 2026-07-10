@@ -372,11 +372,11 @@ function KpiCard({ icon, label, value, valueClass }: {
 }) {
   return (
     <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
+      <CardContent className="p-5">
+        <div className="flex items-center gap-2 text-muted-foreground text-[11px] font-medium uppercase tracking-[0.05em]">
           {icon}<span>{label}</span>
         </div>
-        <p className={cn('text-2xl font-bold mt-2', valueClass)}>{value}</p>
+        <p className={cn('text-[1.75rem] font-bold mt-2 tracking-tight leading-none', valueClass)}>{value}</p>
       </CardContent>
     </Card>
   );
