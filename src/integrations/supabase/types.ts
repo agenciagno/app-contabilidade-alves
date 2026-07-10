@@ -2510,6 +2510,56 @@ export type Database = {
           },
         ]
       }
+      parties: {
+        Row: {
+          company_id: string
+          created_at: string
+          documento: string | null
+          email: string | null
+          id: string
+          is_active: boolean
+          nome: string
+          observacoes: string | null
+          telefone: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          documento?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          nome: string
+          observacoes?: string | null
+          telefone?: string | null
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          documento?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          nome?: string
+          observacoes?: string | null
+          telefone?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parties_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           allowed_modules: string[]
@@ -2837,6 +2887,7 @@ export type Database = {
           issue_date: string | null
           notes: string | null
           paid_amount: number | null
+          party_id: string | null
           type: string
           updated_at: string
         }
@@ -2857,6 +2908,7 @@ export type Database = {
           issue_date?: string | null
           notes?: string | null
           paid_amount?: number | null
+          party_id?: string | null
           type: string
           updated_at?: string
         }
@@ -2877,6 +2929,7 @@ export type Database = {
           issue_date?: string | null
           notes?: string | null
           paid_amount?: number | null
+          party_id?: string | null
           type?: string
           updated_at?: string
         }
@@ -2915,6 +2968,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_cofre_global"
             referencedColumns: ["contact_id"]
+          },
+          {
+            foreignKeyName: "transactions_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id"]
           },
         ]
       }
