@@ -508,6 +508,15 @@ export default function TechOperacao() {
               Envie um e-mail de redefinição de senha para qualquer usuário.
             </DialogDescription>
           </DialogHeader>
+          <div className="flex justify-end pb-2">
+            <Button
+              size="sm"
+              onClick={() => { resetAddUserForm(); setAddUserOpen(true); }}
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Adicionar funcionário
+            </Button>
+          </div>
           <div className="max-h-[60vh] overflow-y-auto">
             <Table>
               <TableHeader>
@@ -516,7 +525,7 @@ export default function TechOperacao() {
                   <TableHead>E-mail</TableHead>
                   <TableHead>Papel</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-[160px] text-right">Ações</TableHead>
+                  <TableHead className="w-[240px] text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -531,17 +540,27 @@ export default function TechOperacao() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={resetting === u.email}
-                        onClick={() => handleResetPassword(u.email)}
-                      >
-                        {resetting === u.email
-                          ? <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                          : <KeyRound className="w-3 h-3 mr-2" />}
-                        Reset de senha
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={resetting === u.email}
+                          onClick={() => handleResetPassword(u.email)}
+                        >
+                          {resetting === u.email
+                            ? <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                            : <KeyRound className="w-3 h-3 mr-2" />}
+                          Reset de senha
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setDeleteUserTarget(u)}
+                          title="Excluir usuário"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -560,6 +579,163 @@ export default function TechOperacao() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AlertDialog: excluir empresa */}
+      <AlertDialog
+        open={!!deleteCompanyTarget}
+        onOpenChange={(o) => { if (!o) { setDeleteCompanyTarget(null); setDeleteCompanyInput(''); } }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Excluir empresa definitivamente?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Esta ação <strong>apaga a empresa "{deleteCompanyTarget?.name}"</strong>, todos os seus
+                  usuários e todos os dados financeiros vinculados. É <strong>irreversível</strong>.
+                </p>
+                <p>Para confirmar, digite o nome exato da empresa abaixo:</p>
+                <Input
+                  autoFocus
+                  value={deleteCompanyInput}
+                  onChange={(e) => setDeleteCompanyInput(e.target.value)}
+                  placeholder={deleteCompanyTarget?.name ?? ''}
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingCompany}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCompany}
+              disabled={
+                deletingCompany ||
+                !deleteCompanyTarget ||
+                deleteCompanyInput.trim() !== deleteCompanyTarget?.name
+              }
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingCompany && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Excluir definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* AlertDialog: excluir usuário */}
+      <AlertDialog open={!!deleteUserTarget} onOpenChange={(o) => !o && setDeleteUserTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O acesso de <strong>{deleteUserTarget?.full_name ?? deleteUserTarget?.email ?? 'este usuário'}</strong> será removido imediatamente. Esta ação é irreversível.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingUser}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={deletingUser}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingUser && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog: adicionar funcionário */}
+      <Dialog
+        open={addUserOpen}
+        onOpenChange={(o) => { setAddUserOpen(o); if (!o) resetAddUserForm(); }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar funcionário</DialogTitle>
+            <DialogDescription>
+              Novo usuário para {usersTarget?.name}.
+            </DialogDescription>
+          </DialogHeader>
+
+          {createdCreds ? (
+            <div className="space-y-3 py-2">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">E-mail</Label>
+                <div className="p-3 rounded-md bg-muted font-mono text-sm break-all">
+                  {createdCreds.email}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Senha provisória</Label>
+                <div className="p-3 rounded-md bg-muted font-mono text-sm break-all">
+                  {createdCreds.password}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                O funcionário será obrigado a trocar a senha no primeiro acesso.
+              </p>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={handleCopyCreds}>
+                  {copiedCreds ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                  Copiar credenciais
+                </Button>
+                <Button type="button" onClick={() => { setAddUserOpen(false); resetAddUserForm(); }}>
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="new-user-name">Nome *</Label>
+                <Input
+                  id="new-user-name"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  maxLength={200}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-user-email">E-mail *</Label>
+                <Input
+                  id="new-user-email"
+                  type="email"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  maxLength={255}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Papel *</Label>
+                <Select value={newUserRole} onValueChange={(v) => setNewUserRole(v as 'admin' | 'colaborador')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="colaborador">Colaborador</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => { setAddUserOpen(false); resetAddUserForm(); }}
+                  disabled={creatingUser}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={handleCreateUser} disabled={creatingUser}>
+                  {creatingUser && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Criar funcionário
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
     </div>
   );
 }
