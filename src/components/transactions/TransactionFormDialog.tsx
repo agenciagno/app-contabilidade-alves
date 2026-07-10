@@ -520,6 +520,33 @@ export function TransactionFormDialog({
               )}
             </div>
 
+            {/* Contraparte (opcional) — vínculo com Clientes & Fornecedores do Financeiro */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cliente/Fornecedor (contraparte)</Label>
+              <Select
+                value={partyId || '__none__'}
+                onValueChange={(v) => setPartyId(v === '__none__' ? '' : v)}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Nenhum" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__" className="text-xs text-muted-foreground">Nenhum</SelectItem>
+                  {activeParties.map((p) => (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">
+                      <div className="flex items-center gap-2">
+                        <span>{p.nome}</span>
+                        <span className="text-[10px] uppercase text-muted-foreground">
+                          {p.tipo === 'ambos' ? 'cli/forn' : p.tipo}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+
             {/* Row 2: Evento Contábil | Conta/Banco */}
 <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1.5">
