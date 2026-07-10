@@ -355,8 +355,8 @@ export default function Dashboard() {
     });
   };
 
-  const handleContactSubmit = (data: any) => {
-    createContact.mutate(data, {
+  const handleContactSubmit = (data: PartyInput) => {
+    createParty.mutate(data, {
       onSuccess: () => setContactDialogOpen(false),
     });
   };
