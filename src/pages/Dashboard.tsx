@@ -104,7 +104,8 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const { banks, isLoading: loadingBanks, createBank } = useBanks();
   const { recurringTransactions } = useRecurringTransactions();
-  const { contacts, createContact } = useContacts();
+  const { contacts } = useContacts();
+  const { create: createParty } = useParties();
   const { categories, createCategory } = useCategories();
 
   // Inline createTransaction mutation (was previously from useTransactions)
