@@ -10,6 +10,7 @@ export interface Transaction {
   category_id: string | null;
   bank_id: string | null;
   contact_id: string | null;
+  party_id: string | null;
   description: string;
   amount: number;
   type: 'receita' | 'despesa';
@@ -32,6 +33,7 @@ export type TransactionInsert = {
   category_id?: string | null;
   bank_id?: string | null;
   contact_id?: string | null;
+  party_id?: string | null;
   description: string;
   amount: number;
   type: 'receita' | 'despesa';

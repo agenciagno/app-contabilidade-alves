@@ -17,6 +17,7 @@ import { Transaction, TransactionInsert } from '@/hooks/useTransactions';
 import { Category, useCategories, CategoryInsert } from '@/hooks/useCategories';
 import { Bank, useBanks, BankInsert } from '@/hooks/useBanks';
 import { Contact, useContacts, ContactInsert } from '@/hooks/useContacts';
+import { useParties } from '@/hooks/useParties';
 import { useTransactionAttachments } from '@/hooks/useTransactionAttachments';
 import { AttachmentUpload } from './AttachmentUpload';
 import { CategoryFormDialog } from '@/components/categories/CategoryFormDialog';
@@ -76,6 +77,9 @@ export function TransactionFormDialog({
   const [categoryId, setCategoryId] = useState<string>('');
   const [bankId, setBankId] = useState<string>('');
   const [contactId, setContactId] = useState<string>('');
+  const [partyId, setPartyId] = useState<string>('');
+  const { data: parties = [] } = useParties();
+  const activeParties = parties.filter((p) => p.is_active);
   const [notes, setNotes] = useState('');
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [yearWarningDates, setYearWarningDates] = useState<{ label: string; value: string }[]>([]);
@@ -153,6 +157,7 @@ export function TransactionFormDialog({
       setCategoryId(transaction.category_id || '');
       setBankId(transaction.bank_id || '');
       setContactId(transaction.contact_id || '');
+      setPartyId((transaction as { party_id?: string | null }).party_id || '');
       setNotes(transaction.notes || '');
       setPendingFiles([]);
       setIsRecurring(false);
@@ -161,13 +166,13 @@ export function TransactionFormDialog({
       setPaymentCondition('a_vista');
       setAmount(''); setPaidAmount('');
       setDate(''); setIssueDate(todayStr); setDueDate(''); setExpectedDate('');
-      setCategoryId(''); setBankId(''); setContactId('');
+      setCategoryId(''); setBankId(''); setContactId(''); setPartyId('');
       setNotes(''); setPendingFiles([]);
       resetRecurring();
     } else if (!transaction && resetKey) {
       setAmount(''); setPaidAmount('');
       setDate(''); setIssueDate(todayStr); setDueDate(''); setExpectedDate('');
-      setCategoryId(''); setBankId(''); setContactId('');
+      setCategoryId(''); setBankId(''); setContactId(''); setPartyId('');
       setNotes(''); setPendingFiles([]);
       resetRecurring();
     }
@@ -196,7 +201,7 @@ export function TransactionFormDialog({
   const resetForm = () => {
     setAmount(''); setPaidAmount('');
     setDate(''); setIssueDate(todayStr); setDueDate(''); setExpectedDate('');
-    setCategoryId(''); setBankId(''); setContactId('');
+    setCategoryId(''); setBankId(''); setContactId(''); setPartyId('');
     setNotes(''); setPendingFiles([]);
   };
 
@@ -324,6 +329,7 @@ export function TransactionFormDialog({
         category_id: categoryId || transaction?.category_id || null,
         bank_id: bankId || transaction?.bank_id || null,
         contact_id: contactId || transaction?.contact_id || null,
+        party_id: partyId || null,
         is_paid: true,
         notes: notes || null,
       } as TransactionInsert;
@@ -346,6 +352,7 @@ export function TransactionFormDialog({
         category_id: categoryId || (isEditing ? transaction?.category_id : null) || null,
         bank_id: bankId || (isEditing ? transaction?.bank_id : null) || null,
         contact_id: contactId || (isEditing ? transaction?.contact_id : null) || null,
+        party_id: partyId || null,
         is_paid: false,
         notes: notes || null,
       } as TransactionInsert;
@@ -369,6 +376,7 @@ export function TransactionFormDialog({
         category_id: categoryId || transaction?.category_id || null,
         bank_id: bankId || transaction?.bank_id || null,
         contact_id: contactId || transaction?.contact_id || null,
+        party_id: partyId || null,
         is_paid: transaction?.is_paid ?? false,
         notes: notes || null,
       } as TransactionInsert;
@@ -394,6 +402,7 @@ export function TransactionFormDialog({
       category_id: categoryId || null,
       bank_id: bankId || null,
       contact_id: contactId || null,
+      party_id: partyId || null,
       is_paid: true,
       notes: notes || null,
     } as TransactionInsert;
@@ -510,6 +519,33 @@ export function TransactionFormDialog({
                 </div>
               )}
             </div>
+
+            {/* Contraparte (opcional) — vínculo com Clientes & Fornecedores do Financeiro */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cliente/Fornecedor (contraparte)</Label>
+              <Select
+                value={partyId || '__none__'}
+                onValueChange={(v) => setPartyId(v === '__none__' ? '' : v)}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Nenhum" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__" className="text-xs text-muted-foreground">Nenhum</SelectItem>
+                  {activeParties.map((p) => (
+                    <SelectItem key={p.id} value={p.id} className="text-xs">
+                      <div className="flex items-center gap-2">
+                        <span>{p.nome}</span>
+                        <span className="text-[10px] uppercase text-muted-foreground">
+                          {p.tipo === 'ambos' ? 'cli/forn' : p.tipo}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
 
             {/* Row 2: Evento Contábil | Conta/Banco */}
 <div className="grid grid-cols-2 gap-2">
