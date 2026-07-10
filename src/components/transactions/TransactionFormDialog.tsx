@@ -201,7 +201,7 @@ export function TransactionFormDialog({
   const resetForm = () => {
     setAmount(''); setPaidAmount('');
     setDate(''); setIssueDate(todayStr); setDueDate(''); setExpectedDate('');
-    setCategoryId(''); setBankId(''); setContactId('');
+    setCategoryId(''); setBankId(''); setContactId(''); setPartyId('');
     setNotes(''); setPendingFiles([]);
   };
 
