@@ -92,7 +92,7 @@ export default function AdminProvisionarCliente() {
 
       let payload = data as ProvisionResponse | null;
       if (error) {
-        let msg = error.message || 'Falha ao provisionar cliente.';
+        let msg = error.message || 'Falha ao cadastrar cliente.';
         const ctx = (error as any)?.context;
         if (ctx && typeof ctx.json === 'function') {
           try {
@@ -105,7 +105,7 @@ export default function AdminProvisionarCliente() {
         throw new Error(msg);
       }
       if (!payload || payload.error) {
-        throw new Error(payload?.error || 'Falha ao provisionar cliente.');
+        throw new Error(payload?.error || 'Falha ao cadastrar cliente.');
       }
       if (!payload.provisional_password) {
         throw new Error('Resposta sem senha provisória.');
@@ -115,7 +115,7 @@ export default function AdminProvisionarCliente() {
       setSuccessOpen(true);
       setCopied(false);
     } catch (err: any) {
-      toast.error(err?.message ?? 'Erro ao provisionar cliente.');
+      toast.error(err?.message ?? 'Erro ao cadastrar cliente.');
     } finally {
       setSubmitting(false);
     }
@@ -147,7 +147,7 @@ export default function AdminProvisionarCliente() {
       <div className="w-full max-w-2xl">
         <Card>
           <CardHeader>
-            <CardTitle>Provisionar Cliente</CardTitle>
+            <CardTitle>Cadastrar Cliente</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -230,7 +230,7 @@ export default function AdminProvisionarCliente() {
 
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Provisionar cliente
+                Cadastrar cliente
               </Button>
             </form>
           </CardContent>

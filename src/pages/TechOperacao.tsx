@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, MoreHorizontal, KeyRound } from 'lucide-react';
+import { Loader2, MoreHorizontal, KeyRound, Trash2, UserPlus, Copy, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
@@ -17,7 +17,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -26,6 +26,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 
 interface CompanyRow {
   id: string;
@@ -75,6 +80,24 @@ export default function TechOperacao() {
   const [savingModules, setSavingModules] = useState(false);
   const [suspending, setSuspending] = useState(false);
   const [resetting, setResetting] = useState<string | null>(null);
+
+  // Excluir empresa
+  const [deleteCompanyTarget, setDeleteCompanyTarget] = useState<CompanyRow | null>(null);
+  const [deleteCompanyInput, setDeleteCompanyInput] = useState('');
+  const [deletingCompany, setDeletingCompany] = useState(false);
+
+  // Excluir usuário
+  const [deleteUserTarget, setDeleteUserTarget] = useState<ProfileRow | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
+
+  // Adicionar funcionário
+  const [addUserOpen, setAddUserOpen] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserRole, setNewUserRole] = useState<'admin' | 'colaborador'>('colaborador');
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState<{ email: string; password: string } | null>(null);
+  const [copiedCreds, setCopiedCreds] = useState(false);
 
   const { data: companies, isLoading: loadingCompanies } = useQuery({
     queryKey: ['tech-operacao-companies'],
@@ -200,6 +223,101 @@ export default function TechOperacao() {
     }
   };
 
+  const isValidEmail = (v: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
+  const refetchAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['tech-operacao-companies'] });
+    queryClient.invalidateQueries({ queryKey: ['tech-operacao-profiles'] });
+  };
+
+  const handleDeleteCompany = async () => {
+    if (!deleteCompanyTarget) return;
+    if (deleteCompanyInput.trim() !== deleteCompanyTarget.name) return;
+    setDeletingCompany(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-tenant', {
+        body: { company_id: deleteCompanyTarget.id },
+      });
+      if (error) throw new Error(error.message || 'Falha ao excluir empresa.');
+      if (data && (data as any).error) throw new Error((data as any).error);
+      toast.success('Empresa excluída definitivamente.');
+      refetchAll();
+      setDeleteCompanyTarget(null);
+      setDeleteCompanyInput('');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao excluir empresa.');
+    } finally {
+      setDeletingCompany(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteUserTarget) return;
+    setDeletingUser(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-tenant-user', {
+        body: { user_id: deleteUserTarget.user_id },
+      });
+      if (error) throw new Error(error.message || 'Falha ao excluir usuário.');
+      if (data && (data as any).error) throw new Error((data as any).error);
+      toast.success('Usuário excluído.');
+      queryClient.invalidateQueries({ queryKey: ['tech-operacao-profiles'] });
+      setDeleteUserTarget(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao excluir usuário.');
+    } finally {
+      setDeletingUser(false);
+    }
+  };
+
+  const resetAddUserForm = () => {
+    setNewUserName('');
+    setNewUserEmail('');
+    setNewUserRole('colaborador');
+    setCreatedCreds(null);
+    setCopiedCreds(false);
+  };
+
+  const handleCreateUser = async () => {
+    if (!usersTarget) return;
+    if (!newUserName.trim()) { toast.error('Informe o nome.'); return; }
+    if (!isValidEmail(newUserEmail)) { toast.error('E-mail inválido.'); return; }
+    setCreatingUser(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-tenant-user', {
+        body: {
+          company_id: usersTarget.id,
+          email: newUserEmail.trim(),
+          name: newUserName.trim(),
+          role: newUserRole,
+        },
+      });
+      if (error) throw new Error(error.message || 'Falha ao criar funcionário.');
+      const payload = data as { provisional_password?: string; error?: string } | null;
+      if (!payload || payload.error) throw new Error(payload?.error || 'Falha ao criar funcionário.');
+      if (!payload.provisional_password) throw new Error('Resposta sem senha provisória.');
+      setCreatedCreds({ email: newUserEmail.trim(), password: payload.provisional_password });
+      toast.success('Funcionário criado.');
+      queryClient.invalidateQueries({ queryKey: ['tech-operacao-profiles'] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao criar funcionário.');
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  const handleCopyCreds = async () => {
+    if (!createdCreds) return;
+    try {
+      await navigator.clipboard.writeText(`E-mail: ${createdCreds.email} | Senha provisória: ${createdCreds.password}`);
+      setCopiedCreds(true);
+      toast.success('Credenciais copiadas.');
+    } catch {
+      toast.error('Não foi possível copiar.');
+    }
+  };
+
+
   const isMatriz = (id: string) => matrizId === id;
 
   return (
@@ -301,6 +419,15 @@ export default function TechOperacao() {
                               <DropdownMenuItem onClick={() => setUsersTarget(c)}>
                                 Usuários
                               </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                disabled={matriz}
+                                onClick={() => { setDeleteCompanyInput(''); setDeleteCompanyTarget(c); }}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Excluir empresa
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -381,6 +508,15 @@ export default function TechOperacao() {
               Envie um e-mail de redefinição de senha para qualquer usuário.
             </DialogDescription>
           </DialogHeader>
+          <div className="flex justify-end pb-2">
+            <Button
+              size="sm"
+              onClick={() => { resetAddUserForm(); setAddUserOpen(true); }}
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Adicionar funcionário
+            </Button>
+          </div>
           <div className="max-h-[60vh] overflow-y-auto">
             <Table>
               <TableHeader>
@@ -389,7 +525,7 @@ export default function TechOperacao() {
                   <TableHead>E-mail</TableHead>
                   <TableHead>Papel</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-[160px] text-right">Ações</TableHead>
+                  <TableHead className="w-[240px] text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -404,17 +540,27 @@ export default function TechOperacao() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={resetting === u.email}
-                        onClick={() => handleResetPassword(u.email)}
-                      >
-                        {resetting === u.email
-                          ? <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                          : <KeyRound className="w-3 h-3 mr-2" />}
-                        Reset de senha
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={resetting === u.email}
+                          onClick={() => handleResetPassword(u.email)}
+                        >
+                          {resetting === u.email
+                            ? <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                            : <KeyRound className="w-3 h-3 mr-2" />}
+                          Reset de senha
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setDeleteUserTarget(u)}
+                          title="Excluir usuário"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -433,9 +579,165 @@ export default function TechOperacao() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AlertDialog: excluir empresa */}
+      <AlertDialog
+        open={!!deleteCompanyTarget}
+        onOpenChange={(o) => { if (!o) { setDeleteCompanyTarget(null); setDeleteCompanyInput(''); } }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Excluir empresa definitivamente?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Esta ação <strong>apaga a empresa "{deleteCompanyTarget?.name}"</strong>, todos os seus
+                  usuários e todos os dados financeiros vinculados. É <strong>irreversível</strong>.
+                </p>
+                <p>Para confirmar, digite o nome exato da empresa abaixo:</p>
+                <Input
+                  autoFocus
+                  value={deleteCompanyInput}
+                  onChange={(e) => setDeleteCompanyInput(e.target.value)}
+                  placeholder={deleteCompanyTarget?.name ?? ''}
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingCompany}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCompany}
+              disabled={
+                deletingCompany ||
+                !deleteCompanyTarget ||
+                deleteCompanyInput.trim() !== deleteCompanyTarget?.name
+              }
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingCompany && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Excluir definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* AlertDialog: excluir usuário */}
+      <AlertDialog open={!!deleteUserTarget} onOpenChange={(o) => !o && setDeleteUserTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O acesso de <strong>{deleteUserTarget?.full_name ?? deleteUserTarget?.email ?? 'este usuário'}</strong> será removido imediatamente. Esta ação é irreversível.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingUser}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={deletingUser}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingUser && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog: adicionar funcionário */}
+      <Dialog
+        open={addUserOpen}
+        onOpenChange={(o) => { setAddUserOpen(o); if (!o) resetAddUserForm(); }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar funcionário</DialogTitle>
+            <DialogDescription>
+              Novo usuário para {usersTarget?.name}.
+            </DialogDescription>
+          </DialogHeader>
+
+          {createdCreds ? (
+            <div className="space-y-3 py-2">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">E-mail</Label>
+                <div className="p-3 rounded-md bg-muted font-mono text-sm break-all">
+                  {createdCreds.email}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Senha provisória</Label>
+                <div className="p-3 rounded-md bg-muted font-mono text-sm break-all">
+                  {createdCreds.password}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                O funcionário será obrigado a trocar a senha no primeiro acesso.
+              </p>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={handleCopyCreds}>
+                  {copiedCreds ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                  Copiar credenciais
+                </Button>
+                <Button type="button" onClick={() => { setAddUserOpen(false); resetAddUserForm(); }}>
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="new-user-name">Nome *</Label>
+                <Input
+                  id="new-user-name"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  maxLength={200}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-user-email">E-mail *</Label>
+                <Input
+                  id="new-user-email"
+                  type="email"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  maxLength={255}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Papel *</Label>
+                <Select value={newUserRole} onValueChange={(v) => setNewUserRole(v as 'admin' | 'colaborador')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="colaborador">Colaborador</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => { setAddUserOpen(false); resetAddUserForm(); }}
+                  disabled={creatingUser}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={handleCreateUser} disabled={creatingUser}>
+                  {creatingUser && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Criar funcionário
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+
 
 function MetricCard({ label, value, tone }: { label: string; value: number; tone?: 'success' | 'danger' }) {
   const colorClass =
