@@ -172,7 +172,7 @@ export function TransactionFormDialog({
     } else if (!transaction && resetKey) {
       setAmount(''); setPaidAmount('');
       setDate(''); setIssueDate(todayStr); setDueDate(''); setExpectedDate('');
-      setCategoryId(''); setBankId(''); setContactId('');
+      setCategoryId(''); setBankId(''); setContactId(''); setPartyId('');
       setNotes(''); setPendingFiles([]);
       resetRecurring();
     }
