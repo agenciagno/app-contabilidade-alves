@@ -402,6 +402,7 @@ export function TransactionFormDialog({
       category_id: categoryId || null,
       bank_id: bankId || null,
       contact_id: contactId || null,
+      party_id: partyId || null,
       is_paid: true,
       notes: notes || null,
     } as TransactionInsert;
