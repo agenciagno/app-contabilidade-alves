@@ -27,6 +27,7 @@ import {
   Gauge,
   ShieldCheck,
   Contact,
+  TrendingUp,
 
 
   type LucideIcon,
