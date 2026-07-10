@@ -157,6 +157,7 @@ export function TransactionFormDialog({
       setCategoryId(transaction.category_id || '');
       setBankId(transaction.bank_id || '');
       setContactId(transaction.contact_id || '');
+      setPartyId((transaction as { party_id?: string | null }).party_id || '');
       setNotes(transaction.notes || '');
       setPendingFiles([]);
       setIsRecurring(false);
