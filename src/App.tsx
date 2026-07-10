@@ -27,6 +27,7 @@ import CrmDispatches from "@/pages/CrmDispatches";
 import ClientReport from "@/pages/ClientReport";
 import Boletos from "@/pages/Boletos";
 import PagarReceber from "@/pages/PagarReceber";
+import Parties from "@/pages/Parties";
 import FiscalTasks from "@/pages/FiscalTasks";
 import FiscalCalendar from "@/pages/FiscalCalendar";
 import FiscalDashboard from "@/pages/FiscalDashboard";
