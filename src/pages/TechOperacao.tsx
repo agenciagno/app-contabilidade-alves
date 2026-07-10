@@ -81,6 +81,24 @@ export default function TechOperacao() {
   const [suspending, setSuspending] = useState(false);
   const [resetting, setResetting] = useState<string | null>(null);
 
+  // Excluir empresa
+  const [deleteCompanyTarget, setDeleteCompanyTarget] = useState<CompanyRow | null>(null);
+  const [deleteCompanyInput, setDeleteCompanyInput] = useState('');
+  const [deletingCompany, setDeletingCompany] = useState(false);
+
+  // Excluir usuário
+  const [deleteUserTarget, setDeleteUserTarget] = useState<ProfileRow | null>(null);
+  const [deletingUser, setDeletingUser] = useState(false);
+
+  // Adicionar funcionário
+  const [addUserOpen, setAddUserOpen] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserRole, setNewUserRole] = useState<'admin' | 'colaborador'>('colaborador');
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState<{ email: string; password: string } | null>(null);
+  const [copiedCreds, setCopiedCreds] = useState(false);
+
   const { data: companies, isLoading: loadingCompanies } = useQuery({
     queryKey: ['tech-operacao-companies'],
     queryFn: async (): Promise<CompanyRow[]> => {
