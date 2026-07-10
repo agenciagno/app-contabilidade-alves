@@ -12,7 +12,7 @@ export function AppHeader() {
   const isDev = isDevEnvironment();
 
   return (
-    <header className="h-14 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 shadow-[0_1px_0_0_hsl(var(--border)/0.5)]">
+    <header className="h-14 bg-card sticky top-0 z-50 border-b border-border">
       <div className="flex items-center justify-between h-full px-4">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
