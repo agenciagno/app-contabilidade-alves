@@ -91,7 +91,7 @@ export default function Banks() {
 
     return (
       <Card
-        className="bg-card border-border/50 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer group"
+        className="bg-card hover:border-primary/40 hover:shadow-md transition-all cursor-pointer group"
         onClick={() => handleBankCardClick(bank)}>
         <CardContent className="p-4">
           <div className="flex items-start justify-between">
@@ -123,7 +123,7 @@ export default function Banks() {
               </Button>
             </div>
           </div>
-          <div className="mt-4 pt-4 border-t border-border/50">
+          <div className="mt-4 pt-4 border-t border-border">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Saldo atual</span>
               <span className={`text-lg font-bold ${closingBalance >= 0 ? 'text-green-500' : 'text-destructive'}`}>
@@ -219,7 +219,7 @@ export default function Banks() {
       }
 
       {banks.length === 0 &&
-      <Card className="bg-card border-border/50">
+      <Card className="bg-card">
           <CardContent className="text-muted-foreground text-center py-16">
             <Building2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>Nenhuma conta cadastrada</p>

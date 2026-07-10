@@ -232,7 +232,7 @@ export default function Contacts() {
   const ContactCard = ({ contact }: { contact: Contact }) => {
     const { isInadimplente } = getFinancialStatus(contact.id);
     return (
-      <Card className={`bg-card border-border/50 ${!contact.is_active ? 'opacity-60' : ''}`}>
+      <Card className={`bg-card ${!contact.is_active ? 'opacity-60' : ''}`}>
         <CardContent className="p-4">
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-3 min-w-0">
@@ -304,7 +304,7 @@ export default function Contacts() {
             </div>
           </div>
 
-          <div className="flex mt-4 pt-3 border-t border-border/50 justify-end">
+          <div className="flex mt-4 pt-3 border-t border-border justify-end">
             <ActionButtons contact={contact} />
           </div>
         </CardContent>
@@ -400,7 +400,7 @@ export default function Contacts() {
         <TabsContent value="clientes">
           <div className="space-y-6">
             <div className="flex items-center justify-end gap-2">
-              <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ViewMode)} className="border border-border/50 rounded-md p-0.5">
+              <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ViewMode)} className="border border-border rounded-md p-0.5">
                 <ToggleGroupItem value="card" className="h-8 w-8 p-0" title="Visualização em cards">
                   <LayoutGrid className="h-4 w-4" />
                 </ToggleGroupItem>
@@ -422,11 +422,11 @@ export default function Contacts() {
                   placeholder="Buscar por nome ou CNPJ..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  className="pl-9 h-9 bg-background/50 border-border/50"
+                  className="pl-9 h-9 bg-card border-border"
                 />
               </div>
               <Select value={filterFinancialStatus} onValueChange={setFilterFinancialStatus}>
-                <SelectTrigger className="w-[140px] h-9 bg-background/50 border-border/50">
+                <SelectTrigger className="w-[140px] h-9 bg-card border-border">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -436,7 +436,7 @@ export default function Contacts() {
                 </SelectContent>
               </Select>
               <Select value={filterCategoria} onValueChange={setFilterCategoria}>
-                <SelectTrigger className="w-[160px] h-9 bg-background/50 border-border/50">
+                <SelectTrigger className="w-[160px] h-9 bg-card border-border">
                   <SelectValue placeholder="Categoria" />
                 </SelectTrigger>
                 <SelectContent>
@@ -448,7 +448,7 @@ export default function Contacts() {
                 </SelectContent>
               </Select>
               <Select value={filterRegime} onValueChange={setFilterRegime}>
-                <SelectTrigger className="w-[180px] h-9 bg-background/50 border-border/50">
+                <SelectTrigger className="w-[180px] h-9 bg-card border-border">
                   <SelectValue placeholder="Regime Tributário" />
                 </SelectTrigger>
                 <SelectContent>
@@ -463,7 +463,7 @@ export default function Contacts() {
                 </SelectContent>
               </Select>
               <Select value={filterResponsible} onValueChange={setFilterResponsible}>
-                <SelectTrigger className="w-[200px] h-9 bg-background/50 border-border/50">
+                <SelectTrigger className="w-[200px] h-9 bg-card border-border">
                   <SelectValue placeholder="Responsável" />
                 </SelectTrigger>
                 <SelectContent>
@@ -541,7 +541,7 @@ export default function Contacts() {
 
             {/* List View */}
             {viewMode === 'list' && filteredContacts.length > 0 && (
-              <Card className="bg-card border-border/50">
+              <Card className="bg-card">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -574,7 +574,7 @@ export default function Contacts() {
             )}
 
             {filteredContacts.length === 0 && (
-              <Card className="bg-card border-border/50">
+              <Card className="bg-card">
                 <CardContent className="text-muted-foreground text-center py-16">
                   {hasActiveFilters ? 'Nenhum cliente/fornecedor encontrado com os filtros aplicados' : 'Nenhum cliente/fornecedor cadastrado ainda'}
                 </CardContent>
