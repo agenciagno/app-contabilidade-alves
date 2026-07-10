@@ -736,9 +736,8 @@ export default function TechOperacao() {
     </div>
   );
 }
-    </div>
-  );
-}
+
+
 
 function MetricCard({ label, value, tone }: { label: string; value: number; tone?: 'success' | 'danger' }) {
   const colorClass =
