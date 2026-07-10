@@ -120,12 +120,13 @@ export default function Boletos() {
     <div className="flex flex-col h-full">
       {/* Cabeçalho */}
       <div className="flex items-center justify-between py-4 px-6 flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <FileText className="w-6 h-6 text-primary" />
-            Controle de Boletos
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Financeiro · Cobrança</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <FileText className="w-7 h-7 text-primary" />
+            Controle de Boletos.
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-[14px] text-muted-foreground">
             Painel da automação de cobrança
           </p>
         </div>

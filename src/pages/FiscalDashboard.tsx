@@ -385,7 +385,10 @@ export default function FiscalDashboard() {
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h1 className="text-2xl font-semibold">Dashboard Fiscal</h1>
+          <div className="space-y-1">
+            <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Fiscal</p>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard Fiscal.</h1>
+          </div>
           <div className="flex flex-wrap items-center gap-2 no-print">
             <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
               <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
