@@ -166,7 +166,7 @@ export function TransactionFormDialog({
       setPaymentCondition('a_vista');
       setAmount(''); setPaidAmount('');
       setDate(''); setIssueDate(todayStr); setDueDate(''); setExpectedDate('');
-      setCategoryId(''); setBankId(''); setContactId('');
+      setCategoryId(''); setBankId(''); setContactId(''); setPartyId('');
       setNotes(''); setPendingFiles([]);
       resetRecurring();
     } else if (!transaction && resetKey) {
