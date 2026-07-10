@@ -57,16 +57,28 @@ export function ModuleGuard({ moduleName, subModule, children, requireAdmin = fa
   const planHasModule = moduleKeysToCheck.some((k) => planModules.includes(k));
   let hasAccess = planHasModule && userHasModule;
 
-  // Sub-module check with backward compatibility: if the user has the parent
-  // but none of its sub-keys, treat as full access (pre-migration users).
+  // Sub-module gating — mirror AppSidebar's subEnabledByPlan + user allowed check.
   if (hasAccess && subModule) {
-    const subKeysToCheck = [subModule, ...(LEGACY_SUBMODULE_ALIASES[subModule] ?? [])];
     const siblings = SUB_MODULES_BY_PARENT[moduleName] ?? [];
-    const hasAnySibling = siblings.some((k) => allowedModules.includes(k));
-    if (hasAnySibling && !subKeysToCheck.some((k) => allowedModules.includes(k))) {
-      hasAccess = false;
+    const explicitInPlan = siblings.filter((k) => planModules.includes(k));
+    const subKeysToCheck = [subModule, ...(LEGACY_SUBMODULE_ALIASES[subModule] ?? [])];
+
+    // Plan-level: if parent has explicit submodules in plan, require this one.
+    // If none are explicit ("grosso", e.g. CA), all submodules are enabled.
+    const subEnabledByPlan =
+      explicitInPlan.length === 0 || subKeysToCheck.some((k) => planModules.includes(k));
+    if (!subEnabledByPlan) hasAccess = false;
+
+    // User-level: for non-admin users, if any sibling sub-key is set on the user,
+    // require this specific sub-key too. Otherwise (no siblings set) keep legacy full access.
+    if (hasAccess && !isAdmin) {
+      const hasAnySibling = siblings.some((k) => allowedModules.includes(k));
+      if (hasAnySibling && !subKeysToCheck.some((k) => allowedModules.includes(k))) {
+        hasAccess = false;
+      }
     }
   }
+
 
 
   if (!hasAccess) {
