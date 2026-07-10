@@ -384,8 +384,11 @@ export default function Contacts() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between py-4 flex-wrap gap-4">
-        <h1 className="text-2xl font-bold text-foreground">Cliente/Fornecedor</h1>
+      <div className="flex items-start justify-between py-4 flex-wrap gap-4">
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Cadastros</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Clientes & Fornecedores.</h1>
+        </div>
       </div>
 
       <Tabs defaultValue="clientes" className="space-y-4">
