@@ -17,6 +17,7 @@ import { Transaction, TransactionInsert } from '@/hooks/useTransactions';
 import { Category, useCategories, CategoryInsert } from '@/hooks/useCategories';
 import { Bank, useBanks, BankInsert } from '@/hooks/useBanks';
 import { Contact, useContacts, ContactInsert } from '@/hooks/useContacts';
+import { useParties } from '@/hooks/useParties';
 import { useTransactionAttachments } from '@/hooks/useTransactionAttachments';
 import { AttachmentUpload } from './AttachmentUpload';
 import { CategoryFormDialog } from '@/components/categories/CategoryFormDialog';
