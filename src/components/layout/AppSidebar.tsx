@@ -408,7 +408,7 @@ export function AppSidebar() {
 
   return (
     <>
-      <Sidebar collapsible="icon" className="border-r border-sidebar-border/40">
+      <Sidebar collapsible="icon" className="border-r border-border">
         <SidebarHeader className="p-3">
           <div className="flex items-center gap-3 justify-center">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary shrink-0 overflow-hidden">
