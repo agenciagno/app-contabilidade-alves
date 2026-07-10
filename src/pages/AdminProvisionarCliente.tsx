@@ -105,7 +105,7 @@ export default function AdminProvisionarCliente() {
         throw new Error(msg);
       }
       if (!payload || payload.error) {
-        throw new Error(payload?.error || 'Falha ao provisionar cliente.');
+        throw new Error(payload?.error || 'Falha ao cadastrar cliente.');
       }
       if (!payload.provisional_password) {
         throw new Error('Resposta sem senha provisória.');
