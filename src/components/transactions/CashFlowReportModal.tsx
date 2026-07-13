@@ -659,7 +659,7 @@ export function CashFlowReportModal({
       r.notes || '',
       r.saldoAtual.toFixed(2).replace('.', ','),
       getStatus(r.is_paid, r.due_date),
-      weekdayOf(r.due_date || r.expected_date),
+      weekdayOf(r.expected_date || r.due_date),
     ]);
 
     const headerRows = `
