@@ -58,14 +58,29 @@ export function useNotifications() {
   const markAllAsRead = useMutation({
     mutationFn: async () => {
       if (!userId) return;
+      const unreadIds = (query.data ?? []).filter((n) => !n.read_at).map((n) => n.id);
+      if (unreadIds.length === 0) return;
+      const nowIso = new Date().toISOString();
       const { error } = await (supabase as any)
         .from('notifications')
-        .update({ read_at: new Date().toISOString() })
-        .eq('user_id', userId)
-        .is('read_at', null);
+        .update({ read_at: nowIso })
+        .in('id', unreadIds)
+        .eq('user_id', userId);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', userId] }),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['notifications', userId] });
+      const previous = queryClient.getQueryData<NotificationRow[]>(['notifications', userId]);
+      const nowIso = new Date().toISOString();
+      queryClient.setQueryData<NotificationRow[]>(['notifications', userId], (old) =>
+        (old ?? []).map((n) => (n.read_at ? n : { ...n, read_at: nowIso }))
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(['notifications', userId], ctx.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['notifications', userId] }),
   });
 
   useEffect(() => {
