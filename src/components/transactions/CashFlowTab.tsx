@@ -982,7 +982,10 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
 
                       {/* Dia da Semana */}
                       <TableCell className="capitalize whitespace-nowrap">
-                        {(row.expected_date || row.due_date) ? getDayOfWeek(row.expected_date || row.due_date!) : '—'}
+                        {(() => {
+                          const d = isReceivables ? row.due_date : (row.expected_date || row.due_date);
+                          return d ? getDayOfWeek(d) : '—';
+                        })()}
                       </TableCell>
                     </TableRow>
                   ))}
