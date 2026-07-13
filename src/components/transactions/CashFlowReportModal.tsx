@@ -514,7 +514,7 @@ export function CashFlowReportModal({
       r.notes || '',
       formatCurrency(r.saldoAtual),
       getStatus(r.is_paid, r.due_date),
-      weekdayOf(r.due_date || r.expected_date),
+      weekdayOf(r.expected_date || r.due_date),
     ]);
     const columnStyles = isReceivables ? {
       0: { cellWidth: 50, halign: 'center' as const },
@@ -659,7 +659,7 @@ export function CashFlowReportModal({
       r.notes || '',
       r.saldoAtual.toFixed(2).replace('.', ','),
       getStatus(r.is_paid, r.due_date),
-      weekdayOf(r.due_date || r.expected_date),
+      weekdayOf(r.expected_date || r.due_date),
     ]);
 
     const headerRows = `
@@ -734,7 +734,7 @@ export function CashFlowReportModal({
       `"${(r.notes || '').replace(/"/g, '""')}"`,
       r.saldoAtual.toFixed(2).replace('.', ','),
       getStatus(r.is_paid, r.due_date),
-      weekdayOf(r.due_date || r.expected_date),
+      weekdayOf(r.expected_date || r.due_date),
     ]).join(';'));
 
     const eventSummary = buildEventSummary(filteredRows);
