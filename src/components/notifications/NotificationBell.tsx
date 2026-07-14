@@ -58,9 +58,19 @@ function Item({ n, onClick }: { n: NotificationRow; onClick: (n: NotificationRow
     >
       <div className="mt-0.5 shrink-0">{iconForType(n.type)}</div>
       <div className="flex-1 min-w-0">
-        <p className={cn('text-sm leading-snug truncate', unread ? 'text-foreground font-medium' : 'text-muted-foreground')}>
-          {n.title || n.message || 'Notificação'}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className={cn('text-sm leading-snug truncate', unread ? 'text-foreground font-medium' : 'text-muted-foreground')}>
+            {n.title || n.message || 'Notificação'}
+          </p>
+          {DEADLINE_BADGES[n.type] && (
+            <span className={cn(
+              'text-[10px] font-semibold px-1.5 py-0.5 rounded-full border shrink-0',
+              DEADLINE_BADGES[n.type].className,
+            )}>
+              {DEADLINE_BADGES[n.type].label}
+            </span>
+          )}
+        </div>
         {n.body && (
           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>
         )}
@@ -68,6 +78,7 @@ function Item({ n, onClick }: { n: NotificationRow; onClick: (n: NotificationRow
           {formatDistanceToNow(parseISO(n.created_at), { locale: ptBR, addSuffix: true })}
         </p>
       </div>
+
       {unread && <span className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />}
     </button>
   );
