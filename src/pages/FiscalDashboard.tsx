@@ -51,6 +51,7 @@ import {
   useFiscalUpcomingTasksRange,
   FiscalTaskRow,
 } from '@/hooks/useFiscalDashboard';
+import { GenerateDeadlineAlertsButton } from '@/components/fiscal/GenerateDeadlineAlertsButton';
 
 
 const MONTHS = [
