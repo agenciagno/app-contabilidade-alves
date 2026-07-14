@@ -4,7 +4,7 @@ import { formatDistanceToNow, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Bell, AlertTriangle, Clock, CheckCircle, UserPlus,
-  ArrowRightLeft, Calendar, Info,
+  ArrowRightLeft, Calendar, Info, CalendarClock, CalendarX,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -21,10 +21,23 @@ const TYPE_META: Record<string, { icon: any; color: string }> = {
   transfer_end: { icon: ArrowRightLeft, color: 'text-purple-500' },
   calendar_generated: { icon: Calendar, color: 'text-blue-500' },
   system: { icon: Info, color: 'text-gray-500' },
+  // Deadline alerts
+  prazo_5d: { icon: CalendarClock, color: 'text-blue-500' },
+  prazo_3d: { icon: CalendarClock, color: 'text-amber-500' },
+  prazo_hoje: { icon: Clock, color: 'text-orange-500' },
+  prazo_atraso: { icon: CalendarX, color: 'text-red-600' },
   // legacy
   due_alert: { icon: Clock, color: 'text-amber-500' },
   overdue: { icon: AlertTriangle, color: 'text-red-500' },
 };
+
+const DEADLINE_BADGES: Record<string, { label: string; className: string }> = {
+  prazo_5d: { label: '5 dias', className: 'bg-blue-100 text-blue-700 border-blue-200' },
+  prazo_3d: { label: '3 dias', className: 'bg-amber-100 text-amber-800 border-amber-200' },
+  prazo_hoje: { label: 'Hoje', className: 'bg-orange-100 text-orange-800 border-orange-200' },
+  prazo_atraso: { label: 'Atraso', className: 'bg-red-100 text-red-700 border-red-200' },
+};
+
 
 export function iconForType(type: string) {
   const meta = TYPE_META[type] ?? TYPE_META.system;
@@ -45,9 +58,19 @@ function Item({ n, onClick }: { n: NotificationRow; onClick: (n: NotificationRow
     >
       <div className="mt-0.5 shrink-0">{iconForType(n.type)}</div>
       <div className="flex-1 min-w-0">
-        <p className={cn('text-sm leading-snug truncate', unread ? 'text-foreground font-medium' : 'text-muted-foreground')}>
-          {n.title || n.message || 'Notificação'}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className={cn('text-sm leading-snug truncate', unread ? 'text-foreground font-medium' : 'text-muted-foreground')}>
+            {n.title || n.message || 'Notificação'}
+          </p>
+          {DEADLINE_BADGES[n.type] && (
+            <span className={cn(
+              'text-[10px] font-semibold px-1.5 py-0.5 rounded-full border shrink-0',
+              DEADLINE_BADGES[n.type].className,
+            )}>
+              {DEADLINE_BADGES[n.type].label}
+            </span>
+          )}
+        </div>
         {n.body && (
           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>
         )}
@@ -55,6 +78,7 @@ function Item({ n, onClick }: { n: NotificationRow; onClick: (n: NotificationRow
           {formatDistanceToNow(parseISO(n.created_at), { locale: ptBR, addSuffix: true })}
         </p>
       </div>
+
       {unread && <span className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />}
     </button>
   );
