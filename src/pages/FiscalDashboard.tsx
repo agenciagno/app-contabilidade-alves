@@ -408,6 +408,8 @@ export default function FiscalDashboard() {
             <Button variant="outline" onClick={handleExport}>
               <Download className="h-4 w-4" /> Exportar PDF
             </Button>
+            <GenerateDeadlineAlertsButton />
+
           </div>
         </div>
 
