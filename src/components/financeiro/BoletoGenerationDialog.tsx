@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { Loader2, AlertTriangle, CheckCircle2, XCircle, MinusCircle, Zap } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -14,9 +13,6 @@ import type { PreviewItem, PreviewResponse, GenerateResult } from '@/hooks/useBo
 const fmtBRL = (n: number | null) =>
   n == null ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
-const fmtMonth = (s: string) => {
-  try { return format(parseISO(s), "MMMM 'de' yyyy", { locale: ptBR }); } catch { return s; }
-};
 const fmtDate = (s: string | null) => {
   if (!s) return '—';
   try { return format(parseISO(s), 'dd/MM/yyyy'); } catch { return s; }
@@ -27,7 +23,6 @@ type Step = 'loading' | 'list' | 'running' | 'done';
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  referenceMonth: string;
   fetchPreview: () => Promise<PreviewResponse>;
   generateBoletos: (
     contactIds: string[],
@@ -40,7 +35,7 @@ function isEligible(i: PreviewItem) {
 }
 
 export function BoletoGenerationDialog({
-  open, onOpenChange, referenceMonth, fetchPreview, generateBoletos,
+  open, onOpenChange, fetchPreview, generateBoletos,
 }: Props) {
   const [step, setStep] = useState<Step>('loading');
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -67,7 +62,7 @@ export function BoletoGenerationDialog({
         setError(e?.message || 'Erro ao carregar o preview');
         setStep('list');
       });
-  }, [open, referenceMonth]);
+  }, [open]);
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -108,7 +103,7 @@ export function BoletoGenerationDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />
-            Gerar boletos — {preview ? fmtMonth(preview.reference_month) : fmtMonth(referenceMonth)}
+            Gerar boletos
           </DialogTitle>
           {step === 'list' && preview && (
             <DialogDescription>

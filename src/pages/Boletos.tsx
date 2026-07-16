@@ -84,7 +84,7 @@ function getMonthOptions(): string[] {
 
 export default function Boletos() {
   const monthOptions = useMemo(() => getMonthOptions(), []);
-  const [referenceMonth, setReferenceMonth] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-01'));
+  const [vencimentoMonth, setVencimentoMonth] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-01'));
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDENTE' | 'PAGO' | 'VENCIDO' | 'FILA_IMPRESSAO'>('ALL');
   const [canalFilter, setCanalFilter] = useState<'ALL' | 'whatsapp' | 'email' | 'impresso' | 'whatsapp_email'>('ALL');
   const [page, setPage] = useState(1);
@@ -97,7 +97,7 @@ export default function Boletos() {
   const {
     boletoList, isLoading, markAsPrinted, resendBilling, fetchPreview, generateBoletos,
     listSyncContacts, findOrphanBoletos, downloadBoletoPdf,
-  } = useBoletoControls(referenceMonth);
+  } = useBoletoControls(vencimentoMonth);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -195,9 +195,9 @@ export default function Boletos() {
 
       {/* Filtros */}
       <div className="flex items-center gap-3 px-6 py-4 flex-wrap">
-        <Select value={referenceMonth} onValueChange={(v) => { setReferenceMonth(v); setPage(1); }}>
+        <Select value={vencimentoMonth} onValueChange={(v) => { setVencimentoMonth(v); setPage(1); }}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Mês de referência" />
+            <SelectValue placeholder="Mês de vencimento" />
           </SelectTrigger>
           <SelectContent>
             {monthOptions.map(m => (
@@ -389,7 +389,6 @@ export default function Boletos() {
       <BoletoGenerationDialog
         open={generateOpen}
         onOpenChange={setGenerateOpen}
-        referenceMonth={referenceMonth}
         fetchPreview={fetchPreview}
         generateBoletos={generateBoletos}
       />

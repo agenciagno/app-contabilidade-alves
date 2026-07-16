@@ -10,6 +10,9 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const COMPANY_ID = "5cd08fcd-c095-4f08-b3a8-c02b9bf1034e";
 
+// Histórico anterior a este mês (vencimento) não é exposto nem salvo — decisão de 16/07/2026.
+const HISTORICO_FLOOR = "2026-07-01";
+
 const SICOOB_CLIENT_ID = Deno.env.get("SICOOB_CLIENT_ID")!;
 const SICOOB_CERT = Deno.env.get("SICOOB_CERT")!;
 const SICOOB_KEY = Deno.env.get("SICOOB_KEY")!;
@@ -63,8 +66,8 @@ function computeContactDatas(dataEmissaoISO: string, dueDay: number) {
     desconto2ISO: dateKey(desconto2),
   };
 }
-function seuNumeroFor(referenceMonth: string, document: string | null): string {
-  const [ano, mes] = referenceMonth.split("-");
+function seuNumeroFor(emissaoMonth: string, document: string | null): string {
+  const [ano, mes] = emissaoMonth.split("-");
   const docSuffix = (document || "").replace(/\D/g, "").slice(-4);
   return `${ano}${mes}${docSuffix}`;
 }
@@ -121,12 +124,13 @@ interface SicoobPagadorBoleto {
   qrCode?: string;
 }
 
-// GET /pagadores/{cpf}/boletos — lista todos os boletos já registrados no Sicoob para o pagador,
-// sem filtro de data (reconciliação: achar boletos que existem no Sicoob mas não em boleto_controls).
+// GET /pagadores/{cpf}/boletos — lista os boletos registrados no Sicoob para o pagador com
+// vencimento a partir de HISTORICO_FLOOR (reconciliação: achar boletos que existem no Sicoob mas
+// não em boleto_controls). Não busca histórico anterior — não precisa ser exposto nem salvo.
 async function listarBoletosPorPagador(token: string, cpfCnpj: string) {
   // @ts-ignore unstable API
   const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
-  const url = `https://api.sicoob.com.br/cobranca-bancaria/v3/pagadores/${cpfCnpj}/boletos?numeroCliente=${NUMERO_CLIENTE}`;
+  const url = `https://api.sicoob.com.br/cobranca-bancaria/v3/pagadores/${cpfCnpj}/boletos?numeroCliente=${NUMERO_CLIENTE}&dataInicio=${HISTORICO_FLOOR}`;
   const res = await fetch(url, {
     method: "GET",
     client,
@@ -242,12 +246,11 @@ Deno.serve(async (req) => {
   try {
     const payload = await req.json().catch(() => ({}));
     const action: string = payload.action;
-    const referenceMonth: string = payload.reference_month; // 'YYYY-MM-01'
-    if (!referenceMonth || !/^\d{4}-\d{2}-01$/.test(referenceMonth)) {
-      return json({ error: "reference_month inválido (esperado YYYY-MM-01)" }, 400);
-    }
 
     const dataEmissaoISO = getDataEmissaoISO();
+    // Ciclo de geração = mês real de hoje — não depende de qual mês está selecionado na tela
+    // (que agora filtra por vencimento). Evita duplicar boleto se o filtro da tabela mudar.
+    const emissaoMonth = `${dataEmissaoISO.slice(0, 7)}-01`;
 
     // Contatos elegíveis (boleto ativo)
     const { data: contatos, error: cErr } = await supabase
@@ -258,12 +261,12 @@ Deno.serve(async (req) => {
       .eq("is_active", true);
     if (cErr) throw cErr;
 
-    // Boletos já existentes no mês
+    // Boletos já gerados neste ciclo de emissão (mês real de hoje)
     const { data: existentes, error: eErr } = await supabase
       .from("boleto_controls")
       .select("contact_id")
       .eq("company_id", COMPANY_ID)
-      .eq("reference_month", referenceMonth);
+      .eq("reference_month", emissaoMonth);
     if (eErr) throw eErr;
     const jaGerados = new Set((existentes || []).map((b: any) => b.contact_id));
 
@@ -285,7 +288,6 @@ Deno.serve(async (req) => {
       });
       items.sort((a, b) => (a.name || "").localeCompare(b.name || "", "pt-BR"));
       return json({
-        reference_month: referenceMonth,
         data_emissao: dataEmissaoISO,
         total: items.length,
         elegiveis: items.filter((i) => !i.already_generated && i.missing_fields.length === 0).length,
@@ -327,7 +329,7 @@ Deno.serve(async (req) => {
         try {
           const contactDatas = computeContactDatas(dataEmissaoISO, c.boleto_due_day);
           const datas: ContactDatas = { dataEmissaoISO, ...contactDatas };
-          const seuNumero = seuNumeroFor(referenceMonth, c.document);
+          const seuNumero = seuNumeroFor(emissaoMonth, c.document);
           const resp = await criarBoletoSicoob(token, c, datas, seuNumero);
           if (!resp.ok) {
             results.push({ contact_id: id, name: c.name, status: "error", message: extractSicoobError(resp.data, resp.status) });
@@ -341,7 +343,7 @@ Deno.serve(async (req) => {
           if (pdfB64) {
             try {
               const bytes = Uint8Array.from(atob(pdfB64), (ch) => ch.charCodeAt(0));
-              pdfPath = `${referenceMonth}/${id}.pdf`;
+              pdfPath = `${emissaoMonth}/${id}.pdf`;
               const up = await supabase.storage.from("boletos").upload(pdfPath, bytes, {
                 contentType: "application/pdf",
                 upsert: true,
@@ -358,7 +360,7 @@ Deno.serve(async (req) => {
           const { error: insErr } = await supabase.from("boleto_controls").insert({
             company_id: COMPANY_ID,
             contact_id: id,
-            reference_month: referenceMonth,
+            reference_month: emissaoMonth,
             status: "PENDENTE",
             generated_at: new Date().toISOString(),
             nosso_numero: resultado?.nossoNumero ?? null,
@@ -386,7 +388,7 @@ Deno.serve(async (req) => {
       const ok = results.filter((r) => r.status === "ok").length;
       const errors = results.filter((r) => r.status === "error").length;
       const skipped = results.filter((r) => r.status === "skipped").length;
-      return json({ reference_month: referenceMonth, ok, errors, skipped, results });
+      return json({ ok, errors, skipped, results });
     }
 
     // ---------------- LIST_CONTACTS (para o "Sincronizar com Sicoob" montar os lotes) ----------------
@@ -454,6 +456,8 @@ Deno.serve(async (req) => {
 
             const dataEmissao = b.dataEmissao ? b.dataEmissao.slice(0, 10) : null;
             const dataVencimento = b.dataVencimento ? b.dataVencimento.slice(0, 10) : null;
+            // Defesa extra: mesmo com dataInicio no filtro, não expõe/salva vencimento anterior ao piso.
+            if (!dataVencimento || dataVencimento < HISTORICO_FLOOR) continue;
             const referenceMonthOrfao = dataEmissao
               ? `${dataEmissao.slice(0, 7)}-01`
               : dataVencimento

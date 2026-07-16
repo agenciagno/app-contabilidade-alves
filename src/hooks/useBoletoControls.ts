@@ -42,7 +42,6 @@ export interface PreviewItem {
   missing_fields: string[];
 }
 export interface PreviewResponse {
-  reference_month: string;
   data_emissao: string;
   total: number;
   elegiveis: number;
@@ -94,13 +93,20 @@ const N8N_REENVIO_URL = 'https://n8n.contabilidadealves.com.br/webhook/sicoob-re
 // Geração processada em lotes para não estourar o tempo de execução da edge function.
 const GENERATE_CHUNK_SIZE = 15;
 
-export function useBoletoControls(referenceMonth: string) {
+function addMonthISO(monthStart: string): string {
+  const [ano, mes] = monthStart.split('-').map(Number);
+  const proximo = mes === 12 ? `${ano + 1}-01-01` : `${ano}-${String(mes + 1).padStart(2, '0')}-01`;
+  return proximo;
+}
+
+// vencimentoMonth: 'YYYY-MM-01' — mês de vencimento exibido na tabela (não o mês de emissão/geração).
+export function useBoletoControls(vencimentoMonth: string) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // 1. Busca boleto_controls do mês com join em contacts
+  // 1. Busca boleto_controls com vencimento dentro do mês selecionado, com join em contacts
   const { data: boletoList = [], isLoading, refetch } = useQuery({
-    queryKey: ['boleto-controls-v2', referenceMonth],
+    queryKey: ['boleto-controls-v2', vencimentoMonth],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from('boleto_controls')
@@ -112,7 +118,8 @@ export function useBoletoControls(referenceMonth: string) {
           origem_baixa, sicoob_response, pdf_url,
           contacts:contact_id ( id, name, type, document, email, phone )
         `)
-        .eq('reference_month', referenceMonth)
+        .gte('data_vencimento', vencimentoMonth)
+        .lt('data_vencimento', addMonthISO(vencimentoMonth))
         .order('data_vencimento', { ascending: false, nullsFirst: false });
       if (error) throw error;
       return (data || []).map((bc: any): BoletoWithContact => ({
@@ -137,7 +144,7 @@ export function useBoletoControls(referenceMonth: string) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2', referenceMonth] });
+      queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2', vencimentoMonth] });
       toast({ title: 'Marcado como impresso' });
     },
     onError: (e: Error) => {
@@ -167,10 +174,10 @@ export function useBoletoControls(referenceMonth: string) {
     },
   });
 
-  // 4. Preview: lista quem receberá boleto no mês (sem chamar o Sicoob).
+  // 4. Preview: lista quem receberia boleto se gerado agora (independe do mês em exibição).
   const fetchPreview = async (): Promise<PreviewResponse> => {
     const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
-      body: { action: 'preview', reference_month: referenceMonth },
+      body: { action: 'preview' },
     });
     if (error) throw new Error(error.message || 'Falha ao carregar o preview');
     if ((data as any)?.error) throw new Error((data as any).error);
@@ -186,21 +193,22 @@ export function useBoletoControls(referenceMonth: string) {
     for (let i = 0; i < contactIds.length; i += GENERATE_CHUNK_SIZE) {
       const chunk = contactIds.slice(i, i + GENERATE_CHUNK_SIZE);
       const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
-        body: { action: 'generate', reference_month: referenceMonth, contact_ids: chunk },
+        body: { action: 'generate', contact_ids: chunk },
       });
       if (error) throw new Error(error.message || 'Falha na geração');
       if ((data as any)?.error) throw new Error((data as any).error);
       all.push(...(((data as any)?.results ?? []) as GenerateResult[]));
       onProgress?.(Math.min(i + GENERATE_CHUNK_SIZE, contactIds.length), contactIds.length);
     }
-    queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2', referenceMonth] });
+    // Boletos gerados vencem no mês seguinte à emissão — pode não ser o mês em exibição agora.
+    queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2'] });
     return all;
   };
 
   // 6. Sincronizar com o Sicoob: acha boletos registrados lá mas ausentes da tabela local.
   const listSyncContacts = async (): Promise<SyncContact[]> => {
     const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
-      body: { action: 'list_contacts', reference_month: referenceMonth },
+      body: { action: 'list_contacts' },
     });
     if (error) throw new Error(error.message || 'Falha ao listar contatos');
     if ((data as any)?.error) throw new Error((data as any).error);
@@ -215,7 +223,7 @@ export function useBoletoControls(referenceMonth: string) {
     for (let i = 0; i < contactIds.length; i += GENERATE_CHUNK_SIZE) {
       const chunk = contactIds.slice(i, i + GENERATE_CHUNK_SIZE);
       const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
-        body: { action: 'find_orphans', reference_month: referenceMonth, contact_ids: chunk },
+        body: { action: 'find_orphans', contact_ids: chunk },
       });
       if (error) throw new Error(error.message || 'Falha na sincronização');
       if ((data as any)?.error) throw new Error((data as any).error);
