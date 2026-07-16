@@ -4,7 +4,7 @@ import { format, addMonths, subMonths, startOfMonth, parseISO, isBefore, startOf
 import { ptBR } from 'date-fns/locale';
 import {
   FileText, CheckCircle2, Clock, AlertCircle, Zap, Mail, MessageCircle, Printer,
-  FileX, MoreHorizontal, Eye, Send, CheckSquare, Download, RefreshCw,
+  FileX, MoreHorizontal, Eye, Send, CheckSquare, Download, RefreshCw, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useBoletoControls, type BoletoWithContact } from '@/hooks/useBoletoControls';
 import { BoletoGenerationDialog } from '@/components/financeiro/BoletoGenerationDialog';
-import { BoletoSyncDialog } from '@/components/financeiro/BoletoSyncDialog';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 const fmtBRL = (n: number | null) =>
@@ -90,12 +90,38 @@ export default function Boletos() {
   const [page, setPage] = useState(1);
   const [detailsOf, setDetailsOf] = useState<BoletoWithContact | null>(null);
   const [generateOpen, setGenerateOpen] = useState(false);
-  const [syncOpen, setSyncOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
+  const { toast } = useToast();
 
   const {
     boletoList, isLoading, markAsPrinted, resendBilling, fetchPreview, generateBoletos,
     listSyncContacts, findOrphanBoletos, downloadBoletoPdf,
   } = useBoletoControls(referenceMonth);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncProgress({ done: 0, total: 0 });
+    try {
+      const contacts = await listSyncContacts();
+      setSyncProgress({ done: 0, total: contacts.length });
+      const result = await findOrphanBoletos(
+        contacts.map((c) => c.contact_id),
+        (done, total) => setSyncProgress({ done, total }),
+      );
+      toast({
+        title: result.totalOrfaos > 0
+          ? `${result.totalOrfaos} boleto(s) adicionado(s) à tabela`
+          : 'Tudo em dia — nada de novo no Sicoob',
+        description: `${result.contactsScanned} clientes consultados, ${result.totalEncontrados} boletos encontrados no Sicoob${result.errors > 0 ? `, ${result.errors} com erro` : ''}.`,
+        variant: result.errors > 0 ? 'destructive' : 'default',
+      });
+    } catch (e: any) {
+      toast({ title: 'Erro ao sincronizar', description: e?.message, variant: 'destructive' });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // KPIs (sobre todo o mês, não a página)
   const kpis = useMemo(() => {
@@ -140,10 +166,13 @@ export default function Boletos() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => setSyncOpen(true)}
+            onClick={handleSync}
+            disabled={syncing}
           >
-            <RefreshCw className="w-4 h-4" />
-            Sincronizar com Sicoob
+            {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {syncing
+              ? `Sincronizando… ${syncProgress.done}/${syncProgress.total || '…'}`
+              : 'Sincronizar com Sicoob'}
           </Button>
           <Button
             variant="outline"
@@ -363,14 +392,6 @@ export default function Boletos() {
         referenceMonth={referenceMonth}
         fetchPreview={fetchPreview}
         generateBoletos={generateBoletos}
-      />
-
-      {/* Dialog: sincronizar com o Sicoob (achar boletos órfãos) */}
-      <BoletoSyncDialog
-        open={syncOpen}
-        onOpenChange={setSyncOpen}
-        listSyncContacts={listSyncContacts}
-        findOrphanBoletos={findOrphanBoletos}
       />
     </div>
   );
