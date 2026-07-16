@@ -67,14 +67,42 @@ function addDaysISO(iso: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
+function daysInMonth(ano: number, mes: number): number {
+  // mes 1-12 → dias do mês (dia 0 do mês seguinte = último dia do mês atual)
+  return new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+}
 
-// referenceMonth = 'YYYY-MM-01' → datas do boleto
-function computeDatas(referenceMonth: string) {
-  const [ano, mes] = referenceMonth.split("-").map(Number); // mes 1-12
-  const feriados = buildFeriados(ano);
-  const dataEmissao = ultimoDiaUtil(new Date(Date.UTC(ano, mes - 1, 18)), feriados);
-  const dataVencimento = ultimoDiaUtil(new Date(Date.UTC(ano, mes, 0)), feriados); // último dia do mês de referência
-  return { dataEmissaoISO: dateKey(dataEmissao), dataVencimentoISO: dateKey(dataVencimento) };
+const feriadosCache = new Map<number, Set<string>>();
+function getFeriados(ano: number): Set<string> {
+  if (!feriadosCache.has(ano)) feriadosCache.set(ano, buildFeriados(ano));
+  return feriadosCache.get(ano)!;
+}
+
+// Data de emissão = data real da geração (hoje, fuso Brasil) — não uma data fixa presumida.
+function getDataEmissaoISO(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+// Vencimento = dia configurado no perfil do cliente (boleto_due_day), no mês seguinte ao da emissão.
+// Descontos: 3% até dia 24 do mês de emissão, 2% até o último dia do mês de emissão.
+// Datas ajustadas para o último dia útil anterior quando caem em fim de semana/feriado.
+function computeContactDatas(dataEmissaoISO: string, dueDay: number) {
+  const [anoEmi, mesEmi] = dataEmissaoISO.split("-").map(Number); // mesEmi 1-12
+  const anoVenc = mesEmi === 12 ? anoEmi + 1 : anoEmi;
+  const mesVenc = mesEmi === 12 ? 1 : mesEmi + 1;
+
+  const diaVenc = Math.min(Math.max(1, dueDay), daysInMonth(anoVenc, mesVenc));
+  const vencimento = ultimoDiaUtil(new Date(Date.UTC(anoVenc, mesVenc - 1, diaVenc)), getFeriados(anoVenc));
+
+  const diaDesc1 = Math.min(24, daysInMonth(anoEmi, mesEmi));
+  const desconto1 = ultimoDiaUtil(new Date(Date.UTC(anoEmi, mesEmi - 1, diaDesc1)), getFeriados(anoEmi));
+  const desconto2 = ultimoDiaUtil(new Date(Date.UTC(anoEmi, mesEmi, 0)), getFeriados(anoEmi)); // último dia do mês de emissão
+
+  return {
+    dataVencimentoISO: dateKey(vencimento),
+    desconto1ISO: dateKey(desconto1),
+    desconto2ISO: dateKey(desconto2),
+  };
 }
 function seuNumeroFor(referenceMonth: string, document: string | null): string {
   const [ano, mes] = referenceMonth.split("-");
@@ -86,6 +114,7 @@ const REQUIRED_FIELDS: { key: string; label: string }[] = [
   { key: "name", label: "nome" },
   { key: "document", label: "CPF/CNPJ" },
   { key: "boleto_value", label: "valor" },
+  { key: "boleto_due_day", label: "dia de vencimento" },
   { key: "address", label: "endereço" },
   { key: "address_number", label: "número" },
   { key: "neighborhood", label: "bairro" },
@@ -119,7 +148,14 @@ async function getSicoobToken(): Promise<string> {
   return data.access_token as string;
 }
 
-async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: { dataEmissaoISO: string; dataVencimentoISO: string }, seuNumero: string) {
+interface ContactDatas {
+  dataEmissaoISO: string;
+  dataVencimentoISO: string;
+  desconto1ISO: string;
+  desconto2ISO: string;
+}
+
+async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: ContactDatas, seuNumero: string) {
   // @ts-ignore unstable API
   const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
   const payload = {
@@ -135,7 +171,13 @@ async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: {
     dataLimitePagamento: addDaysISO(datas.dataVencimentoISO, 30),
     valor: Number(c.boleto_value),
     valorAbatimento: 0,
-    tipoDesconto: 0,
+    // Desconto: 2 = percentual até a data informada (Sicoob v3). 3% até dia 24 do mês de
+    // emissão, 2% até o último dia do mês de emissão.
+    tipoDesconto: 2,
+    dataPrimeiroDesconto: datas.desconto1ISO,
+    valorPrimeiroDesconto: 3,
+    dataSegundoDesconto: datas.desconto2ISO,
+    valorSegundoDesconto: 2,
     tipoMulta: 0,
     tipoJurosMora: 0,
     numeroParcela: 1,
@@ -196,7 +238,7 @@ Deno.serve(async (req) => {
       return json({ error: "reference_month inválido (esperado YYYY-MM-01)" }, 400);
     }
 
-    const datas = computeDatas(referenceMonth);
+    const dataEmissaoISO = getDataEmissaoISO();
 
     // Contatos elegíveis (boleto ativo)
     const { data: contatos, error: cErr } = await supabase
@@ -218,21 +260,24 @@ Deno.serve(async (req) => {
 
     // ---------------- PREVIEW ----------------
     if (action === "preview") {
-      const items = (contatos || []).map((c: any) => ({
-        contact_id: c.id,
-        name: c.name,
-        document: c.document,
-        valor: c.boleto_value != null ? Number(c.boleto_value) : null,
-        canal_entrega: c.canal_entrega,
-        data_vencimento: datas.dataVencimentoISO,
-        already_generated: jaGerados.has(c.id),
-        missing_fields: missingFields(c),
-      }));
+      const items = (contatos || []).map((c: any) => {
+        const faltando = missingFields(c);
+        const contactDatas = faltando.length === 0 ? computeContactDatas(dataEmissaoISO, c.boleto_due_day) : null;
+        return {
+          contact_id: c.id,
+          name: c.name,
+          document: c.document,
+          valor: c.boleto_value != null ? Number(c.boleto_value) : null,
+          canal_entrega: c.canal_entrega,
+          data_vencimento: contactDatas?.dataVencimentoISO ?? null,
+          already_generated: jaGerados.has(c.id),
+          missing_fields: faltando,
+        };
+      });
       items.sort((a, b) => (a.name || "").localeCompare(b.name || "", "pt-BR"));
       return json({
         reference_month: referenceMonth,
-        data_emissao: datas.dataEmissaoISO,
-        data_vencimento: datas.dataVencimentoISO,
+        data_emissao: dataEmissaoISO,
         total: items.length,
         elegiveis: items.filter((i) => !i.already_generated && i.missing_fields.length === 0).length,
         items,
@@ -271,6 +316,8 @@ Deno.serve(async (req) => {
         }
 
         try {
+          const contactDatas = computeContactDatas(dataEmissaoISO, c.boleto_due_day);
+          const datas: ContactDatas = { dataEmissaoISO, ...contactDatas };
           const seuNumero = seuNumeroFor(referenceMonth, c.document);
           const resp = await criarBoletoSicoob(token, c, datas, seuNumero);
           if (!resp.ok) {
@@ -310,7 +357,7 @@ Deno.serve(async (req) => {
             codigo_barras: resultado?.codigoBarras ?? null,
             url_qrcode: resultado?.qrCode ?? null,
             valor: Number(c.boleto_value),
-            data_vencimento: datas.dataVencimentoISO,
+            data_vencimento: contactDatas.dataVencimentoISO,
             seu_numero: seuNumero,
             canal_entrega: c.canal_entrega,
             sicoob_response: resultadoSemPdf,

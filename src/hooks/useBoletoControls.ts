@@ -37,14 +37,13 @@ export interface PreviewItem {
   document: string | null;
   valor: number | null;
   canal_entrega: CanalEntrega;
-  data_vencimento: string;
+  data_vencimento: string | null;
   already_generated: boolean;
   missing_fields: string[];
 }
 export interface PreviewResponse {
   reference_month: string;
   data_emissao: string;
-  data_vencimento: string;
   total: number;
   elegiveis: number;
   items: PreviewItem[];

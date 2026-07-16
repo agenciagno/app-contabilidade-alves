@@ -17,7 +17,8 @@ const fmtBRL = (n: number | null) =>
 const fmtMonth = (s: string) => {
   try { return format(parseISO(s), "MMMM 'de' yyyy", { locale: ptBR }); } catch { return s; }
 };
-const fmtDate = (s: string) => {
+const fmtDate = (s: string | null) => {
+  if (!s) return '—';
   try { return format(parseISO(s), 'dd/MM/yyyy'); } catch { return s; }
 };
 
@@ -111,7 +112,8 @@ export function BoletoGenerationDialog({
           </DialogTitle>
           {step === 'list' && preview && (
             <DialogDescription>
-              Vencimento {fmtDate(preview.data_vencimento)}. Revise a lista e desmarque quem não deve receber boleto.
+              Emissão {fmtDate(preview.data_emissao)}. Vencimento conforme o dia configurado no perfil de cada
+              cliente. Revise a lista e desmarque quem não deve receber boleto.
             </DialogDescription>
           )}
         </DialogHeader>
@@ -162,7 +164,7 @@ export function BoletoGenerationDialog({
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate">{i.name}</div>
                           <div className="text-xs text-muted-foreground">
-                            {fmtBRL(i.valor)} · {i.canal_entrega ?? 'sem canal'}
+                            {fmtBRL(i.valor)} · vence {fmtDate(i.data_vencimento)} · {i.canal_entrega ?? 'sem canal'}
                           </div>
                         </div>
                         {i.already_generated && (
