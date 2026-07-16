@@ -119,11 +119,14 @@ async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: C
   const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
   const payload = {
     numeroCliente: NUMERO_CLIENTE,
-    codigoModalidade: 1,
+    codigoModalidade: 1, // 1 = SIMPLES COM REGISTRO
     numeroContaCorrente: NUMERO_CONTA,
-    codigoEspecieDocumento: "DM",
-    identificacaoEmissaoBoleto: 1,
-    identificacaoDistribuicaoBoleto: 1,
+    codigoEspecieDocumento: "FAT", // Fatura — igual ao boleto de referência já emitido
+    // Cliente Emite/Distribui (2): geramos e enviamos o PDF nós mesmos (WhatsApp/e-mail),
+    // não pelo processo físico do banco. Com "Banco Emite/Distribui" (1) o boleto fica
+    // preso na fila de impressão/distribuição do Sicoob à espera de um formulário físico.
+    identificacaoEmissaoBoleto: 2,
+    identificacaoDistribuicaoBoleto: 2,
     seuNumero,
     dataEmissao: datas.dataEmissaoISO,
     dataVencimento: datas.dataVencimentoISO,
@@ -137,8 +140,13 @@ async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: C
     valorPrimeiroDesconto: 3,
     dataSegundoDesconto: datas.desconto2ISO,
     valorSegundoDesconto: 2,
-    tipoMulta: 0,
-    tipoJurosMora: 0,
+    // Multa 2% e juros de mora 0,07%/dia a partir do dia seguinte ao vencimento.
+    tipoMulta: 2,
+    dataMulta: addDaysISO(datas.dataVencimentoISO, 1),
+    valorMulta: 2,
+    tipoJurosMora: 1,
+    dataJurosMora: addDaysISO(datas.dataVencimentoISO, 1),
+    valorJurosMora: 0.07,
     numeroParcela: 1,
     aceite: false,
     gerarPdf: true,
