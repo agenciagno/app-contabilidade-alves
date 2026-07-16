@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { FiscalTask } from '@/hooks/useFiscalTasks';
+import { TaskCompletionDialog } from './TaskCompletionDialog';
 
 interface GroupedTaskCardProps {
   groupId: string;
@@ -18,6 +19,7 @@ interface GroupedTaskCardProps {
   responsibleInitials: string;
   responsibleName: string;
   onUploadAttachment: (task: FiscalTask, file: File) => Promise<void>;
+  onCompleteTask?: (task: FiscalTask, data: { protocolNumber: string | null; completionNotes: string | null }) => void;
   dragProps?: Record<string, any>;
   onCardClick?: () => void;
 }
@@ -45,11 +47,13 @@ export function GroupedTaskCard({
   tasks,
   responsibleInitials,
   onUploadAttachment,
+  onCompleteTask,
   dragProps,
   onCardClick,
 }: GroupedTaskCardProps) {
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [completingTask, setCompletingTask] = useState<FiscalTask | null>(null);
 
   const isTaskDone = (t: FiscalTask) => t.status === 'concluido' || !!t.attachment_url;
   const isTaskOverdue = (t: FiscalTask) => {
@@ -86,6 +90,7 @@ export function GroupedTaskCard({
   };
 
   return (
+    <>
     <Card
       className={cn(
         'bg-card relative cursor-grab active:cursor-grabbing',
@@ -149,7 +154,8 @@ export function GroupedTaskCard({
               >
                 <Checkbox
                   checked={done}
-                  disabled
+                  disabled={done}
+                  onCheckedChange={() => { if (!done) setCompletingTask(task); }}
                   className="h-3.5 w-3.5 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
                 />
                 <span className={cn('flex-1 truncate', done && 'line-through text-muted-foreground')}>
@@ -210,5 +216,14 @@ export function GroupedTaskCard({
         </ul>
       </CardContent>
     </Card>
+    <TaskCompletionDialog
+      open={!!completingTask}
+      onOpenChange={(o) => { if (!o) setCompletingTask(null); }}
+      onConfirm={(data) => {
+        if (completingTask) onCompleteTask?.(completingTask, data);
+        setCompletingTask(null);
+      }}
+    />
+    </>
   );
 }

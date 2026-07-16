@@ -9,15 +9,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { TaskCompletionDialog } from './TaskCompletionDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -239,10 +232,8 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // Completion flow (single confirm dialog)
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [protocolNumber, setProtocolNumber] = useState('');
-  const [completionNotesInput, setCompletionNotesInput] = useState('');
+  // Completion flow (shared confirm dialog; target = task being completed)
+  const [completionTarget, setCompletionTarget] = useState<{ task: FiscalTask; closeOnConfirm: boolean } | null>(null);
 
   // @ mentions state for the new note
   const newNoteRef = useRef<HTMLTextAreaElement | null>(null);
@@ -260,9 +251,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
       setNotesRaw(task.notes ?? null);
       setNewNote('');
       setAttachmentUrl(task.attachment_url);
-      setConfirmOpen(false);
-      setProtocolNumber('');
-      setCompletionNotesInput('');
+      setCompletionTarget(null);
       setPendingMentions([]);
       setMentionQuery(null);
     }
@@ -323,7 +312,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     if (!canEdit) return;
     if (status === 'concluido' && !attachmentUrl && task.status !== 'concluido') {
       // Open confirm dialog to capture protocol/notes
-      setConfirmOpen(true);
+      setCompletionTarget({ task, closeOnConfirm: true });
       return;
     }
     onUpdate(task.id, {
@@ -406,41 +395,34 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     }
   };
 
-  const handleOpenCompletion = () => {
-    if (attachmentUrl) {
-      onUpdate(task.id, {
+  // t: task being completed (main task, or a single item from the group checklist)
+  // closeOnConfirm: whether to close the whole sheet once completion is confirmed
+  const handleOpenCompletion = (t: FiscalTask = task, closeOnConfirm = true) => {
+    if (t.attachment_url) {
+      onUpdate(t.id, {
         status: 'concluido',
         completion_type: 'attachment',
         completed_at: new Date().toISOString(),
       } as any);
-      onOpenChange(false);
+      if (closeOnConfirm) onOpenChange(false);
       return;
     }
-    setProtocolNumber('');
-    setCompletionNotesInput('');
-    setConfirmOpen(true);
+    setCompletionTarget({ task: t, closeOnConfirm });
   };
 
-  const handleConfirmCompletion = () => {
-    const proto = protocolNumber.trim();
-    const obs = completionNotesInput.trim();
-    if (!proto && obs.length < 10) {
-      toast({
-        title: 'Informe um protocolo ou uma observação com pelo menos 10 caracteres',
-        variant: 'destructive',
-      });
-      return;
-    }
-    const completion_type = proto ? 'protocol' : 'transmitted';
-    onUpdate(task.id, {
+  const handleConfirmCompletion = (data: { protocolNumber: string | null; completionNotes: string | null }) => {
+    if (!completionTarget) return;
+    const { task: t, closeOnConfirm } = completionTarget;
+    const completion_type = data.protocolNumber ? 'protocol' : 'transmitted';
+    onUpdate(t.id, {
       status: 'concluido',
       completion_type,
-      protocol_number: proto || null,
-      completion_notes: obs || null,
+      protocol_number: data.protocolNumber,
+      completion_notes: data.completionNotes,
       completed_at: new Date().toISOString(),
     } as any);
-    setConfirmOpen(false);
-    onOpenChange(false);
+    setCompletionTarget(null);
+    if (closeOnConfirm) onOpenChange(false);
   };
 
 
@@ -618,6 +600,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                     key={gt.id}
                     task={gt}
                     onUpload={onUploadForTask}
+                    onComplete={(t) => handleOpenCompletion(t, false)}
                   />
                 ))}
               </div>
@@ -625,10 +608,15 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
               <div className="rounded-md border border-border/50 p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    {attachmentUrl ? (
+                    {status === 'concluido' || attachmentUrl ? (
                       <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
                     ) : (
-                      <div className="w-4 h-4 rounded-sm border border-muted-foreground/40 shrink-0" />
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCompletion(task, false)}
+                        aria-label="Marcar como concluída"
+                        className="w-4 h-4 rounded-sm border border-muted-foreground/40 shrink-0 hover:border-primary hover:bg-primary/10 transition-colors"
+                      />
                     )}
                     <span className="text-sm truncate">{title}</span>
                   </div>
@@ -835,7 +823,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
             </div>
             <div className="flex gap-2">
               {task.status !== 'concluido' && (
-                <Button size="sm" variant="outline" onClick={handleOpenCompletion} className="gap-1.5">
+                <Button size="sm" variant="outline" onClick={() => handleOpenCompletion()} className="gap-1.5">
                   <CheckCircle className="w-4 h-4" />
                   Concluir Tarefa
                 </Button>
@@ -849,47 +837,11 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
       </SheetContent>
 
       {/* Dialog de confirmação de conclusão sem anexo */}
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Concluir tarefa</DialogTitle>
-            <DialogDescription>
-              Como esta tarefa não tem anexo, informe o <strong>número de protocolo</strong> e/ou
-              uma <strong>observação</strong> (mínimo 10 caracteres) para justificar a conclusão.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div>
-              <Label className="text-xs">Número do protocolo (opcional)</Label>
-              <Input
-                value={protocolNumber}
-                onChange={(e) => setProtocolNumber(e.target.value)}
-                placeholder="Ex: 2.06.000.123456-7"
-                maxLength={100}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Observação (opcional)</Label>
-              <Textarea
-                value={completionNotesInput}
-                onChange={(e) => setCompletionNotesInput(e.target.value)}
-                rows={3}
-                placeholder="Descreva como/onde a obrigação foi cumprida..."
-                maxLength={1000}
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Se não houver protocolo, a observação precisa ter pelo menos 10 caracteres.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
-            <Button onClick={handleConfirmCompletion} className="gap-1.5">
-              <CheckCircle className="w-4 h-4" /> Concluir
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TaskCompletionDialog
+        open={!!completionTarget}
+        onOpenChange={(o) => { if (!o) setCompletionTarget(null); }}
+        onConfirm={handleConfirmCompletion}
+      />
     </Sheet>
   );
 }
@@ -897,9 +849,11 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
 function ChecklistRow({
   task,
   onUpload,
+  onComplete,
 }: {
   task: FiscalTask;
   onUpload?: (task: FiscalTask, file: File) => Promise<void>;
+  onComplete?: (task: FiscalTask) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const done = task.status === 'concluido' || !!task.attachment_url;
@@ -923,7 +877,12 @@ function ChecklistRow({
         {done ? (
           <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
         ) : (
-          <div className="w-4 h-4 rounded-sm border border-muted-foreground/40 shrink-0" />
+          <button
+            type="button"
+            onClick={() => onComplete?.(task)}
+            aria-label="Marcar como concluída"
+            className="w-4 h-4 rounded-sm border border-muted-foreground/40 shrink-0 hover:border-primary hover:bg-primary/10 transition-colors"
+          />
         )}
         <span className={`text-sm truncate ${done ? 'line-through text-muted-foreground' : ''}`}>
           {task.title}

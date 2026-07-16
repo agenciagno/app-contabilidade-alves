@@ -374,6 +374,19 @@ export default function FiscalTasks() {
   };
 
 
+  const handleCompleteTask = (task: FiscalTask, data: { protocolNumber: string | null; completionNotes: string | null }) => {
+    if (guardLocked(task.id)) return;
+    const completion_type = data.protocolNumber ? 'protocol' : 'transmitted';
+    updateTask.mutate({
+      id: task.id,
+      status: 'concluido',
+      completion_type,
+      protocol_number: data.protocolNumber,
+      completion_notes: data.completionNotes,
+      completed_at: new Date().toISOString(),
+    } as any);
+  };
+
   const handleTaskClick = (task: FiscalTask) => {
     setSelectedTask(task);
     setSelectedGroupTasks(null);
@@ -835,6 +848,7 @@ export default function FiscalTasks() {
           onEdit={handleTaskClick}
           onDelete={canDelete ? (id) => { if (!guardLocked(id)) deleteTask.mutate(id); } : undefined}
           onUploadAttachment={handleUploadAttachment}
+          onCompleteTask={handleCompleteTask}
           onGroupClick={handleGroupClick}
           profileOptions={!isColaborador ? profileOptions : undefined}
           onReassign={!isColaborador ? handleInlineReassign : undefined}
