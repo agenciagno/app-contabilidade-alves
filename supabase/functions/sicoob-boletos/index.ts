@@ -23,44 +23,10 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-// ---------- Datas / feriados (replica a lógica do fluxo N8N) ----------
-function calcularPascoa(year: number): Date {
-  const a = year % 19, b = Math.floor(year / 100), c = year % 100;
-  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4), k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31) - 1;
-  const day = ((h + l - 7 * m + 114) % 31) + 1;
-  return new Date(Date.UTC(year, month, day));
-}
+// ---------- Datas ----------
+// Sem ajuste de dia útil: o Sicoob já trata fim de semana/feriado na hora do pagamento.
 function dateKey(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-}
-function buildFeriados(year: number): Set<string> {
-  const feriados = new Set<string>([
-    `${year}-01-01`, `${year}-04-21`, `${year}-05-01`,
-    `${year}-09-07`, `${year}-10-12`, `${year}-11-02`,
-    `${year}-11-15`, `${year}-12-25`,
-  ]);
-  const pascoa = calcularPascoa(year);
-  [-48, -47, -2, 0, 60].forEach((offset) => {
-    const d = new Date(pascoa);
-    d.setUTCDate(d.getUTCDate() + offset);
-    feriados.add(dateKey(d));
-  });
-  return feriados;
-}
-function isWeekend(d: Date): boolean {
-  const day = d.getUTCDay();
-  return day === 0 || day === 6;
-}
-function ultimoDiaUtil(date: Date, feriados: Set<string>): Date {
-  const d = new Date(date);
-  while (isWeekend(d) || feriados.has(dateKey(d))) d.setUTCDate(d.getUTCDate() - 1);
-  return d;
 }
 function addDaysISO(iso: string, days: number): string {
   const d = new Date(iso + "T00:00:00Z");
@@ -72,12 +38,6 @@ function daysInMonth(ano: number, mes: number): number {
   return new Date(Date.UTC(ano, mes, 0)).getUTCDate();
 }
 
-const feriadosCache = new Map<number, Set<string>>();
-function getFeriados(ano: number): Set<string> {
-  if (!feriadosCache.has(ano)) feriadosCache.set(ano, buildFeriados(ano));
-  return feriadosCache.get(ano)!;
-}
-
 // Data de emissão = data real da geração (hoje, fuso Brasil) — não uma data fixa presumida.
 function getDataEmissaoISO(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -85,18 +45,17 @@ function getDataEmissaoISO(): string {
 
 // Vencimento = dia configurado no perfil do cliente (boleto_due_day), no mês seguinte ao da emissão.
 // Descontos: 3% até dia 24 do mês de emissão, 2% até o último dia do mês de emissão.
-// Datas ajustadas para o último dia útil anterior quando caem em fim de semana/feriado.
 function computeContactDatas(dataEmissaoISO: string, dueDay: number) {
   const [anoEmi, mesEmi] = dataEmissaoISO.split("-").map(Number); // mesEmi 1-12
   const anoVenc = mesEmi === 12 ? anoEmi + 1 : anoEmi;
   const mesVenc = mesEmi === 12 ? 1 : mesEmi + 1;
 
   const diaVenc = Math.min(Math.max(1, dueDay), daysInMonth(anoVenc, mesVenc));
-  const vencimento = ultimoDiaUtil(new Date(Date.UTC(anoVenc, mesVenc - 1, diaVenc)), getFeriados(anoVenc));
+  const vencimento = new Date(Date.UTC(anoVenc, mesVenc - 1, diaVenc));
 
   const diaDesc1 = Math.min(24, daysInMonth(anoEmi, mesEmi));
-  const desconto1 = ultimoDiaUtil(new Date(Date.UTC(anoEmi, mesEmi - 1, diaDesc1)), getFeriados(anoEmi));
-  const desconto2 = ultimoDiaUtil(new Date(Date.UTC(anoEmi, mesEmi, 0)), getFeriados(anoEmi)); // último dia do mês de emissão
+  const desconto1 = new Date(Date.UTC(anoEmi, mesEmi - 1, diaDesc1));
+  const desconto2 = new Date(Date.UTC(anoEmi, mesEmi, 0)); // último dia do mês de emissão
 
   return {
     dataVencimentoISO: dateKey(vencimento),
