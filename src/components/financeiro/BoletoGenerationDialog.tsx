@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import type { PreviewItem, PreviewResponse, GenerateResult } from '@/hooks/useBoletoControls';
 
 const fmtBRL = (n: number | null) =>
@@ -146,7 +145,7 @@ export function BoletoGenerationDialog({
                 </span>
               </div>
 
-              <ScrollArea className="flex-1 border rounded-md min-h-[240px] max-h-[46vh]">
+              <div className="border rounded-md overflow-y-auto min-h-[200px] max-h-[50vh]">
                 <div className="divide-y">
                   {preview.items.map((i) => {
                     const eligible = isEligible(i);
@@ -178,7 +177,7 @@ export function BoletoGenerationDialog({
                     );
                   })}
                 </div>
-              </ScrollArea>
+              </div>
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
@@ -222,7 +221,7 @@ export function BoletoGenerationDialog({
                   <Stat icon={<MinusCircle className="h-5 w-5 text-muted-foreground" />} label="Ignorados" value={skipCount} />
                 </div>
                 {problems.length > 0 && (
-                  <ScrollArea className="border rounded-md max-h-[38vh]">
+                  <div className="border rounded-md overflow-y-auto max-h-[38vh]">
                     <div className="divide-y">
                       {problems.map((r) => (
                         <div key={r.contact_id} className="flex items-start gap-3 px-3 py-2 text-sm">
@@ -236,7 +235,7 @@ export function BoletoGenerationDialog({
                         </div>
                       ))}
                     </div>
-                  </ScrollArea>
+                  </div>
                 )}
               </>
             )}
