@@ -16,7 +16,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowDown, ArrowUp, Clock } from 'lucide-react';
+import { ArrowDownAZ, ArrowDownZA, Clock } from 'lucide-react';
 import { differenceInDays, parseISO } from 'date-fns';
 import { FiscalTask } from '@/hooks/useFiscalTasks';
 import { TaskCard } from './TaskCard';
@@ -105,11 +105,11 @@ function DroppableColumn({
         <button
           type="button"
           onClick={onToggleSort}
-          title={sortDir === 'desc' ? 'Mais recente primeiro' : 'Mais antigo primeiro'}
+          title={sortDir === 'desc' ? 'Ordem alfabética: Z → A' : 'Ordem alfabética: A → Z'}
           className="ml-auto h-6 w-6 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
-          aria-label="Alternar ordenação"
+          aria-label="Alternar ordenação alfabética"
         >
-          {sortDir === 'desc' ? <ArrowDown className="w-3.5 h-3.5" /> : <ArrowUp className="w-3.5 h-3.5" />}
+          {sortDir === 'desc' ? <ArrowDownZA className="w-3.5 h-3.5" /> : <ArrowDownAZ className="w-3.5 h-3.5" />}
         </button>
       </div>
       <div
@@ -257,7 +257,9 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
     }
 
 
-    // Distribute into columns: overdue first (always), then by effective due date
+    // Distribute into columns: overdue first (always), then by client name (A-Z / Z-A)
+    const nameOf = (it: KanbanItem) =>
+      contactsMap[it.type === 'single' ? it.task.contact_id : it.contactId] || '';
     return COLUMNS.reduce((acc, col) => {
       const dir = columnSort[col.id];
       const list = items
@@ -266,13 +268,13 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
           const aOver = a.type === 'single' ? isOverdueTask(a.task) : a.tasks.some(isOverdueTask);
           const bOver = b.type === 'single' ? isOverdueTask(b.task) : b.tasks.some(isOverdueTask);
           if (aOver !== bOver) return aOver ? -1 : 1;
-          const cmp = a.dueDate.localeCompare(b.dueDate);
+          const cmp = nameOf(a).localeCompare(nameOf(b), 'pt-BR', { sensitivity: 'base' });
           return dir === 'asc' ? cmp : -cmp;
         });
       acc[col.id] = list;
       return acc;
     }, {} as Record<string, KanbanItem[]>);
-  }, [tasks, columnSort, today]);
+  }, [tasks, columnSort, today, contactsMap]);
 
   const activeItem = useMemo(() => {
     if (!activeId) return null;
