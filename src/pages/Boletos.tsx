@@ -4,7 +4,7 @@ import { format, addMonths, subMonths, startOfMonth, parseISO, isBefore, startOf
 import { ptBR } from 'date-fns/locale';
 import {
   FileText, CheckCircle2, Clock, AlertCircle, Zap, Mail, MessageCircle, Printer,
-  FileX, MoreHorizontal, Loader2, Eye, Send, CheckSquare,
+  FileX, MoreHorizontal, Eye, Send, CheckSquare, Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,12 +17,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useBoletoControls, type BoletoWithContact } from '@/hooks/useBoletoControls';
+import { BoletoGenerationDialog } from '@/components/financeiro/BoletoGenerationDialog';
 import { cn } from '@/lib/utils';
 
 const fmtBRL = (n: number | null) =>
@@ -87,9 +88,9 @@ export default function Boletos() {
   const [canalFilter, setCanalFilter] = useState<'ALL' | 'whatsapp' | 'email' | 'impresso' | 'whatsapp_email'>('ALL');
   const [page, setPage] = useState(1);
   const [detailsOf, setDetailsOf] = useState<BoletoWithContact | null>(null);
-  const [confirmGenerate, setConfirmGenerate] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
 
-  const { boletoList, isLoading, markAsPrinted, resendBilling, triggerGeneration } = useBoletoControls(referenceMonth);
+  const { boletoList, isLoading, markAsPrinted, resendBilling, fetchPreview, generateBoletos, downloadBoletoPdf } = useBoletoControls(referenceMonth);
 
   // KPIs (sobre todo o mês, não a página)
   const kpis = useMemo(() => {
@@ -133,7 +134,7 @@ export default function Boletos() {
         <Button
           variant="outline"
           className="gap-2"
-          onClick={() => setConfirmGenerate(true)}
+          onClick={() => setGenerateOpen(true)}
         >
           <Zap className="w-4 h-4" />
           Gerar boletos do mês
@@ -254,6 +255,11 @@ export default function Boletos() {
                               <DropdownMenuItem onClick={() => setDetailsOf(b)}>
                                 <Eye className="h-4 w-4 mr-2" /> Ver detalhes
                               </DropdownMenuItem>
+                              {b.pdf_url && (
+                                <DropdownMenuItem onClick={() => downloadBoletoPdf(b)}>
+                                  <Download className="h-4 w-4 mr-2" /> Baixar PDF
+                                </DropdownMenuItem>
+                              )}
                               {canResend && (
                                 <DropdownMenuItem
                                   onClick={() => resendBilling.mutate(b)}
@@ -335,34 +341,14 @@ export default function Boletos() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: confirmação de geração */}
-      <Dialog open={confirmGenerate} onOpenChange={setConfirmGenerate}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Gerar boletos agora?</DialogTitle>
-            <DialogDescription>
-              Isso vai gerar boletos para todos os clientes elegíveis com vencimento no próximo mês.
-              Use apenas se necessário fora do ciclo automático.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmGenerate(false)} disabled={triggerGeneration.isPending}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={async () => {
-                await triggerGeneration.mutateAsync();
-                setConfirmGenerate(false);
-              }}
-              disabled={triggerGeneration.isPending}
-              className="gap-2"
-            >
-              {triggerGeneration.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              Confirmar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Dialog: geração de boletos (preview → seleção → progresso → resultado) */}
+      <BoletoGenerationDialog
+        open={generateOpen}
+        onOpenChange={setGenerateOpen}
+        referenceMonth={referenceMonth}
+        fetchPreview={fetchPreview}
+        generateBoletos={generateBoletos}
+      />
     </div>
   );
 }

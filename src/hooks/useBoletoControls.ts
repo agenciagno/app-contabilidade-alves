@@ -27,6 +27,36 @@ export interface BoletoControl {
   url_qrcode: string | null;
   origem_baixa: string | null;
   sicoob_response: any;
+  pdf_url: string | null;
+}
+
+// Preview de geração (retorno da edge function sicoob-boletos, action=preview)
+export interface PreviewItem {
+  contact_id: string;
+  name: string;
+  document: string | null;
+  valor: number | null;
+  canal_entrega: CanalEntrega;
+  data_vencimento: string;
+  already_generated: boolean;
+  missing_fields: string[];
+}
+export interface PreviewResponse {
+  reference_month: string;
+  data_emissao: string;
+  data_vencimento: string;
+  total: number;
+  elegiveis: number;
+  items: PreviewItem[];
+}
+
+// Resultado por item (action=generate)
+export interface GenerateResult {
+  contact_id: string;
+  name: string | null;
+  status: 'ok' | 'error' | 'skipped';
+  message?: string;
+  pdf?: boolean;
 }
 
 export interface BoletoWithContact extends BoletoControl {
@@ -38,7 +68,9 @@ export interface BoletoWithContact extends BoletoControl {
 }
 
 const N8N_REENVIO_URL = 'https://n8n.contabilidadealves.com.br/webhook/sicoob-reenvio';
-const N8N_GERAR_URL = 'https://n8n.contabilidadealves.com.br/webhook/sicoob-gerar-boletos';
+
+// Geração processada em lotes para não estourar o tempo de execução da edge function.
+const GENERATE_CHUNK_SIZE = 15;
 
 export function useBoletoControls(referenceMonth: string) {
   const { toast } = useToast();
@@ -55,7 +87,7 @@ export function useBoletoControls(referenceMonth: string) {
           created_at, updated_at,
           valor, valor_pago, data_vencimento, data_pagamento, canal_entrega,
           nosso_numero, seu_numero, linha_digitavel, codigo_barras, url_qrcode,
-          origem_baixa, sicoob_response,
+          origem_baixa, sicoob_response, pdf_url,
           contacts:contact_id ( id, name, type, document, email, phone )
         `)
         .eq('reference_month', referenceMonth)
@@ -113,26 +145,49 @@ export function useBoletoControls(referenceMonth: string) {
     },
   });
 
-  // 4. Disparo manual de geração via N8N
-  const triggerGeneration = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(N8N_GERAR_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          triggered_by: 'manual',
-          timestamp: new Date().toISOString(),
-        }),
+  // 4. Preview: lista quem receberá boleto no mês (sem chamar o Sicoob).
+  const fetchPreview = async (): Promise<PreviewResponse> => {
+    const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
+      body: { action: 'preview', reference_month: referenceMonth },
+    });
+    if (error) throw new Error(error.message || 'Falha ao carregar o preview');
+    if ((data as any)?.error) throw new Error((data as any).error);
+    return data as PreviewResponse;
+  };
+
+  // 5. Geração: processa os contact_ids selecionados em lotes, agregando resultados.
+  const generateBoletos = async (
+    contactIds: string[],
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<GenerateResult[]> => {
+    const all: GenerateResult[] = [];
+    for (let i = 0; i < contactIds.length; i += GENERATE_CHUNK_SIZE) {
+      const chunk = contactIds.slice(i, i + GENERATE_CHUNK_SIZE);
+      const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
+        body: { action: 'generate', reference_month: referenceMonth, contact_ids: chunk },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    },
-    onSuccess: () => {
-      toast({ title: 'Solicitação enviada — os boletos serão gerados em instantes' });
-    },
-    onError: () => {
-      toast({ title: 'Erro ao acionar geração. Verifique o N8N.', variant: 'destructive' });
-    },
-  });
+      if (error) throw new Error(error.message || 'Falha na geração');
+      if ((data as any)?.error) throw new Error((data as any).error);
+      all.push(...(((data as any)?.results ?? []) as GenerateResult[]));
+      onProgress?.(Math.min(i + GENERATE_CHUNK_SIZE, contactIds.length), contactIds.length);
+    }
+    queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2', referenceMonth] });
+    return all;
+  };
+
+  // 6. Baixar o PDF do boleto (signed URL do bucket privado).
+  const downloadBoletoPdf = async (boleto: BoletoWithContact) => {
+    if (!boleto.pdf_url) {
+      toast({ title: 'PDF indisponível', description: 'Este boleto não tem PDF salvo.', variant: 'destructive' });
+      return;
+    }
+    const { data, error } = await supabase.storage.from('boletos').createSignedUrl(boleto.pdf_url, 60);
+    if (error || !data?.signedUrl) {
+      toast({ title: 'Erro ao gerar link do PDF', description: error?.message, variant: 'destructive' });
+      return;
+    }
+    window.open(data.signedUrl, '_blank', 'noopener');
+  };
 
   return {
     boletoList,
@@ -140,6 +195,8 @@ export function useBoletoControls(referenceMonth: string) {
     refetch,
     markAsPrinted,
     resendBilling,
-    triggerGeneration,
+    fetchPreview,
+    generateBoletos,
+    downloadBoletoPdf,
   };
 }
