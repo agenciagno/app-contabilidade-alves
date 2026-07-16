@@ -4,7 +4,7 @@ import { format, addMonths, subMonths, startOfMonth, parseISO, isBefore, startOf
 import { ptBR } from 'date-fns/locale';
 import {
   FileText, CheckCircle2, Clock, AlertCircle, Zap, Mail, MessageCircle, Printer,
-  FileX, MoreHorizontal, Eye, Send, CheckSquare, Download,
+  FileX, MoreHorizontal, Eye, Send, CheckSquare, Download, RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useBoletoControls, type BoletoWithContact } from '@/hooks/useBoletoControls';
 import { BoletoGenerationDialog } from '@/components/financeiro/BoletoGenerationDialog';
+import { BoletoSyncDialog } from '@/components/financeiro/BoletoSyncDialog';
 import { cn } from '@/lib/utils';
 
 const fmtBRL = (n: number | null) =>
@@ -89,8 +90,12 @@ export default function Boletos() {
   const [page, setPage] = useState(1);
   const [detailsOf, setDetailsOf] = useState<BoletoWithContact | null>(null);
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
 
-  const { boletoList, isLoading, markAsPrinted, resendBilling, fetchPreview, generateBoletos, downloadBoletoPdf } = useBoletoControls(referenceMonth);
+  const {
+    boletoList, isLoading, markAsPrinted, resendBilling, fetchPreview, generateBoletos,
+    listSyncContacts, findOrphanBoletos, downloadBoletoPdf,
+  } = useBoletoControls(referenceMonth);
 
   // KPIs (sobre todo o mês, não a página)
   const kpis = useMemo(() => {
@@ -131,14 +136,24 @@ export default function Boletos() {
             Painel da automação de cobrança
           </p>
         </div>
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => setGenerateOpen(true)}
-        >
-          <Zap className="w-4 h-4" />
-          Gerar boletos do mês
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setSyncOpen(true)}
+          >
+            <RefreshCw className="w-4 h-4" />
+            Sincronizar com Sicoob
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setGenerateOpen(true)}
+          >
+            <Zap className="w-4 h-4" />
+            Gerar boletos do mês
+          </Button>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -348,6 +363,14 @@ export default function Boletos() {
         referenceMonth={referenceMonth}
         fetchPreview={fetchPreview}
         generateBoletos={generateBoletos}
+      />
+
+      {/* Dialog: sincronizar com o Sicoob (achar boletos órfãos) */}
+      <BoletoSyncDialog
+        open={syncOpen}
+        onOpenChange={setSyncOpen}
+        listSyncContacts={listSyncContacts}
+        findOrphanBoletos={findOrphanBoletos}
       />
     </div>
   );

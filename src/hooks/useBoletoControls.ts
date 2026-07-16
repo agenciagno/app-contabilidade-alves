@@ -58,6 +58,29 @@ export interface GenerateResult {
   pdf?: boolean;
 }
 
+// Contato elegível pra sincronização (action=list_contacts)
+export interface SyncContact {
+  contact_id: string;
+  name: string;
+}
+
+// Resultado por contato (action=find_orphans)
+export interface OrphanSyncResult {
+  contact_id: string;
+  name: string | null;
+  encontrados: number;
+  orfaos: number;
+  status: 'ok' | 'error' | 'skipped';
+  message?: string;
+}
+export interface OrphanSyncSummary {
+  contactsScanned: number;
+  totalEncontrados: number;
+  totalOrfaos: number;
+  errors: number;
+  details: OrphanSyncResult[];
+}
+
 export interface BoletoWithContact extends BoletoControl {
   contact_name: string;
   contact_type: string;
@@ -174,7 +197,43 @@ export function useBoletoControls(referenceMonth: string) {
     return all;
   };
 
-  // 6. Baixar o PDF do boleto (signed URL do bucket privado).
+  // 6. Sincronizar com o Sicoob: acha boletos registrados lá mas ausentes da tabela local.
+  const listSyncContacts = async (): Promise<SyncContact[]> => {
+    const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
+      body: { action: 'list_contacts', reference_month: referenceMonth },
+    });
+    if (error) throw new Error(error.message || 'Falha ao listar contatos');
+    if ((data as any)?.error) throw new Error((data as any).error);
+    return ((data as any)?.items ?? []) as SyncContact[];
+  };
+
+  const findOrphanBoletos = async (
+    contactIds: string[],
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<OrphanSyncSummary> => {
+    const details: OrphanSyncResult[] = [];
+    for (let i = 0; i < contactIds.length; i += GENERATE_CHUNK_SIZE) {
+      const chunk = contactIds.slice(i, i + GENERATE_CHUNK_SIZE);
+      const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
+        body: { action: 'find_orphans', reference_month: referenceMonth, contact_ids: chunk },
+      });
+      if (error) throw new Error(error.message || 'Falha na sincronização');
+      if ((data as any)?.error) throw new Error((data as any).error);
+      details.push(...(((data as any)?.details ?? []) as OrphanSyncResult[]));
+      onProgress?.(Math.min(i + GENERATE_CHUNK_SIZE, contactIds.length), contactIds.length);
+    }
+    // Órfãos podem cair em qualquer mês — invalida a lista inteira, não só o mês atual.
+    queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2'] });
+    return {
+      contactsScanned: contactIds.length,
+      totalEncontrados: details.reduce((s, r) => s + r.encontrados, 0),
+      totalOrfaos: details.reduce((s, r) => s + r.orfaos, 0),
+      errors: details.filter((r) => r.status === 'error').length,
+      details,
+    };
+  };
+
+  // 7. Baixar o PDF do boleto (signed URL do bucket privado).
   const downloadBoletoPdf = async (boleto: BoletoWithContact) => {
     if (!boleto.pdf_url) {
       toast({ title: 'PDF indisponível', description: 'Este boleto não tem PDF salvo.', variant: 'destructive' });
@@ -196,6 +255,8 @@ export function useBoletoControls(referenceMonth: string) {
     resendBilling,
     fetchPreview,
     generateBoletos,
+    listSyncContacts,
+    findOrphanBoletos,
     downloadBoletoPdf,
   };
 }

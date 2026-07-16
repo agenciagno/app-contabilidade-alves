@@ -95,7 +95,9 @@ const CONTACT_COLS =
 async function getSicoobToken(): Promise<string> {
   // @ts-ignore unstable API — mTLS validado no edge runtime
   const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
-  const body = `grant_type=client_credentials&client_id=${encodeURIComponent(SICOOB_CLIENT_ID)}&scope=boletos_inclusao`;
+  // boletos_inclusao (criar) + boletos_consulta (GET /boletos, /pagadores/{cpf}/boletos)
+  const scope = encodeURIComponent("boletos_inclusao boletos_consulta");
+  const body = `grant_type=client_credentials&client_id=${encodeURIComponent(SICOOB_CLIENT_ID)}&scope=${scope}`;
   const res = await fetch(
     "https://auth.sicoob.com.br/auth/realms/cooperado/protocol/openid-connect/token",
     { method: "POST", client, headers: { "Content-Type": "application/x-www-form-urlencoded" }, body },
@@ -105,6 +107,46 @@ async function getSicoobToken(): Promise<string> {
     throw new Error(`Falha ao autenticar no Sicoob (HTTP ${res.status})`);
   }
   return data.access_token as string;
+}
+
+interface SicoobPagadorBoleto {
+  nossoNumero: number;
+  seuNumero?: string;
+  codigoBarras?: string;
+  linhaDigitavel?: string;
+  valor?: number;
+  dataEmissao?: string;
+  dataVencimento?: string;
+  situacaoBoleto?: string;
+  qrCode?: string;
+}
+
+// GET /pagadores/{cpf}/boletos — lista todos os boletos já registrados no Sicoob para o pagador,
+// sem filtro de data (reconciliação: achar boletos que existem no Sicoob mas não em boleto_controls).
+async function listarBoletosPorPagador(token: string, cpfCnpj: string) {
+  // @ts-ignore unstable API
+  const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+  const url = `https://api.sicoob.com.br/cobranca-bancaria/v3/pagadores/${cpfCnpj}/boletos?numeroCliente=${NUMERO_CLIENTE}`;
+  const res = await fetch(url, {
+    method: "GET",
+    client,
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "client_id": SICOOB_CLIENT_ID,
+      "Accept": "application/json",
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+// Valores reais observados na API: "ENTRADA NORMAL", "BAIXADO" (não batem com a grafia do doc).
+// "Baixado" é ambíguo (pago OU cancelado/estornado, o Sicoob não distingue nesta resposta) — não
+// dá pra confirmar qual sem outro dado, e o CHECK constraint de boleto_controls.status só aceita
+// PENDENTE/PAGO/FILA_IMPRESSAO/IMPRESSO/CANCELADO. Fica como PENDENTE (neutro); o valor bruto
+// continua disponível em sicoob_response.situacaoBoleto para conferência manual.
+function mapSituacaoBoleto(situacao: string | undefined): string {
+  return (situacao || "").toUpperCase().includes("LIQUID") ? "PAGO" : "PENDENTE";
 }
 
 interface ContactDatas {
@@ -347,7 +389,127 @@ Deno.serve(async (req) => {
       return json({ reference_month: referenceMonth, ok, errors, skipped, results });
     }
 
-    return json({ error: "action inválido (use 'preview' ou 'generate')" }, 400);
+    // ---------------- LIST_CONTACTS (para o "Sincronizar com Sicoob" montar os lotes) ----------------
+    if (action === "list_contacts") {
+      const items = (contatos || [])
+        .filter((c: any) => (c.document || "").replace(/\D/g, "").length > 0)
+        .map((c: any) => ({ contact_id: c.id, name: c.name }));
+      items.sort((a, b) => (a.name || "").localeCompare(b.name || "", "pt-BR"));
+      return json({ total: items.length, items });
+    }
+
+    // ---------------- FIND_ORPHANS (reconciliação: boletos no Sicoob ausentes do sistema) ----------------
+    if (action === "find_orphans") {
+      const contactIds: string[] = Array.isArray(payload.contact_ids) ? payload.contact_ids : [];
+      if (!contactIds.length) return json({ error: "contact_ids vazio" }, 400);
+
+      const byId = new Map((contatos || []).map((c: any) => [c.id, c]));
+
+      const { data: knownRows, error: knownErr } = await supabase
+        .from("boleto_controls")
+        .select("nosso_numero")
+        .eq("company_id", COMPANY_ID)
+        .not("nosso_numero", "is", null);
+      if (knownErr) throw knownErr;
+      const known = new Set((knownRows || []).map((r: any) => Number(r.nosso_numero)));
+
+      let token: string;
+      try {
+        token = await getSicoobToken();
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+
+      const results: any[] = [];
+
+      for (const id of contactIds) {
+        const c = byId.get(id);
+        if (!c) {
+          results.push({ contact_id: id, name: null, encontrados: 0, orfaos: 0, status: "error", message: "Contato não encontrado" });
+          continue;
+        }
+        const cpfCnpj = (c.document || "").replace(/\D/g, "");
+        if (!cpfCnpj) {
+          results.push({ contact_id: id, name: c.name, encontrados: 0, orfaos: 0, status: "skipped", message: "Sem CPF/CNPJ" });
+          continue;
+        }
+        try {
+          const resp = await listarBoletosPorPagador(token, cpfCnpj);
+          if (!resp.ok) {
+            // 400/404 = pagador sem boletos no Sicoob (comum); outro status = falha real
+            if (resp.status === 400 || resp.status === 404) {
+              results.push({ contact_id: id, name: c.name, encontrados: 0, orfaos: 0, status: "ok" });
+            } else {
+              results.push({ contact_id: id, name: c.name, encontrados: 0, orfaos: 0, status: "error", message: extractSicoobError(resp.data, resp.status) });
+            }
+            continue;
+          }
+
+          const lista: SicoobPagadorBoleto[] = Array.isArray(resp.data?.resultado) ? resp.data.resultado : [];
+          let orfaosInseridos = 0;
+          let falhasInsercao = 0;
+          for (const b of lista) {
+            const nn = Number(b.nossoNumero);
+            if (!nn || known.has(nn)) continue;
+
+            const dataEmissao = b.dataEmissao ? b.dataEmissao.slice(0, 10) : null;
+            const dataVencimento = b.dataVencimento ? b.dataVencimento.slice(0, 10) : null;
+            const referenceMonthOrfao = dataEmissao
+              ? `${dataEmissao.slice(0, 7)}-01`
+              : dataVencimento
+              ? `${dataVencimento.slice(0, 7)}-01`
+              : null;
+            if (!referenceMonthOrfao) continue; // sem data suficiente para classificar o mês
+
+            const { error: insErr } = await supabase.from("boleto_controls").insert({
+              company_id: COMPANY_ID,
+              contact_id: id,
+              reference_month: referenceMonthOrfao,
+              status: mapSituacaoBoleto(b.situacaoBoleto),
+              generated_at: dataEmissao,
+              nosso_numero: nn,
+              linha_digitavel: b.linhaDigitavel ?? null,
+              codigo_barras: b.codigoBarras ?? null,
+              url_qrcode: b.qrCode ?? null,
+              valor: b.valor != null ? Number(b.valor) : null,
+              data_vencimento: dataVencimento,
+              seu_numero: b.seuNumero ?? null,
+              canal_entrega: c.canal_entrega ?? null,
+              sicoob_response: b,
+            });
+            if (!insErr) {
+              known.add(nn);
+              orfaosInseridos++;
+            } else {
+              falhasInsercao++;
+            }
+          }
+          results.push({
+            contact_id: id,
+            name: c.name,
+            encontrados: lista.length,
+            orfaos: orfaosInseridos,
+            status: falhasInsercao > 0 ? "error" : "ok",
+            message: falhasInsercao > 0 ? `${falhasInsercao} boleto(s) encontrados mas não salvos (erro ao inserir)` : undefined,
+          });
+        } catch (e) {
+          results.push({ contact_id: id, name: c.name, encontrados: 0, orfaos: 0, status: "error", message: String((e as Error).message || e) });
+        }
+      }
+
+      const totalEncontrados = results.reduce((s, r) => s + (r.encontrados || 0), 0);
+      const totalOrfaos = results.reduce((s, r) => s + (r.orfaos || 0), 0);
+      const errors = results.filter((r) => r.status === "error");
+      return json({
+        contacts_scanned: contactIds.length,
+        total_encontrados: totalEncontrados,
+        total_orfaos: totalOrfaos,
+        errors: errors.length,
+        details: results.filter((r) => r.orfaos > 0 || r.status === "error"),
+      });
+    }
+
+    return json({ error: "action inválido" }, 400);
   } catch (e) {
     return json({ error: String((e as Error).message || e) }, 500);
   }
