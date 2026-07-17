@@ -124,13 +124,15 @@ interface SicoobPagadorBoleto {
   qrCode?: string;
 }
 
-// GET /pagadores/{cpf}/boletos — lista os boletos registrados no Sicoob para o pagador com
-// vencimento a partir de HISTORICO_FLOOR (reconciliação: achar boletos que existem no Sicoob mas
-// não em boleto_controls). Não busca histórico anterior — não precisa ser exposto nem salvo.
+// GET /pagadores/{cpf}/boletos — lista todos os boletos registrados no Sicoob para o pagador
+// (reconciliação: achar boletos que existem no Sicoob mas não em boleto_controls).
+// Sem filtro de data na chamada: o Sicoob exige dataFim sempre que dataInicio é informado E
+// limita o intervalo a no máximo 35 dias — inviável para "de julho em diante" sem paginar por
+// janelas. O piso HISTORICO_FLOOR é aplicado depois, no código, antes de inserir.
 async function listarBoletosPorPagador(token: string, cpfCnpj: string) {
   // @ts-ignore unstable API
   const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
-  const url = `https://api.sicoob.com.br/cobranca-bancaria/v3/pagadores/${cpfCnpj}/boletos?numeroCliente=${NUMERO_CLIENTE}&dataInicio=${HISTORICO_FLOOR}`;
+  const url = `https://api.sicoob.com.br/cobranca-bancaria/v3/pagadores/${cpfCnpj}/boletos?numeroCliente=${NUMERO_CLIENTE}`;
   const res = await fetch(url, {
     method: "GET",
     client,
