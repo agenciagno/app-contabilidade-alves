@@ -36,6 +36,10 @@ function addDaysISO(iso: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
+function formatBR(iso: string): string {
+  const [ano, mes, dia] = iso.split("-");
+  return `${dia}/${mes}/${ano}`;
+}
 function daysInMonth(ano: number, mes: number): number {
   // mes 1-12 → dias do mês (dia 0 do mês seguinte = último dia do mês atual)
   return new Date(Date.UTC(ano, mes, 0)).getUTCDate();
@@ -165,6 +169,7 @@ interface ContactDatas {
 async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: ContactDatas, seuNumero: string) {
   // @ts-ignore unstable API
   const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+  const diaSeguinteVenc = addDaysISO(datas.dataVencimentoISO, 1);
   const payload = {
     numeroCliente: NUMERO_CLIENTE,
     codigoModalidade: 1, // 1 = SIMPLES COM REGISTRO
@@ -190,10 +195,10 @@ async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: C
     valorSegundoDesconto: 2,
     // Multa 2% e juros de mora 0,07%/dia a partir do dia seguinte ao vencimento.
     tipoMulta: 2,
-    dataMulta: addDaysISO(datas.dataVencimentoISO, 1),
+    dataMulta: diaSeguinteVenc,
     valorMulta: 2,
     tipoJurosMora: 1,
-    dataJurosMora: addDaysISO(datas.dataVencimentoISO, 1),
+    dataJurosMora: diaSeguinteVenc,
     valorJurosMora: 0.07,
     numeroParcela: 1,
     aceite: false,
@@ -208,7 +213,14 @@ async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: C
       cep: (c.cep || "").replace(/\D/g, ""),
       email: c.email,
     },
-    mensagensInstrucao: ["Contabilidade Alves"],
+    // Texto padrão obrigatório em todo boleto — datas calculadas por boleto (dia seguinte ao
+    // vencimento p/ multa/juros; dia 24 e último dia do mês de emissão p/ desconto).
+    mensagensInstrucao: [
+      `A partir ${formatBR(diaSeguinteVenc)} Juros 0,07%/dia.`,
+      `A partir ${formatBR(diaSeguinteVenc)} Multa de 2%.`,
+      `Até ${formatBR(datas.desconto1ISO)} desconto de 3,00%`,
+      `Até ${formatBR(datas.desconto2ISO)} desconto de 2,00%`,
+    ],
   };
   const res = await fetch(
     `https://api.sicoob.com.br/cobranca-bancaria/v3/boletos?numeroContrato=${NUMERO_CONTRATO}`,

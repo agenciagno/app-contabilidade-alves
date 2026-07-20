@@ -5,17 +5,21 @@ import { ptBR } from 'date-fns/locale';
 import {
   FileText, CheckCircle2, Clock, AlertCircle, Zap, Mail, MessageCircle, Printer,
   FileX, MoreHorizontal, Eye, Send, CheckSquare, Download, RefreshCw, Loader2,
+  Search, CalendarIcon, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -87,6 +91,11 @@ export default function Boletos() {
   const [vencimentoMonth, setVencimentoMonth] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-01'));
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDENTE' | 'PAGO' | 'VENCIDO' | 'FILA_IMPRESSAO'>('ALL');
   const [canalFilter, setCanalFilter] = useState<'ALL' | 'whatsapp' | 'email' | 'impresso' | 'whatsapp_email'>('ALL');
+  const [search, setSearch] = useState('');
+  const [valorMin, setValorMin] = useState('');
+  const [valorMax, setValorMax] = useState('');
+  const [pagamentoStart, setPagamentoStart] = useState<Date | null>(null);
+  const [pagamentoEnd, setPagamentoEnd] = useState<Date | null>(null);
   const [page, setPage] = useState(1);
   const [detailsOf, setDetailsOf] = useState<BoletoWithContact | null>(null);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -135,14 +144,41 @@ export default function Boletos() {
 
   // Filtro
   const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const min = valorMin.trim() ? Number(valorMin.replace(',', '.')) : null;
+    const max = valorMax.trim() ? Number(valorMax.replace(',', '.')) : null;
     return (boletoList as BoletoWithContact[]).filter(b => {
       if (canalFilter !== 'ALL' && b.canal_entrega !== canalFilter) return false;
-      if (statusFilter === 'ALL') return true;
-      if (statusFilter === 'VENCIDO') return isOverdue(b);
-      if (statusFilter === 'PENDENTE') return b.status === 'PENDENTE' && !isOverdue(b);
-      return b.status === statusFilter;
+
+      if (statusFilter !== 'ALL') {
+        const matchesStatus =
+          statusFilter === 'VENCIDO' ? isOverdue(b) :
+          statusFilter === 'PENDENTE' ? b.status === 'PENDENTE' && !isOverdue(b) :
+          b.status === statusFilter;
+        if (!matchesStatus) return false;
+      }
+
+      if (term) {
+        const haystack = `${b.contact_name} ${b.contact_document ?? ''} ${b.nosso_numero ?? ''} ${b.seu_numero ?? ''}`.toLowerCase();
+        if (!haystack.includes(term)) return false;
+      }
+
+      if (min != null && !Number.isNaN(min) && !(b.valor != null && b.valor >= min)) return false;
+      if (max != null && !Number.isNaN(max) && !(b.valor != null && b.valor <= max)) return false;
+
+      if (pagamentoStart && (!b.data_pagamento || parseISO(b.data_pagamento) < pagamentoStart)) return false;
+      if (pagamentoEnd && (!b.data_pagamento || parseISO(b.data_pagamento) > pagamentoEnd)) return false;
+
+      return true;
     });
-  }, [boletoList, statusFilter, canalFilter]);
+  }, [boletoList, statusFilter, canalFilter, search, valorMin, valorMax, pagamentoStart, pagamentoEnd]);
+
+  const hasExtraFilters = !!search || !!valorMin || !!valorMax || !!pagamentoStart || !!pagamentoEnd;
+  const clearExtraFilters = () => {
+    setSearch(''); setValorMin(''); setValorMax('');
+    setPagamentoStart(null); setPagamentoEnd(null);
+    setPage(1);
+  };
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -195,6 +231,16 @@ export default function Boletos() {
 
       {/* Filtros */}
       <div className="flex items-center gap-3 px-6 py-4 flex-wrap">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Buscar por cliente, CPF/CNPJ ou nosso número…"
+            className="pl-9 w-[280px]"
+          />
+        </div>
+
         <Select value={vencimentoMonth} onValueChange={(v) => { setVencimentoMonth(v); setPage(1); }}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Mês de vencimento" />
@@ -233,6 +279,73 @@ export default function Boletos() {
             <SelectItem value="whatsapp_email">WhatsApp + E-mail</SelectItem>
           </SelectContent>
         </Select>
+
+        <div className="flex items-center gap-1.5">
+          <Input
+            type="number" inputMode="decimal" step="0.01"
+            value={valorMin}
+            onChange={(e) => { setValorMin(e.target.value); setPage(1); }}
+            placeholder="Valor mín."
+            className="w-[110px]"
+          />
+          <span className="text-muted-foreground text-sm">–</span>
+          <Input
+            type="number" inputMode="decimal" step="0.01"
+            value={valorMax}
+            onChange={(e) => { setValorMax(e.target.value); setPage(1); }}
+            placeholder="Valor máx."
+            className="w-[110px]"
+          />
+        </div>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn('gap-2 w-[220px] justify-start font-normal', !pagamentoStart && !pagamentoEnd && 'text-muted-foreground')}
+            >
+              <CalendarIcon className="h-4 w-4" />
+              {pagamentoStart || pagamentoEnd
+                ? `${pagamentoStart ? format(pagamentoStart, 'dd/MM/yy') : '…'} – ${pagamentoEnd ? format(pagamentoEnd, 'dd/MM/yy') : '…'}`
+                : 'Data de pagamento'}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-3" align="start">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground px-1">De</p>
+                <CalendarPicker
+                  mode="single"
+                  selected={pagamentoStart ?? undefined}
+                  onSelect={(d) => { setPagamentoStart(d ?? null); setPage(1); }}
+                  initialFocus
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground px-1">Até</p>
+                <CalendarPicker
+                  mode="single"
+                  selected={pagamentoEnd ?? undefined}
+                  onSelect={(d) => { setPagamentoEnd(d ?? null); setPage(1); }}
+                />
+              </div>
+            </div>
+            {(pagamentoStart || pagamentoEnd) && (
+              <Button
+                variant="ghost" size="sm" className="w-full mt-2 gap-1.5"
+                onClick={() => { setPagamentoStart(null); setPagamentoEnd(null); setPage(1); }}
+              >
+                <X className="h-3.5 w-3.5" /> Limpar período
+              </Button>
+            )}
+          </PopoverContent>
+        </Popover>
+
+        {hasExtraFilters && (
+          <Button variant="ghost" size="sm" onClick={clearExtraFilters} className="gap-1.5 text-muted-foreground">
+            <X className="h-3.5 w-3.5" /> Limpar filtros
+          </Button>
+        )}
       </div>
 
       {/* Tabela */}
@@ -366,6 +479,7 @@ export default function Boletos() {
                 <Field label="Nosso número" value={detailsOf.nosso_numero} />
                 <Field label="Seu número" value={detailsOf.seu_numero} />
               </div>
+              <EncargosSection b={detailsOf} />
               {detailsOf.url_qrcode && (
                 <div>
                   <p className="text-muted-foreground mb-1">QR Code</p>
@@ -408,6 +522,32 @@ function KpiCard({ icon, label, value, valueClass }: {
         <p className={cn('text-[1.75rem] font-bold mt-2 tracking-tight leading-none', valueClass)}>{value}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function EncargosSection({ b }: { b: BoletoWithContact }) {
+  const r = b.sicoob_response;
+  if (!r || (r.valorPrimeiroDesconto == null && r.valorMulta == null && r.valorJurosMora == null)) {
+    return null;
+  }
+  const fmtPct = (v: number | undefined) =>
+    v != null ? `${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}%` : '—';
+  return (
+    <div className="border rounded-md p-3 bg-muted/30 space-y-1 text-sm">
+      <p className="text-muted-foreground text-xs mb-1.5">Desconto, multa e juros</p>
+      {r.dataPrimeiroDesconto && (
+        <p>Até {fmtDate(r.dataPrimeiroDesconto)}: <span className="text-success font-medium">{fmtPct(r.valorPrimeiroDesconto)} de desconto</span></p>
+      )}
+      {r.dataSegundoDesconto && (
+        <p>Até {fmtDate(r.dataSegundoDesconto)}: <span className="text-success font-medium">{fmtPct(r.valorSegundoDesconto)} de desconto</span></p>
+      )}
+      {r.dataMulta && (
+        <p>A partir de {fmtDate(r.dataMulta)}: <span className="text-destructive font-medium">{fmtPct(r.valorMulta)} de multa</span></p>
+      )}
+      {r.dataJurosMora && (
+        <p>A partir de {fmtDate(r.dataJurosMora)}: <span className="text-destructive font-medium">{fmtPct(r.valorJurosMora)} de juros ao dia</span></p>
+      )}
+    </div>
   );
 }
 
