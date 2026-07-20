@@ -559,6 +559,11 @@ function KpiCard({ icon, label, value, valueClass }: {
   );
 }
 
+// Padrão vigente: multa 2%, juros de mora 0,07%/dia. Boletos gerados pelo fluxo N8N antigo
+// (antes de 16/07/2026) foram registrados no Sicoob com 2%/dia de juros por engano — o valor
+// abaixo serve só pra sinalizar esse desvio na tela, não é usado em nenhum cálculo de geração.
+const JUROS_DIA_ESPERADO = 0.07;
+
 function EncargosSection({ b }: { b: BoletoWithContact }) {
   const r = b.sicoob_response;
   if (!r || (r.valorPrimeiroDesconto == null && r.valorMulta == null && r.valorJurosMora == null)) {
@@ -566,6 +571,7 @@ function EncargosSection({ b }: { b: BoletoWithContact }) {
   }
   const fmtPct = (v: number | undefined) =>
     v != null ? `${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}%` : '—';
+  const jurosDivergente = r.valorJurosMora != null && Number(r.valorJurosMora) !== JUROS_DIA_ESPERADO;
   return (
     <div className="border rounded-md p-3 bg-muted/30 space-y-1 text-sm">
       <p className="text-muted-foreground text-xs mb-1.5">Desconto, multa e juros</p>
@@ -579,7 +585,18 @@ function EncargosSection({ b }: { b: BoletoWithContact }) {
         <p>A partir de {fmtDate(r.dataMulta)}: <span className="text-destructive font-medium">{fmtPct(r.valorMulta)} de multa</span></p>
       )}
       {r.dataJurosMora && (
-        <p>A partir de {fmtDate(r.dataJurosMora)}: <span className="text-destructive font-medium">{fmtPct(r.valorJurosMora)} de juros ao dia</span></p>
+        <p>
+          A partir de {fmtDate(r.dataJurosMora)}: <span className="text-destructive font-medium">{fmtPct(r.valorJurosMora)} de juros ao dia</span>
+        </p>
+      )}
+      {jurosDivergente && (
+        <div className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded p-2 mt-2">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <span>
+            Juros registrado no Sicoob ({fmtPct(r.valorJurosMora)}/dia) diverge do padrão vigente ({JUROS_DIA_ESPERADO}%/dia).
+            Provavelmente boleto gerado antes da correção de 16/07 — confirme com o banco antes de comunicar ao cliente.
+          </span>
+        </div>
       )}
     </div>
   );
