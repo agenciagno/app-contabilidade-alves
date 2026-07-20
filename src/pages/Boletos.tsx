@@ -5,7 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import {
   FileText, CheckCircle2, Clock, AlertCircle, Zap, Mail, MessageCircle, Printer,
   FileX, MoreHorizontal, Eye, Send, CheckSquare, Download, RefreshCw, Loader2,
-  Search, CalendarIcon, X,
+  Search, CalendarIcon, X, Copy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -482,8 +482,24 @@ export default function Boletos() {
               <EncargosSection b={detailsOf} />
               {detailsOf.url_qrcode && (
                 <div>
-                  <p className="text-muted-foreground mb-1">QR Code</p>
-                  <img src={detailsOf.url_qrcode} alt="QR Code" className="w-40 h-40 border rounded-md" />
+                  <p className="text-muted-foreground mb-1">PIX copia e cola</p>
+                  <div className="flex items-start gap-2">
+                    <p className="font-mono text-xs break-all bg-muted/30 border rounded-md p-2 flex-1">
+                      {detailsOf.url_qrcode}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(detailsOf.url_qrcode!);
+                        toast({ title: 'Código Pix copiado' });
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               )}
               {detailsOf.sicoob_response && (

@@ -24,7 +24,7 @@ export interface BoletoControl {
   seu_numero: string | null;
   linha_digitavel: string | null;
   codigo_barras: string | null;
-  url_qrcode: string | null;
+  url_qrcode: string | null; // nome de coluna legado — na verdade é o payload PIX copia-e-cola (EMV), não uma URL de imagem
   origem_baixa: string | null;
   sicoob_response: any;
   pdf_url: string | null;
