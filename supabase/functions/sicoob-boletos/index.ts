@@ -117,7 +117,7 @@ async function getSicoobToken(scope = "boletos_inclusao boletos_consulta"): Prom
   );
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.access_token) {
-    throw new Error(`Falha ao autenticar no Sicoob (HTTP ${res.status})`);
+    throw new Error(`Falha ao autenticar no Sicoob (HTTP ${res.status}): ${data?.error_description || data?.error || ""}`);
   }
   return data.access_token as string;
 }
