@@ -21,7 +21,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -521,6 +521,17 @@ export default function Boletos() {
                 </details>
               )}
             </div>
+          )}
+          {detailsOf && (
+            <DialogFooter>
+              {detailsOf.pdf_url ? (
+                <Button className="gap-2" onClick={() => downloadBoletoPdf(detailsOf)}>
+                  <Download className="h-4 w-4" /> Baixar PDF
+                </Button>
+              ) : (
+                <span className="text-xs text-muted-foreground">PDF não disponível para este boleto</span>
+              )}
+            </DialogFooter>
           )}
         </DialogContent>
       </Dialog>
