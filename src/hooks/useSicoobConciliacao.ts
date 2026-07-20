@@ -2,29 +2,34 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+// A API devolve valores monetários como string (ex.: "427.00") — não converter pra number na
+// interface, os componentes formatam com Intl.NumberFormat, que aceita string numérica direto.
 export interface SicoobSaldo {
-  saldo: number;
-  saldoLimite: number;
-  saldoBloqueado: number;
+  saldo: string;
+  saldoLimite: string;
+  saldoBloqueado: string;
 }
 
-// Campos observados no swagger da API Conta Corrente (LancamentoSpuOpenBankingRestDTO).
+// Campos confirmados por chamada real em 20/07 (o swagger não estava acessível sem auth prévia;
+// nomes abaixo vieram do payload de verdade, não de doc). numeroDocumento em lançamentos de boleto
+// ("CRÉD.LIQUIDAÇÃO COBRANÇA") NÃO é o nosso_numero — são faixas numéricas totalmente diferentes,
+// confirmado comparando com boleto_controls. Não usar numeroDocumento pra cruzar com boleto.
 export interface SicoobLancamento {
   transactionId: string;
-  tipo: string;
-  valor: number;
+  tipo: 'CREDITO' | 'DEBITO' | string;
+  valor: string;
   data: string;
-  dataMovimento?: string;
+  dataLote?: string;
   descricao: string;
   numeroDocumento?: string;
   cpfCnpj?: string;
-  descricaoComplementar?: string;
+  descInfComplementar?: string;
 }
 
 export interface SicoobExtrato {
-  saldoAtual?: number;
-  saldoBloqueado?: number;
-  saldoLimite?: number;
+  saldoAtual?: string;
+  saldoBloqueado?: string;
+  saldoLimite?: string;
   transacoes: SicoobLancamento[];
 }
 

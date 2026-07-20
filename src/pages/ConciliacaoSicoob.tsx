@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
+import { format, addMonths, startOfMonth, parseISO, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  Landmark, Wallet, Search, AlertTriangle, CheckCircle2, FlaskConical, Loader2, X,
+  Landmark, Wallet, Search, AlertTriangle, CheckCircle2, HelpCircle, FlaskConical, Loader2, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,8 +23,8 @@ import {
 import { useSicoobConciliacao, type SicoobLancamento, type BoletoParaMatch } from '@/hooks/useSicoobConciliacao';
 import { cn } from '@/lib/utils';
 
-const fmtBRL = (n: number | null | undefined) =>
-  n == null ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
+const fmtBRL = (n: string | number | null | undefined) =>
+  n == null ? '—' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(n));
 
 const fmtDate = (s: string | null | undefined) => {
   if (!s) return '—';
@@ -41,13 +41,40 @@ function getMonthOptions(): { value: string; mes: number; ano: number }[] {
   return months.reverse();
 }
 
-// Tenta achar o boleto correspondente a um lançamento do extrato por número de documento
-// (numeroDocumento no extrato deveria bater com nosso_numero do boleto). Não é 100% garantido —
-// depende do que o Sicoob de fato manda nesse campo; validar no período de teste.
-function matchBoleto(lanc: SicoobLancamento, boletos: BoletoParaMatch[]): BoletoParaMatch | null {
-  const doc = (lanc.numeroDocumento || '').replace(/\D/g, '');
-  if (!doc) return null;
-  return boletos.find((b) => b.nosso_numero && String(b.nosso_numero).replace(/\D/g, '') === doc) ?? null;
+// Janela de tolerância entre a data do lançamento e o vencimento do boleto — cobre pagamento
+// antecipado (desconto) e atraso. Sicoob não manda nenhum identificador de pagador nos lançamentos
+// de "CRÉD.LIQUIDAÇÃO COBRANÇA" (nem numeroDocumento é o nosso_numero — confirmado em 20/07), então
+// o cruzamento é por valor + proximidade de data, não por identificador único.
+const JANELA_DIAS = 10;
+
+interface Candidatos {
+  pendentes: BoletoParaMatch[];
+  pagos: BoletoParaMatch[];
+}
+
+function findCandidatos(lanc: SicoobLancamento, boletos: BoletoParaMatch[]): Candidatos {
+  if (lanc.tipo !== 'CREDITO') return { pendentes: [], pagos: [] };
+  const valorLanc = Math.abs(Number(lanc.valor));
+  const dataLanc = parseISO(lanc.data.slice(0, 10));
+  const bateValor = (b: BoletoParaMatch) => b.valor != null && Math.abs(Number(b.valor) - valorLanc) < 0.01;
+  const bateJanela = (b: BoletoParaMatch) => {
+    if (!b.data_vencimento) return false;
+    return Math.abs(differenceInCalendarDays(dataLanc, parseISO(b.data_vencimento))) <= JANELA_DIAS;
+  };
+  const candidatos = boletos.filter((b) => bateValor(b) && bateJanela(b));
+  return {
+    pendentes: candidatos.filter((b) => b.status === 'PENDENTE'),
+    pagos: candidatos.filter((b) => b.status === 'PAGO'),
+  };
+}
+
+type CompStatus = 'BATE' | 'AMBIGUO' | 'JA_CONFIRMADO' | 'NAO_IDENTIFICADO';
+
+function classificar(c: Candidatos): CompStatus {
+  if (c.pendentes.length === 1) return 'BATE';
+  if (c.pendentes.length > 1) return 'AMBIGUO';
+  if (c.pagos.length > 0) return 'JA_CONFIRMADO';
+  return 'NAO_IDENTIFICADO';
 }
 
 export default function ConciliacaoSicoob() {
@@ -69,10 +96,11 @@ export default function ConciliacaoSicoob() {
   const [valorMax, setValorMax] = useState('');
 
   // Filtros — Comparativo
-  const [compStatus, setCompStatus] = useState<'ALL' | 'BATE' | 'NAO_IDENTIFICADO'>('ALL');
+  const [compStatus, setCompStatus] = useState<'ALL' | CompStatus>('ALL');
   const [compSearch, setCompSearch] = useState('');
 
-  const [confirmTarget, setConfirmTarget] = useState<{ lanc: SicoobLancamento; boleto: BoletoParaMatch } | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<{ lanc: SicoobLancamento; candidatos: BoletoParaMatch[] } | null>(null);
+  const [escolhido, setEscolhido] = useState<string>('');
 
   const tipos = useMemo(() => {
     const set = new Set((extrato?.transacoes ?? []).map((t) => t.tipo).filter(Boolean));
@@ -86,42 +114,47 @@ export default function ConciliacaoSicoob() {
     return (extrato?.transacoes ?? []).filter((t) => {
       if (tipoFilter !== 'ALL' && t.tipo !== tipoFilter) return false;
       if (term) {
-        const haystack = `${t.descricao ?? ''} ${t.descricaoComplementar ?? ''} ${t.numeroDocumento ?? ''} ${t.cpfCnpj ?? ''}`.toLowerCase();
+        const haystack = `${t.descricao ?? ''} ${t.descInfComplementar ?? ''} ${t.numeroDocumento ?? ''} ${t.cpfCnpj ?? ''}`.toLowerCase();
         if (!haystack.includes(term)) return false;
       }
-      if (min != null && !Number.isNaN(min) && !(Math.abs(t.valor) >= min)) return false;
-      if (max != null && !Number.isNaN(max) && !(Math.abs(t.valor) <= max)) return false;
+      const valorAbs = Math.abs(Number(t.valor));
+      if (min != null && !Number.isNaN(min) && !(valorAbs >= min)) return false;
+      if (max != null && !Number.isNaN(max) && !(valorAbs <= max)) return false;
       return true;
     });
   }, [extrato, search, tipoFilter, valorMin, valorMax]);
 
   const comparativo = useMemo(() => {
     return (extrato?.transacoes ?? []).map((lanc) => {
-      const boleto = matchBoleto(lanc, boletos);
-      return { lanc, boleto, bate: !!boleto };
+      const candidatos = findCandidatos(lanc, boletos);
+      return { lanc, candidatos, status: classificar(candidatos) };
     });
   }, [extrato, boletos]);
 
   const filteredComparativo = useMemo(() => {
     const term = compSearch.trim().toLowerCase();
     return comparativo.filter((row) => {
-      if (compStatus === 'BATE' && !row.bate) return false;
-      if (compStatus === 'NAO_IDENTIFICADO' && row.bate) return false;
+      if (compStatus !== 'ALL' && row.status !== compStatus) return false;
       if (term) {
-        const haystack = `${row.lanc.descricao ?? ''} ${row.boleto?.contact_name ?? ''} ${row.lanc.numeroDocumento ?? ''}`.toLowerCase();
+        const nomes = [...row.candidatos.pendentes, ...row.candidatos.pagos].map((b) => b.contact_name).join(' ');
+        const haystack = `${row.lanc.descricao ?? ''} ${nomes} ${row.lanc.numeroDocumento ?? ''}`.toLowerCase();
         if (!haystack.includes(term)) return false;
       }
       return true;
     });
   }, [comparativo, compStatus, compSearch]);
 
-  const naoIdentificadosCount = comparativo.filter((r) => !r.bate).length;
+  const pendentesRevisao = comparativo.filter((r) => r.status === 'AMBIGUO' || r.status === 'NAO_IDENTIFICADO').length;
+
+  const openConfirm = (lanc: SicoobLancamento, candidatos: BoletoParaMatch[]) => {
+    setEscolhido(candidatos.length === 1 ? candidatos[0].id : '');
+    setConfirmTarget({ lanc, candidatos });
+  };
 
   const handleConfirmarBaixa = () => {
-    if (!confirmTarget) return;
-    const { lanc, boleto } = confirmTarget;
+    if (!confirmTarget || !escolhido) return;
     confirmarBaixa.mutate(
-      { boletoId: boleto.id, dataPagamento: lanc.data.slice(0, 10), valorPago: Math.abs(lanc.valor) },
+      { boletoId: escolhido, dataPagamento: confirmTarget.lanc.data.slice(0, 10), valorPago: Math.abs(Number(confirmTarget.lanc.valor)) },
       { onSuccess: () => setConfirmTarget(null) },
     );
   };
@@ -202,9 +235,9 @@ export default function ConciliacaoSicoob() {
             <TabsTrigger value="extrato">Extrato completo</TabsTrigger>
             <TabsTrigger value="comparativo" className="gap-1.5">
               Comparativo
-              {naoIdentificadosCount > 0 && (
+              {pendentesRevisao > 0 && (
                 <Badge variant="outline" className="h-5 px-1.5 border-amber-500/40 text-amber-700 dark:text-amber-400">
-                  {naoIdentificadosCount}
+                  {pendentesRevisao}
                 </Badge>
               )}
             </TabsTrigger>
@@ -279,11 +312,13 @@ export default function ConciliacaoSicoob() {
                       filteredExtrato.map((t) => (
                         <TableRow key={t.transactionId}>
                           <TableCell>{fmtDate(t.data)}</TableCell>
-                          <TableCell className="max-w-[320px] truncate">{t.descricao}{t.descricaoComplementar ? ` — ${t.descricaoComplementar}` : ''}</TableCell>
+                          <TableCell className="max-w-[360px] truncate" title={t.descInfComplementar || undefined}>
+                            {t.descricao}{t.descInfComplementar ? ` — ${t.descInfComplementar.replace(/\|@/g, ' ')}` : ''}
+                          </TableCell>
                           <TableCell className="font-mono text-xs">{t.numeroDocumento || '—'}</TableCell>
                           <TableCell>{t.tipo}</TableCell>
-                          <TableCell className={cn('text-right font-medium', t.valor < 0 ? 'text-destructive' : 'text-success')}>
-                            {fmtBRL(t.valor)}
+                          <TableCell className={cn('text-right font-medium', t.tipo === 'DEBITO' ? 'text-destructive' : 'text-success')}>
+                            {t.tipo === 'DEBITO' ? '- ' : ''}{fmtBRL(t.valor)}
                           </TableCell>
                         </TableRow>
                       ))
@@ -297,8 +332,9 @@ export default function ConciliacaoSicoob() {
           {/* ---------------- Comparativo ---------------- */}
           <TabsContent value="comparativo" className="space-y-4 mt-4">
             <p className="text-xs text-muted-foreground max-w-2xl">
-              Cruzamento por número de documento entre o extrato do Sicoob e os boletos do sistema.
-              Confirme visualmente antes de dar baixa — nenhuma baixa acontece sem clique.
+              O Sicoob não manda identificador do boleto nos lançamentos de recebimento — o cruzamento é por
+              valor + data próxima do vencimento (±{JANELA_DIAS} dias). Quando mais de um boleto bate, escolha
+              manualmente antes de confirmar. Nenhuma baixa acontece sem essa confirmação.
             </p>
             <div className="flex items-center gap-3 flex-wrap">
               <div className="relative">
@@ -311,12 +347,14 @@ export default function ConciliacaoSicoob() {
                 />
               </div>
               <Select value={compStatus} onValueChange={(v: any) => setCompStatus(v)}>
-                <SelectTrigger className="w-[220px]">
+                <SelectTrigger className="w-[240px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Todos</SelectItem>
-                  <SelectItem value="BATE">Bate com boleto</SelectItem>
+                  <SelectItem value="BATE">Bate com um boleto</SelectItem>
+                  <SelectItem value="AMBIGUO">Múltiplos candidatos</SelectItem>
+                  <SelectItem value="JA_CONFIRMADO">Já confirmado</SelectItem>
                   <SelectItem value="NAO_IDENTIFICADO">Não identificado</SelectItem>
                 </SelectContent>
               </Select>
@@ -331,8 +369,8 @@ export default function ConciliacaoSicoob() {
                       <TableHead>Lançamento (Sicoob)</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Cliente / boleto</TableHead>
-                      <TableHead className="w-[140px]"></TableHead>
+                      <TableHead>Cliente / candidato(s)</TableHead>
+                      <TableHead className="w-[160px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -350,40 +388,45 @@ export default function ConciliacaoSicoob() {
                       </TableRow>
                     ) : (
                       filteredComparativo.map((row) => {
-                        const jaConfirmado = row.boleto?.status === 'PAGO';
-                        const podeConfirmar = row.bate && !jaConfirmado && row.boleto;
-                        const divergeValor = row.boleto?.valor != null && Math.abs(Math.abs(row.lanc.valor) - Number(row.boleto.valor)) > 0.01;
+                        const nomes = row.status === 'JA_CONFIRMADO'
+                          ? row.candidatos.pagos.map((b) => b.contact_name).join(', ')
+                          : row.candidatos.pendentes.map((b) => b.contact_name).join(', ');
                         return (
                           <TableRow key={row.lanc.transactionId}>
                             <TableCell>{fmtDate(row.lanc.data)}</TableCell>
                             <TableCell className="max-w-[260px] truncate">{row.lanc.descricao}</TableCell>
-                            <TableCell className={cn('text-right font-medium', row.lanc.valor < 0 ? 'text-destructive' : 'text-success')}>
+                            <TableCell className={cn('text-right font-medium', row.lanc.tipo === 'DEBITO' ? 'text-destructive' : 'text-success')}>
                               {fmtBRL(row.lanc.valor)}
                             </TableCell>
                             <TableCell>
-                              {row.bate ? (
-                                jaConfirmado ? (
-                                  <Badge className="bg-success/15 text-success border-success/30"><CheckCircle2 className="h-3 w-3 mr-1" />Já confirmado</Badge>
-                                ) : (
-                                  <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 dark:text-blue-400">Bate com boleto</Badge>
-                                )
-                              ) : (
+                              {row.status === 'BATE' && (
+                                <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 dark:text-blue-400">Bate com boleto</Badge>
+                              )}
+                              {row.status === 'AMBIGUO' && (
+                                <Badge className="bg-purple-500/15 text-purple-600 border-purple-500/30 dark:text-purple-400">
+                                  <HelpCircle className="h-3 w-3 mr-1" />{row.candidatos.pendentes.length} candidatos
+                                </Badge>
+                              )}
+                              {row.status === 'JA_CONFIRMADO' && (
+                                <Badge className="bg-success/15 text-success border-success/30"><CheckCircle2 className="h-3 w-3 mr-1" />Já confirmado</Badge>
+                              )}
+                              {row.status === 'NAO_IDENTIFICADO' && row.lanc.tipo === 'CREDITO' && (
                                 <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30">
                                   <AlertTriangle className="h-3 w-3 mr-1" />Não identificado
                                 </Badge>
                               )}
-                              {divergeValor && (
-                                <p className="text-[11px] text-destructive mt-1">Valor diverge do boleto ({fmtBRL(row.boleto?.valor)})</p>
+                              {row.lanc.tipo === 'DEBITO' && row.status === 'NAO_IDENTIFICADO' && (
+                                <Badge variant="outline">Débito (fora de boleto)</Badge>
                               )}
                             </TableCell>
-                            <TableCell>{row.boleto?.contact_name ?? '—'}</TableCell>
+                            <TableCell className="text-sm">{nomes || '—'}</TableCell>
                             <TableCell>
-                              {podeConfirmar && (
+                              {(row.status === 'BATE' || row.status === 'AMBIGUO') && (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className="gap-1.5"
-                                  onClick={() => setConfirmTarget({ lanc: row.lanc, boleto: row.boleto! })}
+                                  onClick={() => openConfirm(row.lanc, row.candidatos.pendentes)}
                                 >
                                   <CheckCircle2 className="h-3.5 w-3.5" /> Confirmar baixa
                                 </Button>
@@ -406,18 +449,41 @@ export default function ConciliacaoSicoob() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar baixa do boleto?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirmTarget && (
-                <>
-                  Cliente <strong>{confirmTarget.boleto.contact_name}</strong> — {fmtBRL(Math.abs(confirmTarget.lanc.valor))} em{' '}
-                  {fmtDate(confirmTarget.lanc.data)}. O boleto será marcado como PAGO com esses dados.
-                </>
-              )}
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                {confirmTarget && (
+                  <p>
+                    Lançamento de {fmtBRL(confirmTarget.lanc.valor)} em {fmtDate(confirmTarget.lanc.data)}
+                    {confirmTarget.candidatos.length > 1
+                      ? ' — mais de um boleto com esse valor e vencimento próximo. Escolha qual é:'
+                      : '.'}
+                  </p>
+                )}
+                {confirmTarget && confirmTarget.candidatos.length > 1 && (
+                  <Select value={escolhido} onValueChange={setEscolhido}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o cliente/boleto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {confirmTarget.candidatos.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.contact_name} — venc. {fmtDate(b.data_vencimento)} — {fmtBRL(b.valor)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {confirmTarget && confirmTarget.candidatos.length === 1 && (
+                  <p className="font-medium text-foreground">
+                    {confirmTarget.candidatos[0].contact_name} — venc. {fmtDate(confirmTarget.candidatos[0].data_vencimento)}
+                  </p>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmarBaixa} disabled={confirmarBaixa.isPending}>
+            <AlertDialogAction onClick={handleConfirmarBaixa} disabled={confirmarBaixa.isPending || !escolhido}>
               {confirmarBaixa.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirmar baixa'}
             </AlertDialogAction>
           </AlertDialogFooter>

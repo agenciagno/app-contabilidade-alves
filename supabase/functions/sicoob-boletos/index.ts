@@ -104,8 +104,9 @@ const CONTACT_COLS =
   "id,name,document,email,phone,whatsapp,address,address_number,neighborhood,city,state,cep,boleto_value,boleto_due_day,canal_entrega,enviar_cobranca_auto,numero_cliente_sicoob";
 
 // ---------- Sicoob ----------
-// Escopo padrão (boletos). Conta Corrente (extrato/saldo) usa cco_extrato/cco_saldo — precisam
-// estar liberados para o client_id no portal Sicoob, senão a autenticação falha com esse escopo.
+// Escopo padrão (boletos). Conta Corrente (extrato/saldo) usa cco_consulta — API 3 no portal
+// Sicoob, confirmado em 20/07 (só existe cco_consulta e cco_transferencias, não escopos separados
+// por endpoint).
 async function getSicoobToken(scope = "boletos_inclusao boletos_consulta"): Promise<string> {
   // @ts-ignore unstable API — mTLS validado no edge runtime
   const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
@@ -652,7 +653,7 @@ Deno.serve(async (req) => {
     if (action === "saldo") {
       let token: string;
       try {
-        token = await getSicoobToken("cco_saldo");
+        token = await getSicoobToken("cco_consulta");
       } catch (e) {
         return json({ error: String((e as Error).message || e) }, 502);
       }
@@ -669,7 +670,7 @@ Deno.serve(async (req) => {
 
       let token: string;
       try {
-        token = await getSicoobToken("cco_extrato");
+        token = await getSicoobToken("cco_consulta");
       } catch (e) {
         return json({ error: String((e as Error).message || e) }, 502);
       }
