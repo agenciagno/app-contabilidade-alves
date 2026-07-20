@@ -467,7 +467,10 @@ Deno.serve(async (req) => {
               : null;
             if (!referenceMonthOrfao) continue; // sem data suficiente para classificar o mês
 
-            const { error: insErr } = await supabase.from("boleto_controls").insert({
+            // upsert com ignoreDuplicates: a constraint única (company_id, nosso_numero) é quem
+            // garante idempotência de verdade — o Set em memória não protege contra execuções
+            // concorrentes (foi assim que duplicatas entraram antes da constraint existir).
+            const { error: insErr } = await supabase.from("boleto_controls").upsert({
               company_id: COMPANY_ID,
               contact_id: id,
               reference_month: referenceMonthOrfao,
@@ -482,7 +485,7 @@ Deno.serve(async (req) => {
               seu_numero: b.seuNumero ?? null,
               canal_entrega: c.canal_entrega ?? null,
               sicoob_response: b,
-            });
+            }, { onConflict: "company_id,nosso_numero", ignoreDuplicates: true });
             if (!insErr) {
               known.add(nn);
               orfaosInseridos++;
