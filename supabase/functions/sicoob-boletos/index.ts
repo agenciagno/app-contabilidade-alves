@@ -52,6 +52,16 @@ function getDataEmissaoISO(): string {
 
 // Vencimento = dia configurado no perfil do cliente (boleto_due_day), no mês seguinte ao da emissão.
 // Descontos: 3% até dia 24 do mês de emissão, 2% até o último dia do mês de emissão.
+// Desconto sempre deriva do mês de emissão (hoje), independente do vencimento —
+// vale tanto pro ciclo mensal quanto pro boleto avulso.
+function computeDescontoDatas(dataEmissaoISO: string) {
+  const [anoEmi, mesEmi] = dataEmissaoISO.split("-").map(Number);
+  const diaDesc1 = Math.min(24, daysInMonth(anoEmi, mesEmi));
+  const desconto1 = new Date(Date.UTC(anoEmi, mesEmi - 1, diaDesc1));
+  const desconto2 = new Date(Date.UTC(anoEmi, mesEmi, 0)); // último dia do mês de emissão
+  return { desconto1ISO: dateKey(desconto1), desconto2ISO: dateKey(desconto2) };
+}
+
 function computeContactDatas(dataEmissaoISO: string, dueDay: number) {
   const [anoEmi, mesEmi] = dataEmissaoISO.split("-").map(Number); // mesEmi 1-12
   const anoVenc = mesEmi === 12 ? anoEmi + 1 : anoEmi;
@@ -60,14 +70,9 @@ function computeContactDatas(dataEmissaoISO: string, dueDay: number) {
   const diaVenc = Math.min(Math.max(1, dueDay), daysInMonth(anoVenc, mesVenc));
   const vencimento = new Date(Date.UTC(anoVenc, mesVenc - 1, diaVenc));
 
-  const diaDesc1 = Math.min(24, daysInMonth(anoEmi, mesEmi));
-  const desconto1 = new Date(Date.UTC(anoEmi, mesEmi - 1, diaDesc1));
-  const desconto2 = new Date(Date.UTC(anoEmi, mesEmi, 0)); // último dia do mês de emissão
-
   return {
     dataVencimentoISO: dateKey(vencimento),
-    desconto1ISO: dateKey(desconto1),
-    desconto2ISO: dateKey(desconto2),
+    ...computeDescontoDatas(dataEmissaoISO),
   };
 }
 function seuNumeroFor(emissaoMonth: string, document: string | null): string {
@@ -403,6 +408,89 @@ Deno.serve(async (req) => {
       const errors = results.filter((r) => r.status === "error").length;
       const skipped = results.filter((r) => r.status === "skipped").length;
       return json({ ok, errors, skipped, results });
+    }
+
+    // ---------------- GENERATE_SINGLE (boleto avulso: valor e vencimento escolhidos na hora) --
+    if (action === "generate_single") {
+      const contactId: string = payload.contact_id;
+      const valorInput = Number(payload.valor);
+      const vencimentoInput: string = payload.data_vencimento;
+
+      if (!contactId) return json({ error: "Cliente não informado" }, 400);
+      if (!Number.isFinite(valorInput) || valorInput <= 0) return json({ error: "Valor inválido" }, 400);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimentoInput || "")) {
+        return json({ error: "Data de vencimento inválida" }, 400);
+      }
+
+      const c = (contatos || []).find((x: any) => x.id === contactId);
+      if (!c) return json({ error: "Cliente não encontrado ou inativo" }, 404);
+
+      const faltando = missingFields(c);
+      if (faltando.length) return json({ error: `Dados incompletos: ${faltando.join(", ")}` }, 400);
+
+      let token: string;
+      try {
+        token = await getSicoobToken();
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+
+      // Desconto segue a regra do mês de emissão; vencimento é o escolhido na hora (não o
+      // boleto_due_day do cadastro) — por isso não passa por computeContactDatas.
+      const datas: ContactDatas = {
+        dataEmissaoISO,
+        dataVencimentoISO: vencimentoInput,
+        ...computeDescontoDatas(dataEmissaoISO),
+      };
+      // Sufixo de tempo pra não colidir com o seuNumero do ciclo mensal do mesmo cliente/mês.
+      const seuNumero = `${seuNumeroFor(emissaoMonth, c.document)}${String(Date.now()).slice(-4)}`;
+
+      const resp = await criarBoletoSicoob(token, { ...c, boleto_value: valorInput }, datas, seuNumero);
+      if (!resp.ok) {
+        return json({ error: extractSicoobError(resp.data, resp.status) }, 502);
+      }
+      const resultado = resp.data?.resultado ?? resp.data;
+
+      let pdfPath: string | null = null;
+      const pdfB64: string | undefined = resultado?.pdfBoleto;
+      if (pdfB64) {
+        try {
+          const bytes = Uint8Array.from(atob(pdfB64), (ch) => ch.charCodeAt(0));
+          pdfPath = `${emissaoMonth}/${contactId}-avulso-${Date.now()}.pdf`;
+          const up = await supabase.storage.from("boletos").upload(pdfPath, bytes, {
+            contentType: "application/pdf",
+            upsert: true,
+          });
+          if (up.error) pdfPath = null;
+        } catch {
+          pdfPath = null;
+        }
+      }
+
+      const { pdfBoleto: _omit, ...resultadoSemPdf } = resultado || {};
+
+      const { error: insErr } = await supabase.from("boleto_controls").insert({
+        company_id: COMPANY_ID,
+        contact_id: contactId,
+        reference_month: emissaoMonth,
+        status: "PENDENTE",
+        generated_at: new Date().toISOString(),
+        nosso_numero: resultado?.nossoNumero ?? null,
+        linha_digitavel: resultado?.linhaDigitavel ?? null,
+        codigo_barras: resultado?.codigoBarras ?? null,
+        url_qrcode: resultado?.qrCode ?? null,
+        valor: valorInput,
+        data_vencimento: vencimentoInput,
+        seu_numero: seuNumero,
+        canal_entrega: c.canal_entrega,
+        sicoob_response: resultadoSemPdf,
+        pdf_url: pdfPath,
+      });
+      if (insErr) {
+        return json({ error: `Boleto gerado no Sicoob mas falhou ao salvar: ${insErr.message}` }, 500);
+      }
+
+      return json({ ok: true, contact_id: contactId, name: c.name, nosso_numero: resultado?.nossoNumero ?? null, pdf: !!pdfPath });
     }
 
     // ---------------- LIST_CONTACTS (para o "Sincronizar com Sicoob" montar os lotes) ----------------

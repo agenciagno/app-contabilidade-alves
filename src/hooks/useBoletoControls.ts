@@ -205,6 +205,21 @@ export function useBoletoControls(vencimentoMonth: string) {
     return all;
   };
 
+  // 5b. Boleto avulso: um cliente, valor e vencimento escolhidos na hora (fora do ciclo mensal).
+  const generateSingleBoleto = async (
+    contactId: string,
+    valor: number,
+    dataVencimento: string,
+  ): Promise<{ ok: true; name: string | null; nosso_numero: number | null; pdf: boolean }> => {
+    const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
+      body: { action: 'generate_single', contact_id: contactId, valor, data_vencimento: dataVencimento },
+    });
+    if (error) throw new Error(error.message || 'Falha ao gerar boleto');
+    if ((data as any)?.error) throw new Error((data as any).error);
+    queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2'] });
+    return data as any;
+  };
+
   // 6. Sincronizar com o Sicoob: acha boletos registrados lá mas ausentes da tabela local.
   const listSyncContacts = async (): Promise<SyncContact[]> => {
     const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
@@ -263,6 +278,7 @@ export function useBoletoControls(vencimentoMonth: string) {
     resendBilling,
     fetchPreview,
     generateBoletos,
+    generateSingleBoleto,
     listSyncContacts,
     findOrphanBoletos,
     downloadBoletoPdf,

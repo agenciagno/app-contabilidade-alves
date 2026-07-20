@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useBoletoControls, type BoletoWithContact } from '@/hooks/useBoletoControls';
 import { BoletoGenerationDialog } from '@/components/financeiro/BoletoGenerationDialog';
+import { IndividualBoletoDialog } from '@/components/financeiro/IndividualBoletoDialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -99,13 +100,14 @@ export default function Boletos() {
   const [page, setPage] = useState(1);
   const [detailsOf, setDetailsOf] = useState<BoletoWithContact | null>(null);
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [singleOpen, setSingleOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
   const { toast } = useToast();
 
   const {
     boletoList, isLoading, markAsPrinted, resendBilling, fetchPreview, generateBoletos,
-    listSyncContacts, findOrphanBoletos, downloadBoletoPdf,
+    generateSingleBoleto, listSyncContacts, findOrphanBoletos, downloadBoletoPdf,
   } = useBoletoControls(vencimentoMonth);
 
   const handleSync = async () => {
@@ -217,6 +219,14 @@ export default function Boletos() {
           >
             <Zap className="w-4 h-4" />
             Gerar boletos do mês
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setSingleOpen(true)}
+          >
+            <Zap className="w-4 h-4" />
+            Boleto avulso
           </Button>
         </div>
       </div>
@@ -521,6 +531,14 @@ export default function Boletos() {
         onOpenChange={setGenerateOpen}
         fetchPreview={fetchPreview}
         generateBoletos={generateBoletos}
+      />
+
+      {/* Dialog: boleto avulso (busca cliente → valor/vencimento → geração) */}
+      <IndividualBoletoDialog
+        open={singleOpen}
+        onOpenChange={setSingleOpen}
+        fetchPreview={fetchPreview}
+        generateSingleBoleto={generateSingleBoleto}
       />
     </div>
   );
