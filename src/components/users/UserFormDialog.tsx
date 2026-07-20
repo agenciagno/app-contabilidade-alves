@@ -50,6 +50,7 @@ const MODULE_TREE: ModuleNode[] = [
       { key: 'financeiro_pagar_receber', label: 'Pagar/Receber' },
       { key: 'financeiro_boletos', label: 'Boletos' },
       { key: 'financeiro_conta_corrente', label: 'Conta Corrente' },
+      { key: 'financeiro_conciliacao_sicoob', label: 'Conciliação Sicoob' },
       { key: 'financeiro_eventos_contabeis', label: 'Eventos Contábeis' },
       { key: 'financeiro_dre', label: 'DRE' },
     ],

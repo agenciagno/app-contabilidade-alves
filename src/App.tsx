@@ -26,6 +26,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import CrmDispatches from "@/pages/CrmDispatches";
 import ClientReport from "@/pages/ClientReport";
 import Boletos from "@/pages/Boletos";
+import ConciliacaoSicoob from "@/pages/ConciliacaoSicoob";
 import PagarReceber from "@/pages/PagarReceber";
 import Parties from "@/pages/Parties";
 import CashFlow from "@/pages/CashFlow";
@@ -83,6 +84,7 @@ const App = () => (
               <Route path="/relatorio-clientes" element={<AppLayout><ModuleGuard moduleName="contatos"><ClientReport /></ModuleGuard></AppLayout>} />
 
               <Route path="/boletos" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_boletos"><Boletos /></ModuleGuard></AppLayout>} />
+              <Route path="/financeiro/conciliacao-sicoob" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_conciliacao_sicoob"><ConciliacaoSicoob /></ModuleGuard></AppLayout>} />
               <Route path="/fiscal/tarefas" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_tarefas"><FiscalTasks /></ModuleGuard></AppLayout>} />
               <Route path="/fiscal/calendario" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_calendario" requireAdmin><FiscalCalendar /></ModuleGuard></AppLayout>} />
               <Route path="/fiscal/dashboard" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_dashboard" requireAdmin><FiscalDashboard /></ModuleGuard></AppLayout>} />

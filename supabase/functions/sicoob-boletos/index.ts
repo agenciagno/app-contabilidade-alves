@@ -104,12 +104,13 @@ const CONTACT_COLS =
   "id,name,document,email,phone,whatsapp,address,address_number,neighborhood,city,state,cep,boleto_value,boleto_due_day,canal_entrega,enviar_cobranca_auto,numero_cliente_sicoob";
 
 // ---------- Sicoob ----------
-async function getSicoobToken(): Promise<string> {
+// Escopo padrão (boletos). Conta Corrente (extrato/saldo) usa cco_extrato/cco_saldo — precisam
+// estar liberados para o client_id no portal Sicoob, senão a autenticação falha com esse escopo.
+async function getSicoobToken(scope = "boletos_inclusao boletos_consulta"): Promise<string> {
   // @ts-ignore unstable API — mTLS validado no edge runtime
   const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
-  // boletos_inclusao (criar) + boletos_consulta (GET /boletos, /pagadores/{cpf}/boletos)
-  const scope = encodeURIComponent("boletos_inclusao boletos_consulta");
-  const body = `grant_type=client_credentials&client_id=${encodeURIComponent(SICOOB_CLIENT_ID)}&scope=${scope}`;
+  const scopeParam = encodeURIComponent(scope);
+  const body = `grant_type=client_credentials&client_id=${encodeURIComponent(SICOOB_CLIENT_ID)}&scope=${scopeParam}`;
   const res = await fetch(
     "https://auth.sicoob.com.br/auth/realms/cooperado/protocol/openid-connect/token",
     { method: "POST", client, headers: { "Content-Type": "application/x-www-form-urlencoded" }, body },
@@ -150,6 +151,35 @@ async function listarBoletosPorPagador(token: string, cpfCnpj: string) {
       "client_id": SICOOB_CLIENT_ID,
       "Accept": "application/json",
     },
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+// GET /saldo — saldo atual/bloqueado/limite da conta corrente. Só leitura.
+async function consultarSaldo(token: string) {
+  // @ts-ignore unstable API
+  const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+  const url = `https://api.sicoob.com.br/conta-corrente/v4/saldo?numeroContaCorrente=${NUMERO_CONTA}`;
+  const res = await fetch(url, {
+    method: "GET",
+    client,
+    headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Accept": "application/json" },
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+// GET /extrato/{mes}/{ano} — extrato completo da conta corrente (todos os lançamentos, não só
+// boletos: PIX, TED, tarifas, etc.). Só leitura.
+async function consultarExtrato(token: string, mes: number, ano: number) {
+  // @ts-ignore unstable API
+  const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+  const url = `https://api.sicoob.com.br/conta-corrente/v4/extrato/${mes}/${ano}?numeroContaCorrente=${NUMERO_CONTA}`;
+  const res = await fetch(url, {
+    method: "GET",
+    client,
+    headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Accept": "application/json" },
   });
   const data = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, data };
@@ -616,6 +646,36 @@ Deno.serve(async (req) => {
         errors: errors.length,
         details: results.filter((r) => r.orfaos > 0 || r.status === "error"),
       });
+    }
+
+    // ---------------- SALDO (só leitura, Conta Corrente) ----------------
+    if (action === "saldo") {
+      let token: string;
+      try {
+        token = await getSicoobToken("cco_saldo");
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+      const resp = await consultarSaldo(token);
+      if (!resp.ok) return json({ error: extractSicoobError(resp.data, resp.status) }, 502);
+      return json(resp.data?.resultado ?? resp.data);
+    }
+
+    // ---------------- EXTRATO (só leitura, Conta Corrente — mês/ano completos) ----------------
+    if (action === "extrato") {
+      const mes = Number(payload.mes);
+      const ano = Number(payload.ano);
+      if (!mes || mes < 1 || mes > 12 || !ano) return json({ error: "mês/ano inválidos" }, 400);
+
+      let token: string;
+      try {
+        token = await getSicoobToken("cco_extrato");
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+      const resp = await consultarExtrato(token, mes, ano);
+      if (!resp.ok) return json({ error: extractSicoobError(resp.data, resp.status) }, 502);
+      return json(resp.data?.resultado ?? resp.data);
     }
 
     return json({ error: "action inválido" }, 400);

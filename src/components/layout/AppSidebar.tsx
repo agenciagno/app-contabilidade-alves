@@ -28,7 +28,7 @@ import {
   ShieldCheck,
   Contact,
   TrendingUp,
-
+  Landmark,
 
   type LucideIcon,
 } from 'lucide-react';
@@ -186,6 +186,7 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
       { title: 'Fluxo de Caixa', url: '/financeiro/fluxo-caixa', icon: TrendingUp, iconName: 'trending-up' },
       { title: 'Boletos', url: '/boletos', icon: FileCheck, iconName: 'file-check', subKey: 'financeiro_boletos' },
       { title: 'Conta Corrente', url: '/bancos', icon: Building2, iconName: 'building-2', subKey: 'financeiro_conta_corrente' },
+      { title: 'Conciliação Sicoob', url: '/financeiro/conciliacao-sicoob', icon: Landmark, iconName: 'landmark', subKey: 'financeiro_conciliacao_sicoob' },
       { title: 'Eventos Contábeis', url: '/categorias', icon: Tags, iconName: 'tags', subKey: 'financeiro_eventos_contabeis' },
       { title: 'DRE', url: '/dre', icon: FileBarChart, iconName: 'file-bar-chart', subKey: 'financeiro_dre' },
     ],
@@ -210,7 +211,7 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
 
 const SUB_MODULES_BY_PARENT: Record<string, string[]> = {
   fiscal: ['fiscal_dashboard', 'fiscal_tarefas', 'fiscal_calendario', 'fiscal_colaboradores', 'fiscal_monitor_cnpj'],
-  financeiro: ['financeiro_dashboard', 'financeiro_lancamentos', 'financeiro_pagar_receber', 'financeiro_boletos', 'financeiro_conta_corrente', 'financeiro_eventos_contabeis', 'financeiro_dre'],
+  financeiro: ['financeiro_dashboard', 'financeiro_lancamentos', 'financeiro_pagar_receber', 'financeiro_boletos', 'financeiro_conta_corrente', 'financeiro_conciliacao_sicoob', 'financeiro_eventos_contabeis', 'financeiro_dre'],
   tech: ['tech_disparos'],
 };
 
