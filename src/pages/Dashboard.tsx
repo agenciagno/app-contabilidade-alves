@@ -373,6 +373,7 @@ export default function Dashboard() {
       .from('transactions')
       .select('*, category:categories(id, name, color), bank:banks(id, name, color), contact:contacts(id, name, type)')
       .is('deleted_at', null)
+      .eq('is_transfer', false)
       .order('date', { ascending: false });
 
     if (selectedBankId !== 'all') query = query.eq('bank_id', selectedBankId);

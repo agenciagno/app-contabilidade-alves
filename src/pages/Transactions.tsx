@@ -8,7 +8,7 @@ import {
   Plus, Upload, Pencil, Trash2, TrendingUp, TrendingDown, Receipt,
   Download, FileSpreadsheet, FileText, AlertTriangle, Landmark,
   BarChart3, CalendarCheck, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
-  Building2, CheckCircle2, Search, Filter, X, ArrowUpDown, CircleDollarSign
+  Building2, CheckCircle2, Search, Filter, X, ArrowUpDown, CircleDollarSign, ArrowLeftRight
 } from 'lucide-react';
 import { useTransactions, Transaction, TransactionInsert } from '@/hooks/useTransactions';
 import { useServerTransactions, useTransactionKPIs, useDistinctTransactionValues, PAGE_SIZE, ServerFilters, IS_EMPTY } from '@/hooks/useServerTransactions';
@@ -34,6 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { BulkEditDialog } from '@/components/transactions/BulkEditDialog';
 import { BulkSettleDialog } from '@/components/transactions/BulkSettleDialog';
+import { TransferFormDialog, TransferInput } from '@/components/transactions/TransferFormDialog';
 import {
   startOfMonth, endOfMonth, isWithinInterval, parseISO, format
 } from 'date-fns';
@@ -640,7 +641,7 @@ export default function Transactions() {
   // Keep useTransactions for mutations only
   const {
     createTransaction, updateTransaction, deleteTransaction,
-    togglePaid, bulkSettleWithDate, bulkCreateTransactions
+    togglePaid, bulkSettleWithDate, bulkCreateTransactions, createTransfer
   } = useTransactions();
 
   const { categories, createCategory } = useCategories();
@@ -687,6 +688,7 @@ export default function Transactions() {
   const [bulkSettleOpen, setBulkSettleOpen] = useState(false);
   const [defaultType, setDefaultType] = useState<'receita' | 'despesa'>('receita');
   const [importOpen, setImportOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Clear selection when page changes
@@ -855,6 +857,9 @@ export default function Transactions() {
           </DropdownMenu>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setImportOpen(true)}>
             <Upload className="w-4 h-4" /> Importar
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setTransferOpen(true)}>
+            <ArrowLeftRight className="w-4 h-4" /> Transferência
           </Button>
           <Button size="sm" onClick={() => handleNewTransaction('receita')} className="gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white">
             <Plus className="w-4 h-4" /> Nova Movimentação
@@ -1143,8 +1148,13 @@ export default function Transactions() {
                             {isOverdue && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/40 whitespace-nowrap shrink-0">Vencido</span>}
                             {(() => {
                               const isVisualCash = transaction.is_paid && !!transaction.date && !!transaction.due_date && !!transaction.issue_date && transaction.date === transaction.due_date && transaction.due_date === transaction.issue_date;
-                              return isVisualCash ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 whitespace-nowrap shrink-0">À Vista</span> : null;
+                              return isVisualCash && !transaction.is_transfer ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 whitespace-nowrap shrink-0">À Vista</span> : null;
                             })()}
+                            {transaction.is_transfer && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-400 border border-violet-500/30 whitespace-nowrap shrink-0 inline-flex items-center gap-1">
+                                <ArrowLeftRight className="w-2.5 h-2.5" /> Transferência
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="min-w-0 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -1276,6 +1286,14 @@ export default function Transactions() {
         count={selectedIds.size}
         onConfirm={handleBulkSettleConfirm}
         isLoading={bulkSettleWithDate.isPending}
+      />
+
+      <TransferFormDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        banks={banks}
+        onSubmit={(data: TransferInput) => createTransfer.mutate(data, { onSuccess: () => setTransferOpen(false) })}
+        isLoading={createTransfer.isPending}
       />
     </div>
   );

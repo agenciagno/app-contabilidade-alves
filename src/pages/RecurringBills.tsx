@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Pencil, Trash2, TrendingUp, TrendingDown, RefreshCw, Calendar, Users } from 'lucide-react';
+import { Plus, Pencil, Trash2, TrendingUp, TrendingDown, RefreshCw, Calendar, Users, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useRecurringTransactions, RecurringTransaction, RecurringTransactionInsert } from '@/hooks/useRecurringTransactions';
 import { useTransactions } from '@/hooks/useTransactions';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { RecurringFormDialog } from '@/components/recurring/RecurringFormDialog';
 import { DAY_LABELS } from '@/components/recurring/WeekDaysSelector';
 const formatCurrency = (value: number) => {
@@ -39,6 +42,28 @@ export default function RecurringBills() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRecurring, setEditingRecurring] = useState<RecurringTransaction | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // F4 — gera manualmente os recorrentes que vencem hoje (mesma função do cron diário,
+  // com escopo da empresa do usuário). Idempotente: não duplica o que já foi gerado.
+  const handleGenerateNow = async () => {
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.rpc('generate_my_recurring_transactions');
+      if (error) throw error;
+      const n = Number(data ?? 0);
+      toast({ title: n > 0 ? `${n} lançamento(s) gerado(s).` : 'Nenhum recorrente vence hoje (ou já foram gerados).' });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['server-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['transaction-kpis'] });
+    } catch (e: any) {
+      toast({ title: 'Erro ao gerar recorrentes', description: e.message, variant: 'destructive' });
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   // Calculate client fees (recurring revenue from CRM - monthly fees per client)
   const clientFees = useMemo(() => {
@@ -181,12 +206,20 @@ export default function RecurringBills() {
       <div className="flex items-center justify-between py-4 flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Contas Recorrentes</h1>
-          
+          <p className="text-xs text-muted-foreground mt-1">
+            Os lançamentos são gerados automaticamente todo dia às 06h para os recorrentes que vencem no dia.
+          </p>
         </div>
-        <Button onClick={handleCreate} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Nova Recorrente
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleGenerateNow} disabled={generating} className="gap-2">
+            <Zap className="w-4 h-4" />
+            {generating ? 'Gerando...' : 'Gerar de hoje'}
+          </Button>
+          <Button onClick={handleCreate} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Nova Recorrente
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}

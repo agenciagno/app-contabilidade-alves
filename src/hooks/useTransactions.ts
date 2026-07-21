@@ -4,6 +4,68 @@ import { useToast } from '@/hooks/use-toast';
 import { createGlobalLog } from '@/hooks/useGlobalLogs';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
 
+function fmtMoney(v: unknown): string {
+  const n = Number(v ?? 0);
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function fmtDateBR(v: unknown): string {
+  if (!v || typeof v !== 'string') return '—';
+  const [y, m, d] = v.split('-');
+  return d && m && y ? `${d}/${m}/${y}` : v;
+}
+
+// Resolve os nomes das FKs que mudaram, para um histórico legível.
+async function resolveNames(
+  table: 'categories' | 'banks' | 'contacts' | 'parties',
+  ids: (string | null | undefined)[]
+): Promise<Record<string, string>> {
+  const clean = Array.from(new Set(ids.filter((x): x is string => !!x)));
+  if (!clean.length) return {};
+  const nameCol = table === 'parties' ? 'nome' : 'name';
+  const { data } = await supabase.from(table).select(`id, ${nameCol}`).in('id', clean);
+  const map: Record<string, string> = {};
+  (data as any[] | null)?.forEach((row) => { map[row.id] = row[nameCol]; });
+  return map;
+}
+
+// Monta a lista de alterações legíveis entre o lançamento antigo e as atualizações.
+async function buildTransactionDiff(
+  oldRow: Record<string, any>,
+  updates: Record<string, any>
+): Promise<string[]> {
+  const changes: string[] = [];
+  const changed = (k: string) => k in updates && String(oldRow[k] ?? '') !== String(updates[k] ?? '');
+
+  if (changed('amount')) changes.push(`Valor: ${fmtMoney(oldRow.amount)} → ${fmtMoney(updates.amount)}`);
+  if (changed('paid_amount')) changes.push(`Valor pago: ${fmtMoney(oldRow.paid_amount)} → ${fmtMoney(updates.paid_amount)}`);
+  if (changed('description')) changes.push(`Descrição: "${oldRow.description ?? '—'}" → "${updates.description ?? '—'}"`);
+  if (changed('due_date')) changes.push(`Vencimento: ${fmtDateBR(oldRow.due_date)} → ${fmtDateBR(updates.due_date)}`);
+  if (changed('issue_date')) changes.push(`Emissão: ${fmtDateBR(oldRow.issue_date)} → ${fmtDateBR(updates.issue_date)}`);
+  if (changed('expected_date')) changes.push(`Prevista: ${fmtDateBR(oldRow.expected_date)} → ${fmtDateBR(updates.expected_date)}`);
+  if (changed('date')) changes.push(`Pagamento: ${fmtDateBR(oldRow.date)} → ${fmtDateBR(updates.date)}`);
+  if (changed('is_paid')) changes.push(`Situação: ${oldRow.is_paid ? 'Pago' : 'Pendente'} → ${updates.is_paid ? 'Pago' : 'Pendente'}`);
+
+  if (changed('category_id')) {
+    const m = await resolveNames('categories', [oldRow.category_id, updates.category_id]);
+    changes.push(`Evento contábil: ${oldRow.category_id ? (m[oldRow.category_id] ?? '—') : '—'} → ${updates.category_id ? (m[updates.category_id] ?? '—') : '—'}`);
+  }
+  if (changed('bank_id')) {
+    const m = await resolveNames('banks', [oldRow.bank_id, updates.bank_id]);
+    changes.push(`Conta/Banco: ${oldRow.bank_id ? (m[oldRow.bank_id] ?? '—') : '—'} → ${updates.bank_id ? (m[updates.bank_id] ?? '—') : '—'}`);
+  }
+  if (changed('contact_id')) {
+    const m = await resolveNames('contacts', [oldRow.contact_id, updates.contact_id]);
+    changes.push(`Cliente/Fornecedor: ${oldRow.contact_id ? (m[oldRow.contact_id] ?? '—') : '—'} → ${updates.contact_id ? (m[updates.contact_id] ?? '—') : '—'}`);
+  }
+  if (changed('party_id')) {
+    const m = await resolveNames('parties', [oldRow.party_id, updates.party_id]);
+    changes.push(`Contraparte: ${oldRow.party_id ? (m[oldRow.party_id] ?? '—') : '—'} → ${updates.party_id ? (m[updates.party_id] ?? '—') : '—'}`);
+  }
+
+  return changes;
+}
+
 export interface Transaction {
   id: string;
   company_id: string;
@@ -21,6 +83,9 @@ export interface Transaction {
   is_paid: boolean;
   paid_amount: number | null;
   notes: string | null;
+  is_transfer?: boolean;
+  transfer_group_id?: string | null;
+  recurring_id?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
@@ -136,6 +201,13 @@ export function useTransactions() {
 
   const updateTransaction = useMutation({
     mutationFn: async ({ id, ...updates }: TransactionUpdate & { id: string }) => {
+      // Captura o estado anterior para o histórico de alterações (auditoria).
+      const { data: oldRow } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('id', id)
+        .single();
+
       const { data, error } = await supabase
         .from('transactions')
         .update(updates)
@@ -144,6 +216,21 @@ export function useTransactions() {
         .single();
 
       if (error) throw error;
+
+      // Registra o diff legível em global_logs (reaproveita o padrão do módulo).
+      if (oldRow) {
+        const changes = await buildTransactionDiff(oldRow, updates);
+        if (changes.length) {
+          await createGlobalLog({
+            action: 'ALTERACAO',
+            module: 'FINANCEIRO',
+            entityId: id,
+            entityName: (data as any)?.description ?? oldRow.description,
+            details: changes.join(' · '),
+          });
+        }
+      }
+
       return data;
     },
     onSuccess: () => {
@@ -343,9 +430,89 @@ export function useTransactions() {
     },
   });
 
-  // Calculate totals using strict isEffectivelyPaid rule
+  // Transferência entre contas: cria as 2 pernas vinculadas (saída no banco de origem,
+  // entrada no banco de destino). Não entra em receita/despesa (is_transfer=true), mas
+  // afeta o saldo de cada banco via trigger update_bank_balance.
+  const createTransfer = useMutation({
+    mutationFn: async (input: {
+      fromBankId: string;
+      toBankId: string;
+      amount: number;
+      date: string;
+      description?: string | null;
+      notes?: string | null;
+    }) => {
+      if (input.fromBankId === input.toBankId) throw new Error('Origem e destino devem ser contas diferentes.');
+      if (!(input.amount > 0)) throw new Error('Informe um valor maior que zero.');
+      if (!input.date) throw new Error('Informe a data da transferência.');
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+      if (!profile) throw new Error('Perfil não encontrado');
+
+      const groupId = crypto.randomUUID();
+      const baseDesc = input.description?.trim() || 'Transferência entre contas';
+
+      const legs = [
+        { bank_id: input.fromBankId, type: 'despesa' as const, description: `${baseDesc} (saída)` },
+        { bank_id: input.toBankId, type: 'receita' as const, description: `${baseDesc} (entrada)` },
+      ].map((leg) => ({
+        company_id: profile.company_id,
+        bank_id: leg.bank_id,
+        type: leg.type,
+        description: leg.description,
+        amount: input.amount,
+        paid_amount: input.amount,
+        date: input.date,
+        issue_date: input.date,
+        is_paid: true,
+        is_transfer: true,
+        transfer_group_id: groupId,
+        category_id: null,
+        contact_id: null,
+        notes: input.notes || null,
+      }));
+
+      const { error } = await supabase.from('transactions').insert(legs);
+      if (error) throw error;
+
+      await createGlobalLog({
+        action: 'ADICAO',
+        module: 'FINANCEIRO',
+        entityId: groupId,
+        entityName: baseDesc,
+        details: `Transferência de ${fmtMoney(input.amount)} entre contas em ${fmtDateBR(input.date)}`,
+      });
+
+      return { groupId };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['server-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['transaction-kpis'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-prior'] });
+      queryClient.invalidateQueries({ queryKey: ['bank-transactions-period'] });
+      queryClient.invalidateQueries({ queryKey: ['banks'] });
+      queryClient.invalidateQueries({ queryKey: ['global-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['dre-previsto'] });
+      queryClient.invalidateQueries({ queryKey: ['dre-realizado'] });
+      toast({ title: 'Transferência registrada com sucesso!' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro ao registrar transferência', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Calculate totals using strict isEffectivelyPaid rule.
+  // Transferências entre contas não compõem receita/despesa.
   const totals = transactions.reduce(
     (acc, t) => {
+      if (t.is_transfer) return acc;
       const paid = isEffectivelyPaid(t);
       const effectiveAmt = paid && t.paid_amount != null ? Number(t.paid_amount) : Number(t.amount);
       if (t.type === 'receita') {
@@ -369,8 +536,9 @@ export function useTransactions() {
     updateTransaction,
     deleteTransaction,
     togglePaid,
-    
+
     bulkSettleWithDate,
     bulkCreateTransactions,
+    createTransfer,
   };
 }

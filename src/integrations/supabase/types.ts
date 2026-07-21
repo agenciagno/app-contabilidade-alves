@@ -2884,10 +2884,13 @@ export type Database = {
           expected_date: string | null
           id: string
           is_paid: boolean
+          is_transfer: boolean
           issue_date: string | null
           notes: string | null
           paid_amount: number | null
           party_id: string | null
+          recurring_id: string | null
+          transfer_group_id: string | null
           type: string
           updated_at: string
         }
@@ -2905,10 +2908,13 @@ export type Database = {
           expected_date?: string | null
           id?: string
           is_paid?: boolean
+          is_transfer?: boolean
           issue_date?: string | null
           notes?: string | null
           paid_amount?: number | null
           party_id?: string | null
+          recurring_id?: string | null
+          transfer_group_id?: string | null
           type: string
           updated_at?: string
         }
@@ -2926,14 +2932,24 @@ export type Database = {
           expected_date?: string | null
           id?: string
           is_paid?: boolean
+          is_transfer?: boolean
           issue_date?: string | null
           notes?: string | null
           paid_amount?: number | null
           party_id?: string | null
+          recurring_id?: string | null
+          transfer_group_id?: string | null
           type?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "transactions_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_transactions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "transactions_bank_id_fkey"
             columns: ["bank_id"]
@@ -3159,9 +3175,17 @@ export type Database = {
         Returns: undefined
       }
       fn_executar_retencao: { Args: never; Returns: number }
+      generate_due_recurring_transactions: {
+        Args: { p_company_id?: string }
+        Returns: number
+      }
       generate_monthly_fiscal_tasks: {
         Args: { p_month: number; p_year: number }
         Returns: Json
+      }
+      generate_my_recurring_transactions: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       get_annual_metrics: {
         Args: {

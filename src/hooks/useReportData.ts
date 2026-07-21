@@ -48,6 +48,7 @@ export function useReportData(filters: ReportFilters) {
           contact:contacts(id, name, type, tax_regime, phone)
         `)
         .is('deleted_at', null)
+        .eq('is_transfer', false)
         .order('date', { ascending: false });
 
       if (filters.startDate) {

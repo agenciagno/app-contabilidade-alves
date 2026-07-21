@@ -19,12 +19,14 @@ import { Bank, useBanks, BankInsert } from '@/hooks/useBanks';
 import { Contact, useContacts, ContactInsert } from '@/hooks/useContacts';
 import { useParties } from '@/hooks/useParties';
 import { useTransactionAttachments } from '@/hooks/useTransactionAttachments';
+import { useTransactionHistory } from '@/hooks/useTransactionHistory';
+import { useSuggestedCategory } from '@/hooks/useSuggestedCategory';
 import { AttachmentUpload } from './AttachmentUpload';
 import { CategoryFormDialog } from '@/components/categories/CategoryFormDialog';
 import { BankFormDialog } from '@/components/banks/BankFormDialog';
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TrendingUp, TrendingDown, User, Plus, AlertTriangle, CalendarIcon, Repeat } from 'lucide-react';
+import { TrendingUp, TrendingDown, User, Plus, AlertTriangle, CalendarIcon, Repeat, History } from 'lucide-react';
 import { addBusinessDays } from '@/lib/business-days';
 import { isValidDateString } from '@/lib/utils';
 import { generateInstallments, calculateSummary } from '@/hooks/useInstallments';
@@ -103,6 +105,18 @@ export function TransactionFormDialog({
   const { createBank } = useBanks();
   const { createContact } = useContacts();
   const { attachments, uploadAttachment, deleteAttachment } = useTransactionAttachments(transaction?.id);
+
+  // F1 — histórico de alterações (auditoria) do lançamento em edição.
+  const { data: history = [] } = useTransactionHistory(isEditing ? transaction?.id : null);
+
+  // F3 — sugestão de categoria pela última usada com a contraparte (create only).
+  const { data: suggestedCategoryId } = useSuggestedCategory({
+    partyId: partyId || null,
+    contactId: contactId || null,
+    type,
+    enabled: !isEditing && !isSettleMode && open,
+  });
+  const [categoryWasSuggested, setCategoryWasSuggested] = useState(false);
 
   const filteredCategories = categories.filter(c => c.type === type);
   const activeBanks = banks.filter(b => b.is_active);
@@ -192,6 +206,16 @@ export function TransactionFormDialog({
       setCategoryId('');
     }
   }, [type, transaction, categories, categoryId]);
+
+  // F3 — pré-preenche a categoria sugerida quando o usuário ainda não escolheu uma.
+  useEffect(() => {
+    if (isEditing || isSettleMode) return;
+    if (!suggestedCategoryId || categoryId) return;
+    if (categories.some(c => c.id === suggestedCategoryId && c.type === type)) {
+      setCategoryId(suggestedCategoryId);
+      setCategoryWasSuggested(true);
+    }
+  }, [suggestedCategoryId, contactId, partyId, categoryId, isEditing, isSettleMode, categories, type]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => setAmount(formatCurrencyInput(e.target.value));
   const handlePaidAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => setPaidAmount(formatCurrencyInput(e.target.value));
@@ -421,7 +445,7 @@ export function TransactionFormDialog({
     createContact.mutate({ ...data, type: 'cliente' }, { onSuccess: (nc) => { setContactId(nc.id); setContactDialogOpen(false); } });
   };
 
-  const handleCategoryChange = (v: string) => { if (v === '__new__') setCategoryDialogOpen(true); else setCategoryId(v); };
+  const handleCategoryChange = (v: string) => { if (v === '__new__') setCategoryDialogOpen(true); else { setCategoryId(v); setCategoryWasSuggested(false); } };
   const handleBankChange = (v: string) => { if (v === '__new__') setBankDialogOpen(true); else setBankId(v); };
   const handleContactChange = (v: string) => { if (v === '__new__') setContactDialogOpen(true); else setContactId(v); };
 
@@ -564,6 +588,11 @@ export function TransactionFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {categoryWasSuggested && categoryId === suggestedCategoryId && (
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    Sugerido pelo histórico desta contraparte — você pode alterar.
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">
@@ -754,6 +783,37 @@ export function TransactionFormDialog({
                 <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Histórico..." rows={1} className="min-h-[36px] resize-none text-xs" disabled={isSettleMode} />
               </div>
             </div>
+
+            {/* F1 — Histórico de alterações (auditoria) */}
+            {isEditing && (
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <History className="w-3.5 h-3.5 text-muted-foreground" />
+                  Histórico de alterações
+                </Label>
+                {history.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground border rounded-md p-2 bg-muted/20">
+                    Nenhuma alteração registrada ainda.
+                  </p>
+                ) : (
+                  <div className="border rounded-md bg-muted/20 max-h-32 overflow-y-auto divide-y divide-border/40">
+                    {history.map((log) => (
+                      <div key={log.id} className="px-2 py-1.5 text-[11px] leading-snug">
+                        <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                          <span className="font-medium text-foreground">
+                            {log.action === 'ALTERACAO' ? 'Alteração' : log.action === 'ADICAO' ? 'Criação' : log.action === 'EXCLUSAO' ? 'Exclusão' : log.action}
+                          </span>
+                          <span className="shrink-0">
+                            {log.user_name || 'Usuário'} · {new Date(log.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        {log.details && <p className="text-muted-foreground mt-0.5 break-words">{log.details}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Row 5: Buttons */}
             <div className="flex items-center justify-end gap-3 pt-1">
