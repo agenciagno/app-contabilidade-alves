@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { addDays, format, startOfDay, parseISO, isWithinInterval, getDate } from 'date-fns';
 import { useBanks } from './useBanks';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 
 interface ForecastTransaction {
   id: string;
@@ -61,7 +62,8 @@ export interface CashFlowForecastData {
 
 export function useCashFlowForecast(days: number = 30) {
   const { banks = [] } = useBanks();
-  
+  const { activeCompanyId } = useActiveCompany();
+
   // Calculate current balance from all active visible banks (exclude invisible)
   const currentBalance = banks
     .filter(b => b.is_active && !b.is_invisible)
@@ -75,7 +77,7 @@ export function useCashFlowForecast(days: number = 30) {
 
   // Fetch pending transactions for the next X days
   const { data: pendingTransactions = [], isLoading: loadingTransactions } = useQuery({
-    queryKey: ['cash-flow-pending', days, invisibleBankIds],
+    queryKey: ['cash-flow-pending', activeCompanyId, days, invisibleBankIds],
     queryFn: async () => {
       let query = supabase
         .from('transactions')
@@ -89,6 +91,7 @@ export function useCashFlowForecast(days: number = 30) {
           bank_id,
           category:categories(name, color)
         `)
+        .eq('company_id', activeCompanyId!)
         .is('deleted_at', null)
         .eq('is_transfer', false)
         .eq('is_paid', false)
@@ -114,11 +117,12 @@ export function useCashFlowForecast(days: number = 30) {
         isRecurring: false,
       }));
     },
+    enabled: !!activeCompanyId,
   });
 
   // Fetch active recurring transactions
   const { data: recurringTransactions = [], isLoading: loadingRecurring } = useQuery({
-    queryKey: ['cash-flow-recurring', days],
+    queryKey: ['cash-flow-recurring', activeCompanyId, days],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('recurring_transactions')
@@ -133,20 +137,23 @@ export function useCashFlowForecast(days: number = 30) {
           end_date,
           category:categories(name, color)
         `)
+        .eq('company_id', activeCompanyId!)
         .eq('is_active', true);
 
       if (error) throw error;
       return data;
     },
+    enabled: !!activeCompanyId,
   });
 
   // Fetch paid transactions of the past window to reconstruct the REALIZED balance curve.
   const { data: paidHistory = [], isLoading: loadingHistory } = useQuery({
-    queryKey: ['cash-flow-realized', days, invisibleBankIds],
+    queryKey: ['cash-flow-realized', activeCompanyId, days, invisibleBankIds],
     queryFn: async () => {
       let query = supabase
         .from('transactions')
         .select('date, amount, paid_amount, type, bank_id')
+        .eq('company_id', activeCompanyId!)
         .is('deleted_at', null)
         .eq('is_transfer', false)
         .eq('is_paid', true)
@@ -161,6 +168,7 @@ export function useCashFlowForecast(days: number = 30) {
       if (error) throw error;
       return data as { date: string; amount: number; paid_amount: number | null; type: string }[];
     },
+    enabled: !!activeCompanyId,
   });
 
   // Process the forecast data

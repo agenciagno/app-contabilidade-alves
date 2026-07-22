@@ -33,6 +33,7 @@ import { createGlobalLog } from '@/hooks/useGlobalLogs';
 import { toast } from 'sonner';
 import { useDashboardSummary, useAnnualMetrics, useMonthlyEvolution, useCategoryBreakdown } from '@/hooks/useRpcDashboard';
 import { useBanks } from '@/hooks/useBanks';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 import { useRecurringTransactions } from '@/hooks/useRecurringTransactions';
 import { useContacts } from '@/hooks/useContacts';
 import { useCategories } from '@/hooks/useCategories';
@@ -104,6 +105,7 @@ export default function Dashboard() {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const queryClient = useQueryClient();
+  const { activeCompanyId } = useActiveCompany();
   const { banks, isLoading: loadingBanks, createBank } = useBanks();
   const { recurringTransactions } = useRecurringTransactions();
   const { contacts } = useContacts();
@@ -113,17 +115,10 @@ export default function Dashboard() {
   // Inline createTransaction mutation (was previously from useTransactions)
   const createTransaction = useMutation({
     mutationFn: async (transaction: TransactionInsert) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-      if (!profile) throw new Error('Perfil não encontrado');
+      if (!activeCompanyId) throw new Error('Empresa em contexto não definida');
       const { data, error } = await supabase
         .from('transactions')
-        .insert({ ...transaction, company_id: profile.company_id })
+        .insert({ ...transaction, company_id: activeCompanyId })
         .select()
         .single();
       if (error) throw error;
@@ -300,11 +295,13 @@ export default function Dashboard() {
 
   // Pending transactions (unified list - a receber + a pagar) — direct query, top 15
   const { data: pendingTransactions = [], isLoading: loadingPending } = useQuery({
-    queryKey: ['pending-transactions-dashboard'],
+    queryKey: ['pending-transactions-dashboard', activeCompanyId],
+    enabled: !!activeCompanyId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('transactions')
         .select('*, category:categories(id, name, color), bank:banks(id, name, color), contact:contacts(id, name, type)')
+        .eq('company_id', activeCompanyId!)
         .is('deleted_at', null)
         .eq('is_paid', false)
         .order('due_date', { ascending: true, nullsFirst: false })
@@ -374,6 +371,7 @@ export default function Dashboard() {
     let query = supabase
       .from('transactions')
       .select('*, category:categories(id, name, color), bank:banks(id, name, color), contact:contacts(id, name, type)')
+      .eq('company_id', activeCompanyId!)
       .is('deleted_at', null)
       .eq('is_transfer', false)
       .order('date', { ascending: false });

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 
 export interface BankStatementRow {
   id: string;
@@ -41,6 +42,7 @@ function formatDate(dateStr: string) {
 const PAGE_SIZE = 1000;
 
 async function fetchAllPriorRows(
+  companyId: string,
   bankId: string | 'all',
   activeBankIds: string[],
   startDate: string
@@ -51,6 +53,7 @@ async function fetchAllPriorRows(
     let query = supabase
       .from('transactions')
       .select('type, amount, paid_amount, bank_id, is_paid')
+      .eq('company_id', companyId)
       .is('deleted_at', null)
       .lt('date', startDate)
       .eq('is_paid', true);
@@ -76,6 +79,7 @@ async function fetchAllPriorRows(
 }
 
 async function fetchAllPeriodRows(
+  companyId: string,
   bankId: string | 'all',
   activeBankIds: string[],
   startDate?: string | null,
@@ -94,6 +98,7 @@ async function fetchAllPeriodRows(
         categories:category_id (name),
         banks:bank_id (name)
       `)
+      .eq('company_id', companyId)
       .is('deleted_at', null)
       .eq('is_paid', true)
       .order('date', { ascending: true })
@@ -128,18 +133,20 @@ export function useBankTransactions(
   banks: { id: string; initial_balance: number; is_active: boolean }[] = []
 ): BankStatementResult {
   const { bankId, startDate, endDate, contactId, categoryId } = filters;
+  const { activeCompanyId } = useActiveCompany();
   const activeBankIds = banks.filter(b => b.is_active).map(b => b.id);
 
   const { data: priorTransactions = [], isLoading: isLoadingPrior } = useQuery({
-    queryKey: ['bank-transactions-prior', bankId, startDate],
-    queryFn: () => fetchAllPriorRows(bankId, activeBankIds, startDate!),
-    enabled: !!startDate,
+    queryKey: ['bank-transactions-prior', activeCompanyId, bankId, startDate],
+    queryFn: () => fetchAllPriorRows(activeCompanyId!, bankId, activeBankIds, startDate!),
+    enabled: !!startDate && !!activeCompanyId,
     staleTime: 1000 * 30,
   });
 
   const { data: periodTransactions = [], isLoading: isLoadingPeriod } = useQuery({
-    queryKey: ['bank-transactions-period', bankId, startDate, endDate, contactId, categoryId],
-    queryFn: () => fetchAllPeriodRows(bankId, activeBankIds, startDate, endDate, contactId, categoryId),
+    queryKey: ['bank-transactions-period', activeCompanyId, bankId, startDate, endDate, contactId, categoryId],
+    queryFn: () => fetchAllPeriodRows(activeCompanyId!, bankId, activeBankIds, startDate, endDate, contactId, categoryId),
+    enabled: !!activeCompanyId,
     staleTime: 1000 * 30,
   });
 

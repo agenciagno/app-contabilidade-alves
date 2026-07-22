@@ -4,6 +4,7 @@ import { HeartPulse, ShieldCheck, AlertTriangle, ShieldAlert } from 'lucide-reac
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useCashFlowForecast } from '@/hooks/useCashFlowForecast';
 import { useInadimplentContacts } from '@/hooks/useInadimplentContacts';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -15,6 +16,7 @@ type Health = 'saudavel' | 'atencao' | 'critico';
 export function FinancialHealthBadge() {
   const { firstNegativeDate, lowestProjected, currentBalance, isLoading: cashLoading } = useCashFlowForecast(30);
   const { count: inadCount, totalAmount: inadTotal, isLoading: inadLoading } = useInadimplentContacts();
+  const { activeCompanyId } = useActiveCompany();
 
   const monthYear = (() => {
     const d = new Date();
@@ -22,12 +24,13 @@ export function FinancialHealthBadge() {
   })();
 
   const { data: margin, isLoading: marginLoading } = useQuery({
-    queryKey: ['health-margin', monthYear],
+    queryKey: ['health-margin', activeCompanyId, monthYear],
+    enabled: !!activeCompanyId,
     queryFn: async () => {
       const today = new Date();
       const start = `${monthYear}-01`;
       const end = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
-      const { data, error } = await supabase.rpc('get_dashboard_summary', { p_start_date: start, p_end_date: end });
+      const { data, error } = await supabase.rpc('get_dashboard_summary', { p_company_id: activeCompanyId!, p_start_date: start, p_end_date: end });
       if (error) throw error;
       const d = data as any;
       return Number(d?.receitas_pagas ?? 0) - Number(d?.despesas_pagas ?? 0);

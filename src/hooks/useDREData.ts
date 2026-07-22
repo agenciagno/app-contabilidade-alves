@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories, Category } from '@/hooks/useCategories';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 
 
 // Fixed DRE structure matching the PDF layout
@@ -102,25 +103,28 @@ async function fetchAllPaged<T>(
 
 export function useDREData(startDate: string, endDate: string) {
   const { categories } = useCategories();
+  const { activeCompanyId } = useActiveCompany();
 
   // Query for saldo em conta corrente: soma inicial dos bancos + todas as transações pagas até endDate
   const { data: banksInitialTotal = 0 } = useQuery({
-    queryKey: ['dre-banks-initial'],
+    queryKey: ['dre-banks-initial', activeCompanyId],
     queryFn: async () => {
       const rows = await fetchAllPaged<{ initial_balance: number | null }>(() =>
-        supabase.from('banks').select('id, initial_balance')
+        supabase.from('banks').select('id, initial_balance').eq('company_id', activeCompanyId!)
       );
       return rows.reduce((s, b) => s + Number(b.initial_balance ?? 0), 0);
     },
+    enabled: !!activeCompanyId,
   });
 
   const { data: paidUntilEnd = [] } = useQuery({
-    queryKey: ['dre-paid-until', endDate],
+    queryKey: ['dre-paid-until', activeCompanyId, endDate],
     queryFn: async () => {
       return await fetchAllPaged<{ paid_amount: number | null; amount: number; type: string }>(() =>
         supabase
           .from('transactions')
           .select('id, paid_amount, amount, type')
+          .eq('company_id', activeCompanyId!)
           .is('deleted_at', null)
           .eq('is_transfer', false)
           .eq('is_paid', true)
@@ -128,16 +132,17 @@ export function useDREData(startDate: string, endDate: string) {
           .lte('date', endDate)
       );
     },
-    enabled: !!endDate,
+    enabled: !!endDate && !!activeCompanyId,
   });
 
   const { data: previstoTxnsRaw = [] } = useQuery({
-    queryKey: ['dre-previsto', startDate, endDate],
+    queryKey: ['dre-previsto', activeCompanyId, startDate, endDate],
     queryFn: async () => {
       return await fetchAllPaged<{ category_id: string | null; amount: number; type: string; is_paid: boolean; date: string | null }>(() =>
         supabase
           .from('transactions')
           .select('id, category_id, amount, type, is_paid, date')
+          .eq('company_id', activeCompanyId!)
           .is('deleted_at', null)
           .eq('is_transfer', false)
           .not('expected_date', 'is', null)
@@ -145,7 +150,7 @@ export function useDREData(startDate: string, endDate: string) {
           .lte('expected_date', endDate)
       );
     },
-    enabled: !!startDate && !!endDate,
+    enabled: !!startDate && !!endDate && !!activeCompanyId,
   });
 
   // Nova regra do Previsto: se a transação está liquidada, a data de pagamento
@@ -155,12 +160,13 @@ export function useDREData(startDate: string, endDate: string) {
   );
 
   const { data: realizadoTxns = [] } = useQuery({
-    queryKey: ['dre-realizado', startDate, endDate],
+    queryKey: ['dre-realizado', activeCompanyId, startDate, endDate],
     queryFn: async () => {
       return await fetchAllPaged<{ category_id: string | null; paid_amount: number | null; amount: number; type: string }>(() =>
         supabase
           .from('transactions')
           .select('id, category_id, paid_amount, amount, type')
+          .eq('company_id', activeCompanyId!)
           .is('deleted_at', null)
           .eq('is_transfer', false)
           .eq('is_paid', true)
@@ -169,7 +175,7 @@ export function useDREData(startDate: string, endDate: string) {
           .lte('date', endDate)
       );
     },
-    enabled: !!startDate && !!endDate,
+    enabled: !!startDate && !!endDate && !!activeCompanyId,
   });
 
 

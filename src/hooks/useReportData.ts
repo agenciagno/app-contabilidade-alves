@@ -4,6 +4,7 @@ import { format, parseISO, startOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 
 interface ReportFilters {
   startDate?: Date;
@@ -30,8 +31,10 @@ export interface ReportTransaction {
 }
 
 export function useReportData(filters: ReportFilters) {
+  const { activeCompanyId } = useActiveCompany();
   return useQuery({
-    queryKey: ['report-data', filters],
+    queryKey: ['report-data', activeCompanyId, filters],
+    enabled: !!activeCompanyId,
     queryFn: async () => {
       let query = supabase
         .from('transactions')
@@ -47,6 +50,7 @@ export function useReportData(filters: ReportFilters) {
           bank:banks(id, name, color),
           contact:contacts(id, name, type, tax_regime, phone)
         `)
+        .eq('company_id', activeCompanyId!)
         .is('deleted_at', null)
         .eq('is_transfer', false)
         .order('date', { ascending: false });

@@ -3191,6 +3191,7 @@ export type Database = {
         Args: {
           p_bank_id?: string
           p_category_id?: string
+          p_company_id: string
           p_contact_id?: string
           p_year: number
         }
@@ -3199,6 +3200,7 @@ export type Database = {
       get_category_breakdown: {
         Args: {
           p_bank_id?: string
+          p_company_id: string
           p_contact_id?: string
           p_end_date: string
           p_limit?: number
@@ -3211,6 +3213,7 @@ export type Database = {
         Args: {
           p_bank_id?: string
           p_category_id?: string
+          p_company_id: string
           p_contact_id?: string
           p_end_date: string
           p_payment_status?: string
@@ -3226,6 +3229,7 @@ export type Database = {
         Args: {
           p_bank_id?: string
           p_category_id?: string
+          p_company_id: string
           p_contact_id?: string
           p_months?: number
         }
@@ -3235,6 +3239,7 @@ export type Database = {
         Args: {
           p_bank_id?: string
           p_category_id?: string
+          p_company_id: string
           p_contact_id?: string
           p_end_date?: string
           p_payment_status?: string
@@ -3243,6 +3248,14 @@ export type Database = {
           p_type?: string
         }
         Returns: Json
+      }
+      list_client_companies: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          cnpj: string
+          id: string
+          name: string
+        }[]
       }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: { Args: never; Returns: string }

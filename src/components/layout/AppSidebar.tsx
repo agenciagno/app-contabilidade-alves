@@ -40,6 +40,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 
 import { ProfileModal } from '@/components/profile/ProfileModal';
+import { ClientesFinanceiroNav } from '@/components/layout/ClientesFinanceiroNav';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   Sidebar,
@@ -446,10 +447,27 @@ export function AppSidebar() {
             </SidebarGroup>
           )}
 
-          {/* Menu entries */}
-          {/* Menu entries */}
+          {/* Seção CA — Interno */}
+          {showLabels && (
+            <div className="px-3 pt-2 pb-1 text-[11px] uppercase tracking-[0.05em] font-semibold text-muted-foreground/70">
+              CA — Interno
+            </div>
+          )}
           {visibleEntries.map(entry =>
             entry.kind === 'simple' ? renderSimpleEntry(entry) : renderCollapsibleEntry(entry)
+          )}
+
+          {/* Seção Financeiro dos Clientes — só super admin */}
+          {isSuperAdmin && (
+            <>
+              <Separator className="my-2 bg-sidebar-border" />
+              {showLabels && (
+                <div className="px-3 pt-1 pb-1 text-[11px] uppercase tracking-[0.05em] font-semibold text-primary/80">
+                  Financeiro dos Clientes
+                </div>
+              )}
+              <ClientesFinanceiroNav showLabels={showLabels} onNavigate={handleMobileNav} />
+            </>
           )}
 
         </SidebarContent>

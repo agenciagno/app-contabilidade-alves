@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Transaction } from '@/hooks/useTransactions';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 
 export const PAGE_SIZE = 99;
 export const IS_EMPTY = '__IS_EMPTY_OR_NULL__';
@@ -179,9 +180,11 @@ function applyFilters(
 export function useServerTransactions(page: number, filters: ServerFilters) {
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
+  const { activeCompanyId } = useActiveCompany();
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ['server-transactions', page, filters],
+    queryKey: ['server-transactions', activeCompanyId, page, filters],
+    enabled: !!activeCompanyId,
     queryFn: async () => {
       let query = supabase
         .from('transactions')
@@ -190,7 +193,8 @@ export function useServerTransactions(page: number, filters: ServerFilters) {
           category:categories(id, name, color),
           bank:banks(id, name, color),
           contact:contacts(id, name, type)
-        `, { count: 'exact' });
+        `, { count: 'exact' })
+        .eq('company_id', activeCompanyId!);
 
       query = applyFilters(query, filters);
 
@@ -232,6 +236,7 @@ export function useServerTransactions(page: number, filters: ServerFilters) {
 
 // Separate KPI query — delegates aggregation to Postgres RPC `get_transaction_kpis`
 export function useTransactionKPIs(filters: ServerFilters) {
+  const { activeCompanyId } = useActiveCompany();
   const cf = filters.columnFilters;
 
   // Map ServerFilters → RPC scalar params (single-value RPC).
@@ -263,6 +268,7 @@ export function useTransactionKPIs(filters: ServerFilters) {
   const p_search = filters.searchTerm || null;
 
   const rpcParams = {
+    p_company_id: activeCompanyId,
     p_start_date,
     p_end_date,
     p_type,
@@ -275,8 +281,9 @@ export function useTransactionKPIs(filters: ServerFilters) {
 
   const { data, isLoading } = useQuery({
     queryKey: ['transaction-kpis', rpcParams],
+    enabled: !!activeCompanyId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_transaction_kpis', rpcParams);
+      const { data, error } = await supabase.rpc('get_transaction_kpis', rpcParams as any);
       if (error) throw error;
       const d = data as any;
       return {
@@ -306,11 +313,12 @@ export function useDistinctTransactionValues(
   filters: ServerFilters,
   enabled: boolean
 ) {
+  const { activeCompanyId } = useActiveCompany();
   const { data, isFetching } = useQuery({
-    queryKey: ['distinct-transaction-values', column, filters],
-    enabled,
+    queryKey: ['distinct-transaction-values', activeCompanyId, column, filters],
+    enabled: enabled && !!activeCompanyId,
     queryFn: async () => {
-      let query = supabase.from('transactions').select(column);
+      let query = supabase.from('transactions').select(column).eq('company_id', activeCompanyId!);
       query = applyFilters(query, filters, column);
       query = query.limit(5000);
       const { data, error } = await query;

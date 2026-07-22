@@ -6,8 +6,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { CompanyProvider } from "@/contexts/CompanyContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ModuleGuard } from "@/components/auth/ModuleGuard";
+import { ClientesFinanceiroGuard } from "@/components/auth/ClientesFinanceiroGuard";
 import { PwaUpdateBanner } from "@/components/PwaUpdateBanner";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 
@@ -60,6 +62,7 @@ const App = () => (
           <PwaUpdateBanner />
           <PwaInstallBanner />
           <BrowserRouter>
+            <CompanyProvider>
             <NotificationProvider>
               <Routes>
               <Route path="/auth" element={<Auth />} />
@@ -99,10 +102,19 @@ const App = () => (
               <Route path="/tech/operacao" element={<AppLayout><TechOperacao /></AppLayout>} />
               <Route path="/tech/lgpd" element={<AppLayout><TechLGPD /></AppLayout>} />
 
+              {/* Financeiro dos Clientes — mesmos componentes, empresa em contexto = cliente selecionado.
+                  Prefixo /clientes/* isolado pra, no futuro, trocar só a fonte de dados sem reforma de UI. */}
+              <Route path="/clientes/financeiro" element={<AppLayout><ClientesFinanceiroGuard><Dashboard /></ClientesFinanceiroGuard></AppLayout>} />
+              <Route path="/clientes/financeiro/lancamentos" element={<AppLayout><ClientesFinanceiroGuard><Transactions /></ClientesFinanceiroGuard></AppLayout>} />
+              <Route path="/clientes/financeiro/pagar-receber" element={<AppLayout><ClientesFinanceiroGuard><PagarReceber /></ClientesFinanceiroGuard></AppLayout>} />
+              <Route path="/clientes/financeiro/conta-corrente" element={<AppLayout><ClientesFinanceiroGuard><Banks /></ClientesFinanceiroGuard></AppLayout>} />
+              <Route path="/clientes/financeiro/dre" element={<AppLayout><ClientesFinanceiroGuard><DRE /></ClientesFinanceiroGuard></AppLayout>} />
+              <Route path="/clientes/financeiro/fluxo-caixa" element={<AppLayout><ClientesFinanceiroGuard><CashFlow /></ClientesFinanceiroGuard></AppLayout>} />
 
               <Route path="*" element={<NotFound />} />
               </Routes>
             </NotificationProvider>
+            </CompanyProvider>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

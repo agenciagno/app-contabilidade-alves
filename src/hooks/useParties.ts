@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useCompany } from '@/hooks/useCompany';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 import { toast } from 'sonner';
 
 export type PartyTipo = 'cliente' | 'fornecedor' | 'ambos';
@@ -31,8 +31,8 @@ export interface PartyInput {
 
 export const useParties = () => {
   const qc = useQueryClient();
-  const { company } = useCompany();
-  const companyId = company?.id;
+  const { activeCompanyId } = useActiveCompany();
+  const companyId = activeCompanyId;
 
   const query = useQuery({
     queryKey: ['parties', companyId],
@@ -40,6 +40,7 @@ export const useParties = () => {
       const { data, error } = await supabase
         .from('parties')
         .select('*')
+        .eq('company_id', companyId!)
         .order('nome', { ascending: true });
       if (error) throw error;
       return (data ?? []) as Party[];

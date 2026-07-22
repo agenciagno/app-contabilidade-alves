@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useCompany } from '@/hooks/useCompany';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 import { useCategories } from '@/hooks/useCategories';
 import { createGlobalLog } from '@/hooks/useGlobalLogs';
 
@@ -22,8 +22,8 @@ export interface BudgetRow {
 export function useBudgets(monthYear: string) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { company } = useCompany();
-  const companyId = company?.id;
+  const { activeCompanyId } = useActiveCompany();
+  const companyId = activeCompanyId;
   const { categories } = useCategories();
 
   const start = `${monthYear}-01`;
@@ -38,6 +38,7 @@ export function useBudgets(monthYear: string) {
       const { data, error } = await supabase
         .from('dre_budgets')
         .select('id, category_id, budget_value')
+        .eq('company_id', companyId!)
         .eq('month_year', monthYear);
       if (error) throw error;
       return (data ?? []) as { id: string; category_id: string; budget_value: number }[];
@@ -49,6 +50,7 @@ export function useBudgets(monthYear: string) {
     enabled: !!companyId,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_category_breakdown', {
+        p_company_id: companyId!,
         p_type: 'despesa',
         p_start_date: start,
         p_end_date: end,

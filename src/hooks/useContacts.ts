@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { createAuditLog, getFieldChanges } from '@/hooks/useAuditLog';
 import { createGlobalLog } from '@/hooks/useGlobalLogs';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 
 export type TaxRegime = 'mei' | 'simples_nacional' | 'lucro_presumido' | 'lucro_real' | 'nao_aplica';
 
@@ -106,38 +107,32 @@ export type ContactUpdate = Partial<ContactInsert>;
 export function useContacts() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { activeCompanyId } = useActiveCompany();
 
   const { data: contacts = [], isLoading, error } = useQuery({
-    queryKey: ['contacts'],
+    queryKey: ['contacts', activeCompanyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('contacts')
         .select('*')
+        .eq('company_id', activeCompanyId!)
         .order('name', { ascending: true });
 
       if (error) throw error;
       return data as Contact[];
     },
+    enabled: !!activeCompanyId,
     staleTime: 1000 * 30,
     gcTime: 1000 * 60 * 5,
   });
 
   const createContact = useMutation({
     mutationFn: async (contact: ContactInsert) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) throw new Error('Perfil não encontrado');
+      if (!activeCompanyId) throw new Error('Empresa em contexto não definida');
 
       const { data, error } = await supabase
         .from('contacts')
-        .insert({ ...contact, company_id: profile.company_id })
+        .insert({ ...contact, company_id: activeCompanyId })
         .select()
         .single();
 

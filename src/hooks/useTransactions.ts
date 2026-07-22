@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { createGlobalLog } from '@/hooks/useGlobalLogs';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 
 function fmtMoney(v: unknown): string {
   const n = Number(v ?? 0);
@@ -116,9 +117,10 @@ export type TransactionUpdate = Partial<TransactionInsert>;
 export function useTransactions() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { activeCompanyId } = useActiveCompany();
 
   const { data: transactions = [], isLoading, error } = useQuery({
-    queryKey: ['transactions'],
+    queryKey: ['transactions', activeCompanyId],
     queryFn: async () => {
       const seen = new Map<string, Transaction>();
       const PAGE_SIZE = 1000;
@@ -132,6 +134,7 @@ export function useTransactions() {
             bank:banks(id, name, color),
             contact:contacts(id, name, type)
           `)
+          .eq('company_id', activeCompanyId!)
           .is('deleted_at', null)
           .order('created_at', { ascending: false })
           .order('id', { ascending: false })
@@ -146,26 +149,18 @@ export function useTransactions() {
       }
       return Array.from(seen.values());
     },
+    enabled: !!activeCompanyId,
     staleTime: 1000 * 30, // 30 seconds - data is fresh
     gcTime: 1000 * 60 * 5, // 5 minutes - garbage collection
   });
 
   const createTransaction = useMutation({
     mutationFn: async (transaction: TransactionInsert) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) throw new Error('Perfil não encontrado');
+      if (!activeCompanyId) throw new Error('Empresa em contexto não definida');
 
       const { data, error } = await supabase
         .from('transactions')
-        .insert({ ...transaction, company_id: profile.company_id })
+        .insert({ ...transaction, company_id: activeCompanyId })
         .select()
         .single();
 
@@ -382,20 +377,11 @@ export function useTransactions() {
 
   const bulkCreateTransactions = useMutation({
     mutationFn: async (transactions: TransactionInsert[]) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) throw new Error('Perfil não encontrado');
+      if (!activeCompanyId) throw new Error('Empresa em contexto não definida');
 
       const withCompany = transactions.map(t => ({
         ...t,
-        company_id: profile.company_id,
+        company_id: activeCompanyId,
       }));
 
       const BATCH_SIZE = 500;
@@ -445,15 +431,7 @@ export function useTransactions() {
       if (input.fromBankId === input.toBankId) throw new Error('Origem e destino devem ser contas diferentes.');
       if (!(input.amount > 0)) throw new Error('Informe um valor maior que zero.');
       if (!input.date) throw new Error('Informe a data da transferência.');
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-      if (!profile) throw new Error('Perfil não encontrado');
+      if (!activeCompanyId) throw new Error('Empresa em contexto não definida');
 
       const groupId = crypto.randomUUID();
       const baseDesc = input.description?.trim() || 'Transferência entre contas';
@@ -462,7 +440,7 @@ export function useTransactions() {
         { bank_id: input.fromBankId, type: 'despesa' as const, description: `${baseDesc} (saída)` },
         { bank_id: input.toBankId, type: 'receita' as const, description: `${baseDesc} (entrada)` },
       ].map((leg) => ({
-        company_id: profile.company_id,
+        company_id: activeCompanyId,
         bank_id: leg.bank_id,
         type: leg.type,
         description: leg.description,

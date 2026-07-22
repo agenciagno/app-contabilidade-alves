@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useActiveCompany } from "@/contexts/CompanyContext";
 
 interface DashboardSummary {
   receitas_pagas: number;
@@ -40,10 +41,13 @@ export function useDashboardSummary(
     paymentStatus?: string;
   }
 ) {
+  const { activeCompanyId } = useActiveCompany();
   return useQuery({
-    queryKey: ["dashboard-summary", startDate, endDate, filters],
+    queryKey: ["dashboard-summary", activeCompanyId, startDate, endDate, filters],
+    enabled: !!activeCompanyId,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_dashboard_summary", {
+        p_company_id: activeCompanyId!,
         p_start_date: startDate,
         p_end_date: endDate,
         p_bank_id: filters?.bankId || null,
@@ -65,10 +69,13 @@ export function useAnnualMetrics(
     contactId?: string;
   }
 ) {
+  const { activeCompanyId } = useActiveCompany();
   return useQuery({
-    queryKey: ["annual-metrics", year, filters],
+    queryKey: ["annual-metrics", activeCompanyId, year, filters],
+    enabled: !!activeCompanyId,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_annual_metrics", {
+        p_company_id: activeCompanyId!,
         p_year: year,
         p_bank_id: filters?.bankId || null,
         p_category_id: filters?.categoryId || null,
@@ -88,10 +95,13 @@ export function useMonthlyEvolution(
     contactId?: string;
   }
 ) {
+  const { activeCompanyId } = useActiveCompany();
   return useQuery({
-    queryKey: ["monthly-evolution", months, filters],
+    queryKey: ["monthly-evolution", activeCompanyId, months, filters],
+    enabled: !!activeCompanyId,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_monthly_evolution", {
+        p_company_id: activeCompanyId!,
         p_months: months,
         p_bank_id: filters?.bankId || null,
         p_category_id: filters?.categoryId || null,
@@ -113,10 +123,13 @@ export function useCategoryBreakdown(
     contactId?: string;
   }
 ) {
+  const { activeCompanyId } = useActiveCompany();
   return useQuery({
-    queryKey: ["category-breakdown", type, startDate, endDate, limit, filters],
+    queryKey: ["category-breakdown", activeCompanyId, type, startDate, endDate, limit, filters],
+    enabled: !!activeCompanyId,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_category_breakdown", {
+        p_company_id: activeCompanyId!,
         p_type: type,
         p_start_date: startDate,
         p_end_date: endDate,

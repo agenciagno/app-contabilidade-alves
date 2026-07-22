@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 
 export interface Category {
   id: string;
@@ -21,39 +22,32 @@ export type CategoryUpdate = Partial<Omit<Category, 'id' | 'company_id' | 'creat
 export function useCategories() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { activeCompanyId } = useActiveCompany();
 
   const { data: categories = [], isLoading, error } = useQuery({
-    queryKey: ['categories'],
+    queryKey: ['categories', activeCompanyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('categories')
         .select('*')
+        .eq('company_id', activeCompanyId!)
         .order('name');
-      
+
       if (error) throw error;
       return data as Category[];
     },
+    enabled: !!activeCompanyId,
     staleTime: 1000 * 60, // 1 minute - categories change less often
     gcTime: 1000 * 60 * 10,
   });
 
   const createCategory = useMutation({
     mutationFn: async (category: Omit<CategoryInsert, 'company_id'>) => {
-      // Get user's company_id from profile
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) throw new Error('Perfil não encontrado');
+      if (!activeCompanyId) throw new Error('Empresa em contexto não definida');
 
       const { data, error } = await supabase
         .from('categories')
-        .insert({ ...category, company_id: profile.company_id })
+        .insert({ ...category, company_id: activeCompanyId })
         .select()
         .single();
 

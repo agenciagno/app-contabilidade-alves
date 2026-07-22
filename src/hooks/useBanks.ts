@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { createGlobalLog } from '@/hooks/useGlobalLogs';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 
 export interface Bank {
   id: string;
@@ -25,41 +26,35 @@ export type BankUpdate = Partial<Omit<Bank, 'id' | 'company_id' | 'created_at' |
 export function useBanks() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { activeCompanyId } = useActiveCompany();
 
   const { data: banks = [], isLoading, error } = useQuery({
-    queryKey: ['banks'],
+    queryKey: ['banks', activeCompanyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('banks')
         .select('*')
+        .eq('company_id', activeCompanyId!)
         .order('name');
-      
+
       if (error) throw error;
       return data as Bank[];
     },
+    enabled: !!activeCompanyId,
     staleTime: 1000 * 30,
     gcTime: 1000 * 60 * 5,
   });
 
   const createBank = useMutation({
     mutationFn: async (bank: Omit<BankInsert, 'company_id'>) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) throw new Error('Perfil não encontrado');
+      if (!activeCompanyId) throw new Error('Empresa em contexto não definida');
 
       const { data, error } = await supabase
         .from('banks')
-        .insert({ 
-          ...bank, 
-          company_id: profile.company_id,
-          current_balance: bank.initial_balance 
+        .insert({
+          ...bank,
+          company_id: activeCompanyId,
+          current_balance: bank.initial_balance
         })
         .select()
         .single();

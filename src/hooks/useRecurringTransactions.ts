@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { createGlobalLog } from '@/hooks/useGlobalLogs';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 
 export interface RecurringTransaction {
   id: string;
@@ -49,9 +50,11 @@ export type RecurringTransactionUpdate = Partial<RecurringTransactionInsert>;
 export function useRecurringTransactions() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { activeCompanyId } = useActiveCompany();
 
   const { data: recurringTransactions = [], isLoading, error } = useQuery({
-    queryKey: ['recurring_transactions'],
+    queryKey: ['recurring_transactions', activeCompanyId],
+    enabled: !!activeCompanyId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('recurring_transactions')
@@ -61,6 +64,7 @@ export function useRecurringTransactions() {
           bank:banks(id, name, color),
           contact:contacts(id, name, type)
         `)
+        .eq('company_id', activeCompanyId!)
         .order('description');
 
       if (error) throw error;
@@ -77,21 +81,12 @@ export function useRecurringTransactions() {
 
   const createRecurring = useMutation({
     mutationFn: async (recurring: RecurringTransactionInsert) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) throw new Error('Perfil não encontrado');
+      if (!activeCompanyId) throw new Error('Empresa em contexto não definida');
 
       // Convert days_of_week array to JSON string for storage
       const dataToInsert = {
         ...recurring,
-        company_id: profile.company_id,
+        company_id: activeCompanyId,
         days_of_week: recurring.days_of_week ? JSON.stringify(recurring.days_of_week) : null
       };
 

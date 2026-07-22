@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfDay, parseISO, isToday, differenceInDays, format, addDays } from 'date-fns';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 
 export type NotificationType = 'error' | 'warning' | 'success' | 'info';
 
@@ -44,6 +45,9 @@ interface SimpleTransaction {
 }
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
+  // As notificações são sempre da própria empresa (a CA), nunca do cliente que
+  // estiver sendo visitado — por isso fixamos em ownCompanyId, não activeCompanyId.
+  const { ownCompanyId } = useActiveCompany();
   const [manualNotifications, setManualNotifications] = useState<Notification[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(() => {
     try {
@@ -56,16 +60,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   // Direct query for transactions (no toast dependency)
   const { data: transactions = [] } = useQuery({
-    queryKey: ['notifications-transactions'],
+    queryKey: ['notifications-transactions', ownCompanyId],
+    enabled: !!ownCompanyId,
     queryFn: async () => {
       try {
         const { data, error } = await supabase
           .from('transactions')
           .select('id, amount, due_date, is_paid, contact_id, bank_id, type, contact:contacts(id, name)')
+          .eq('company_id', ownCompanyId!)
           .is('deleted_at', null)
           .eq('is_paid', false)
           .not('due_date', 'is', null);
-        
+
         if (error) return [];
         return data as SimpleTransaction[];
       } catch {
@@ -79,13 +85,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   // Direct query for banks to calculate cash flow (exclude invisible)
   const { data: banksData = [] } = useQuery({
-    queryKey: ['notifications-banks'],
+    queryKey: ['notifications-banks', ownCompanyId],
+    enabled: !!ownCompanyId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('banks')
         .select('id, current_balance, is_invisible')
+        .eq('company_id', ownCompanyId!)
         .eq('is_active', true);
-      
+
       if (error) return [];
       return data;
     },
@@ -97,11 +105,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // Orçamentos do mês corrente + realizado por categoria (para alerta de estouro).
   const monthYear = format(startOfDay(new Date()), 'yyyy-MM');
   const { data: budgetsData = [] } = useQuery({
-    queryKey: ['notif-budgets', monthYear],
+    queryKey: ['notif-budgets', ownCompanyId, monthYear],
+    enabled: !!ownCompanyId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('dre_budgets')
         .select('category_id, budget_value')
+        .eq('company_id', ownCompanyId!)
         .eq('month_year', monthYear);
       if (error) return [];
       return data as { category_id: string; budget_value: number }[];
@@ -112,14 +122,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   });
 
   const { data: budgetRealizado = {} } = useQuery({
-    queryKey: ['notif-budget-realizado', monthYear],
-    enabled: budgetsData.length > 0,
+    queryKey: ['notif-budget-realizado', ownCompanyId, monthYear],
+    enabled: budgetsData.length > 0 && !!ownCompanyId,
     queryFn: async () => {
       const today = new Date();
       const start = `${monthYear}-01`;
       const end = format(new Date(today.getFullYear(), today.getMonth() + 1, 0), 'yyyy-MM-dd');
       const { data, error } = await supabase.rpc('get_category_breakdown', {
-        p_type: 'despesa', p_start_date: start, p_end_date: end, p_limit: 1000,
+        p_company_id: ownCompanyId!, p_type: 'despesa', p_start_date: start, p_end_date: end, p_limit: 1000,
       });
       if (error) return {} as Record<string, { total: number; name: string }>;
       const map: Record<string, { total: number; name: string }> = {};
