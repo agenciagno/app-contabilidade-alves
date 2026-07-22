@@ -3335,14 +3335,6 @@ export type Database = {
       }
       is_company_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
-      list_client_companies: {
-        Args: never
-        Returns: {
-          cnpj: string
-          id: string
-          name: string
-        }[]
-      }
       log_data_access: {
         Args: {
           p_acao: string

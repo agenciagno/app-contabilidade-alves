@@ -30,6 +30,7 @@ import {
   TrendingUp,
   Landmark,
   BellRing,
+  Target,
 
   type LucideIcon,
 } from 'lucide-react';
@@ -41,7 +42,6 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 
 import { ProfileModal } from '@/components/profile/ProfileModal';
-import { ClientesFinanceiroNav } from '@/components/layout/ClientesFinanceiroNav';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   Sidebar,
@@ -110,6 +110,8 @@ type MenuEntry = SimpleModule | CollapsibleModule;
 
 interface SubMenuItem extends MenuItem {
   subKey?: string;
+  /** Rótulo de um mini-divisor visual exibido ANTES deste item, dentro do mesmo menu. */
+  sectionBreak?: string;
 }
 
 interface CollapsibleModuleExt {
@@ -139,7 +141,8 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
       { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'tech_disparos' },
       { title: 'Operação Interna', url: '/tech/operacao', icon: Gauge, iconName: 'gauge' },
       { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check' },
-
+      { title: 'Cadastrar Cliente', url: '/admin/provisionar-cliente', icon: UserPlus, iconName: 'user-plus' },
+      { title: 'Central de Notificações', url: '/central-notificacoes', icon: BellRing, iconName: 'bell-ring' },
     ],
   },
 
@@ -184,13 +187,15 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
       { title: 'Dashboard', url: '/painel-financeiro', icon: LayoutDashboard, iconName: 'layout-dashboard', subKey: 'financeiro_dashboard' },
       { title: 'Lançamentos', url: '/movimentacoes', icon: ArrowLeftRight, iconName: 'arrow-left-right', subKey: 'financeiro_lancamentos' },
       { title: 'Pagar/Receber', url: '/financeiro/pagar-receber', icon: ArrowUpDown, iconName: 'arrow-up-down', subKey: 'financeiro_pagar_receber' },
-      { title: 'Clientes & Fornecedores', url: '/financeiro/clientes-fornecedores', icon: Contact, iconName: 'contact' },
       { title: 'Fluxo de Caixa', url: '/financeiro/fluxo-caixa', icon: TrendingUp, iconName: 'trending-up' },
       { title: 'Boletos', url: '/boletos', icon: FileCheck, iconName: 'file-check', subKey: 'financeiro_boletos' },
       { title: 'Conta Corrente', url: '/bancos', icon: Building2, iconName: 'building-2', subKey: 'financeiro_conta_corrente' },
       { title: 'Conciliação Sicoob', url: '/financeiro/conciliacao-sicoob', icon: Landmark, iconName: 'landmark', subKey: 'financeiro_conciliacao_sicoob' },
       { title: 'Eventos Contábeis', url: '/categorias', icon: Tags, iconName: 'tags', subKey: 'financeiro_eventos_contabeis' },
       { title: 'DRE', url: '/dre', icon: FileBarChart, iconName: 'file-bar-chart', subKey: 'financeiro_dre' },
+      { title: 'Clientes & Fornecedores', url: '/financeiro/clientes-fornecedores', icon: Contact, iconName: 'contact', sectionBreak: 'Módulo vendido a clientes' },
+      { title: 'Categorias', url: '/categorias', icon: Tags, iconName: 'tags' },
+      { title: 'Metas & Orçamentos', url: '/financeiro/metas-orcamentos', icon: Target, iconName: 'target' },
     ],
   },
   {
@@ -376,12 +381,21 @@ export function AppSidebar() {
               {entry.items
                 .filter((item) => item.url !== '/tech/operacao' || isSuperAdmin)
                 .filter((item) => item.url !== '/tech/lgpd' || isAdmin || isSuperAdmin)
-
+                .filter((item) => item.url !== '/admin/provisionar-cliente' || isSuperAdmin)
+                .filter((item) => item.url !== '/central-notificacoes' || isSuperAdmin)
                 .filter((item) => (!['/fiscal/calendario', '/fiscal/dashboard', '/fiscal/colaboradores', '/fiscal/monitor-cnpj'].includes(item.url)) || isAdmin || isSuperAdmin)
                 .filter((item) => isSubItemVisible(entry.moduleKey, item.subKey))
                 .map((item) => (
 
                 <SidebarMenuItem key={item.title}>
+                  {item.sectionBreak && showLabels && (
+                    <div className="px-3 pt-3 pb-1 text-[10px] uppercase tracking-[0.05em] text-muted-foreground/50 border-t border-sidebar-border/60 mt-1">
+                      {item.sectionBreak}
+                    </div>
+                  )}
+                  {item.sectionBreak && !showLabels && (
+                    <Separator className="my-1.5 mx-2 w-auto bg-sidebar-border/60" />
+                  )}
                   <SidebarMenuButton asChild tooltip={item.title}>
                     <NavLink onClick={handleMobileNav}
                       to={item.url}
@@ -448,66 +462,14 @@ export function AppSidebar() {
             </SidebarGroup>
           )}
 
-          {/* Seção CA — Interno */}
-          {showLabels && (
-            <div className="px-3 pt-2 pb-1 text-[11px] uppercase tracking-[0.05em] font-semibold text-muted-foreground/70">
-              CA — Interno
-            </div>
-          )}
           {visibleEntries.map(entry =>
             entry.kind === 'simple' ? renderSimpleEntry(entry) : renderCollapsibleEntry(entry)
-          )}
-
-          {/* Seção Financeiro dos Clientes — só super admin */}
-          {isSuperAdmin && (
-            <>
-              <Separator className="my-2 bg-sidebar-border" />
-              {showLabels && (
-                <div className="px-3 pt-1 pb-1 text-[11px] uppercase tracking-[0.05em] font-semibold text-primary/80">
-                  Financeiro dos Clientes
-                </div>
-              )}
-              <ClientesFinanceiroNav showLabels={showLabels} onNavigate={handleMobileNav} />
-            </>
           )}
 
         </SidebarContent>
 
         <SidebarFooter className="p-4">
           <SidebarMenu>
-            {isSuperAdmin && (
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Cadastrar Cliente">
-                  <NavLink onClick={handleMobileNav}
-                    to="/admin/provisionar-cliente"
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] text-muted-foreground hover:bg-accent hover:text-foreground transition-[background,color] duration-[120ms]"
-                    activeClassName="bg-accent text-foreground font-semibold"
-
-                  >
-                    <UserPlus className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
-                    {showLabels && (
-                      <span className="flex-1">Cadastrar Cliente</span>
-                    )}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {isSuperAdmin && (
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Central de Notificações">
-                  <NavLink onClick={handleMobileNav}
-                    to="/central-notificacoes"
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] text-muted-foreground hover:bg-accent hover:text-foreground transition-[background,color] duration-[120ms]"
-                    activeClassName="bg-accent text-foreground font-semibold"
-                  >
-                    <BellRing className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
-                    {showLabels && (
-                      <span className="flex-1">Central de Notificações</span>
-                    )}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
             {showSettings && (
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Configurações">

@@ -6,10 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
-import { CompanyProvider } from "@/contexts/CompanyContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ModuleGuard } from "@/components/auth/ModuleGuard";
-import { ClientesFinanceiroGuard } from "@/components/auth/ClientesFinanceiroGuard";
 import { PwaUpdateBanner } from "@/components/PwaUpdateBanner";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 
@@ -49,6 +47,7 @@ import AdminProvisionarCliente from "@/pages/AdminProvisionarCliente";
 import TechOperacao from "@/pages/TechOperacao";
 import TechLGPD from "@/pages/TechLGPD";
 import CentralNotificacoes from "@/pages/CentralNotificacoes";
+import MetasOrcamentos from "@/pages/MetasOrcamentos";
 
 
 const queryClient = new QueryClient();
@@ -63,7 +62,6 @@ const App = () => (
           <PwaUpdateBanner />
           <PwaInstallBanner />
           <BrowserRouter>
-            <CompanyProvider>
             <NotificationProvider>
               <Routes>
               <Route path="/auth" element={<Auth />} />
@@ -75,7 +73,8 @@ const App = () => (
               <Route path="/financeiro/pagar-receber" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_pagar_receber"><PagarReceber /></ModuleGuard></AppLayout>} />
               <Route path="/financeiro/clientes-fornecedores" element={<AppLayout><ModuleGuard moduleName="financeiro"><Parties /></ModuleGuard></AppLayout>} />
               <Route path="/financeiro/fluxo-caixa" element={<AppLayout><ModuleGuard moduleName="financeiro"><CashFlow /></ModuleGuard></AppLayout>} />
-              
+              <Route path="/financeiro/metas-orcamentos" element={<AppLayout><ModuleGuard moduleName="financeiro"><MetasOrcamentos /></ModuleGuard></AppLayout>} />
+
               <Route path="/contatos" element={<AppLayout><ModuleGuard moduleName="contatos"><Contacts /></ModuleGuard></AppLayout>} />
               <Route path="/crm/cliente/:id" element={<AppLayout><ModuleGuard moduleName="contatos"><ContactProfile /></ModuleGuard></AppLayout>} />
 
@@ -104,19 +103,9 @@ const App = () => (
               <Route path="/tech/lgpd" element={<AppLayout><TechLGPD /></AppLayout>} />
               <Route path="/central-notificacoes" element={<AppLayout><CentralNotificacoes /></AppLayout>} />
 
-              {/* Financeiro dos Clientes — mesmos componentes, empresa em contexto = cliente selecionado.
-                  Prefixo /clientes/* isolado pra, no futuro, trocar só a fonte de dados sem reforma de UI. */}
-              <Route path="/clientes/financeiro" element={<AppLayout><ClientesFinanceiroGuard><Dashboard /></ClientesFinanceiroGuard></AppLayout>} />
-              <Route path="/clientes/financeiro/lancamentos" element={<AppLayout><ClientesFinanceiroGuard><Transactions /></ClientesFinanceiroGuard></AppLayout>} />
-              <Route path="/clientes/financeiro/pagar-receber" element={<AppLayout><ClientesFinanceiroGuard><PagarReceber /></ClientesFinanceiroGuard></AppLayout>} />
-              <Route path="/clientes/financeiro/conta-corrente" element={<AppLayout><ClientesFinanceiroGuard><Banks /></ClientesFinanceiroGuard></AppLayout>} />
-              <Route path="/clientes/financeiro/dre" element={<AppLayout><ClientesFinanceiroGuard><DRE /></ClientesFinanceiroGuard></AppLayout>} />
-              <Route path="/clientes/financeiro/fluxo-caixa" element={<AppLayout><ClientesFinanceiroGuard><CashFlow /></ClientesFinanceiroGuard></AppLayout>} />
-
               <Route path="*" element={<NotFound />} />
               </Routes>
             </NotificationProvider>
-            </CompanyProvider>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
