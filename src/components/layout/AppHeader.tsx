@@ -12,8 +12,8 @@ export function AppHeader() {
   const isDev = isDevEnvironment();
 
   return (
-    <header className="h-14 bg-card sticky top-0 z-50 border-b border-border">
-      <div className="flex items-center justify-between h-full px-4">
+    <header className="bg-card sticky top-0 z-50 border-b border-border pt-[env(safe-area-inset-top)]">
+      <div className="flex items-center justify-between h-14 px-4">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
           {isDev && (
