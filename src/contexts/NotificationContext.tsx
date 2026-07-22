@@ -94,6 +94,45 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     retry: false,
   });
 
+  // Orçamentos do mês corrente + realizado por categoria (para alerta de estouro).
+  const monthYear = format(startOfDay(new Date()), 'yyyy-MM');
+  const { data: budgetsData = [] } = useQuery({
+    queryKey: ['notif-budgets', monthYear],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('dre_budgets')
+        .select('category_id, budget_value')
+        .eq('month_year', monthYear);
+      if (error) return [];
+      return data as { category_id: string; budget_value: number }[];
+    },
+    staleTime: 1000 * 60,
+    gcTime: 1000 * 60 * 5,
+    retry: false,
+  });
+
+  const { data: budgetRealizado = {} } = useQuery({
+    queryKey: ['notif-budget-realizado', monthYear],
+    enabled: budgetsData.length > 0,
+    queryFn: async () => {
+      const today = new Date();
+      const start = `${monthYear}-01`;
+      const end = format(new Date(today.getFullYear(), today.getMonth() + 1, 0), 'yyyy-MM-dd');
+      const { data, error } = await supabase.rpc('get_category_breakdown', {
+        p_type: 'despesa', p_start_date: start, p_end_date: end, p_limit: 1000,
+      });
+      if (error) return {} as Record<string, { total: number; name: string }>;
+      const map: Record<string, { total: number; name: string }> = {};
+      (data as any[] | null)?.forEach((r) => {
+        if (r.category_id) map[r.category_id] = { total: Number(r.total ?? 0), name: r.category_name ?? 'Categoria' };
+      });
+      return map;
+    },
+    staleTime: 1000 * 60,
+    gcTime: 1000 * 60 * 5,
+    retry: false,
+  });
+
   const invisibleBankIds = useMemo(() => new Set(banksData.filter((b: any) => b.is_invisible).map((b: any) => b.id)), [banksData]);
   const banks = useMemo(() => banksData.filter((b: any) => !b.is_invisible), [banksData]);
   
@@ -173,23 +212,33 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       });
     }
 
-    // Projeção de saldo negativo (simplified calculation)
+    // Projeção de saldo negativo — dia a dia (30 dias), detecta o 1º cruzamento do zero.
     const totalBalance = banks.reduce((sum, b) => sum + Number(b.current_balance || 0), 0);
-    const next7DaysExpenses = filteredTransactions
-      .filter((t) => {
-        if (!t.due_date || t.type !== 'despesa') return false;
-        const dueDate = parseISO(t.due_date);
-        return dueDate >= today && dueDate <= addDays(today, 7);
-      })
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-
-    if (totalBalance - next7DaysExpenses < 0) {
-      const id = `saldo-negativo-${todayStr}`;
+    const HORIZON = 30;
+    const horizonStr = format(addDays(today, HORIZON), 'yyyy-MM-dd');
+    // Net por vencimento das contas em aberto (a partir de hoje).
+    const netByDue = new Map<string, number>();
+    filteredTransactions.forEach((t) => {
+      if (!t.due_date || t.due_date < todayStr || t.due_date > horizonStr) return;
+      const net = t.type === 'receita' ? Number(t.amount) : -Number(t.amount);
+      netByDue.set(t.due_date, (netByDue.get(t.due_date) ?? 0) + net);
+    });
+    let cum = totalBalance;
+    let firstNegDate: string | null = null;
+    let firstNegSaldo = 0;
+    for (let i = 0; i <= HORIZON; i++) {
+      const dStr = format(addDays(today, i), 'yyyy-MM-dd');
+      cum += netByDue.get(dStr) ?? 0;
+      if (cum < 0) { firstNegDate = dStr; firstNegSaldo = cum; break; }
+    }
+    if (firstNegDate) {
+      const id = `saldo-negativo-${firstNegDate}`;
+      const [y, m, d] = firstNegDate.split('-');
       notifications.push({
         id,
         type: 'error',
         title: 'Projeção de Saldo Negativo',
-        description: `Atenção: Projeção de saldo negativo detectada para os próximos 7 dias. Saldo atual: R$ ${totalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`,
+        description: `Atenção: a projeção de caixa fica negativa em ${d}/${m}/${y} (saldo previsto R$ ${firstNegSaldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}). Saldo atual: R$ ${totalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`,
         timestamp: new Date(),
         read: readIds.has(id),
         category: 'saldo',
@@ -197,8 +246,27 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       });
     }
 
+    // Orçamento estourado por categoria (mês corrente).
+    budgetsData.forEach((b) => {
+      const meta = Number(b.budget_value);
+      const real = budgetRealizado[b.category_id];
+      if (!real || meta <= 0 || real.total <= meta) return;
+      const id = `orcamento-estourado-${monthYear}-${b.category_id}`;
+      const pct = Math.round((real.total / meta) * 100);
+      notifications.push({
+        id,
+        type: 'warning',
+        title: 'Orçamento Estourado',
+        description: `A categoria "${real.name}" atingiu ${pct}% da meta do mês (R$ ${real.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} de R$ ${meta.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}).`,
+        timestamp: new Date(),
+        read: readIds.has(id),
+        category: 'sistema',
+        actionUrl: '/',
+      });
+    });
+
     return notifications;
-  }, [filteredTransactions, banks, readIds]);
+  }, [filteredTransactions, banks, readIds, budgetsData, budgetRealizado, monthYear]);
 
   // Combine all notifications
   const notifications = useMemo(() => {

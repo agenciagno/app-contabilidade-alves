@@ -37,6 +37,14 @@ interface CashFlowAlert {
   message: string;
 }
 
+// Ponto do gráfico combinado: passado = realizado, futuro = projetado.
+export interface CashFlowChartPoint {
+  date: string;
+  dateFormatted: string;
+  realizado: number | null;
+  projetado: number | null;
+}
+
 export interface CashFlowForecastData {
   currentBalance: number;
   finalBalance: number;
@@ -46,6 +54,9 @@ export interface CashFlowForecastData {
   totalReceitas: number;
   totalDespesas: number;
   pendingTransactions: ForecastTransaction[];
+  chartData: CashFlowChartPoint[];
+  firstNegativeDate: string | null;
+  lowestProjected: number;
 }
 
 export function useCashFlowForecast(days: number = 30) {
@@ -129,17 +140,41 @@ export function useCashFlowForecast(days: number = 30) {
     },
   });
 
+  // Fetch paid transactions of the past window to reconstruct the REALIZED balance curve.
+  const { data: paidHistory = [], isLoading: loadingHistory } = useQuery({
+    queryKey: ['cash-flow-realized', days, invisibleBankIds],
+    queryFn: async () => {
+      let query = supabase
+        .from('transactions')
+        .select('date, amount, paid_amount, type, bank_id')
+        .is('deleted_at', null)
+        .eq('is_transfer', false)
+        .eq('is_paid', true)
+        .not('date', 'is', null)
+        .gte('date', format(addDays(today, -days), 'yyyy-MM-dd'))
+        .lte('date', format(today, 'yyyy-MM-dd'));
+      if (invisibleBankIds.length > 0) {
+        const notInFilter = invisibleBankIds.map(id => `bank_id.neq.${id}`).join(',');
+        query = query.or(`bank_id.is.null,and(${notInFilter})`);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as { date: string; amount: number; paid_amount: number | null; type: string }[];
+    },
+  });
+
   // Process the forecast data
   const forecastData: CashFlowForecastData = processCashFlowForecast(
     pendingTransactions,
     recurringTransactions,
     currentBalance,
-    days
+    days,
+    paidHistory
   );
 
   return {
     ...forecastData,
-    isLoading: loadingTransactions || loadingRecurring,
+    isLoading: loadingTransactions || loadingRecurring || loadingHistory,
   };
 }
 
@@ -147,7 +182,8 @@ function processCashFlowForecast(
   pendingTransactions: ForecastTransaction[],
   recurringTransactions: any[],
   currentBalance: number,
-  days: number
+  days: number,
+  paidHistory: { date: string; amount: number; paid_amount: number | null; type: string }[] = []
 ): CashFlowForecastData {
   const today = startOfDay(new Date());
   const endDate = addDays(today, days);
@@ -254,12 +290,53 @@ function processCashFlowForecast(
       message: `Saldo negativo previsto em ${d.dateFormatted}`,
     }));
 
+  const firstNegativeDate = alerts.length > 0 ? alerts[0].date : null;
+  const lowestProjected = dailyForecast.reduce(
+    (min, d) => Math.min(min, d.saldoAcumulado),
+    currentBalance
+  );
+
   const totalReceitas = allTransactions
     .filter(t => t.type === 'receita')
     .reduce((sum, t) => sum + t.amount, 0);
   const totalDespesas = allTransactions
     .filter(t => t.type === 'despesa')
     .reduce((sum, t) => sum + t.amount, 0);
+
+  // ── Série REALIZADA (passado): reconstrói o saldo de fechamento diário
+  // caminhando para trás a partir do saldo atual. netByDate = receita(+)/despesa(-) pagas no dia.
+  const netByDate = new Map<string, number>();
+  for (const t of paidHistory) {
+    const amt = t.paid_amount != null ? Number(t.paid_amount) : Number(t.amount);
+    netByDate.set(t.date, (netByDate.get(t.date) ?? 0) + (t.type === 'receita' ? amt : -amt));
+  }
+  const pastDates: Date[] = [];
+  for (let i = 0; i <= days; i++) pastDates.push(addDays(today, -days + i)); // mais antigo → hoje
+  const closings = new Array<number>(pastDates.length);
+  closings[pastDates.length - 1] = currentBalance; // fechamento de hoje = saldo atual
+  for (let i = pastDates.length - 2; i >= 0; i--) {
+    const nextDayStr = format(pastDates[i + 1], 'yyyy-MM-dd');
+    closings[i] = closings[i + 1] - (netByDate.get(nextDayStr) ?? 0);
+  }
+
+  // Gráfico combinado: passado (realizado) → hoje → futuro (projetado).
+  const chartData: CashFlowChartPoint[] = [];
+  for (let i = 0; i < pastDates.length - 1; i++) {
+    chartData.push({
+      date: format(pastDates[i], 'yyyy-MM-dd'),
+      dateFormatted: format(pastDates[i], 'dd/MM'),
+      realizado: closings[i],
+      projetado: null,
+    });
+  }
+  dailyForecast.forEach((d, idx) => {
+    chartData.push({
+      date: d.date,
+      dateFormatted: d.dateFormatted,
+      realizado: idx === 0 ? currentBalance : null, // ponto de junção em "hoje"
+      projetado: d.saldoAcumulado,
+    });
+  });
 
   return {
     currentBalance,
@@ -270,5 +347,8 @@ function processCashFlowForecast(
     totalReceitas,
     totalDespesas,
     pendingTransactions: allTransactions,
+    chartData,
+    firstNegativeDate,
+    lowestProjected,
   };
 }

@@ -55,6 +55,8 @@ import { exportToCSV, exportToPDF, useReportData, processReportData } from '@/ho
 import { DRECard } from '@/components/reports/DRECard';
 import { PeriodComparison } from '@/components/reports/PeriodComparison';
 import { CashFlowForecast } from '@/components/reports/CashFlowForecast';
+import { BudgetTracker } from '@/components/financeiro/BudgetTracker';
+import { FinancialHealthBadge } from '@/components/financeiro/FinancialHealthBadge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -455,6 +457,9 @@ export default function Dashboard() {
           <p className="text-[14px] text-muted-foreground">
             {periodLabel}
           </p>
+          <div className="mt-2">
+            <FinancialHealthBadge />
+          </div>
         </div>
         <div className="flex gap-2">
           <DashboardWidgetsConfig widgets={widgets} onToggle={toggleWidget} />
@@ -968,6 +973,9 @@ export default function Dashboard() {
       {isWidgetEnabled('cashFlowForecast') && (
         <CashFlowForecast />
       )}
+
+      {/* Orçamento por categoria (meta x realizado) */}
+      <BudgetTracker />
 
       {/* Dialogs */}
       <TransactionFormDialog

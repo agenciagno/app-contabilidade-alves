@@ -9,10 +9,9 @@ import {
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  Tooltip, 
+  Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  Area,
   ComposedChart
 } from 'recharts';
 import { 
@@ -33,19 +32,17 @@ interface CustomTooltipProps {
   label?: string;
 }
 
-const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+    const valor = data.realizado != null ? data.realizado : data.projetado;
+    const isRealizado = data.realizado != null;
     return (
       <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
-        <p className="font-medium text-foreground mb-2">{data.dateFormatted}</p>
-        <div className="space-y-1 text-sm">
-          <p className="text-emerald-500">Receitas: {formatCurrency(data.receitas)}</p>
-          <p className="text-red-500">Despesas: {formatCurrency(data.despesas)}</p>
-          <p className={`font-medium ${data.saldoAcumulado >= 0 ? 'text-primary' : 'text-destructive'}`}>
-            Saldo: {formatCurrency(data.saldoAcumulado)}
-          </p>
-        </div>
+        <p className="font-medium text-foreground mb-1">{data.dateFormatted}</p>
+        <p className={`text-sm font-medium ${valor >= 0 ? 'text-primary' : 'text-destructive'}`}>
+          {isRealizado ? 'Realizado' : 'Projetado'}: {formatCurrency(valor ?? 0)}
+        </p>
       </div>
     );
   }
@@ -53,16 +50,16 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 };
 
 export function CashFlowForecast() {
-  const { 
-    currentBalance, 
-    finalBalance, 
-    dailyForecast, 
-    weeklySummary, 
-    alerts, 
-    totalReceitas, 
+  const {
+    currentBalance,
+    finalBalance,
+    weeklySummary,
+    alerts,
+    totalReceitas,
     totalDespesas,
     pendingTransactions,
-    isLoading 
+    chartData,
+    isLoading
   } = useCashFlowForecast(30);
 
   if (isLoading) {
@@ -94,7 +91,7 @@ export function CashFlowForecast() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wallet className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Fluxo de Caixa Previsto - Próximos 30 dias</CardTitle>
+            <CardTitle className="text-lg">Fluxo de Caixa — Realizado × Projetado (30 dias)</CardTitle>
           </div>
           {alerts.length > 0 && (
             <Badge variant="destructive" className="flex items-center gap-1">
@@ -133,37 +130,46 @@ export function CashFlowForecast() {
           </div>
         </div>
 
-        {/* Chart */}
+        {/* Chart — Realizado (passado, linha cheia) × Projetado (futuro, tracejado) */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-primary" /> Realizado</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-4 border-t-2 border-dashed border-amber-500" /> Projetado</span>
+        </div>
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={dailyForecast}>
+            <ComposedChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
-              <XAxis 
-                dataKey="dateFormatted" 
+              <XAxis
+                dataKey="dateFormatted"
                 tick={{ fontSize: 11 }}
-                interval={4}
+                interval={6}
                 className="text-muted-foreground"
               />
-              <YAxis 
+              <YAxis
                 tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                 className="text-muted-foreground"
                 tick={{ fontSize: 11 }}
               />
               <Tooltip content={<CustomTooltip />} />
               <ReferenceLine y={0} stroke="hsl(var(--destructive))" strokeDasharray="3 3" />
-              <Area 
-                type="monotone" 
-                dataKey="saldoAcumulado" 
-                fill="hsl(var(--primary) / 0.1)" 
-                stroke="none"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="saldoAcumulado" 
-                stroke="hsl(var(--primary))" 
+              <Line
+                type="monotone"
+                dataKey="realizado"
+                stroke="hsl(var(--primary))"
                 strokeWidth={2}
                 dot={false}
-                name="Saldo"
+                connectNulls={false}
+                name="Realizado"
+              />
+              <Line
+                type="monotone"
+                dataKey="projetado"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                strokeDasharray="5 4"
+                dot={false}
+                connectNulls={false}
+                name="Projetado"
               />
             </ComposedChart>
           </ResponsiveContainer>
