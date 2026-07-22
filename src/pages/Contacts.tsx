@@ -11,10 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Edit2, Trash2, User, Mail, Phone, Copy, Eye, Users, AlertTriangle, X, FileText, RefreshCw, LayoutGrid, List, Pencil } from 'lucide-react';
+import { Plus, Search, User, Mail, Phone, Copy, Users, X, FileText, LayoutGrid, List, Pencil, Trash2 } from 'lucide-react';
 import { useContacts, Contact, ContactInsert } from '@/hooks/useContacts';
 import { useTransactions } from '@/hooks/useTransactions';
-import { useContactDependencies } from '@/hooks/useContactDependencies';
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
 import { ContactBulkEditDialog } from '@/components/contacts/ContactBulkEditDialog';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +26,9 @@ import { useAllFiscalProfiles } from '@/hooks/useCollaboratorCoverage';
 
 type ViewMode = 'card' | 'list';
 
+const ARCHIVED_STATUSES = ['Encerrado', 'Ex-cliente'];
+const isArchivedContact = (c: Contact) => ARCHIVED_STATUSES.includes(((c as any).status_cliente || '').toString());
+
 export default function Contacts() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -36,7 +38,6 @@ export default function Contacts() {
   const { transactions } = useTransactions();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | undefined>();
-  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterFinancialStatus, setFilterFinancialStatus] = useState('all');
   const [filterCategoria, setFilterCategoria] = useState('all');
@@ -56,8 +57,6 @@ export default function Contacts() {
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
-
-  const { data: dependencies, isLoading: loadingDependencies } = useContactDependencies(deleteId);
 
   const getFinancialStatus = (contactId: string) => {
     const today = new Date().toISOString().split('T')[0];
@@ -115,10 +114,24 @@ export default function Contacts() {
         matchesResponsible = filterResponsible === 'none' ? !rid : rid === filterResponsible;
       }
 
-      return matchesSearch && matchesFinancialStatus && matchesCategoria && matchesRegime && matchesResponsible;
+      return matchesSearch && matchesFinancialStatus && matchesCategoria && matchesRegime && matchesResponsible && !isArchivedContact(c);
     });
   }, [contacts, searchTerm, filterFinancialStatus, filterCategoria, filterRegime, filterResponsible, transactions]);
 
+  const archivedContacts = useMemo(() => {
+    const q = searchTerm.toLowerCase();
+    return contacts.filter(c => {
+      if (!isArchivedContact(c)) return false;
+      if (!q) return true;
+      return (
+        c.name.toLowerCase().includes(q) ||
+        (getContactDisplayName(c) || '').toLowerCase().includes(q) ||
+        (c.razao_social || '').toLowerCase().includes(q) ||
+        (c.nome_fantasia || '').toLowerCase().includes(q) ||
+        (c.document || '').toLowerCase().includes(q)
+      );
+    });
+  }, [contacts, searchTerm]);
 
   const activeContacts = filteredContacts.filter(c => c.is_active);
   const inactiveContacts = filteredContacts.filter(c => !c.is_active);
@@ -172,12 +185,8 @@ export default function Contacts() {
     }
   };
 
-  const handleDelete = () => {
-    if (deleteId) deleteContact.mutate(deleteId, { onSuccess: () => setDeleteId(null) });
-  };
-
-  const handleEdit = (contact: Contact) => { setEditingContact(contact); setDialogOpen(true); };
   const handleNew = () => { setEditingContact(undefined); setDialogOpen(true); };
+  const goToProfile = (contact: Contact) => navigate(`/crm/cliente/${contact.id}`);
 
   if (isLoading) {
     return <div className="space-y-6">
@@ -215,24 +224,13 @@ export default function Contacts() {
     );
   };
 
-  const ActionButtons = ({ contact }: { contact: Contact }) => (
-    <div className="flex gap-1 justify-end">
-      <Button variant="ghost" size="icon" title="Ver Perfil" onClick={() => navigate(`/crm/cliente/${contact.id}`)}>
-        <Eye className="h-4 w-4" />
-      </Button>
-      <Button variant="ghost" size="icon" title="Editar" onClick={() => handleEdit(contact)}>
-        <Edit2 className="h-4 w-4" />
-      </Button>
-      <Button variant="ghost" size="icon" title="Excluir" onClick={() => setDeleteId(contact.id)}>
-        <Trash2 className="h-4 w-4 text-destructive" />
-      </Button>
-    </div>
-  );
-
   const ContactCard = ({ contact }: { contact: Contact }) => {
     const { isInadimplente } = getFinancialStatus(contact.id);
     return (
-      <Card className={`bg-card ${!contact.is_active ? 'opacity-60' : ''}`}>
+      <Card
+        className={`bg-card cursor-pointer transition-colors hover:border-primary/40 ${!contact.is_active ? 'opacity-60' : ''}`}
+        onClick={() => goToProfile(contact)}
+      >
         <CardContent className="p-4">
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-3 min-w-0">
@@ -240,7 +238,7 @@ export default function Contacts() {
                 <User className="h-5 w-5 text-primary" />
               </div>
               <button
-                onClick={() => copyToClipboard(getContactDisplayName(contact), 'Nome')}
+                onClick={(e) => { e.stopPropagation(); copyToClipboard(getContactDisplayName(contact), 'Nome'); }}
                 className="group flex items-center gap-2 hover:text-primary transition-colors text-left min-w-0"
               >
                 <h3 className="font-semibold text-foreground truncate">{getContactDisplayName(contact)}</h3>
@@ -260,7 +258,7 @@ export default function Contacts() {
               <FileText className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/60" />
               {contact.document ? (
                 <button
-                  onClick={() => copyToClipboard(contact.document!, 'CPF/CNPJ')}
+                  onClick={(e) => { e.stopPropagation(); copyToClipboard(contact.document!, 'CPF/CNPJ'); }}
                   className="group flex items-center gap-2 w-full hover:text-primary transition-colors text-left"
                 >
                   <span className="truncate flex-1 font-mono text-xs">{contact.document}</span>
@@ -276,7 +274,7 @@ export default function Contacts() {
               <Phone className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/60" />
               {contact.phone ? (
                 <button
-                  onClick={() => copyToClipboard(contact.phone!, 'Telefone')}
+                  onClick={(e) => { e.stopPropagation(); copyToClipboard(contact.phone!, 'Telefone'); }}
                   className="group flex items-center gap-2 w-full hover:text-primary transition-colors text-left"
                 >
                   <span className="flex-1 text-xs">{maskPhone(contact.phone)}</span>
@@ -292,7 +290,7 @@ export default function Contacts() {
               <Mail className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/60" />
               {contact.email ? (
                 <button
-                  onClick={() => copyToClipboard(contact.email!, 'E-mail')}
+                  onClick={(e) => { e.stopPropagation(); copyToClipboard(contact.email!, 'E-mail'); }}
                   className="group flex items-center gap-2 w-full hover:text-primary transition-colors text-left"
                 >
                   <span className="truncate flex-1 text-xs">{contact.email}</span>
@@ -303,27 +301,27 @@ export default function Contacts() {
               )}
             </div>
           </div>
-
-          <div className="flex mt-4 pt-3 border-t border-border justify-end">
-            <ActionButtons contact={contact} />
-          </div>
         </CardContent>
       </Card>
     );
   };
 
-  const ContactTableSection = ({ contacts: list, label }: { contacts: Contact[]; label: string }) => (
+  const ContactTableSection = ({ contacts: list, label, showCheckbox = true }: { contacts: Contact[]; label: string; showCheckbox?: boolean }) => (
     <>
       <TableRow className="hover:bg-transparent border-0">
-        <TableCell colSpan={canBulkAction ? 8 : 7} className="py-2 px-4">
+        <TableCell colSpan={canBulkAction && showCheckbox ? 6 : 5} className="py-2 px-4">
           <span className="text-xs font-medium text-muted-foreground">{label} ({list.length})</span>
         </TableCell>
       </TableRow>
       {list.map(contact => {
         const { isInadimplente } = getFinancialStatus(contact.id);
         return (
-          <TableRow key={contact.id} className={`${!contact.is_active ? 'opacity-60' : ''}`}>
-            {canBulkAction && (
+          <TableRow
+            key={contact.id}
+            className={`cursor-pointer hover:bg-muted/40 ${!contact.is_active ? 'opacity-60' : ''}`}
+            onClick={() => goToProfile(contact)}
+          >
+            {canBulkAction && showCheckbox && (
               <TableCell className="w-10" onClick={e => e.stopPropagation()}>
                 <Checkbox
                   checked={selectedIds.includes(contact.id)}
@@ -334,7 +332,7 @@ export default function Contacts() {
             <TableCell className="font-medium">
               <div className="flex items-center gap-2 flex-wrap">
                 <button
-                  onClick={() => copyToClipboard(getContactDisplayName(contact), 'Nome')}
+                  onClick={(e) => { e.stopPropagation(); copyToClipboard(getContactDisplayName(contact), 'Nome'); }}
                   className="group flex items-center gap-2 hover:text-primary transition-colors text-left"
                 >
                   <span>{getContactDisplayName(contact)}</span>
@@ -345,7 +343,7 @@ export default function Contacts() {
             </TableCell>
             <TableCell className="font-mono text-xs text-muted-foreground">
               {contact.document ? (
-                <button onClick={() => copyToClipboard(contact.document!, 'CPF/CNPJ')} className="group flex items-center gap-1 hover:text-primary transition-colors">
+                <button onClick={(e) => { e.stopPropagation(); copyToClipboard(contact.document!, 'CPF/CNPJ'); }} className="group flex items-center gap-1 hover:text-primary transition-colors">
                   {contact.document}
                   <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
@@ -353,7 +351,7 @@ export default function Contacts() {
             </TableCell>
             <TableCell className="text-muted-foreground text-sm">
               {contact.phone ? (
-                <button onClick={() => copyToClipboard(contact.phone!, 'Telefone')} className="group flex items-center gap-1 hover:text-primary transition-colors">
+                <button onClick={(e) => { e.stopPropagation(); copyToClipboard(contact.phone!, 'Telefone'); }} className="group flex items-center gap-1 hover:text-primary transition-colors">
                   {maskPhone(contact.phone)}
                   <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
@@ -361,7 +359,7 @@ export default function Contacts() {
             </TableCell>
             <TableCell className="text-muted-foreground text-sm">
               {contact.email ? (
-                <button onClick={() => copyToClipboard(contact.email!, 'E-mail')} className="group flex items-center gap-1 hover:text-primary transition-colors">
+                <button onClick={(e) => { e.stopPropagation(); copyToClipboard(contact.email!, 'E-mail'); }} className="group flex items-center gap-1 hover:text-primary transition-colors">
                   {contact.email}
                   <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
@@ -372,9 +370,6 @@ export default function Contacts() {
                 className={`h-2.5 w-2.5 rounded-full ${isInadimplente ? 'bg-destructive' : 'bg-emerald-500'}`}
                 title={isInadimplente ? 'Inadimplente' : 'Adimplente'}
               />
-            </TableCell>
-            <TableCell className="text-right">
-              <ActionButtons contact={contact} />
             </TableCell>
           </TableRow>
         );
@@ -393,8 +388,9 @@ export default function Contacts() {
 
       <Tabs defaultValue="clientes" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="clientes">Clientes</TabsTrigger>
+          <TabsTrigger value="clientes">Contatos</TabsTrigger>
           <TabsTrigger value="entrada-2026">Entrada de Clientes 2026</TabsTrigger>
+          <TabsTrigger value="arquivados">Arquivados ({archivedContacts.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="clientes">
@@ -558,7 +554,6 @@ export default function Contacts() {
                       <TableHead>Telefone</TableHead>
                       <TableHead>E-mail</TableHead>
                       <TableHead className="w-10">Status</TableHead>
-                      <TableHead className="text-right w-32">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -586,58 +581,52 @@ export default function Contacts() {
         <TabsContent value="entrada-2026">
           <NewClients2026Tab contacts={contacts} />
         </TabsContent>
+
+        <TabsContent value="arquivados">
+          <div className="space-y-6">
+            <div className="relative max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome ou CNPJ..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-9 h-9 bg-card border-border"
+              />
+            </div>
+
+            {archivedContacts.length === 0 ? (
+              <Card className="bg-card">
+                <CardContent className="text-muted-foreground text-center py-16">
+                  Nenhum contato arquivado (status Encerrado ou Ex-cliente)
+                </CardContent>
+              </Card>
+            ) : viewMode === 'card' ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {archivedContacts.map(contact => <ContactCard key={contact.id} contact={contact} />)}
+              </div>
+            ) : (
+              <Card className="bg-card">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>CPF/CNPJ</TableHead>
+                      <TableHead>Telefone</TableHead>
+                      <TableHead>E-mail</TableHead>
+                      <TableHead className="w-10">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <ContactTableSection contacts={archivedContacts} label="Arquivados" showCheckbox={false} />
+                  </TableBody>
+                </Table>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
       </Tabs>
 
       <ContactFormDialog open={dialogOpen} onOpenChange={setDialogOpen} contact={editingContact} onSubmit={handleSubmit} isLoading={createContact.isPending || updateContact.isPending} />
-
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir cliente/fornecedor?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>Esta ação não pode ser desfeita. O cliente/fornecedor será removido permanentemente.</p>
-                {loadingDependencies ? (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Verificando vínculos...
-                  </div>
-                ) : dependencies?.hasDependencies && (
-                  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 space-y-2">
-                    <p className="font-medium text-destructive flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      Atenção: Este contato possui vínculos
-                    </p>
-                    <ul className="text-sm text-muted-foreground space-y-1 ml-6">
-                      {dependencies.transactionCount > 0 && (
-                        <li className="flex items-center gap-2">
-                          <FileText className="h-3.5 w-3.5" />
-                          {dependencies.transactionCount} transação(ões) financeira(s)
-                        </li>
-                      )}
-                      {dependencies.recurringCount > 0 && (
-                        <li className="flex items-center gap-2">
-                          <RefreshCw className="h-3.5 w-3.5" />
-                          {dependencies.recurringCount} conta(s) recorrente(s)
-                        </li>
-                      )}
-                    </ul>
-                    <p className="text-xs text-muted-foreground">
-                      Ao excluir, os registros vinculados permanecerão sem associação a este contato.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground" disabled={loadingDependencies}>
-              {dependencies?.hasDependencies ? 'Excluir mesmo assim' : 'Excluir'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* Bulk Edit Dialog */}
       <ContactBulkEditDialog

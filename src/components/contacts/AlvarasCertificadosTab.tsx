@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { differenceInDays, format } from 'date-fns';
-import { Plus, Upload, Loader2, Download, Trash2, ShieldCheck, FileText } from 'lucide-react';
+import { Plus, Upload, Loader2, Download, Trash2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { abrirDocumentoViaEdge } from '@/lib/documento-baixar';
 
@@ -23,9 +23,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { AcessoPortal, useAcessosCliente } from '@/hooks/useAcessosCliente';
-import { AcessosTable } from './AcessosTable';
-import { AcessoFormDialog } from './AcessoFormDialog';
 
 interface Props {
   contactId: string;
@@ -46,57 +43,6 @@ function ValidadeBadge({ data }: { data: string }) {
   );
 }
 
-export function AlvarasCertificadosTab({ contactId }: Props) {
-  return (
-    <div className="space-y-6">
-      <CertificadosSection contactId={contactId} />
-      <AlvarasSection contactId={contactId} />
-    </div>
-  );
-}
-
-// ===================== CERTIFICADOS =====================
-function CertificadosSection({ contactId }: Props) {
-  const { data: acessos, isLoading } = useAcessosCliente(contactId);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<AcessoPortal | null>(null);
-
-  const certificados = (acessos || []).filter(a => a.portal === 'certificado_digital');
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-primary" />
-          Certificados Digitais
-        </CardTitle>
-        <Button size="sm" onClick={() => { setEditing(null); setDialogOpen(true); }}>
-          <Plus className="h-4 w-4 mr-1" /> Adicionar Certificado
-        </Button>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <Skeleton className="h-24 w-full" />
-        ) : certificados.length === 0 ? (
-          <div className="rounded-md border border-dashed p-10 text-center text-sm text-muted-foreground">
-            Nenhum certificado cadastrado.
-          </div>
-        ) : (
-          <AcessosTable acessos={certificados} contactId={contactId} onEdit={(a) => { setEditing(a); setDialogOpen(true); }} />
-        )}
-
-        <AcessoFormDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          contactId={contactId}
-          acesso={editing}
-          lockCertificado
-        />
-      </CardContent>
-    </Card>
-  );
-}
-
 // ===================== ALVARÁS =====================
 interface Alvara {
   id: string;
@@ -107,7 +53,7 @@ interface Alvara {
   uploaded_at: string;
 }
 
-function AlvarasSection({ contactId }: Props) {
+export function AlvarasSection({ contactId }: Props) {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,10 +17,15 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, Search, Info, Save, UserPlus, Pencil, LogOut } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Loader2, Search, Info, Save, UserPlus, Pencil, LogOut, Trash2, AlertTriangle } from 'lucide-react';
 import { useSuperPerfil } from '@/hooks/useSuperPerfil';
 import { useContactPartners } from '@/hooks/useContactPartners';
 import { useContacts } from '@/hooks/useContacts';
+import { useContactDependencies } from '@/hooks/useContactDependencies';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ContactBillingCard } from '../ContactBillingCard';
@@ -34,7 +40,7 @@ interface Props {
   contactId: string;
 }
 
-const STATUS_CLIENTE = ['Prospect', 'Ativo', 'Inativo', 'Suspenso', 'Encerrado'];
+const STATUS_CLIENTE = ['Ativo', 'Inativo', 'Suspenso', 'Encerrado', 'Ex-cliente'];
 const BR_STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
 const AutofillBadge = () => (
@@ -148,9 +154,8 @@ export function ContactCadastroTab({ contactId }: Props) {
 
   return (
     <Tabs defaultValue="identificacao" className="w-full">
-      <TabsList className="w-full grid grid-cols-2 md:grid-cols-5 gap-1">
+      <TabsList className="w-full grid grid-cols-2 md:grid-cols-4 gap-1">
         <TabsTrigger value="identificacao">Identificação</TabsTrigger>
-        <TabsTrigger value="endereco">Endereço</TabsTrigger>
         <TabsTrigger value="fiscal">Fiscal</TabsTrigger>
         <TabsTrigger value="operacional">Operacional</TabsTrigger>
         <TabsTrigger value="socios">Sócios</TabsTrigger>
@@ -176,25 +181,12 @@ export function ContactCadastroTab({ contactId }: Props) {
               <Input value={form.nome_fantasia || ''} onChange={e => set('nome_fantasia', e.target.value)} />
             </Field>
             <Field label="Nome de Exibição">
-              <Select
-                value={
-                  form.display_name && form.display_name === (form.razao_social || '')
-                    ? 'razao_social'
-                    : 'nome_fantasia'
-                }
-                onValueChange={(v) => {
-                  const novo = v === 'razao_social' ? (form.razao_social || '') : (form.nome_fantasia || '');
-                  set('display_name', novo || null);
-                }}
-              >
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="nome_fantasia">Nome Fantasia</SelectItem>
-                  <SelectItem value="razao_social">Razão Social</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                value={form.display_name ?? form.nome_fantasia ?? ''}
+                onChange={e => set('display_name', e.target.value)}
+              />
               <p className="text-xs text-muted-foreground mt-1">
-                Este é o nome exibido na listagem de contatos
+                Preenchido automaticamente com o Nome Fantasia — edite livremente. É o nome exibido na listagem de contatos.
               </p>
             </Field>
             <Field label="Porte">
@@ -249,21 +241,6 @@ export function ContactCadastroTab({ contactId }: Props) {
             </div>
           </CardContent>
         </Card>
-        <div className="flex justify-end">
-          <Button onClick={() => saveSection([
-            'document', 'razao_social', 'nome_fantasia', 'display_name', 'porte', 'natureza_juridica',
-            'data_abertura_receita', 'situacao_cadastral', 'email', 'phone', 'whatsapp', 'notes',
-            'cnae_principal', 'cnaes_secundarios',
-            'tipo_estabelecimento', 'representative_legal', 'segundo_email_contato',
-          ])} disabled={updateSuperPerfil.isPending}>
-            {updateSuperPerfil.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Salvar
-          </Button>
-        </div>
-      </TabsContent>
-
-      {/* ENDEREÇO */}
-      <TabsContent value="endereco" className="mt-6 space-y-4">
         <Card>
           <CardHeader><CardTitle className="text-base">Endereço</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -297,6 +274,10 @@ export function ContactCadastroTab({ contactId }: Props) {
         </Card>
         <div className="flex justify-end">
           <Button onClick={() => saveSection([
+            'document', 'razao_social', 'nome_fantasia', 'display_name', 'porte', 'natureza_juridica',
+            'data_abertura_receita', 'situacao_cadastral', 'email', 'phone', 'whatsapp', 'notes',
+            'cnae_principal', 'cnaes_secundarios',
+            'tipo_estabelecimento', 'representative_legal', 'segundo_email_contato',
             'cep', 'address', 'address_number', 'complemento', 'neighborhood', 'city', 'state',
           ])} disabled={updateSuperPerfil.isPending}>
             {updateSuperPerfil.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
@@ -328,21 +309,6 @@ export function ContactCadastroTab({ contactId }: Props) {
             </Field>
             <Field label="Inscrição Municipal (IM)"><Input value={form.im || ''} onChange={e => set('im', e.target.value)} /></Field>
             <Field label="Inscrição Estadual (IE)"><Input value={form.ie || ''} onChange={e => set('ie', e.target.value)} /></Field>
-            <Field label="Regime de Apuração">
-              <Select value={form.regime_apuracao || ''} onValueChange={v => set('regime_apuracao', v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Mensal">Mensal</SelectItem>
-                  <SelectItem value="Trimestral">Trimestral</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Nº Alvará">
-              <Input value={form.numero_alvara || ''} onChange={e => set('numero_alvara', e.target.value)} />
-            </Field>
-            <Field label="Validade Alvará">
-              <Input type="date" value={form.validade_alvara || ''} onChange={e => set('validade_alvara', e.target.value)} />
-            </Field>
           </CardContent>
         </Card>
 
@@ -396,7 +362,6 @@ export function ContactCadastroTab({ contactId }: Props) {
         <div className="flex justify-end">
           <Button onClick={() => saveSection([
             'tax_regime', 'status_cliente', 'im', 'ie',
-            'regime_apuracao', 'numero_alvara', 'validade_alvara',
             'registro_entradas', 'registro_saidas', 'registro_icms', 'inventario',
           ])} disabled={updateSuperPerfil.isPending}>
             {updateSuperPerfil.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
@@ -528,8 +493,15 @@ function OperacionalSection({
   isPending: boolean;
   contactId: string;
 }) {
-  const { contacts } = useContacts();
+  const { contacts, deleteContact } = useContacts();
   const contact = contacts.find(c => c.id === contactId);
+  const navigate = useNavigate();
+  const { data: dependencies, isLoading: loadingDependencies } = useContactDependencies(contactId);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const handleDelete = () => {
+    deleteContact.mutate(contactId, { onSuccess: () => navigate('/contatos') });
+  };
 
   const { data: profiles } = useQuery({
     queryKey: ['profiles-active-cadastro'],
@@ -674,6 +646,64 @@ function OperacionalSection({
       </div>
 
       {contact && <ContactBillingCard contact={contact} />}
+
+      <Card className="border-destructive/30">
+        <CardHeader><CardTitle className="text-base text-destructive">Zona de Risco</CardTitle></CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between rounded-lg border border-destructive/20 p-3">
+            <div>
+              <p className="text-sm font-medium">Excluir contato</p>
+              <p className="text-xs text-muted-foreground">Remove {contact?.name || 'este contato'} permanentemente.</p>
+            </div>
+            <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-2" /> Excluir
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir contato?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Esta ação não pode ser desfeita. O contato será removido permanentemente.</p>
+                {loadingDependencies ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Verificando vínculos...
+                  </div>
+                ) : dependencies?.hasDependencies && (
+                  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 space-y-2">
+                    <p className="font-medium text-destructive flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      Atenção: este contato possui vínculos
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-6">
+                      {dependencies.transactionCount > 0 && (
+                        <li>{dependencies.transactionCount} transação(ões) financeira(s)</li>
+                      )}
+                      {dependencies.recurringCount > 0 && (
+                        <li>{dependencies.recurringCount} conta(s) recorrente(s)</li>
+                      )}
+                    </ul>
+                    <p className="text-xs text-muted-foreground">
+                      Ao excluir, os registros vinculados permanecerão sem associação a este contato.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground" disabled={loadingDependencies}>
+              {dependencies?.hasDependencies ? 'Excluir mesmo assim' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, User, DollarSign, FileText, ClipboardList, Download, History, ShieldCheck, KeyRound } from 'lucide-react';
+import { ArrowLeft, User, DollarSign, FileText, ClipboardList, Download, History, KeyRound } from 'lucide-react';
 import { useContacts } from '@/hooks/useContacts';
 import { useContactTransactions, useContactFinancialStatus } from '@/hooks/useContactTransactions';
 import { useContactDocuments, DOCUMENT_CATEGORIES } from '@/hooks/useContactDocuments';
@@ -16,7 +16,6 @@ import { ContactDocumentsTab } from '@/components/contacts/ContactDocumentsTab';
 import { generateContactReport } from '@/components/contacts/ContactReportPDF';
 import { AcessosTab } from '@/components/contacts/AcessosTab';
 import { ContactCadastroTab } from '@/components/contacts/cadastro/ContactCadastroTab';
-import { AlvarasCertificadosTab } from '@/components/contacts/AlvarasCertificadosTab';
 import { ContactLogsWithComunicacaoTab } from '@/components/contacts/ContactLogsWithComunicacaoTab';
 
 const taxRegimeLabels: Record<string, string> = {
@@ -100,7 +99,7 @@ export default function ContactProfile() {
     );
   }
 
-  const tabsColsClass = canViewAcessos ? 'grid-cols-3 md:grid-cols-6' : 'grid-cols-3 md:grid-cols-5';
+  const tabsColsClass = canViewAcessos ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4';
 
   return (
     <div className="space-y-6">
@@ -168,10 +167,6 @@ export default function ContactProfile() {
             <ClipboardList className="h-4 w-4" />
             <span className="hidden sm:inline">Cadastro</span>
           </TabsTrigger>
-          <TabsTrigger value="alvaras" className="flex items-center gap-1.5">
-            <ShieldCheck className="h-4 w-4" />
-            <span className="hidden sm:inline">Alvarás e Certificados</span>
-          </TabsTrigger>
           {canViewAcessos && (
             <TabsTrigger value="acessos" className="flex items-center gap-1.5">
               <KeyRound className="h-4 w-4" />
@@ -194,10 +189,6 @@ export default function ContactProfile() {
 
         <TabsContent value="cadastro" className="mt-6">
           <ContactCadastroTab contactId={contact.id} />
-        </TabsContent>
-
-        <TabsContent value="alvaras" className="mt-6">
-          <AlvarasCertificadosTab contactId={contact.id} />
         </TabsContent>
 
         {canViewAcessos && (
