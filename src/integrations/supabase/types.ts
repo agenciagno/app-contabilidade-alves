@@ -189,6 +189,7 @@ export type Database = {
           linha_digitavel: string | null
           nosso_numero: number | null
           origem_baixa: string | null
+          pdf_url: string | null
           reference_month: string
           seu_numero: string | null
           sicoob_response: Json | null
@@ -212,6 +213,7 @@ export type Database = {
           linha_digitavel?: string | null
           nosso_numero?: number | null
           origem_baixa?: string | null
+          pdf_url?: string | null
           reference_month: string
           seu_numero?: string | null
           sicoob_response?: Json | null
@@ -235,6 +237,7 @@ export type Database = {
           linha_digitavel?: string | null
           nosso_numero?: number | null
           origem_baixa?: string | null
+          pdf_url?: string | null
           reference_month?: string
           seu_numero?: string | null
           sicoob_response?: Json | null
@@ -244,7 +247,29 @@ export type Database = {
           valor?: number | null
           valor_pago?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "boleto_controls_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "boleto_controls_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "boleto_controls_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
       }
       categories: {
         Row: {
@@ -2625,6 +2650,50 @@ export type Database = {
           },
         ]
       }
+      push_tokens: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          endpoint: string
+          id: string
+          last_used_at: string
+          platform: string | null
+          subscription: Json
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          endpoint: string
+          id?: string
+          last_used_at?: string
+          platform?: string | null
+          subscription: Json
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          endpoint?: string
+          id?: string
+          last_used_at?: string
+          platform?: string | null
+          subscription?: Json
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_tokens_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recurring_transactions: {
         Row: {
           amount: number
@@ -2944,13 +3013,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "transactions_recurring_id_fkey"
-            columns: ["recurring_id"]
-            isOneToOne: false
-            referencedRelation: "recurring_transactions"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "transactions_bank_id_fkey"
             columns: ["bank_id"]
             isOneToOne: false
@@ -2990,6 +3052,13 @@ export type Database = {
             columns: ["party_id"]
             isOneToOne: false
             referencedRelation: "parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_transactions"
             referencedColumns: ["id"]
           },
         ]
@@ -3183,10 +3252,7 @@ export type Database = {
         Args: { p_month: number; p_year: number }
         Returns: Json
       }
-      generate_my_recurring_transactions: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      generate_my_recurring_transactions: { Args: never; Returns: number }
       get_annual_metrics: {
         Args: {
           p_bank_id?: string
@@ -3225,6 +3291,14 @@ export type Database = {
         Args: { p_date: string; p_profile_id: string }
         Returns: string
       }
+      get_financial_alerts: {
+        Args: { p_company_id: string; p_days_before?: number }
+        Returns: Json
+      }
+      get_financial_summary: {
+        Args: { p_company_id: string; p_end: string; p_start: string }
+        Returns: Json
+      }
       get_monthly_evolution: {
         Args: {
           p_bank_id?: string
@@ -3235,6 +3309,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_report_recipients: { Args: never; Returns: Json }
       get_transaction_kpis: {
         Args: {
           p_bank_id?: string
@@ -3249,14 +3324,6 @@ export type Database = {
         }
         Returns: Json
       }
-      list_client_companies: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          cnpj: string
-          id: string
-          name: string
-        }[]
-      }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: { Args: never; Returns: string }
       has_role: {
@@ -3268,6 +3335,14 @@ export type Database = {
       }
       is_company_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      list_client_companies: {
+        Args: never
+        Returns: {
+          cnpj: string
+          id: string
+          name: string
+        }[]
+      }
       log_data_access: {
         Args: {
           p_acao: string

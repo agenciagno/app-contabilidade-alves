@@ -48,6 +48,7 @@ import CofreGlobal from "@/pages/CofreGlobal";
 import AdminProvisionarCliente from "@/pages/AdminProvisionarCliente";
 import TechOperacao from "@/pages/TechOperacao";
 import TechLGPD from "@/pages/TechLGPD";
+import CentralNotificacoes from "@/pages/CentralNotificacoes";
 
 
 const queryClient = new QueryClient();
@@ -101,6 +102,7 @@ const App = () => (
               <Route path="/admin/provisionar-cliente" element={<AppLayout><AdminProvisionarCliente /></AppLayout>} />
               <Route path="/tech/operacao" element={<AppLayout><TechOperacao /></AppLayout>} />
               <Route path="/tech/lgpd" element={<AppLayout><TechLGPD /></AppLayout>} />
+              <Route path="/central-notificacoes" element={<AppLayout><CentralNotificacoes /></AppLayout>} />
 
               {/* Financeiro dos Clientes — mesmos componentes, empresa em contexto = cliente selecionado.
                   Prefixo /clientes/* isolado pra, no futuro, trocar só a fonte de dados sem reforma de UI. */}

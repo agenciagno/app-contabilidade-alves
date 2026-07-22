@@ -29,6 +29,7 @@ import {
   Contact,
   TrendingUp,
   Landmark,
+  BellRing,
 
   type LucideIcon,
 } from 'lucide-react';
@@ -486,6 +487,22 @@ export function AppSidebar() {
                     <UserPlus className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
                     {showLabels && (
                       <span className="flex-1">Cadastrar Cliente</span>
+                    )}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {isSuperAdmin && (
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Central de Notificações">
+                  <NavLink onClick={handleMobileNav}
+                    to="/central-notificacoes"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] text-muted-foreground hover:bg-accent hover:text-foreground transition-[background,color] duration-[120ms]"
+                    activeClassName="bg-accent text-foreground font-semibold"
+                  >
+                    <BellRing className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
+                    {showLabels && (
+                      <span className="flex-1">Central de Notificações</span>
                     )}
                   </NavLink>
                 </SidebarMenuButton>

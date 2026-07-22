@@ -16,13 +16,38 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: "autoUpdate",
       devOptions: { enabled: false },
-      manifest: false,
+      includeAssets: ["favicon.ico", "apple-touch-icon.png", "push-sw.js"],
+      manifest: {
+        name: "Contabilidade Alves",
+        short_name: "Alves",
+        description: "Portal financeiro e fiscal da Contabilidade Alves",
+        id: "/",
+        start_url: "/",
+        scope: "/",
+        display: "standalone",
+        orientation: "portrait",
+        lang: "pt-BR",
+        background_color: "#101923",
+        theme_color: "#101923",
+        icons: [
+          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        ],
+      },
       workbox: {
+        // Handlers de push (push/notificationclick) injetados no SW gerado.
+        importScripts: ["push-sw.js"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         skipWaiting: true,
         clientsClaim: true,
         navigateFallbackDenylist: [/^\/~oauth/],
         runtimeCaching: [
+          {
+            // Dado financeiro NUNCA é cacheado — sempre fresco do Supabase.
+            urlPattern: ({ url }) => url.hostname.endsWith("supabase.co"),
+            handler: "NetworkOnly",
+          },
           {
             urlPattern: ({ request }) => request.mode === "navigate",
             handler: "NetworkFirst",

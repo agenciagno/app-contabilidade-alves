@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useNotifications, NotificationRow } from '@/hooks/useNotifications';
+import { PushOptIn } from '@/components/notifications/PushOptIn';
 
 function iconFor(type: string) {
   switch (type) {
@@ -102,6 +103,7 @@ export function NotificationBellDropdown() {
           Marcar todas como lidas
         </Button>
       </div>
+      <PushOptIn />
       <ScrollArea className="max-h-[400px]">
         {isLoading ? (
           <div className="px-3 py-8 text-center text-sm text-muted-foreground">Carregando...</div>
