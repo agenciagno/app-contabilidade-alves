@@ -37,8 +37,8 @@ function Item({ n, onOpen, onMarkRead }: ItemProps) {
   return (
     <div
       className={cn(
-        'group w-full flex items-start gap-3 px-3 py-2.5 border-b border-border/40 last:border-b-0 hover:bg-muted/40 transition-colors',
-        unread && 'bg-muted/50'
+        'group w-full flex items-start gap-3 px-3 py-2.5 border-b border-border/40 last:border-b-0 hover:bg-muted/40 transition-[background,opacity]',
+        unread ? 'bg-muted/50' : 'opacity-50'
       )}
     >
       <button
@@ -80,7 +80,14 @@ function Item({ n, onOpen, onMarkRead }: ItemProps) {
 }
 
 export function NotificationBellDropdown() {
-  const { notifications, unreadCount, markAsRead, markAllAsRead, isLoading } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll, isLoading } = useNotifications();
+
+  const handleClear = () => {
+    if (notifications.length === 0) return;
+    if (window.confirm('Limpar todas as notificações? Esta ação não pode ser desfeita.')) {
+      clearAll();
+    }
+  };
 
   const handleOpen = (n: NotificationRow) => {
     if (!n.read_at) markAsRead(n.id);
@@ -91,17 +98,28 @@ export function NotificationBellDropdown() {
 
   return (
     <div className="w-[380px]">
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50">
-        <h3 className="text-sm font-semibold">Notificações</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-xs"
-          disabled={unreadCount === 0}
-          onClick={() => markAllAsRead()}
-        >
-          Marcar todas como lidas
-        </Button>
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50 gap-1">
+        <h3 className="text-sm font-semibold shrink-0">Notificações</h3>
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs px-2"
+            disabled={unreadCount === 0}
+            onClick={() => markAllAsRead()}
+          >
+            Marcar lidas
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs px-2 text-muted-foreground hover:text-destructive"
+            disabled={notifications.length === 0}
+            onClick={handleClear}
+          >
+            Limpar
+          </Button>
+        </div>
       </div>
       <PushOptIn />
       <ScrollArea className="max-h-[400px]">

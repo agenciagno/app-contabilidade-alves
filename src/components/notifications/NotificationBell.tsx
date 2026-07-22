@@ -11,6 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useNotifications, NotificationRow } from '@/hooks/useNotifications';
+import { PushOptIn } from '@/components/notifications/PushOptIn';
 
 const TYPE_META: Record<string, { icon: any; color: string }> = {
   task_due: { icon: Clock, color: 'text-amber-500' },
@@ -52,8 +53,8 @@ function Item({ n, onClick }: { n: NotificationRow; onClick: (n: NotificationRow
       type="button"
       onClick={() => onClick(n)}
       className={cn(
-        'w-full text-left flex items-start gap-3 px-3 py-2.5 border-b border-border/40 last:border-b-0 hover:bg-muted/40 transition-colors',
-        unread && 'bg-muted/50'
+        'w-full text-left flex items-start gap-3 px-3 py-2.5 border-b border-border/40 last:border-b-0 hover:bg-muted/40 transition-[background,opacity]',
+        unread ? 'bg-muted/50' : 'opacity-50'
       )}
     >
       <div className="mt-0.5 shrink-0">{iconForType(n.type)}</div>
@@ -87,7 +88,14 @@ function Item({ n, onClick }: { n: NotificationRow; onClick: (n: NotificationRow
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, isLoading } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll, isLoading } = useNotifications();
+
+  const handleClear = () => {
+    if (notifications.length === 0) return;
+    if (window.confirm('Limpar todas as notificações? Esta ação não pode ser desfeita.')) {
+      clearAll();
+    }
+  };
 
   const handleClick = (n: NotificationRow) => {
     if (!n.read_at) markAsRead(n.id);
@@ -110,18 +118,30 @@ export function NotificationBell() {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[380px] p-0">
-        <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50">
-          <h3 className="text-sm font-semibold">Notificações</h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs"
-            disabled={unreadCount === 0}
-            onClick={() => markAllAsRead()}
-          >
-            Marcar todas como lidas
-          </Button>
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50 gap-1">
+          <h3 className="text-sm font-semibold shrink-0">Notificações</h3>
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs px-2"
+              disabled={unreadCount === 0}
+              onClick={() => markAllAsRead()}
+            >
+              Marcar lidas
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs px-2 text-muted-foreground hover:text-destructive"
+              disabled={notifications.length === 0}
+              onClick={handleClear}
+            >
+              Limpar
+            </Button>
+          </div>
         </div>
+        <PushOptIn />
         <ScrollArea className="max-h-[420px]">
           {isLoading ? (
             <div className="px-3 py-8 text-center text-sm text-muted-foreground">Carregando...</div>

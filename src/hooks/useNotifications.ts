@@ -61,11 +61,12 @@ export function useNotifications() {
       const unreadIds = (query.data ?? []).filter((n) => !n.read_at).map((n) => n.id);
       if (unreadIds.length === 0) return;
       const nowIso = new Date().toISOString();
+      // Sem .eq('user_id') — a RLS de UPDATE já limita ao que o admin pode gerenciar
+      // (próprias + as da empresa). Restringir por user_id deixaria as da empresa sempre não-lidas.
       const { error } = await (supabase as any)
         .from('notifications')
         .update({ read_at: nowIso })
-        .in('id', unreadIds)
-        .eq('user_id', userId);
+        .in('id', unreadIds);
       if (error) throw error;
     },
     onMutate: async () => {
@@ -75,6 +76,29 @@ export function useNotifications() {
       queryClient.setQueryData<NotificationRow[]>(['notifications', userId], (old) =>
         (old ?? []).map((n) => (n.read_at ? n : { ...n, read_at: nowIso }))
       );
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(['notifications', userId], ctx.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['notifications', userId] }),
+  });
+
+  const clearAll = useMutation({
+    mutationFn: async () => {
+      const ids = (query.data ?? []).map((n) => n.id);
+      if (ids.length === 0) return;
+      // Remove as notificações visíveis (RLS de DELETE limita ao que o admin pode gerenciar).
+      const { error } = await (supabase as any)
+        .from('notifications')
+        .delete()
+        .in('id', ids);
+      if (error) throw error;
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['notifications', userId] });
+      const previous = queryClient.getQueryData<NotificationRow[]>(['notifications', userId]);
+      queryClient.setQueryData<NotificationRow[]>(['notifications', userId], []);
       return { previous };
     },
     onError: (_err, _vars, ctx) => {
@@ -106,5 +130,6 @@ export function useNotifications() {
     isLoading: query.isLoading,
     markAsRead: (id: string) => markAsRead.mutate(id),
     markAllAsRead: () => markAllAsRead.mutate(),
+    clearAll: () => clearAll.mutate(),
   };
 }
