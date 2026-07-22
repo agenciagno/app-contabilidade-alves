@@ -212,6 +212,40 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       });
     }
 
+    // Régua de cobrança — contas a RECEBER vencendo nos próximos X dias (aviso antecipado).
+    // Complementa "Vencimentos do Dia" (no vencimento) e "Inadimplência" (atrasado).
+    const COBRANCA_DIAS_ANTES = 3;
+    const limiteCobrancaStr = format(addDays(today, COBRANCA_DIAS_ANTES), 'yyyy-MM-dd');
+    const aVencerByContact = new Map<string, { name: string; count: number; total: number; nextDate: string }>();
+    filteredTransactions.forEach((t) => {
+      if (t.type !== 'receita' || !t.due_date || !t.contact_id) return;
+      if (t.due_date <= todayStr || t.due_date > limiteCobrancaStr) return; // entre amanhã e +X dias
+      const contactName = t.contact?.name || 'Cliente';
+      const ex = aVencerByContact.get(t.contact_id);
+      if (ex) {
+        ex.count += 1;
+        ex.total += Number(t.amount);
+        if (t.due_date < ex.nextDate) ex.nextDate = t.due_date;
+      } else {
+        aVencerByContact.set(t.contact_id, { name: contactName, count: 1, total: Number(t.amount), nextDate: t.due_date });
+      }
+    });
+    aVencerByContact.forEach((info, contactId) => {
+      const id = `cobranca-avencer-${contactId}-${info.nextDate}`;
+      const [y, m, d] = info.nextDate.split('-');
+      notifications.push({
+        id,
+        type: 'warning',
+        title: 'Cobrança a vencer',
+        description: `${info.name}: ${info.count} título(s) a receber vencendo até ${d}/${m}/${y}, total R$ ${info.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`,
+        timestamp: new Date(),
+        read: readIds.has(id),
+        category: 'vencimento',
+        actionUrl: `/crm/cliente/${contactId}`,
+        contactId,
+      });
+    });
+
     // Projeção de saldo negativo — dia a dia (30 dias), detecta o 1º cruzamento do zero.
     const totalBalance = banks.reduce((sum, b) => sum + Number(b.current_balance || 0), 0);
     const HORIZON = 30;
