@@ -26,6 +26,7 @@ import { useSuperPerfil } from '@/hooks/useSuperPerfil';
 import { useContactPartners } from '@/hooks/useContactPartners';
 import { useContacts } from '@/hooks/useContacts';
 import { useContactDependencies } from '@/hooks/useContactDependencies';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ContactBillingCard } from '../ContactBillingCard';
@@ -498,6 +499,9 @@ function OperacionalSection({
   const navigate = useNavigate();
   const { data: dependencies, isLoading: loadingDependencies } = useContactDependencies(contactId);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const { isSuperAdmin, isAdmin, allowedModules } = useUserRole();
+  const canViewCobranca = isSuperAdmin || isAdmin || allowedModules.includes('financeiro');
+  const canDeleteContact = isSuperAdmin || isAdmin;
 
   const handleDelete = () => {
     deleteContact.mutate(contactId, { onSuccess: () => navigate('/contatos') });
@@ -645,23 +649,26 @@ function OperacionalSection({
         </Button>
       </div>
 
-      {contact && <ContactBillingCard contact={contact} />}
+      {canViewCobranca && contact && <ContactBillingCard contact={contact} />}
 
-      <Card className="border-destructive/30">
-        <CardHeader><CardTitle className="text-base text-destructive">Zona de Risco</CardTitle></CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between rounded-lg border border-destructive/20 p-3">
-            <div>
-              <p className="text-sm font-medium">Excluir contato</p>
-              <p className="text-xs text-muted-foreground">Remove {contact?.name || 'este contato'} permanentemente.</p>
+      {canDeleteContact && (
+        <Card className="border-destructive/30">
+          <CardHeader><CardTitle className="text-base text-destructive">Zona de Risco</CardTitle></CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between rounded-lg border border-destructive/20 p-3">
+              <div>
+                <p className="text-sm font-medium">Excluir contato</p>
+                <p className="text-xs text-muted-foreground">Remove {contact?.name || 'este contato'} permanentemente.</p>
+              </div>
+              <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="h-4 w-4 mr-2" /> Excluir
+              </Button>
             </div>
-            <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
-              <Trash2 className="h-4 w-4 mr-2" /> Excluir
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
+      {canDeleteContact && (
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -704,6 +711,7 @@ function OperacionalSection({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      )}
     </>
   );
 }

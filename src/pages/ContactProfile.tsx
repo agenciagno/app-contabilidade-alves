@@ -34,6 +34,8 @@ export default function ContactProfile() {
   const { documents, getDocumentCounts } = useContactDocuments(id);
   const { isAdmin, isSuperAdmin, allowedModules } = useUserRole();
   const canViewAcessos = isSuperAdmin || allowedModules.includes('acessos');
+  const canViewFinanceiro = isSuperAdmin || isAdmin || allowedModules.includes('financeiro');
+  const canViewLogs = isSuperAdmin || isAdmin;
   const contact = contacts.find(c => c.id === id);
   const { isInadimplente } = useContactFinancialStatus(id, transactions);
 
@@ -99,7 +101,14 @@ export default function ContactProfile() {
     );
   }
 
-  const tabsColsClass = canViewAcessos ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4';
+  const visibleTabCount = 2 + (canViewAcessos ? 1 : 0) + (canViewFinanceiro ? 1 : 0) + (canViewLogs ? 1 : 0);
+  const GRID_COLS_CLASS: Record<number, string> = {
+    2: 'grid-cols-2 md:grid-cols-2',
+    3: 'grid-cols-2 md:grid-cols-3',
+    4: 'grid-cols-2 md:grid-cols-4',
+    5: 'grid-cols-2 md:grid-cols-5',
+  };
+  const tabsColsClass = GRID_COLS_CLASS[visibleTabCount];
 
   return (
     <div className="space-y-6">
@@ -177,14 +186,18 @@ export default function ContactProfile() {
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Documentos</span>
           </TabsTrigger>
-          <TabsTrigger value="financeiro" className="flex items-center gap-1.5">
-            <DollarSign className="h-4 w-4" />
-            <span className="hidden sm:inline">Financeiro</span>
-          </TabsTrigger>
-          <TabsTrigger value="logs" className="flex items-center gap-1.5">
-            <History className="h-4 w-4" />
-            <span className="hidden sm:inline">Logs</span>
-          </TabsTrigger>
+          {canViewFinanceiro && (
+            <TabsTrigger value="financeiro" className="flex items-center gap-1.5">
+              <DollarSign className="h-4 w-4" />
+              <span className="hidden sm:inline">Financeiro</span>
+            </TabsTrigger>
+          )}
+          {canViewLogs && (
+            <TabsTrigger value="logs" className="flex items-center gap-1.5">
+              <History className="h-4 w-4" />
+              <span className="hidden sm:inline">Logs</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="cadastro" className="mt-6">
@@ -201,13 +214,17 @@ export default function ContactProfile() {
           <ContactDocumentsTab contactId={contact.id} />
         </TabsContent>
 
-        <TabsContent value="financeiro" className="mt-6">
-          <ContactFinancialTab contactId={contact.id} contactName={contact.name} />
-        </TabsContent>
+        {canViewFinanceiro && (
+          <TabsContent value="financeiro" className="mt-6">
+            <ContactFinancialTab contactId={contact.id} contactName={contact.name} />
+          </TabsContent>
+        )}
 
-        <TabsContent value="logs" className="mt-6">
-          <ContactLogsWithComunicacaoTab contactId={contact.id} />
-        </TabsContent>
+        {canViewLogs && (
+          <TabsContent value="logs" className="mt-6">
+            <ContactLogsWithComunicacaoTab contactId={contact.id} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
