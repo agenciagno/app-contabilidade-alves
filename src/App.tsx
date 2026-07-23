@@ -21,6 +21,7 @@ import Contacts from "@/pages/Contacts";
 import ContactProfile from "@/pages/ContactProfile";
 import Banks from "@/pages/Banks";
 import Categories from "@/pages/Categories";
+import ClientCategories from "@/pages/ClientCategories";
 import DRE from "@/pages/DRE";
 import SettingsPage from "@/pages/SettingsPage";
 import CrmDispatches from "@/pages/CrmDispatches";
@@ -80,6 +81,7 @@ const App = () => (
 
               <Route path="/bancos" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_conta_corrente"><Banks /></ModuleGuard></AppLayout>} />
               <Route path="/categorias" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_eventos_contabeis"><Categories /></ModuleGuard></AppLayout>} />
+              <Route path="/financeiro/categorias-clientes" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_categorias"><ClientCategories /></ModuleGuard></AppLayout>} />
               <Route path="/dre" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_dre"><DRE /></ModuleGuard></AppLayout>} />
               
               <Route path="/configuracoes" element={<AppLayout><ModuleGuard moduleName="configuracoes"><SettingsPage /></ModuleGuard></AppLayout>} />

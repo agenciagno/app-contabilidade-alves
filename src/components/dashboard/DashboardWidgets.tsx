@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Settings2, TrendingUp, TrendingDown, Wallet, Clock, DollarSign, PiggyBank, BarChart3, CreditCard, FileText } from 'lucide-react';
+import { Settings2, TrendingUp, TrendingDown, Wallet, Clock, DollarSign, PiggyBank, BarChart3, CreditCard } from 'lucide-react';
 
 export interface WidgetConfig {
   id: string;
@@ -22,11 +22,8 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'evolution', name: 'Evolução Mensal', enabled: true, icon: <BarChart3 className="h-4 w-4" /> },
   { id: 'revenueCategoryChart', name: 'Receitas por Evento Contábil', enabled: true, icon: <BarChart3 className="h-4 w-4" /> },
   { id: 'categoryChart', name: 'Despesas por Evento Contábil', enabled: true, icon: <BarChart3 className="h-4 w-4" /> },
-  { id: 'pendingList', name: 'Contas Pendentes', enabled: true, icon: <FileText className="h-4 w-4" /> },
   { id: 'recentTransactions', name: 'Últimas Movimentações', enabled: true, icon: <TrendingUp className="h-4 w-4" /> },
-  { id: 'dre', name: 'Resultado Operacional (DRE)', enabled: true, icon: <BarChart3 className="h-4 w-4" /> },
   { id: 'periodComparison', name: 'Comparativo de Períodos', enabled: true, icon: <TrendingUp className="h-4 w-4" /> },
-  { id: 'cashFlowForecast', name: 'Fluxo de Caixa Previsto', enabled: true, icon: <TrendingDown className="h-4 w-4" /> },
 ];
 
 const STORAGE_KEY = 'dashboard-widgets-config';

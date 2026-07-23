@@ -69,6 +69,7 @@ export interface OrphanSyncResult {
   name: string | null;
   encontrados: number;
   orfaos: number;
+  atualizados: number;
   status: 'ok' | 'error' | 'skipped';
   message?: string;
 }
@@ -76,6 +77,7 @@ export interface OrphanSyncSummary {
   contactsScanned: number;
   totalEncontrados: number;
   totalOrfaos: number;
+  totalAtualizados: number;
   errors: number;
   details: OrphanSyncResult[];
 }
@@ -251,6 +253,7 @@ export function useBoletoControls(vencimentoMonth: string) {
       contactsScanned: contactIds.length,
       totalEncontrados: details.reduce((s, r) => s + r.encontrados, 0),
       totalOrfaos: details.reduce((s, r) => s + r.orfaos, 0),
+      totalAtualizados: details.reduce((s, r) => s + (r.atualizados || 0), 0),
       errors: details.filter((r) => r.status === 'error').length,
       details,
     };

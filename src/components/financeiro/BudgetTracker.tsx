@@ -3,9 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Target, AlertTriangle, Settings2 } from 'lucide-react';
+import { Target, AlertTriangle, Plus, X } from 'lucide-react';
 import { useBudgets } from '@/hooks/useBudgets';
-import { BudgetManagerDialog } from './BudgetManagerDialog';
+import { AddGoalOrBudgetDialog } from './AddGoalOrBudgetDialog';
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -17,8 +17,8 @@ function currentMonthYear(): string {
 
 export function BudgetTracker() {
   const monthYear = currentMonthYear();
-  const { rows, totalBudget, totalRealizado, overCount, isLoading } = useBudgets(monthYear);
-  const [manageOpen, setManageOpen] = useState(false);
+  const { rows, totalBudget, totalRealizado, overCount, isLoading, deleteBudget } = useBudgets(monthYear);
+  const [addOpen, setAddOpen] = useState(false);
 
   return (
     <Card className="border-border/30">
@@ -33,8 +33,8 @@ export function BudgetTracker() {
               </Badge>
             )}
           </CardTitle>
-          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => setManageOpen(true)}>
-            <Settings2 className="h-3.5 w-3.5" /> Gerenciar
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => setAddOpen(true)}>
+            <Plus className="h-3.5 w-3.5" /> Adicionar
           </Button>
         </div>
       </CardHeader>
@@ -46,7 +46,7 @@ export function BudgetTracker() {
         ) : rows.length === 0 ? (
           <div className="text-center py-6 text-sm text-muted-foreground">
             Nenhum orçamento definido para {monthYear.split('-').reverse().join('/')}.<br />
-            Clique em <span className="font-medium">Gerenciar</span> para definir tetos por categoria.
+            Clique em <span className="font-medium">Adicionar</span> para definir um teto por categoria.
           </div>
         ) : (
           <>
@@ -58,16 +58,28 @@ export function BudgetTracker() {
               const pctClamped = Math.min(r.pct, 1) * 100;
               const overWidth = r.pct > 1 ? Math.min((r.pct - 1) / r.pct, 1) * 100 : 0;
               return (
-                <div key={r.categoryId} className="space-y-1">
+                <div key={r.categoryId} className="space-y-1 group">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.categoryColor }} />
                       <span className="truncate">{r.categoryName}</span>
                     </div>
-                    <span className={`tabular-nums shrink-0 ${r.over ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
-                      {formatCurrency(r.realizado)} / {formatCurrency(r.budget)}
-                      {r.over && <span className="ml-1">({Math.round(r.pct * 100)}%)</span>}
-                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className={`tabular-nums ${r.over ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+                        {formatCurrency(r.realizado)} / {formatCurrency(r.budget)}
+                        {r.over && <span className="ml-1">({Math.round(r.pct * 100)}%)</span>}
+                      </span>
+                      {r.budgetId && (
+                        <button
+                          type="button"
+                          title="Remover orçamento"
+                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                          onClick={() => deleteBudget.mutate(r.budgetId!)}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="h-2 w-full rounded-full bg-muted overflow-hidden flex">
                     <div
@@ -82,7 +94,7 @@ export function BudgetTracker() {
           </>
         )}
       </CardContent>
-      <BudgetManagerDialog open={manageOpen} onOpenChange={setManageOpen} monthYear={monthYear} />
+      <AddGoalOrBudgetDialog open={addOpen} onOpenChange={setAddOpen} monthYear={monthYear} />
     </Card>
   );
 }

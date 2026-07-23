@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 
+export type CategoryScope = 'interno' | 'cliente';
+
 export interface Category {
   id: string;
   company_id: string;
@@ -12,25 +14,34 @@ export interface Category {
   icon: string;
   parent_id: string | null;
   show_in_dre: boolean;
+  scope: CategoryScope;
   created_at: string;
   updated_at: string;
 }
 
-export type CategoryInsert = Omit<Category, 'id' | 'created_at' | 'updated_at' | 'parent_id' | 'show_in_dre'> & { parent_id?: string | null; show_in_dre?: boolean };
+export type CategoryInsert = Omit<Category, 'id' | 'created_at' | 'updated_at' | 'parent_id' | 'show_in_dre' | 'scope'> & { parent_id?: string | null; show_in_dre?: boolean };
 export type CategoryUpdate = Partial<Omit<Category, 'id' | 'company_id' | 'created_at' | 'updated_at'>>;
 
-export function useCategories() {
+// Eventos Contábeis (scope 'interno', bookkeeping da própria empresa) × Categorias (scope
+// 'cliente', módulo Financeiro vendido a clientes) são isolados mesmo dentro da mesma
+// company_id — decisão de 22/07/2026. Sem override, o scope é resolvido pela mesma regra usada
+// em Lançamentos (isInternalCompany): empresa interna da CA vê 'interno', cliente externo do
+// módulo vê 'cliente'. O único lugar que passa override é a tela "Categorias" (preview do
+// módulo vendido, acessada pela própria equipe da CA).
+export function useCategories(scopeOverride?: CategoryScope) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { activeCompanyId } = useActiveCompany();
+  const { activeCompanyId, isInternalCompany } = useActiveCompany();
+  const scope: CategoryScope = scopeOverride ?? (isInternalCompany ? 'interno' : 'cliente');
 
   const { data: categories = [], isLoading, error } = useQuery({
-    queryKey: ['categories', activeCompanyId],
+    queryKey: ['categories', activeCompanyId, scope],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('categories')
         .select('*')
         .eq('company_id', activeCompanyId!)
+        .eq('scope', scope)
         .order('name');
 
       if (error) throw error;
@@ -47,7 +58,7 @@ export function useCategories() {
 
       const { data, error } = await supabase
         .from('categories')
-        .insert({ ...category, company_id: activeCompanyId })
+        .insert({ ...category, company_id: activeCompanyId, scope })
         .select()
         .single();
 

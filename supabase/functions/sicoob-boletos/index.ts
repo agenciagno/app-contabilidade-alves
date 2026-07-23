@@ -157,6 +157,36 @@ async function listarBoletosPorPagador(token: string, cpfCnpj: string) {
   return { ok: res.ok, status: res.status, data };
 }
 
+// GET /boletos — consulta individual (não confundir com "listar por pagador" acima). Só chamada
+// para boletos que acabaram de virar LIQUIDADO, atrás do listaHistorico — é o único lugar da API
+// de boletos do Sicoob que carrega uma data por evento. Confirmado no schema oficial (Swagger
+// cobranca-bancaria-v3, model InlineResponse200Resultado): não existe valorPago/valorRecebido em
+// nenhum nível dessa API — por isso o valor pago não é preenchido automaticamente aqui, só via
+// conciliação manual do extrato (Conciliação Sicoob).
+async function consultarBoletoDetalhe(token: string, nossoNumero: number) {
+  // @ts-ignore unstable API
+  const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+  const url = `https://api.sicoob.com.br/cobranca-bancaria/v3/boletos?numeroCliente=${NUMERO_CLIENTE}&codigoModalidade=1&nossoNumero=${nossoNumero}`;
+  const res = await fetch(url, {
+    method: "GET",
+    client,
+    headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Accept": "application/json" },
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+// Acha a data do evento de liquidação no listaHistorico (mesma heurística textual "LIQUID" já
+// usada em mapSituacaoBoleto). Sem entrada compatível, não inventa data — fica null.
+function extrairDataPagamento(listaHistorico: unknown): string | null {
+  if (!Array.isArray(listaHistorico)) return null;
+  const evento = listaHistorico.find((h: any) =>
+    `${h?.tipoHistorico || ""} ${h?.descricaoHistorico || ""}`.toUpperCase().includes("LIQUID")
+  );
+  const data = (evento as any)?.dataHistorico;
+  return data ? String(data).slice(0, 10) : null;
+}
+
 // GET /saldo — saldo atual/bloqueado/limite da conta corrente. Só leitura.
 async function consultarSaldo(token: string) {
   // @ts-ignore unstable API
@@ -583,9 +613,38 @@ Deno.serve(async (req) => {
           const lista: SicoobPagadorBoleto[] = Array.isArray(resp.data?.resultado) ? resp.data.resultado : [];
           let orfaosInseridos = 0;
           let falhasInsercao = 0;
+          let statusAtualizados = 0;
           for (const b of lista) {
             const nn = Number(b.nossoNumero);
-            if (!nn || known.has(nn)) continue;
+            if (!nn) continue;
+
+            // Já existe localmente — atualiza só quando o Sicoob já mostra LIQUIDADO e o registro
+            // local ainda não está PAGO. Visual apenas: não baixa boleto nem cria movimentação.
+            if (known.has(nn)) {
+              if (mapSituacaoBoleto(b.situacaoBoleto) !== "PAGO") continue;
+              const { data: localRow } = await supabase
+                .from("boleto_controls")
+                .select("id, status")
+                .eq("company_id", COMPANY_ID)
+                .eq("nosso_numero", nn)
+                .maybeSingle();
+              if (!localRow || localRow.status === "PAGO") continue;
+
+              let dataPagamento: string | null = null;
+              try {
+                const det = await consultarBoletoDetalhe(token, nn);
+                if (det.ok) dataPagamento = extrairDataPagamento((det.data as any)?.resultado?.listaHistorico);
+              } catch {
+                // Segue sem data — não bloqueia a atualização do status por causa disso.
+              }
+              const { error: updErr } = await supabase.from("boleto_controls").update({
+                status: "PAGO",
+                data_pagamento: dataPagamento,
+                sicoob_response: b,
+              }).eq("id", localRow.id);
+              if (!updErr) statusAtualizados++;
+              continue;
+            }
 
             const dataEmissao = b.dataEmissao ? b.dataEmissao.slice(0, 10) : null;
             const dataVencimento = b.dataVencimento ? b.dataVencimento.slice(0, 10) : null;
@@ -629,23 +688,26 @@ Deno.serve(async (req) => {
             name: c.name,
             encontrados: lista.length,
             orfaos: orfaosInseridos,
+            atualizados: statusAtualizados,
             status: falhasInsercao > 0 ? "error" : "ok",
             message: falhasInsercao > 0 ? `${falhasInsercao} boleto(s) encontrados mas não salvos (erro ao inserir)` : undefined,
           });
         } catch (e) {
-          results.push({ contact_id: id, name: c.name, encontrados: 0, orfaos: 0, status: "error", message: String((e as Error).message || e) });
+          results.push({ contact_id: id, name: c.name, encontrados: 0, orfaos: 0, atualizados: 0, status: "error", message: String((e as Error).message || e) });
         }
       }
 
       const totalEncontrados = results.reduce((s, r) => s + (r.encontrados || 0), 0);
       const totalOrfaos = results.reduce((s, r) => s + (r.orfaos || 0), 0);
+      const totalAtualizados = results.reduce((s, r) => s + (r.atualizados || 0), 0);
       const errors = results.filter((r) => r.status === "error");
       return json({
         contacts_scanned: contactIds.length,
         total_encontrados: totalEncontrados,
         total_orfaos: totalOrfaos,
+        total_atualizados: totalAtualizados,
         errors: errors.length,
-        details: results.filter((r) => r.orfaos > 0 || r.status === "error"),
+        details: results.filter((r) => r.orfaos > 0 || r.atualizados > 0 || r.status === "error"),
       });
     }
 

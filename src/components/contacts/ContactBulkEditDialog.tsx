@@ -122,6 +122,7 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
         .from('categories')
         .select('id, name')
         .eq('company_id', companyId!)
+        .eq('scope', 'interno') // Contatos é módulo só da CA — sempre Eventos Contábeis internos.
         .order('name');
       if (error) throw error;
       return data;

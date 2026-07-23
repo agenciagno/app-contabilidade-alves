@@ -280,6 +280,7 @@ export type Database = {
           id: string
           name: string
           parent_id: string | null
+          scope: string
           show_in_dre: boolean
           type: string
           updated_at: string
@@ -292,6 +293,7 @@ export type Database = {
           id?: string
           name: string
           parent_id?: string | null
+          scope?: string
           show_in_dre?: boolean
           type: string
           updated_at?: string
@@ -304,6 +306,7 @@ export type Database = {
           id?: string
           name?: string
           parent_id?: string | null
+          scope?: string
           show_in_dre?: boolean
           type?: string
           updated_at?: string
@@ -1625,6 +1628,53 @@ export type Database = {
           },
         ]
       }
+      financial_goals: {
+        Row: {
+          company_id: string
+          created_at: string
+          current_value: number
+          end_date: string
+          id: string
+          notes: string | null
+          start_date: string
+          target_value: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          current_value?: number
+          end_date: string
+          id?: string
+          notes?: string | null
+          start_date: string
+          target_value: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          current_value?: number
+          end_date?: string
+          id?: string
+          notes?: string | null
+          start_date?: string
+          target_value?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_goals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fiscal_audit_log: {
         Row: {
           action: string
@@ -2411,6 +2461,7 @@ export type Database = {
           task_id: string | null
           title: string
           type: string
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -2425,6 +2476,7 @@ export type Database = {
           task_id?: string | null
           title: string
           type: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -2439,6 +2491,7 @@ export type Database = {
           task_id?: string | null
           title?: string
           type?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [

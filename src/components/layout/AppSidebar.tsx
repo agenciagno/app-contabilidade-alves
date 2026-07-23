@@ -202,7 +202,7 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
       { title: 'Eventos Contábeis', url: '/categorias', icon: Tags, iconName: 'tags', subKey: 'financeiro_eventos_contabeis' },
       { title: 'DRE', url: '/dre', icon: FileBarChart, iconName: 'file-bar-chart', subKey: 'financeiro_dre' },
       { title: 'Clientes & Fornecedores', url: '/financeiro/clientes-fornecedores', icon: Contact, iconName: 'contact', sectionBreak: 'Módulo vendido a clientes', subKey: 'financeiro_clientes_fornecedores' },
-      { title: 'Categorias', url: '/categorias', icon: Tags, iconName: 'tags' },
+      { title: 'Categorias', url: '/financeiro/categorias-clientes', icon: Tags, iconName: 'tags', subKey: 'financeiro_categorias' },
       { title: 'Metas & Orçamentos', url: '/financeiro/metas-orcamentos', icon: Target, iconName: 'target', subKey: 'financeiro_metas_orcamentos' },
     ],
   },
@@ -226,7 +226,7 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
 
 const SUB_MODULES_BY_PARENT: Record<string, string[]> = {
   fiscal: ['fiscal_dashboard', 'fiscal_tarefas', 'fiscal_calendario', 'fiscal_colaboradores', 'fiscal_monitor_cnpj'],
-  financeiro: ['financeiro_dashboard', 'financeiro_lancamentos', 'financeiro_pagar_receber', 'financeiro_fluxo_caixa', 'financeiro_boletos', 'financeiro_conta_corrente', 'financeiro_conciliacao_sicoob', 'financeiro_eventos_contabeis', 'financeiro_dre', 'financeiro_clientes_fornecedores', 'financeiro_metas_orcamentos'],
+  financeiro: ['financeiro_dashboard', 'financeiro_lancamentos', 'financeiro_pagar_receber', 'financeiro_fluxo_caixa', 'financeiro_boletos', 'financeiro_conta_corrente', 'financeiro_conciliacao_sicoob', 'financeiro_eventos_contabeis', 'financeiro_dre', 'financeiro_clientes_fornecedores', 'financeiro_metas_orcamentos', 'financeiro_categorias'],
   tech: ['tech_disparos'],
 };
 

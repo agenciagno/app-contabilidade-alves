@@ -120,9 +120,13 @@ export default function Boletos() {
         contacts.map((c) => c.contact_id),
         (done, total) => setSyncProgress({ done, total }),
       );
+      const novidades = result.totalOrfaos > 0 || result.totalAtualizados > 0;
       toast({
-        title: result.totalOrfaos > 0
-          ? `${result.totalOrfaos} boleto(s) adicionado(s) à tabela`
+        title: novidades
+          ? [
+              result.totalOrfaos > 0 ? `${result.totalOrfaos} boleto(s) adicionado(s)` : null,
+              result.totalAtualizados > 0 ? `${result.totalAtualizados} marcado(s) como pago` : null,
+            ].filter(Boolean).join(' · ')
           : 'Tudo em dia — nada de novo no Sicoob',
         description: `${result.contactsScanned} clientes consultados, ${result.totalEncontrados} boletos encontrados no Sicoob${result.errors > 0 ? `, ${result.errors} com erro` : ''}.`,
         variant: result.errors > 0 ? 'destructive' : 'default',

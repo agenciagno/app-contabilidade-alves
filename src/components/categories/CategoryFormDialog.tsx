@@ -9,6 +9,26 @@ import { Switch } from '@/components/ui/switch';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { Category } from '@/hooks/useCategories';
 
+interface CategoryFormDialogLabels {
+  dialogTitleNew: string;
+  dialogTitleEdit: string;
+  parentQuestion: string;
+  parentPlaceholder: string;
+  parentNoneOption: string;
+  parentHelper: string;
+}
+
+// Rótulos padrão = Eventos Contábeis (bookkeeping interno da CA). A tela "Categorias"
+// (módulo Financeiro vendido a clientes) passa `labels` com termos mais amigáveis.
+const DEFAULT_LABELS: CategoryFormDialogLabels = {
+  dialogTitleNew: 'Novo Evento Contábil',
+  dialogTitleEdit: 'Editar Evento Contábil',
+  parentQuestion: 'Pertence a qual Evento Macro? (Opcional)',
+  parentPlaceholder: 'Nenhum (este é um Evento Macro)',
+  parentNoneOption: 'Nenhum (Evento Macro)',
+  parentHelper: 'Se não selecionar, este evento será um Macro. Se selecionar, será um sub evento.',
+};
+
 interface CategoryFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -17,9 +37,11 @@ interface CategoryFormDialogProps {
   onSubmit: (data: { name: string; type: 'receita' | 'despesa'; color: string; icon: string; parent_id?: string | null; show_in_dre?: boolean }) => void;
   isLoading?: boolean;
   defaultType?: 'receita' | 'despesa';
+  labels?: Partial<CategoryFormDialogLabels>;
 }
 
-export function CategoryFormDialog({ open, onOpenChange, category, categories = [], onSubmit, isLoading, defaultType = 'receita' }: CategoryFormDialogProps) {
+export function CategoryFormDialog({ open, onOpenChange, category, categories = [], onSubmit, isLoading, defaultType = 'receita', labels }: CategoryFormDialogProps) {
+  const l = { ...DEFAULT_LABELS, ...labels };
   const [name, setName] = useState('');
   const [type, setType] = useState<'receita' | 'despesa'>(defaultType);
   const [parentId, setParentId] = useState<string | null>(null);
@@ -53,7 +75,7 @@ export function CategoryFormDialog({ open, onOpenChange, category, categories = 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{category ? 'Editar Evento Contábil' : 'Novo Evento Contábil'}</DialogTitle>
+          <DialogTitle>{category ? l.dialogTitleEdit : l.dialogTitleNew}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -83,16 +105,16 @@ export function CategoryFormDialog({ open, onOpenChange, category, categories = 
           </div>
 
           <div className="space-y-2">
-            <Label>Pertence a qual Evento Macro? (Opcional)</Label>
+            <Label>{l.parentQuestion}</Label>
             <Select
               value={parentId || '__none__'}
               onValueChange={(v) => setParentId(v === '__none__' ? null : v)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Nenhum (este é um Evento Macro)" />
+                <SelectValue placeholder={l.parentPlaceholder} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">Nenhum (Evento Macro)</SelectItem>
+                <SelectItem value="__none__">{l.parentNoneOption}</SelectItem>
                 {macroOptions.map(macro => (
                   <SelectItem key={macro.id} value={macro.id}>
                     {macro.name}
@@ -101,7 +123,7 @@ export function CategoryFormDialog({ open, onOpenChange, category, categories = 
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Se não selecionar, este evento será um Macro. Se selecionar, será um sub evento.
+              {l.parentHelper}
             </p>
           </div>
 

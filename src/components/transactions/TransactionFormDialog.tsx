@@ -17,7 +17,8 @@ import { Transaction, TransactionInsert } from '@/hooks/useTransactions';
 import { Category, useCategories, CategoryInsert } from '@/hooks/useCategories';
 import { Bank, useBanks, BankInsert } from '@/hooks/useBanks';
 import { Contact, useContacts, ContactInsert } from '@/hooks/useContacts';
-import { useParties } from '@/hooks/useParties';
+import { useParties, PartyInput } from '@/hooks/useParties';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 import { useTransactionAttachments } from '@/hooks/useTransactionAttachments';
 import { useTransactionHistory } from '@/hooks/useTransactionHistory';
 import { useSuggestedCategory } from '@/hooks/useSuggestedCategory';
@@ -25,6 +26,7 @@ import { AttachmentUpload } from './AttachmentUpload';
 import { CategoryFormDialog } from '@/components/categories/CategoryFormDialog';
 import { BankFormDialog } from '@/components/banks/BankFormDialog';
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
+import { PartyFormDialog } from '@/components/parties/PartyFormDialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TrendingUp, TrendingDown, User, Plus, AlertTriangle, CalendarIcon, Repeat, History } from 'lucide-react';
 import { addBusinessDays } from '@/lib/business-days';
@@ -80,8 +82,9 @@ export function TransactionFormDialog({
   const [bankId, setBankId] = useState<string>('');
   const [contactId, setContactId] = useState<string>('');
   const [partyId, setPartyId] = useState<string>('');
-  const { data: parties = [] } = useParties();
+  const { data: parties = [], create: createParty } = useParties();
   const activeParties = parties.filter((p) => p.is_active);
+  const { isInternalCompany } = useActiveCompany();
   const [notes, setNotes] = useState('');
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [yearWarningDates, setYearWarningDates] = useState<{ label: string; value: string }[]>([]);
@@ -100,6 +103,7 @@ export function TransactionFormDialog({
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [partyDialogOpen, setPartyDialogOpen] = useState(false);
 
   const { createCategory } = useCategories();
   const { createBank } = useBanks();
@@ -444,17 +448,22 @@ export function TransactionFormDialog({
   const handleCreateContact = (data: ContactInsert) => {
     createContact.mutate({ ...data, type: 'cliente' }, { onSuccess: (nc) => { setContactId(nc.id); setContactDialogOpen(false); } });
   };
+  const handleCreateParty = (data: PartyInput) => {
+    createParty.mutate(data, { onSuccess: (np) => { setPartyId(np.id); setPartyDialogOpen(false); } });
+  };
 
   const handleCategoryChange = (v: string) => { if (v === '__new__') setCategoryDialogOpen(true); else { setCategoryId(v); setCategoryWasSuggested(false); } };
   const handleBankChange = (v: string) => { if (v === '__new__') setBankDialogOpen(true); else setBankId(v); };
   const handleContactChange = (v: string) => { if (v === '__new__') setContactDialogOpen(true); else setContactId(v); };
+  const handlePartyChange = (v: string) => { if (v === '__new__') setPartyDialogOpen(true); else setPartyId(v); };
 
   // Validation rules per mode
+  const hasPartyOrContact = isInternalCompany ? !!contactId : !!partyId;
   const baseFormValid = isSettleMode
     ? parseCurrencyInput(paidAmount) > 0 && !!bankId && !!date
     : isAVista
-      ? parseCurrencyInput(paidAmount) > 0 && !!bankId && !!date && !!categoryId && !!contactId && !!issueDate
-      : parseCurrencyInput(amount) > 0 && !!categoryId && !!contactId && !!issueDate && !!dueDate && !!expectedDate;
+      ? parseCurrencyInput(paidAmount) > 0 && !!bankId && !!date && !!categoryId && hasPartyOrContact && !!issueDate
+      : parseCurrencyInput(amount) > 0 && !!categoryId && hasPartyOrContact && !!issueDate && !!dueDate && !!expectedDate;
 
   const isFormValid = baseFormValid && isRecurringValid;
 
@@ -513,21 +522,39 @@ export function TransactionFormDialog({
             <div className={`grid grid-cols-1 ${isAPrazo ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-2`}>
               <div className="space-y-1.5">
                 <Label className="text-xs">Cliente/Fornecedor <span className="text-destructive">*</span></Label>
-                <Select value={contactId} onValueChange={handleContactChange} disabled={structuralDisabled}>
-                  <SelectTrigger className={`h-8 text-xs ${structuralDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__new__" className="text-primary font-medium text-xs">
-                      <div className="flex items-center gap-1"><Plus className="w-3 h-3" /> Novo</div>
-                    </SelectItem>
-                    {filteredContacts.map(c => (
-                      <SelectItem key={c.id} value={c.id} className="text-xs">
-                        <div className="flex items-center gap-1"><User className="w-3 h-3 text-muted-foreground" />{c.name}</div>
+                {isInternalCompany ? (
+                  <Select value={contactId} onValueChange={handleContactChange} disabled={structuralDisabled}>
+                    <SelectTrigger className={`h-8 text-xs ${structuralDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__new__" className="text-primary font-medium text-xs">
+                        <div className="flex items-center gap-1"><Plus className="w-3 h-3" /> Novo</div>
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      {filteredContacts.map(c => (
+                        <SelectItem key={c.id} value={c.id} className="text-xs">
+                          <div className="flex items-center gap-1"><User className="w-3 h-3 text-muted-foreground" />{c.name}</div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Select value={partyId} onValueChange={handlePartyChange} disabled={structuralDisabled}>
+                    <SelectTrigger className={`h-8 text-xs ${structuralDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__new__" className="text-primary font-medium text-xs">
+                        <div className="flex items-center gap-1"><Plus className="w-3 h-3" /> Novo</div>
+                      </SelectItem>
+                      {activeParties.map(p => (
+                        <SelectItem key={p.id} value={p.id} className="text-xs">
+                          <div className="flex items-center gap-1"><User className="w-3 h-3 text-muted-foreground" />{p.nome}</div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Valor (R$) {!isAVista && <span className="text-destructive">*</span>}</Label>
@@ -543,33 +570,6 @@ export function TransactionFormDialog({
                 </div>
               )}
             </div>
-
-            {/* Contraparte (opcional) — vínculo com Clientes & Fornecedores do Financeiro */}
-            <div className="space-y-1.5">
-              <Label className="text-xs">Cliente/Fornecedor (contraparte)</Label>
-              <Select
-                value={partyId || '__none__'}
-                onValueChange={(v) => setPartyId(v === '__none__' ? '' : v)}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Nenhum" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__" className="text-xs text-muted-foreground">Nenhum</SelectItem>
-                  {activeParties.map((p) => (
-                    <SelectItem key={p.id} value={p.id} className="text-xs">
-                      <div className="flex items-center gap-2">
-                        <span>{p.nome}</span>
-                        <span className="text-[10px] uppercase text-muted-foreground">
-                          {p.tipo === 'ambos' ? 'cli/forn' : p.tipo}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
 
             {/* Row 2: Evento Contábil | Conta/Banco */}
 <div className="grid grid-cols-2 gap-2">
@@ -846,6 +846,7 @@ export function TransactionFormDialog({
       <CategoryFormDialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen} onSubmit={handleCreateCategory} isLoading={createCategory.isPending} />
       <BankFormDialog open={bankDialogOpen} onOpenChange={setBankDialogOpen} onSubmit={handleCreateBank} isLoading={createBank.isPending} />
       <ContactFormDialog open={contactDialogOpen} onOpenChange={setContactDialogOpen} onSubmit={handleCreateContact} isLoading={createContact.isPending} />
+      <PartyFormDialog open={partyDialogOpen} onOpenChange={setPartyDialogOpen} onSubmit={handleCreateParty} isLoading={createParty.isPending} />
 
       <AlertDialog open={yearWarningDates.length > 0} onOpenChange={(open) => { if (!open) handleCancelYear(); }}>
         <AlertDialogContent>

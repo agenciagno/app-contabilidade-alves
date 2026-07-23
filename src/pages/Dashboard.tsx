@@ -1,17 +1,8 @@
 import { useMemo, useState } from 'react';
-import { 
-  Plus, 
-  TrendingUp, 
-  TrendingDown, 
-  Wallet, 
-  Clock,
-  Building2,
-  Users,
+import {
+  TrendingUp,
+  TrendingDown,
   FileText,
-  ChevronRight,
-  PiggyBank,
-  CreditCard,
-  Tag,
   Download,
   FileSpreadsheet,
   SlidersHorizontal,
@@ -20,16 +11,13 @@ import {
   Landmark,
   BarChart3,
   CalendarCheck,
-  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
-import { Badge } from '@/components/ui/badge';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { createGlobalLog } from '@/hooks/useGlobalLogs';
 import { toast } from 'sonner';
 import { useDashboardSummary, useAnnualMetrics, useMonthlyEvolution, useCategoryBreakdown } from '@/hooks/useRpcDashboard';
 import { useBanks } from '@/hooks/useBanks';
@@ -37,25 +25,17 @@ import { useActiveCompany } from '@/contexts/CompanyContext';
 import { useRecurringTransactions } from '@/hooks/useRecurringTransactions';
 import { useContacts } from '@/hooks/useContacts';
 import { useCategories } from '@/hooks/useCategories';
-import { 
-  ChartTooltip, 
+import {
+  ChartTooltip,
 } from '@/components/ui/chart';
-import { BarChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, Area, AreaChart, CartesianGrid } from 'recharts';
-import { format, addDays, addMonths, isBefore, isAfter, subMonths, subDays, parseISO, startOfMonth, endOfMonth, startOfYear, endOfYear, isWithinInterval } from 'date-fns';
+import { PieChart, Pie, Cell, ResponsiveContainer, Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { format, parseISO, startOfMonth, endOfMonth, subMonths, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { DashboardWidgetsConfig, useDashboardWidgets } from '@/components/dashboard/DashboardWidgets';
-import { TransactionFormDialog } from '@/components/transactions/TransactionFormDialog';
-import { BankFormDialog } from '@/components/banks/BankFormDialog';
-import { PartyFormDialog } from '@/components/parties/PartyFormDialog';
-import { useParties, type PartyInput } from '@/hooks/useParties';
-import { CategoryFormDialog } from '@/components/categories/CategoryFormDialog';
-import { TransactionInsert } from '@/hooks/useTransactions';
 import { UnifiedFilterBox, PeriodFilter, getDateRangeFromPeriod } from '@/components/filters/UnifiedFilterBox';
 import { exportToCSV, exportToPDF, useReportData, processReportData } from '@/hooks/useReportData';
-import { DRECard } from '@/components/reports/DRECard';
 import { PeriodComparison } from '@/components/reports/PeriodComparison';
-import { CashFlowForecast } from '@/components/reports/CashFlowForecast';
 import { BudgetTracker } from '@/components/financeiro/BudgetTracker';
 import { FinancialHealthBadge } from '@/components/financeiro/FinancialHealthBadge';
 import {
@@ -86,13 +66,6 @@ export default function Dashboard() {
 
   const { widgets, toggleWidget, isWidgetEnabled } = useDashboardWidgets();
 
-  // Dialog states
-  const [transactionDialogOpen, setTransactionDialogOpen] = useState(false);
-  const [defaultTransactionType, setDefaultTransactionType] = useState<'receita' | 'despesa'>('despesa');
-  const [bankDialogOpen, setBankDialogOpen] = useState(false);
-  const [contactDialogOpen, setContactDialogOpen] = useState(false);
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-
   // Filter states - Default to 'all' (limpo)
   const [period, setPeriod] = useState<PeriodFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -106,47 +79,10 @@ export default function Dashboard() {
 
   const queryClient = useQueryClient();
   const { activeCompanyId } = useActiveCompany();
-  const { banks, isLoading: loadingBanks, createBank } = useBanks();
+  const { banks, isLoading: loadingBanks } = useBanks();
   const { recurringTransactions } = useRecurringTransactions();
   const { contacts } = useContacts();
-  const { create: createParty } = useParties();
-  const { categories, createCategory } = useCategories();
-
-  // Inline createTransaction mutation (was previously from useTransactions)
-  const createTransaction = useMutation({
-    mutationFn: async (transaction: TransactionInsert) => {
-      if (!activeCompanyId) throw new Error('Empresa em contexto não definida');
-      const { data, error } = await supabase
-        .from('transactions')
-        .insert({ ...transaction, company_id: activeCompanyId })
-        .select()
-        .single();
-      if (error) throw error;
-      await createGlobalLog({
-        action: 'ADICAO',
-        module: 'FINANCEIRO',
-        entityId: data.id,
-        entityName: transaction.description,
-        details: `Transação "${transaction.description}" criada - ${transaction.type === 'receita' ? 'Receita' : 'Despesa'} de R$ ${Number(transaction.amount).toFixed(2)}`,
-      });
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['server-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['transaction-kpis'] });
-      queryClient.invalidateQueries({ queryKey: ['banks'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-      queryClient.invalidateQueries({ queryKey: ['annual-metrics'] });
-      queryClient.invalidateQueries({ queryKey: ['monthly-evolution'] });
-      queryClient.invalidateQueries({ queryKey: ['category-breakdown'] });
-      queryClient.invalidateQueries({ queryKey: ['pending-transactions-dashboard'] });
-      toast.success('Transação criada com sucesso!');
-    },
-    onError: (error: Error) => {
-      toast.error(error.message ?? 'Erro ao criar transação');
-    },
-  });
+  const { categories } = useCategories();
 
   // Get date range for filtering
   const getDateRange = (): { start: Date; end: Date } | null => {
@@ -293,32 +229,6 @@ export default function Dashboard() {
     });
   }, [revenueCategoryRpc, categories]);
 
-  // Pending transactions (unified list - a receber + a pagar) — direct query, top 15
-  const { data: pendingTransactions = [], isLoading: loadingPending } = useQuery({
-    queryKey: ['pending-transactions-dashboard', activeCompanyId],
-    enabled: !!activeCompanyId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*, category:categories(id, name, color), bank:banks(id, name, color), contact:contacts(id, name, type)')
-        .eq('company_id', activeCompanyId!)
-        .is('deleted_at', null)
-        .eq('is_paid', false)
-        .order('due_date', { ascending: true, nullsFirst: false })
-        .limit(15);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  // DRE data — derived from RPC summary totals (independente de status de pagamento)
-  const dreData = useMemo(() => {
-    const faturamentoBruto = Number((dashboardSummary as any)?.total_receitas ?? 0);
-    const impostos = faturamentoBruto * 0.15;
-    const despesasOperacionais = Number((dashboardSummary as any)?.total_despesas ?? 0);
-    return { faturamentoBruto, impostos, despesasOperacionais };
-  }, [dashboardSummary]);
-
   // Period comparison data
   const thisMonthStart = startOfMonth(now);
   const lastMonthStart = startOfMonth(subMonths(now, 1));
@@ -334,37 +244,7 @@ export default function Dashboard() {
   const thisMonthData = useMemo(() => processReportData(thisMonthTx), [thisMonthTx]);
   const lastMonthData = useMemo(() => processReportData(lastMonthTx), [lastMonthTx]);
 
-  const isLoading = loadingBanks || loadingSummary || loadingAnnual || loadingMonthly || loadingCategory || loadingPending;
-
-  // Handlers
-  const handleNewTransaction = (type: 'receita' | 'despesa') => {
-    setDefaultTransactionType(type);
-    setTransactionDialogOpen(true);
-  };
-
-  const handleTransactionSubmit = (data: TransactionInsert) => {
-    createTransaction.mutate(data, {
-      onSuccess: () => setTransactionDialogOpen(false),
-    });
-  };
-
-  const handleBankSubmit = (data: any) => {
-    createBank.mutate(data, {
-      onSuccess: () => setBankDialogOpen(false),
-    });
-  };
-
-  const handleContactSubmit = (data: PartyInput) => {
-    createParty.mutate(data, {
-      onSuccess: () => setContactDialogOpen(false),
-    });
-  };
-
-  const handleCategorySubmit = (data: any) => {
-    createCategory.mutate(data, {
-      onSuccess: () => setCategoryDialogOpen(false),
-    });
-  };
+  const isLoading = loadingBanks || loadingSummary || loadingAnnual || loadingMonthly || loadingCategory;
 
   // Lazy fetch for exports — only runs when user clicks export
   const fetchExportData = async () => {
@@ -485,49 +365,6 @@ export default function Dashboard() {
             Relatórios
           </Button>
         </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="flex flex-wrap gap-2">
-        <Button 
-          className="gap-2 bg-emerald-600 hover:bg-emerald-700"
-          onClick={() => handleNewTransaction('receita')}
-        >
-          <Plus className="w-4 h-4" />
-          Receita
-        </Button>
-        <Button 
-          variant="destructive" 
-          className="gap-2"
-          onClick={() => handleNewTransaction('despesa')}
-        >
-          <Plus className="w-4 h-4" />
-          Despesa
-        </Button>
-        <Button 
-          variant="outline" 
-          className="gap-2"
-          onClick={() => setBankDialogOpen(true)}
-        >
-          <Building2 className="w-4 h-4" />
-          Conta
-        </Button>
-        <Button 
-          variant="outline" 
-          className="gap-2"
-          onClick={() => setContactDialogOpen(true)}
-        >
-          <Users className="w-4 h-4" />
-          Cliente/Forn.
-        </Button>
-        <Button 
-          variant="outline" 
-          className="gap-2"
-          onClick={() => setCategoryDialogOpen(true)}
-        >
-          <Tag className="w-4 h-4" />
-          Categoria
-        </Button>
       </div>
 
       {/* Collapsible Filters */}
@@ -695,88 +532,6 @@ export default function Dashboard() {
       </div>
 
 
-      {/* Lista Unificada de Contas Pendentes - moved above evolution */}
-      {isWidgetEnabled('pendingList') && (
-        <Card className="border-border/30">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                Contas Pendentes
-              </CardTitle>
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/financeiro/pagar-receber" className="text-xs text-muted-foreground">
-                  Ver todas <ChevronRight className="w-4 h-4" />
-                </Link>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-14 w-full" />
-                ))}
-              </div>
-            ) : pendingTransactions.length > 0 ? (
-              <div className="space-y-2">
-                {pendingTransactions.map((transaction) => {
-                  const isReceita = transaction.type === 'receita';
-                  const txDateStr = transaction.due_date || transaction.date || transaction.issue_date;
-                  const txDate = txDateStr ? new Date(txDateStr + 'T12:00:00') : new Date();
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
-                  const isOverdue = isBefore(txDate, today);
-                  
-                  return (
-                    <div
-                      key={transaction.id}
-                      className={`flex items-center justify-between p-3 rounded-lg border ${
-                        isReceita 
-                          ? 'bg-emerald-500/10 border-emerald-500/20' 
-                          : 'bg-red-500/10 border-red-500/20'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          isReceita ? 'bg-emerald-500/20' : 'bg-red-500/20'
-                        }`}>
-                          {isReceita ? (
-                            <TrendingUp className="w-4 h-4 text-emerald-500" />
-                          ) : (
-                            <TrendingDown className="w-4 h-4 text-red-500" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{transaction.description}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {transaction.contact?.name || 'Sem contato'} • Venc: {format(txDate, "dd/MM/yyyy")}
-                            {isOverdue && (
-                              <Badge variant="outline" className="ml-2 text-amber-500 border-amber-500/50">
-                                Vencido
-                              </Badge>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      <span className={`font-semibold ml-3 ${
-                        isReceita ? 'text-emerald-500' : 'text-red-500'
-                      }`}>
-                        {formatCurrency(Number(transaction.amount))}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-center py-8">
-                Nenhuma conta pendente
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       {/* Monthly Evolution - Full Width & Larger */}
       {isWidgetEnabled('evolution') && (
         <Card className="border-border/30">
@@ -942,15 +697,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* DRE Card */}
-      {isWidgetEnabled('dre') && (
-        <DRECard
-          faturamentoBruto={dreData.faturamentoBruto}
-          impostos={dreData.impostos}
-          despesasOperacionais={dreData.despesasOperacionais}
-        />
-      )}
-
       {/* Period Comparison */}
       {isWidgetEnabled('periodComparison') && (
         <PeriodComparison
@@ -967,47 +713,8 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Cash Flow Forecast */}
-      {isWidgetEnabled('cashFlowForecast') && (
-        <CashFlowForecast />
-      )}
-
       {/* Orçamento por categoria (meta x realizado) */}
       <BudgetTracker />
-
-      {/* Dialogs */}
-      <TransactionFormDialog
-        open={transactionDialogOpen}
-        onOpenChange={setTransactionDialogOpen}
-        transaction={null}
-        categories={categories}
-        banks={banks}
-        contacts={contacts}
-        onSubmit={handleTransactionSubmit}
-        isLoading={createTransaction.isPending}
-        defaultType={defaultTransactionType}
-      />
-
-      <BankFormDialog
-        open={bankDialogOpen}
-        onOpenChange={setBankDialogOpen}
-        onSubmit={handleBankSubmit}
-        isLoading={createBank.isPending}
-      />
-
-      <PartyFormDialog
-        open={contactDialogOpen}
-        onOpenChange={setContactDialogOpen}
-        onSubmit={handleContactSubmit}
-        isLoading={createParty.isPending}
-      />
-
-      <CategoryFormDialog
-        open={categoryDialogOpen}
-        onOpenChange={setCategoryDialogOpen}
-        onSubmit={handleCategorySubmit}
-        isLoading={createCategory.isPending}
-      />
     </div>
   );
 }
