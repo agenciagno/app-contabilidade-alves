@@ -34,7 +34,7 @@ const MODULE_TREE: ModuleNode[] = [
     label: 'Fiscal',
     children: [
       { key: 'fiscal_dashboard', label: 'Dashboard' },
-      { key: 'fiscal_tarefas', label: 'Tarefas Fiscais' },
+      { key: 'fiscal_tarefas', label: 'Tarefas' },
       { key: 'fiscal_calendario', label: 'Calendário Fiscal' },
       { key: 'fiscal_colaboradores', label: 'Colaboradores' },
       { key: 'fiscal_monitor_cnpj', label: 'Monitor CNPJ' },

@@ -31,6 +31,7 @@ import {
   Landmark,
   BellRing,
   Target,
+  ListChecks,
 
   type LucideIcon,
 } from 'lucide-react';
@@ -156,18 +157,25 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
   },
   {
     kind: 'collapsible',
+    title: 'Tarefas',
+    icon: ListChecks,
+    moduleKey: 'fiscal',
+    items: [
+      { title: 'Dashboard', url: '/fiscal/dashboard', icon: LayoutDashboard, iconName: 'layout-dashboard', subKey: 'fiscal_dashboard' },
+      { title: 'Tarefas', url: '/fiscal/tarefas', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_tarefas' },
+      { title: 'Colaboradores', url: '/fiscal/colaboradores', icon: UsersRound, iconName: 'users-round', subKey: 'fiscal_colaboradores' },
+      { title: 'Obrigações e Declarações', url: '/fiscal/obrigacoes', icon: BookOpen, iconName: 'book-open', subKey: 'fiscal_calendario' },
+      { title: 'Calendário Fiscal', url: '/fiscal/calendario', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_calendario' },
+    ],
+  },
+  {
+    kind: 'collapsible',
     title: 'Fiscal',
     icon: FileCheck,
     moduleKey: 'fiscal',
     items: [
-      { title: 'Dashboard', url: '/fiscal/dashboard', icon: LayoutDashboard, iconName: 'layout-dashboard', subKey: 'fiscal_dashboard' },
-      { title: 'Tarefas Fiscais', url: '/fiscal/tarefas', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_tarefas' },
-      { title: 'Calendário Fiscal', url: '/fiscal/calendario', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_calendario' },
-      { title: 'Obrigações', url: '/fiscal/obrigacoes', icon: BookOpen, iconName: 'book-open', subKey: 'fiscal_calendario' },
-      { title: 'Colaboradores', url: '/fiscal/colaboradores', icon: UsersRound, iconName: 'users-round', subKey: 'fiscal_colaboradores' },
       { title: 'Monitor CNPJ', url: '/fiscal/monitor-cnpj', icon: Shield, iconName: 'shield', subKey: 'fiscal_monitor_cnpj' },
     ],
-
   },
   {
     kind: 'simple',

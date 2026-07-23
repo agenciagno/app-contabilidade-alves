@@ -517,7 +517,7 @@ export default function FiscalTasks() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between py-4 flex-wrap gap-4">
-        <h1 className="text-2xl font-bold text-foreground">Tarefas Fiscais</h1>
+        <h1 className="text-2xl font-bold text-foreground">Tarefas</h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="gap-2" onClick={() => setBulkCompleteOpen(true)}>
             <CheckCheck className="w-4 h-4" />
