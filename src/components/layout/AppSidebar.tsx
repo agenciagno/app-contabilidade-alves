@@ -32,6 +32,7 @@ import {
   BellRing,
   Target,
   ListChecks,
+  Bot,
 
   type LucideIcon,
 } from 'lucide-react';
@@ -142,6 +143,7 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
       { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'tech_disparos' },
       { title: 'Operação Interna', url: '/tech/operacao', icon: Gauge, iconName: 'gauge' },
       { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check' },
+      { title: 'Agente IA', url: '/tech/agente-ia', icon: Bot, iconName: 'bot' },
       { title: 'Cadastrar Cliente', url: '/admin/provisionar-cliente', icon: UserPlus, iconName: 'user-plus' },
       { title: 'Central de Notificações', url: '/central-notificacoes', icon: BellRing, iconName: 'bell-ring' },
     ],
@@ -389,6 +391,7 @@ export function AppSidebar() {
               {entry.items
                 .filter((item) => item.url !== '/tech/operacao' || isSuperAdmin)
                 .filter((item) => item.url !== '/tech/lgpd' || isAdmin || isSuperAdmin)
+                .filter((item) => item.url !== '/tech/agente-ia' || isAdmin || isSuperAdmin)
                 .filter((item) => item.url !== '/admin/provisionar-cliente' || isSuperAdmin)
                 .filter((item) => item.url !== '/central-notificacoes' || isSuperAdmin)
                 .filter((item) => (!['/fiscal/calendario', '/fiscal/dashboard', '/fiscal/colaboradores', '/fiscal/monitor-cnpj'].includes(item.url)) || isAdmin || isSuperAdmin)

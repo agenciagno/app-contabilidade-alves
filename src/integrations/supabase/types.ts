@@ -118,6 +118,236 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_agent_config: {
+        Row: {
+          company_id: string
+          created_at: string
+          dias_semana: number[]
+          diretrizes: string | null
+          horario_fim: string
+          horario_inicio: string
+          id: string
+          is_active: boolean
+          mensagem_feriado: string | null
+          mensagem_fora_horario: string | null
+          mensagem_handoff_template: string | null
+          mensagem_saudacao: string | null
+          stop_keyword: string
+          tom_de_voz: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          dias_semana?: number[]
+          diretrizes?: string | null
+          horario_fim?: string
+          horario_inicio?: string
+          id?: string
+          is_active?: boolean
+          mensagem_feriado?: string | null
+          mensagem_fora_horario?: string | null
+          mensagem_handoff_template?: string | null
+          mensagem_saudacao?: string | null
+          stop_keyword?: string
+          tom_de_voz?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          dias_semana?: number[]
+          diretrizes?: string | null
+          horario_fim?: string
+          horario_inicio?: string
+          id?: string
+          is_active?: boolean
+          mensagem_feriado?: string | null
+          mensagem_fora_horario?: string | null
+          mensagem_handoff_template?: string | null
+          mensagem_saudacao?: string | null
+          stop_keyword?: string
+          tom_de_voz?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_exceptions: {
+        Row: {
+          ativo: boolean
+          company_id: string
+          created_at: string
+          data: string
+          id: string
+          mensagem_custom: string | null
+          motivo: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          company_id: string
+          created_at?: string
+          data: string
+          id?: string
+          mensagem_custom?: string | null
+          motivo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          company_id?: string
+          created_at?: string
+          data?: string
+          id?: string
+          mensagem_custom?: string | null
+          motivo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_exceptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_logs: {
+        Row: {
+          chatwoot_conversation_id: number | null
+          company_id: string
+          contact_id: string | null
+          coverage_aplicada: boolean
+          created_at: string
+          id: string
+          mensagem_recebida: string | null
+          responsavel_atribuido_id: string | null
+          resposta_ia: string | null
+          setor_identificado: string | null
+          status: string
+          telefone: string | null
+        }
+        Insert: {
+          chatwoot_conversation_id?: number | null
+          company_id: string
+          contact_id?: string | null
+          coverage_aplicada?: boolean
+          created_at?: string
+          id?: string
+          mensagem_recebida?: string | null
+          responsavel_atribuido_id?: string | null
+          resposta_ia?: string | null
+          setor_identificado?: string | null
+          status?: string
+          telefone?: string | null
+        }
+        Update: {
+          chatwoot_conversation_id?: number | null
+          company_id?: string
+          contact_id?: string | null
+          coverage_aplicada?: boolean
+          created_at?: string
+          id?: string
+          mensagem_recebida?: string | null
+          responsavel_atribuido_id?: string | null
+          resposta_ia?: string | null
+          setor_identificado?: string | null
+          status?: string
+          telefone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_logs_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_logs_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+          {
+            foreignKeyName: "ai_agent_logs_responsavel_atribuido_id_fkey"
+            columns: ["responsavel_atribuido_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_routing_rules: {
+        Row: {
+          ativo: boolean
+          chatwoot_agent_id: number | null
+          chatwoot_team_id: number | null
+          coluna_responsavel: string | null
+          company_id: string
+          created_at: string
+          id: string
+          palavras_chave: string[]
+          prioridade: number
+          setor: string
+          updated_at: string
+          usa_responsavel_cliente: boolean
+        }
+        Insert: {
+          ativo?: boolean
+          chatwoot_agent_id?: number | null
+          chatwoot_team_id?: number | null
+          coluna_responsavel?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          palavras_chave?: string[]
+          prioridade?: number
+          setor: string
+          updated_at?: string
+          usa_responsavel_cliente?: boolean
+        }
+        Update: {
+          ativo?: boolean
+          chatwoot_agent_id?: number | null
+          chatwoot_team_id?: number | null
+          coluna_responsavel?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          palavras_chave?: string[]
+          prioridade?: number
+          setor?: string
+          updated_at?: string
+          usa_responsavel_cliente?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_routing_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       banks: {
         Row: {
           account_number: string | null
@@ -1102,8 +1332,10 @@ export type Database = {
           city: string | null
           cnae_principal: Json | null
           cnaes_secundarios: Json | null
+          comercial_responsible_id: string | null
           company_id: string
           complemento: string | null
+          contabil_responsible_id: string | null
           created_at: string
           data_abertura_estado: string | null
           data_abertura_junta: string | null
@@ -1118,8 +1350,10 @@ export type Database = {
           data_saida_cliente: string | null
           display_name: string | null
           document: string | null
+          dp_responsible_id: string | null
           email: string | null
           enviar_cobranca_auto: boolean
+          financeiro_responsible_id: string | null
           grupo_cipa: string | null
           grupo_escritorio: string | null
           id: string
@@ -1177,8 +1411,10 @@ export type Database = {
           city?: string | null
           cnae_principal?: Json | null
           cnaes_secundarios?: Json | null
+          comercial_responsible_id?: string | null
           company_id: string
           complemento?: string | null
+          contabil_responsible_id?: string | null
           created_at?: string
           data_abertura_estado?: string | null
           data_abertura_junta?: string | null
@@ -1193,8 +1429,10 @@ export type Database = {
           data_saida_cliente?: string | null
           display_name?: string | null
           document?: string | null
+          dp_responsible_id?: string | null
           email?: string | null
           enviar_cobranca_auto?: boolean
+          financeiro_responsible_id?: string | null
           grupo_cipa?: string | null
           grupo_escritorio?: string | null
           id?: string
@@ -1252,8 +1490,10 @@ export type Database = {
           city?: string | null
           cnae_principal?: Json | null
           cnaes_secundarios?: Json | null
+          comercial_responsible_id?: string | null
           company_id?: string
           complemento?: string | null
+          contabil_responsible_id?: string | null
           created_at?: string
           data_abertura_estado?: string | null
           data_abertura_junta?: string | null
@@ -1268,8 +1508,10 @@ export type Database = {
           data_saida_cliente?: string | null
           display_name?: string | null
           document?: string | null
+          dp_responsible_id?: string | null
           email?: string | null
           enviar_cobranca_auto?: boolean
+          financeiro_responsible_id?: string | null
           grupo_cipa?: string | null
           grupo_escritorio?: string | null
           id?: string
@@ -1315,10 +1557,38 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "contacts_comercial_responsible_id_fkey"
+            columns: ["comercial_responsible_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "contacts_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_contabil_responsible_id_fkey"
+            columns: ["contabil_responsible_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_dp_responsible_id_fkey"
+            columns: ["dp_responsible_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_financeiro_responsible_id_fkey"
+            columns: ["financeiro_responsible_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2642,6 +2912,7 @@ export type Database = {
         Row: {
           allowed_modules: string[]
           avatar_url: string | null
+          chatwoot_agent_id: number | null
           company_id: string
           created_at: string
           email: string
@@ -2660,6 +2931,7 @@ export type Database = {
         Insert: {
           allowed_modules?: string[]
           avatar_url?: string | null
+          chatwoot_agent_id?: number | null
           company_id: string
           created_at?: string
           email: string
@@ -2678,6 +2950,7 @@ export type Database = {
         Update: {
           allowed_modules?: string[]
           avatar_url?: string | null
+          chatwoot_agent_id?: number | null
           company_id?: string
           created_at?: string
           email?: string
