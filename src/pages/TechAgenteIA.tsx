@@ -578,7 +578,14 @@ const emptyException: AiAgentExceptionInput = {
   data: new Date().toISOString().slice(0, 10),
   motivo: '',
   mensagem_custom: '',
+  hora_inicio: null,
+  hora_fim: null,
   ativo: true,
+};
+
+const formatJanela = (inicio: string | null, fim: string | null) => {
+  if (!inicio && !fim) return 'Dia inteiro';
+  return `${(inicio ?? '00:00').slice(0, 5)}–${(fim ?? '23:59').slice(0, 5)}`;
 };
 
 function AbaExcecoes() {
@@ -591,7 +598,14 @@ function AbaExcecoes() {
   const openNew = () => { setEditing(null); setForm(emptyException); setDialogOpen(true); };
   const openEdit = (exc: AiAgentException) => {
     setEditing(exc);
-    setForm({ data: exc.data, motivo: exc.motivo ?? '', mensagem_custom: exc.mensagem_custom ?? '', ativo: exc.ativo });
+    setForm({
+      data: exc.data,
+      motivo: exc.motivo ?? '',
+      mensagem_custom: exc.mensagem_custom ?? '',
+      hora_inicio: exc.hora_inicio,
+      hora_fim: exc.hora_fim,
+      ativo: exc.ativo,
+    });
     setDialogOpen(true);
   };
 
@@ -622,6 +636,7 @@ function AbaExcecoes() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Data</TableHead>
+                  <TableHead>Janela</TableHead>
                   <TableHead>Motivo</TableHead>
                   <TableHead>Mensagem</TableHead>
                   <TableHead>Ativa</TableHead>
@@ -632,6 +647,7 @@ function AbaExcecoes() {
                 {exceptions.map((exc) => (
                   <TableRow key={exc.id}>
                     <TableCell className="tabular-nums">{exc.data}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatJanela(exc.hora_inicio, exc.hora_fim)}</TableCell>
                     <TableCell>{exc.motivo || '—'}</TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-[280px] truncate">{exc.mensagem_custom || '—'}</TableCell>
                     <TableCell>
@@ -661,6 +677,25 @@ function AbaExcecoes() {
               <Label>Data</Label>
               <Input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Início da janela (opcional)</Label>
+                <Input
+                  type="time"
+                  value={form.hora_inicio ? form.hora_inicio.slice(0, 5) : ''}
+                  onChange={(e) => setForm({ ...form, hora_inicio: e.target.value ? e.target.value + ':00' : null })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Fim da janela (opcional)</Label>
+                <Input
+                  type="time"
+                  value={form.hora_fim ? form.hora_fim.slice(0, 5) : ''}
+                  onChange={(e) => setForm({ ...form, hora_fim: e.target.value ? e.target.value + ':00' : null })}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground -mt-2">Deixe os dois vazios para valer o dia inteiro. Preencha só a parte do dia em que o atendimento fica indisponível (ex.: 13:00–18:00 pra um treinamento à tarde).</p>
             <div className="space-y-2">
               <Label>Motivo</Label>
               <Input value={form.motivo ?? ''} onChange={(e) => setForm({ ...form, motivo: e.target.value })} placeholder="Ex.: Confraternização da equipe" />

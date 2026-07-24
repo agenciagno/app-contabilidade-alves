@@ -186,6 +186,8 @@ export type Database = {
           company_id: string
           created_at: string
           data: string
+          hora_fim: string | null
+          hora_inicio: string | null
           id: string
           mensagem_custom: string | null
           motivo: string | null
@@ -196,6 +198,8 @@ export type Database = {
           company_id: string
           created_at?: string
           data: string
+          hora_fim?: string | null
+          hora_inicio?: string | null
           id?: string
           mensagem_custom?: string | null
           motivo?: string | null
@@ -206,6 +210,8 @@ export type Database = {
           company_id?: string
           created_at?: string
           data?: string
+          hora_fim?: string | null
+          hora_inicio?: string | null
           id?: string
           mensagem_custom?: string | null
           motivo?: string | null

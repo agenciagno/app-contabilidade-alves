@@ -9,6 +9,8 @@ export interface AiAgentException {
   data: string;
   motivo: string | null;
   mensagem_custom: string | null;
+  hora_inicio: string | null;
+  hora_fim: string | null;
   ativo: boolean;
   created_at: string;
   updated_at: string;
