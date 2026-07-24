@@ -264,23 +264,25 @@ function AbaConfiguracao() {
         </div>
 
         <div className="space-y-2">
-          <Label>Mensagem de saudação</Label>
+          <Label>Diretriz de saudação</Label>
           <Textarea
             rows={2}
             value={form.mensagem_saudacao ?? ''}
             onChange={(e) => setForm({ ...form, mensagem_saudacao: e.target.value })}
+            placeholder="O que a IA deve fazer/perguntar — não a frase pronta"
           />
+          <p className="text-xs text-muted-foreground">Fatos e instruções curtas, não a frase pronta — a IA escreve a mensagem final com o próprio tom.</p>
         </div>
 
         <div className="space-y-2">
-          <Label>Template de handoff</Label>
+          <Label>Diretriz de handoff</Label>
           <Textarea
             rows={2}
             value={form.mensagem_handoff_template ?? ''}
             onChange={(e) => setForm({ ...form, mensagem_handoff_template: e.target.value })}
             placeholder="Use {{responsavel}} e {{setor}} como variáveis"
           />
-          <p className="text-xs text-muted-foreground">A IA usa este texto como base para gerar a mensagem final.</p>
+          <p className="text-xs text-muted-foreground">Fatos e instruções curtas, não a frase pronta — a IA escreve a mensagem final com o próprio tom.</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -318,21 +320,25 @@ function AbaConfiguracao() {
         </div>
 
         <div className="space-y-2">
-          <Label>Mensagem fora do horário</Label>
+          <Label>Diretriz de fora do horário</Label>
           <Textarea
             rows={2}
             value={form.mensagem_fora_horario ?? ''}
             onChange={(e) => setForm({ ...form, mensagem_fora_horario: e.target.value })}
+            placeholder="Fatos: horário de atendimento e o que avisar ao cliente"
           />
+          <p className="text-xs text-muted-foreground">Fatos e instruções curtas, não a frase pronta — a IA escreve a mensagem final com o próprio tom.</p>
         </div>
 
         <div className="space-y-2">
-          <Label>Mensagem de feriado</Label>
+          <Label>Diretriz de feriado</Label>
           <Textarea
             rows={2}
             value={form.mensagem_feriado ?? ''}
             onChange={(e) => setForm({ ...form, mensagem_feriado: e.target.value })}
+            placeholder="Fatos: que hoje é feriado e o que avisar ao cliente"
           />
+          <p className="text-xs text-muted-foreground">Fatos e instruções curtas, não a frase pronta — a IA escreve a mensagem final com o próprio tom.</p>
         </div>
 
         <div className="flex justify-end">
