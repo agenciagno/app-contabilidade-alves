@@ -29,10 +29,8 @@ export const SETORES: { value: string; label: string }[] = [
   { value: 'financeiro', label: 'Financeiro' },
   { value: 'contabil', label: 'Contábil' },
   { value: 'comercial', label: 'Comercial' },
-  { value: 'diretoria', label: 'Diretoria' },
-  { value: 'marketing', label: 'Marketing' },
+  { value: 'notafiscal', label: 'Nota Fiscal' },
   { value: 'tecnologia', label: 'Tecnologia' },
-  { value: 'design', label: 'Design' },
   { value: 'outro', label: 'Outro' },
 ];
 
