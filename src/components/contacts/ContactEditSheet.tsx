@@ -25,6 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
 import { ContactObligationsSelector } from '@/components/fiscal/ContactObligationsSelector';
 import { lookupCnpj, pickEmptyFields } from '@/lib/cnpj-lookup';
+import { maskCPFCNPJ } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -265,11 +266,12 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
 
   const [loadingCnpj, setLoadingCnpj] = useState(false);
   const handleDocumentBlur = async () => {
-    const digits = document.replace(/\D/g, '');
-    if (digits.length !== 14) return;
+    // Mantém letras — CNPJ alfanumérico (IN RFB 2.229/2024, novas inscrições a partir de 31/07/2026)
+    const clean = document.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+    if (clean.length !== 14) return;
     setLoadingCnpj(true);
     try {
-      const data = await lookupCnpj(digits);
+      const data = await lookupCnpj(clean);
 
       // Editable fields in this section: only email/phone are visible here.
       // Fill any empty visible fields from this section first.
@@ -442,7 +444,7 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
                 <div className="relative">
                   <Input
                     value={document}
-                    onChange={e => setDocument(e.target.value)}
+                    onChange={e => setDocument(maskCPFCNPJ(e.target.value))}
                     onBlur={handleDocumentBlur}
                     placeholder="000.000.000-00"
                     disabled={loadingCnpj}

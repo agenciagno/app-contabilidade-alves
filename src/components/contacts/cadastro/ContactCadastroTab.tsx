@@ -32,7 +32,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ContactBillingCard } from '../ContactBillingCard';
 import { ContactObligationsSelector } from '@/components/fiscal/ContactObligationsSelector';
 import { useCompany } from '@/hooks/useCompany';
-import { maskPhone } from '@/lib/utils';
+import { maskPhone, maskCPFCNPJ, getDocumentType } from '@/lib/utils';
 import { toast } from 'sonner';
 import { TAX_REGIMES } from '@/constants/taxRegimes';
 import { PORTE_OPTIONS } from '@/constants/porte';
@@ -57,7 +57,16 @@ const AutofillBadge = () => (
   </TooltipProvider>
 );
 
-function Field({ label, children, autofill }: { label: string; children: React.ReactNode; autofill?: boolean }) {
+function PersonTypeBadge({ type }: { type: 'CPF' | 'CNPJ' | null }) {
+  if (!type) return null;
+  return (
+    <Badge variant="outline" className="ml-2 text-[10px] font-normal">
+      {type === 'CPF' ? 'Pessoa Física' : 'Pessoa Jurídica'}
+    </Badge>
+  );
+}
+
+function Field({ label, children, autofill }: { label: React.ReactNode; children: React.ReactNode; autofill?: boolean }) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs font-medium flex items-center">
@@ -97,6 +106,9 @@ export function ContactCadastroTab({ contactId }: Props) {
 
   const set = (key: string, value: any) => setForm(prev => ({ ...prev, [key]: value }));
 
+  const documentType = getDocumentType(form.document);
+  const isPessoaFisica = documentType === 'CPF';
+
   const saveSection = (keys: string[]) => {
     const payload: Record<string, any> = {};
     keys.forEach(k => { payload[k] = form[k] ?? null; });
@@ -104,7 +116,7 @@ export function ContactCadastroTab({ contactId }: Props) {
   };
 
   const handleCnpjLookup = async () => {
-    if (!form.document) return;
+    if (documentType !== 'CNPJ') return;
     setCnpjLoading(true);
     try {
       const r = await lookupCnpj(form.document);
@@ -155,11 +167,11 @@ export function ContactCadastroTab({ contactId }: Props) {
 
   return (
     <Tabs defaultValue="identificacao" className="w-full">
-      <TabsList className="w-full grid grid-cols-2 md:grid-cols-4 gap-1">
+      <TabsList className={`w-full grid gap-1 ${isPessoaFisica ? 'grid-cols-3' : 'grid-cols-2 md:grid-cols-4'}`}>
         <TabsTrigger value="identificacao">Identificação</TabsTrigger>
         <TabsTrigger value="fiscal">Fiscal</TabsTrigger>
         <TabsTrigger value="operacional">Operacional</TabsTrigger>
-        <TabsTrigger value="socios">Sócios</TabsTrigger>
+        {!isPessoaFisica && <TabsTrigger value="socios">Sócios</TabsTrigger>}
       </TabsList>
 
       {/* IDENTIFICAÇÃO & CONTATOS */}
@@ -167,20 +179,41 @@ export function ContactCadastroTab({ contactId }: Props) {
         <Card>
           <CardHeader><CardTitle className="text-base">Identificação & Contatos</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="CNPJ / CPF">
+            <Field label={<>CNPJ / CPF<PersonTypeBadge type={documentType} /></>}>
               <div className="flex gap-2">
-                <Input value={form.document || ''} onChange={e => set('document', e.target.value)} />
-                <Button type="button" variant="outline" size="icon" onClick={handleCnpjLookup} disabled={cnpjLoading}>
-                  {cnpjLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                </Button>
+                <Input
+                  value={form.document || ''}
+                  onChange={e => set('document', maskCPFCNPJ(e.target.value))}
+                  placeholder="CNPJ ou CPF"
+                />
+                {documentType !== 'CPF' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleCnpjLookup}
+                    disabled={cnpjLoading || documentType !== 'CNPJ'}
+                    title="Buscar dados do CNPJ"
+                  >
+                    {cnpjLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  </Button>
+                )}
               </div>
             </Field>
-            <Field label="Razão Social" autofill>
-              <Input value={form.razao_social || ''} onChange={e => set('razao_social', e.target.value)} />
-            </Field>
-            <Field label="Nome Fantasia" autofill>
-              <Input value={form.nome_fantasia || ''} onChange={e => set('nome_fantasia', e.target.value)} />
-            </Field>
+            {isPessoaFisica ? (
+              <Field label="Nome">
+                <Input value={form.name || ''} onChange={e => set('name', e.target.value)} />
+              </Field>
+            ) : (
+              <>
+                <Field label="Razão Social" autofill>
+                  <Input value={form.razao_social || ''} onChange={e => set('razao_social', e.target.value)} />
+                </Field>
+                <Field label="Nome Fantasia" autofill>
+                  <Input value={form.nome_fantasia || ''} onChange={e => set('nome_fantasia', e.target.value)} />
+                </Field>
+              </>
+            )}
             <Field label="Nome de Exibição">
               <Input
                 value={form.display_name ?? form.nome_fantasia ?? ''}
@@ -190,35 +223,39 @@ export function ContactCadastroTab({ contactId }: Props) {
                 Preenchido automaticamente com o Nome Fantasia — edite livremente. É o nome exibido na listagem de contatos.
               </p>
             </Field>
-            <Field label="Porte">
-              <Select value={form.porte || ''} onValueChange={v => set('porte', v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  {PORTE_OPTIONS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Tipo de Estabelecimento">
-              <Select value={form.tipo_estabelecimento || ''} onValueChange={v => set('tipo_estabelecimento', v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Matriz">Matriz</SelectItem>
-                  <SelectItem value="Filial">Filial</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Representante Legal">
-              <Input value={form.representative_legal || ''} onChange={e => set('representative_legal', e.target.value)} />
-            </Field>
-            <Field label="Natureza Jurídica" autofill>
-              <Input value={form.natureza_juridica || ''} onChange={e => set('natureza_juridica', e.target.value)} />
-            </Field>
-            <Field label="Data de Abertura / Fundação" autofill>
-              <Input type="date" value={form.data_abertura_receita || ''} onChange={e => set('data_abertura_receita', e.target.value)} />
-            </Field>
-            <Field label="Situação na Receita Federal" autofill>
-              <Input value={form.situacao_cadastral || ''} readOnly className="bg-muted/40" />
-            </Field>
+            {!isPessoaFisica && (
+              <>
+                <Field label="Porte">
+                  <Select value={form.porte || ''} onValueChange={v => set('porte', v)}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      {PORTE_OPTIONS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Tipo de Estabelecimento">
+                  <Select value={form.tipo_estabelecimento || ''} onValueChange={v => set('tipo_estabelecimento', v)}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Matriz">Matriz</SelectItem>
+                      <SelectItem value="Filial">Filial</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Representante Legal">
+                  <Input value={form.representative_legal || ''} onChange={e => set('representative_legal', e.target.value)} />
+                </Field>
+                <Field label="Natureza Jurídica" autofill>
+                  <Input value={form.natureza_juridica || ''} onChange={e => set('natureza_juridica', e.target.value)} />
+                </Field>
+                <Field label="Data de Abertura / Fundação" autofill>
+                  <Input type="date" value={form.data_abertura_receita || ''} onChange={e => set('data_abertura_receita', e.target.value)} />
+                </Field>
+                <Field label="Situação na Receita Federal" autofill>
+                  <Input value={form.situacao_cadastral || ''} readOnly className="bg-muted/40" />
+                </Field>
+              </>
+            )}
             <Field label="E-mail">
               <Input type="email" value={form.email || ''} onChange={e => set('email', e.target.value)} />
             </Field>
@@ -275,7 +312,7 @@ export function ContactCadastroTab({ contactId }: Props) {
         </Card>
         <div className="flex justify-end">
           <Button onClick={() => saveSection([
-            'document', 'razao_social', 'nome_fantasia', 'display_name', 'porte', 'natureza_juridica',
+            'document', 'name', 'razao_social', 'nome_fantasia', 'display_name', 'porte', 'natureza_juridica',
             'data_abertura_receita', 'situacao_cadastral', 'email', 'phone', 'whatsapp', 'notes',
             'cnae_principal', 'cnaes_secundarios',
             'tipo_estabelecimento', 'representative_legal', 'segundo_email_contato',
@@ -292,14 +329,16 @@ export function ContactCadastroTab({ contactId }: Props) {
         <Card>
           <CardHeader><CardTitle className="text-base">Regime e Inscrições</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Regime Tributário">
-              <Select value={form.tax_regime || ''} onValueChange={v => set('tax_regime', v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  {TAX_REGIMES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
+            {!isPessoaFisica && (
+              <Field label="Regime Tributário">
+                <Select value={form.tax_regime || ''} onValueChange={v => set('tax_regime', v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {TAX_REGIMES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
             <Field label="Status do Cliente">
               <Select value={form.status_cliente || ''} onValueChange={v => set('status_cliente', v)}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
@@ -308,55 +347,63 @@ export function ContactCadastroTab({ contactId }: Props) {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Inscrição Municipal (IM)"><Input value={form.im || ''} onChange={e => set('im', e.target.value)} /></Field>
-            <Field label="Inscrição Estadual (IE)"><Input value={form.ie || ''} onChange={e => set('ie', e.target.value)} /></Field>
+            {!isPessoaFisica && (
+              <>
+                <Field label="Inscrição Municipal (IM)"><Input value={form.im || ''} onChange={e => set('im', e.target.value)} /></Field>
+                <Field label="Inscrição Estadual (IE)"><Input value={form.ie || ''} onChange={e => set('ie', e.target.value)} /></Field>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">CNAE (Receita Federal)</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">CNAE Principal</p>
-              {form.cnae_principal ? (
-                <CnaeCard cnae={form.cnae_principal} />
-              ) : (
-                <p className="text-sm text-muted-foreground">—</p>
-              )}
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">
-                CNAEs Secundários ({Array.isArray(form.cnaes_secundarios) ? form.cnaes_secundarios.length : 0})
-              </p>
-              {Array.isArray(form.cnaes_secundarios) && form.cnaes_secundarios.length > 0 ? (
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {form.cnaes_secundarios.map((c: any, i: number) => (
-                    <CnaeCard key={i} cnae={c} />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">—</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">Registros e Livros</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              { key: 'registro_entradas', label: 'Registro de Entradas' },
-              { key: 'registro_saidas', label: 'Registro de Saídas' },
-              { key: 'registro_icms', label: 'Registro ICMS' },
-              { key: 'inventario', label: 'Inventário' },
-            ].map(item => (
-              <div key={item.key} className="flex items-center justify-between rounded-lg border p-3">
-                <Label className="text-sm">{item.label}</Label>
-                <Switch checked={!!form[item.key]} onCheckedChange={v => set(item.key, v)} />
+        {!isPessoaFisica && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">CNAE (Receita Federal)</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">CNAE Principal</p>
+                {form.cnae_principal ? (
+                  <CnaeCard cnae={form.cnae_principal} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">—</p>
+                )}
               </div>
-            ))}
-          </CardContent>
-        </Card>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">
+                  CNAEs Secundários ({Array.isArray(form.cnaes_secundarios) ? form.cnaes_secundarios.length : 0})
+                </p>
+                {Array.isArray(form.cnaes_secundarios) && form.cnaes_secundarios.length > 0 ? (
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {form.cnaes_secundarios.map((c: any, i: number) => (
+                      <CnaeCard key={i} cnae={c} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">—</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {!isPessoaFisica && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Registros e Livros</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { key: 'registro_entradas', label: 'Registro de Entradas' },
+                { key: 'registro_saidas', label: 'Registro de Saídas' },
+                { key: 'registro_icms', label: 'Registro ICMS' },
+                { key: 'inventario', label: 'Inventário' },
+              ].map(item => (
+                <div key={item.key} className="flex items-center justify-between rounded-lg border p-3">
+                  <Label className="text-sm">{item.label}</Label>
+                  <Switch checked={!!form[item.key]} onCheckedChange={v => set(item.key, v)} />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         <ObligationsSection contactId={contactId} />
 
@@ -388,13 +435,16 @@ export function ContactCadastroTab({ contactId }: Props) {
           ])}
           isPending={updateSuperPerfil.isPending}
           contactId={contactId}
+          isPessoaFisica={isPessoaFisica}
         />
       </TabsContent>
 
       {/* SÓCIOS */}
-      <TabsContent value="socios" className="mt-6">
-        <SociosSection contactId={contactId} />
-      </TabsContent>
+      {!isPessoaFisica && (
+        <TabsContent value="socios" className="mt-6">
+          <SociosSection contactId={contactId} />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }
@@ -486,13 +536,14 @@ function ObligationsSection({ contactId }: { contactId: string }) {
 
 // ============ Operacional ============
 function OperacionalSection({
-  form, set, onSave, isPending, contactId,
+  form, set, onSave, isPending, contactId, isPessoaFisica,
 }: {
   form: Record<string, any>;
   set: (k: string, v: any) => void;
   onSave: () => void;
   isPending: boolean;
   contactId: string;
+  isPessoaFisica: boolean;
 }) {
   const { contacts, deleteContact } = useContacts();
   const contact = contacts.find(c => c.id === contactId);
@@ -573,73 +624,77 @@ function OperacionalSection({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Datas por Esfera</CardTitle></CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 pr-3 font-medium text-xs text-muted-foreground">Esfera</th>
-                  <th className="text-left py-2 pr-3 font-medium text-xs text-muted-foreground">Abertura</th>
-                  <th className="text-left py-2 font-medium text-xs text-muted-foreground">Encerramento</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { label: 'Junta Comercial', open: 'data_abertura_junta', close: 'data_encerramento_junta' },
-                  { label: 'Receita Federal', open: 'data_abertura_rf', close: 'data_encerramento_rf' },
-                  { label: 'Prefeitura', open: 'data_abertura_prefeitura', close: 'data_encerramento_prefeitura' },
-                  { label: 'Estado', open: 'data_abertura_estado', close: 'data_encerramento_estado' },
-                ].map(row => (
-                  <tr key={row.label} className="border-b last:border-0">
-                    <td className="py-2 pr-3">{row.label}</td>
-                    <td className="py-2 pr-3">
-                      <Input type="date" value={form[row.open] || ''} onChange={e => set(row.open, e.target.value)} />
-                    </td>
-                    <td className="py-2">
-                      <Input type="date" value={form[row.close] || ''} onChange={e => set(row.close, e.target.value)} />
-                    </td>
+      {!isPessoaFisica && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Datas por Esfera</CardTitle></CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 pr-3 font-medium text-xs text-muted-foreground">Esfera</th>
+                    <th className="text-left py-2 pr-3 font-medium text-xs text-muted-foreground">Abertura</th>
+                    <th className="text-left py-2 font-medium text-xs text-muted-foreground">Encerramento</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                </thead>
+                <tbody>
+                  {[
+                    { label: 'Junta Comercial', open: 'data_abertura_junta', close: 'data_encerramento_junta' },
+                    { label: 'Receita Federal', open: 'data_abertura_rf', close: 'data_encerramento_rf' },
+                    { label: 'Prefeitura', open: 'data_abertura_prefeitura', close: 'data_encerramento_prefeitura' },
+                    { label: 'Estado', open: 'data_abertura_estado', close: 'data_encerramento_estado' },
+                  ].map(row => (
+                    <tr key={row.label} className="border-b last:border-0">
+                      <td className="py-2 pr-3">{row.label}</td>
+                      <td className="py-2 pr-3">
+                        <Input type="date" value={form[row.open] || ''} onChange={e => set(row.open, e.target.value)} />
+                      </td>
+                      <td className="py-2">
+                        <Input type="date" value={form[row.close] || ''} onChange={e => set(row.close, e.target.value)} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Departamento Pessoal</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <Label className="text-sm">Possui Funcionários</Label>
-            <Switch checked={!!form.possui_funcionarios} onCheckedChange={v => set('possui_funcionarios', v)} />
-          </div>
-          {form.possui_funcionarios === true && (
-            <Field label="Nº Funcionários">
-              <Input type="number" value={form.numero_funcionarios ?? ''} onChange={e => set('numero_funcionarios', e.target.value === '' ? null : Number(e.target.value))} />
+      {!isPessoaFisica && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Departamento Pessoal</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <Label className="text-sm">Possui Funcionários</Label>
+              <Switch checked={!!form.possui_funcionarios} onCheckedChange={v => set('possui_funcionarios', v)} />
+            </div>
+            {form.possui_funcionarios === true && (
+              <Field label="Nº Funcionários">
+                <Input type="number" value={form.numero_funcionarios ?? ''} onChange={e => set('numero_funcionarios', e.target.value === '' ? null : Number(e.target.value))} />
+              </Field>
+            )}
+            <Field label="Tipo Cartão Ponto">
+              <Select value={form.tipo_cartao_ponto || ''} onValueChange={v => set('tipo_cartao_ponto', v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Central">Central</SelectItem>
+                  <SelectItem value="Convencional">Convencional</SelectItem>
+                  <SelectItem value="Eletrônico">Eletrônico</SelectItem>
+                  <SelectItem value="Espelho">Espelho</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
-          )}
-          <Field label="Tipo Cartão Ponto">
-            <Select value={form.tipo_cartao_ponto || ''} onValueChange={v => set('tipo_cartao_ponto', v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Central">Central</SelectItem>
-                <SelectItem value="Convencional">Convencional</SelectItem>
-                <SelectItem value="Eletrônico">Eletrônico</SelectItem>
-                <SelectItem value="Espelho">Espelho</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <Label className="text-sm">Medicina do Trabalho</Label>
-            <Switch checked={!!form.medicina_trabalho} onCheckedChange={v => set('medicina_trabalho', v)} />
-          </div>
-          <Field label="Grupo CIPA">
-            <Input value={form.grupo_cipa || ''} onChange={e => set('grupo_cipa', e.target.value)} />
-          </Field>
-        </CardContent>
-      </Card>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <Label className="text-sm">Medicina do Trabalho</Label>
+              <Switch checked={!!form.medicina_trabalho} onCheckedChange={v => set('medicina_trabalho', v)} />
+            </div>
+            <Field label="Grupo CIPA">
+              <Input value={form.grupo_cipa || ''} onChange={e => set('grupo_cipa', e.target.value)} />
+            </Field>
+          </CardContent>
+        </Card>
+      )}
 
 
       <div className="flex justify-end">

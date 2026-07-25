@@ -17,6 +17,7 @@ import { generateContactReport } from '@/components/contacts/ContactReportPDF';
 import { AcessosTab } from '@/components/contacts/AcessosTab';
 import { ContactCadastroTab } from '@/components/contacts/cadastro/ContactCadastroTab';
 import { ContactLogsWithComunicacaoTab } from '@/components/contacts/ContactLogsWithComunicacaoTab';
+import { getDocumentType } from '@/lib/utils';
 
 const taxRegimeLabels: Record<string, string> = {
   mei: 'MEI',
@@ -128,7 +129,7 @@ export default function ContactProfile() {
             <h1 className="text-2xl font-bold text-foreground">{contact.name}</h1>
             {contact.document && (
               <p className="text-sm text-muted-foreground mt-0.5">
-                {contact.document.length > 14 ? 'CNPJ' : 'CPF'}: {contact.document}
+                {getDocumentType(contact.document) ?? 'CNPJ'}: {contact.document}
               </p>
             )}
             <div className="flex flex-wrap gap-2 mt-2">

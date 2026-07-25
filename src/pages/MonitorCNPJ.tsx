@@ -40,7 +40,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+import { cn, getDocumentType } from '@/lib/utils';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
@@ -131,7 +131,7 @@ export default function MonitorCNPJ() {
         .eq('is_active', true);
       if (error) throw error;
       return ((data ?? []) as ContactRow[]).filter(
-        (c) => (c.document ?? '').replace(/\D/g, '').length === 14
+        (c) => getDocumentType(c.document) === 'CNPJ'
       );
     },
   });

@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getDocumentType } from '@/lib/utils';
 
 interface Contact {
   id: string;
@@ -84,7 +85,7 @@ export function generateContactReport(
   doc.setFont('helvetica', 'normal');
   
   if (contact.document) {
-    const docType = contact.document.length > 14 ? 'CNPJ' : 'CPF';
+    const docType = getDocumentType(contact.document) ?? 'CNPJ';
     doc.text(`${docType}: ${contact.document}`, 20, yPosition);
     yPosition += 6;
   }

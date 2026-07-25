@@ -20,11 +20,12 @@ export interface CnpjLookupResult {
 }
 
 export async function lookupCnpj(cnpj: string): Promise<CnpjLookupResult> {
-  const digits = cnpj.replace(/\D/g, '');
-  if (digits.length !== 14) throw new Error('CNPJ inválido');
+  // Mantém letras — CNPJ alfanumérico (IN RFB 2.229/2024, novas inscrições a partir de 31/07/2026)
+  const clean = cnpj.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+  if (clean.length !== 14) throw new Error('CNPJ inválido');
 
   const { data, error } = await supabase.functions.invoke('cnpj-lookup', {
-    body: { cnpj: digits },
+    body: { cnpj: clean },
   });
   if (error) throw new Error(error.message || 'CNPJ não encontrado');
   if (!data || (data as any).error) throw new Error((data as any)?.error || 'CNPJ não encontrado');

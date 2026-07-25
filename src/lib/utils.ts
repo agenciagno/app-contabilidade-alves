@@ -31,24 +31,34 @@ export function maskCPF(value: string): string {
     .slice(0, 14);
 }
 
-// Máscara para CNPJ: 00.000.000/0000-00
+// Máscara para CNPJ: AA.AAA.AAA/AAAA-00 (12 primeiras posições alfanuméricas, DV sempre numérico —
+// CNPJ alfanumérico da Receita Federal, IN RFB 2.229/2024, novas inscrições a partir de 31/07/2026)
 export function maskCNPJ(value: string): string {
-  return value
-    .replace(/\D/g, '')
-    .replace(/^(\d{2})(\d)/, '$1.$2')
-    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-    .replace(/\.(\d{3})(\d)/, '.$1/$2')
-    .replace(/(\d{4})(\d)/, '$1-$2')
-    .slice(0, 18);
+  const clean = value.replace(/[^0-9A-Za-z]/g, '').toUpperCase().slice(0, 14);
+  return clean
+    .replace(/^([0-9A-Z]{2})([0-9A-Z])/, '$1.$2')
+    .replace(/^([0-9A-Z]{2})\.([0-9A-Z]{3})([0-9A-Z])/, '$1.$2.$3')
+    .replace(/\.([0-9A-Z]{3})([0-9A-Z])/, '.$1/$2')
+    .replace(/([0-9A-Z]{4})([0-9A-Z])/, '$1-$2');
 }
 
-// Máscara automática CPF ou CNPJ baseada no tamanho
+// Máscara automática CPF ou CNPJ baseada no conteúdo. CPF nunca tem letra (só o CNPJ ficou
+// alfanumérico) — se aparecer qualquer letra, força tratamento como CNPJ mesmo com poucos caracteres.
 export function maskCPFCNPJ(value: string): string {
-  const numbers = value.replace(/\D/g, '');
-  if (numbers.length <= 11) {
+  const clean = value.replace(/[^0-9A-Za-z]/g, '');
+  const hasLetter = /[A-Za-z]/.test(clean);
+  if (!hasLetter && clean.length <= 11) {
     return maskCPF(value);
   }
   return maskCNPJ(value);
+}
+
+// Tipo de documento a partir do tamanho (ignora pontuação): CPF = 11, CNPJ = 14 (alfanumérico ou não)
+export function getDocumentType(document: string | null | undefined): 'CPF' | 'CNPJ' | null {
+  const clean = (document || '').replace(/[^0-9A-Za-z]/g, '');
+  if (clean.length === 11) return 'CPF';
+  if (clean.length === 14) return 'CNPJ';
+  return null;
 }
 
 // Valida data no formato YYYY-MM-DD com dia 01-31, mês 01-12, ano 4 dígitos

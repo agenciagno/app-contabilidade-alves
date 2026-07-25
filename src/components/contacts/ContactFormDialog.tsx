@@ -92,13 +92,14 @@ export function ContactFormDialog({
   }, [contact, open]);
 
   const runCnpjLookup = async (opts: { silentIfShort?: boolean } = {}) => {
-    const cleanDoc = document.replace(/\D/g, '');
+    // Mantém letras — CNPJ alfanumérico (IN RFB 2.229/2024, novas inscrições a partir de 31/07/2026)
+    const cleanDoc = document.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
 
     if (cleanDoc.length !== 14) {
       if (opts.silentIfShort) return;
       toast({
         title: 'CNPJ inválido',
-        description: 'Digite um CNPJ completo (14 dígitos) para buscar',
+        description: 'Digite um CNPJ completo (14 caracteres) para buscar',
         variant: 'destructive',
       });
       return;
@@ -264,7 +265,7 @@ export function ContactFormDialog({
                   variant="outline"
                   size="icon"
                   onClick={handleFetchCnpj}
-                  disabled={isFetchingCnpj || document.replace(/\D/g, '').length < 14}
+                  disabled={isFetchingCnpj || document.replace(/[^0-9A-Za-z]/g, '').length < 14}
                   title="Buscar dados do CNPJ"
                 >
                   {isFetchingCnpj ? (
