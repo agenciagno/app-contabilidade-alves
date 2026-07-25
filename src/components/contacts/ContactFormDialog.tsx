@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Contact, ContactInsert } from '@/hooks/useContacts';
-import { maskCPFCNPJ, maskPhone, unmaskPhone } from '@/lib/utils';
+import { maskCPFCNPJ, maskPhone, unmaskPhone, getDocumentType } from '@/lib/utils';
 import { Search, Loader2 } from 'lucide-react';
 import { lookupCnpj, pickEmptyFields } from '@/lib/cnpj-lookup';
 import { useToast } from '@/hooks/use-toast';
+import { PORTE_OPTIONS } from '@/constants/porte';
 
 interface ContactFormDialogProps {
   open: boolean;
@@ -40,9 +42,11 @@ export function ContactFormDialog({
 }: ContactFormDialogProps) {
   const [name, setName] = useState('');
   const [document, setDocument] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
+  const [segundoEmail, setSegundoEmail] = useState('');
   const [cep, setCep] = useState('');
   const [address, setAddress] = useState('');
   const [addressNumber, setAddressNumber] = useState('');
@@ -50,35 +54,67 @@ export function ContactFormDialog({
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [notes, setNotes] = useState('');
+  const [complemento, setComplemento] = useState('');
+  // Campos exclusivos de Pessoa Jurídica (mesmo conjunto da aba Identificação do Super Perfil)
+  const [razaoSocial, setRazaoSocial] = useState('');
+  const [nomeFantasia, setNomeFantasia] = useState('');
+  const [porte, setPorte] = useState('');
+  const [tipoEstabelecimento, setTipoEstabelecimento] = useState('');
+  const [representativeLegal, setRepresentativeLegal] = useState('');
+  const [naturezaJuridica, setNaturezaJuridica] = useState('');
+  const [dataAberturaReceita, setDataAberturaReceita] = useState('');
+  const [situacaoCadastral, setSituacaoCadastral] = useState('');
+
   const [isFetchingCnpj, setIsFetchingCnpj] = useState(false);
   const [isLoadingCep, setIsLoadingCep] = useState(false);
   const [addressFieldsLocked, setAddressFieldsLocked] = useState(false);
-  const [complemento, setComplemento] = useState('');
-  const [cnpjExtras, setCnpjExtras] = useState<Record<string, any>>({});
+  const [cnaeExtras, setCnaeExtras] = useState<Record<string, any>>({});
   const { toast } = useToast();
+
+  // Só assume o layout de PJ quando o CNPJ estiver completo (14 caracteres) — documento vazio ou
+  // parcial mantém o formulário enxuto de hoje (Nome + contato), sem exigir Razão Social à toa.
+  const documentType = getDocumentType(document);
+  const showPJFields = documentType === 'CNPJ';
 
   useEffect(() => {
     if (contact) {
       setName(contact.name);
       setDocument(contact.document || '');
+      setDisplayName(contact.display_name || '');
       setEmail(contact.email || '');
       setPhone(maskPhone(contact.phone || ''));
-      setWhatsapp(maskPhone((contact as any).whatsapp || ''));
+      setWhatsapp(maskPhone(contact.whatsapp || ''));
+      setSegundoEmail(contact.segundo_email_contato || '');
 
       setCep(contact.cep || '');
       setAddress(contact.address || '');
       setAddressNumber(contact.address_number || '');
-      setComplemento((contact as any).complemento || '');
+      setComplemento(contact.complemento || '');
       setNeighborhood(contact.neighborhood || '');
       setCity(contact.city || '');
       setState(contact.state || '');
       setNotes(contact.notes || '');
+
+      setRazaoSocial(contact.razao_social || '');
+      setNomeFantasia(contact.nome_fantasia || '');
+      setPorte(contact.porte || '');
+      setTipoEstabelecimento(contact.tipo_estabelecimento || '');
+      setRepresentativeLegal(contact.representative_legal || '');
+      setNaturezaJuridica(contact.natureza_juridica || '');
+      setDataAberturaReceita(contact.data_abertura_receita || '');
+      setSituacaoCadastral(contact.situacao_cadastral || '');
+      setCnaeExtras({
+        cnae_principal: contact.cnae_principal ?? null,
+        cnaes_secundarios: contact.cnaes_secundarios ?? null,
+      });
     } else {
       setName('');
       setDocument('');
+      setDisplayName('');
       setEmail('');
       setPhone('');
       setWhatsapp('');
+      setSegundoEmail('');
       setCep('');
       setAddress('');
       setAddressNumber('');
@@ -87,8 +123,16 @@ export function ContactFormDialog({
       setCity('');
       setState('');
       setNotes('');
+      setRazaoSocial('');
+      setNomeFantasia('');
+      setPorte('');
+      setTipoEstabelecimento('');
+      setRepresentativeLegal('');
+      setNaturezaJuridica('');
+      setDataAberturaReceita('');
+      setSituacaoCadastral('');
+      setCnaeExtras({});
     }
-    setCnpjExtras({});
   }, [contact, open]);
 
   const runCnpjLookup = async (opts: { silentIfShort?: boolean } = {}) => {
@@ -112,11 +156,18 @@ export function ContactFormDialog({
       const data = await lookupCnpj(cleanDoc);
 
       const current = {
-        name, email, phone, cep, address, address_number: addressNumber,
+        razao_social: razaoSocial, nome_fantasia: nomeFantasia,
+        natureza_juridica: naturezaJuridica, situacao_cadastral: situacaoCadastral,
+        data_abertura_receita: dataAberturaReceita,
+        email, phone, cep, address, address_number: addressNumber,
         complemento, neighborhood, city, state,
       };
       const incoming = {
-        name: data.nome_fantasia || data.razao_social || '',
+        razao_social: data.razao_social || '',
+        nome_fantasia: data.nome_fantasia || '',
+        natureza_juridica: data.natureza_juridica || '',
+        situacao_cadastral: data.situacao_cadastral || '',
+        data_abertura_receita: data.data_abertura_receita || '',
         email: data.email || '',
         phone: data.phone || '',
         cep: data.cep || '',
@@ -129,7 +180,11 @@ export function ContactFormDialog({
       };
       const fill = pickEmptyFields(incoming, current);
 
-      if (fill.name) setName(fill.name);
+      if (fill.razao_social) setRazaoSocial(fill.razao_social);
+      if (fill.nome_fantasia) setNomeFantasia(fill.nome_fantasia);
+      if (fill.natureza_juridica) setNaturezaJuridica(fill.natureza_juridica);
+      if (fill.situacao_cadastral) setSituacaoCadastral(fill.situacao_cadastral);
+      if (fill.data_abertura_receita) setDataAberturaReceita(fill.data_abertura_receita);
       if (fill.email) setEmail(fill.email);
       if (fill.phone) setPhone(maskPhone(fill.phone));
       if (fill.cep) setCep(maskCep(fill.cep));
@@ -140,15 +195,10 @@ export function ContactFormDialog({
       if (fill.city) setCity(fill.city);
       if (fill.state) setState(fill.state);
 
-      // Structured fields not bound to inputs — keep them for the submit payload
-      setCnpjExtras({
-        razao_social: data.razao_social,
-        nome_fantasia: data.nome_fantasia,
-        cnae_principal: data.cnae_principal,
-        cnaes_secundarios: data.cnaes_secundarios,
-        natureza_juridica: data.natureza_juridica,
-        situacao_cadastral: data.situacao_cadastral,
-        data_abertura_receita: data.data_abertura_receita,
+      // CNAE não aparece neste modal (só na aba Fiscal do Super Perfil) — segue no payload calado
+      setCnaeExtras({
+        cnae_principal: data.cnae_principal ?? null,
+        cnaes_secundarios: data.cnaes_secundarios ?? null,
       });
 
       toast({
@@ -169,8 +219,6 @@ export function ContactFormDialog({
 
   const handleFetchCnpj = () => runCnpjLookup();
   const handleDocumentBlur = () => runCnpjLookup({ silentIfShort: true });
-
-
 
   const handleFetchCep = async () => {
     const cleanCep = cep.replace(/\D/g, '');
@@ -209,15 +257,23 @@ export function ContactFormDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
-      name: name.trim(),
+
+    // PJ nova: deriva o nome canônico de Nome Fantasia/Razão Social (não há campo "Nome" para PJ).
+    // PJ em edição: preserva o name já existente (nada aqui o altera, evita sobrescrever à toa).
+    const resolvedName = (showPJFields && !contact)
+      ? (nomeFantasia.trim() || razaoSocial.trim())
+      : name.trim();
+
+    const basePayload: any = {
+      name: resolvedName,
       type: contact?.type || 'cliente',
       document: document.trim() || null,
       tax_regime: null,
       email: email.trim() || null,
       phone: unmaskPhone(phone) || null,
       whatsapp: unmaskPhone(whatsapp) || null,
-
+      display_name: displayName.trim() || null,
+      segundo_email_contato: segundoEmail.trim() || null,
       cep: cep.trim() || null,
       address: address.trim() || null,
       address_number: addressNumber.trim() || null,
@@ -227,12 +283,26 @@ export function ContactFormDialog({
       state: state || null,
       notes: notes.trim() || null,
       is_active: true,
-      representative_legal: null,
-      ...cnpjExtras,
-    } as any);
+      ...cnaeExtras,
+    };
+
+    // Campos de PJ só entram no payload quando o formulário de PJ está em uso — assim, editar um
+    // contato como PF nunca apaga dados de PJ que já existiam (a coluna simplesmente não é tocada).
+    const pjPayload = showPJFields ? {
+      razao_social: razaoSocial.trim() || null,
+      nome_fantasia: nomeFantasia.trim() || null,
+      porte: porte || null,
+      tipo_estabelecimento: tipoEstabelecimento || null,
+      representative_legal: representativeLegal.trim() || null,
+      natureza_juridica: naturezaJuridica.trim() || null,
+      data_abertura_receita: dataAberturaReceita || null,
+      situacao_cadastral: situacaoCadastral || null,
+    } : {};
+
+    onSubmit({ ...basePayload, ...pjPayload } as any);
   };
 
-  const isFormValid = name.trim();
+  const isFormValid = showPJFields ? (razaoSocial.trim() || nomeFantasia.trim()) : name.trim();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -244,7 +314,14 @@ export function ContactFormDialog({
           <div className="grid grid-cols-3 gap-4">
             {/* Linha 1: CPF/CNPJ */}
             <div className="col-span-3">
-              <Label htmlFor="document">CPF/CNPJ</Label>
+              <Label htmlFor="document" className="flex items-center">
+                CPF/CNPJ
+                {documentType && (
+                  <Badge variant="outline" className="ml-2 text-[10px] font-normal">
+                    {documentType === 'CPF' ? 'Pessoa Física' : 'Pessoa Jurídica'}
+                  </Badge>
+                )}
+              </Label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Input
@@ -252,7 +329,7 @@ export function ContactFormDialog({
                     value={document}
                     onChange={(e) => setDocument(maskCPFCNPJ(e.target.value))}
                     onBlur={handleDocumentBlur}
-                    placeholder="00.000.000/0000-00"
+                    placeholder="CNPJ ou CPF"
                     maxLength={18}
                     className={isFetchingCnpj ? 'pr-9' : ''}
                   />
@@ -260,37 +337,127 @@ export function ContactFormDialog({
                     <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
                   )}
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={handleFetchCnpj}
-                  disabled={isFetchingCnpj || document.replace(/[^0-9A-Za-z]/g, '').length < 14}
-                  title="Buscar dados do CNPJ"
-                >
-                  {isFetchingCnpj ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Search className="h-4 w-4" />
-                  )}
-                </Button>
+                {documentType !== 'CPF' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleFetchCnpj}
+                    disabled={isFetchingCnpj || document.replace(/[^0-9A-Za-z]/g, '').length < 14}
+                    title="Buscar dados do CNPJ"
+                  >
+                    {isFetchingCnpj ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
 
-            {/* Linha 2: Nome */}
+            {/* Linha 2: Nome (PF) ou Razão Social + Nome Fantasia (PJ) */}
+            {showPJFields ? (
+              <>
+                <div className="col-span-3 sm:col-span-2">
+                  <Label htmlFor="razao-social">Razão Social <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="razao-social"
+                    value={razaoSocial}
+                    onChange={(e) => setRazaoSocial(e.target.value)}
+                    placeholder="Razão social"
+                  />
+                </div>
+                <div className="col-span-3 sm:col-span-1">
+                  <Label htmlFor="nome-fantasia">Nome Fantasia</Label>
+                  <Input
+                    id="nome-fantasia"
+                    value={nomeFantasia}
+                    onChange={(e) => setNomeFantasia(e.target.value)}
+                    placeholder="Nome fantasia"
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="col-span-3">
+                <Label htmlFor="name">Nome <span className="text-destructive">*</span></Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Nome do cliente ou fornecedor"
+                  required
+                />
+              </div>
+            )}
+
+            {/* Linha 3: Nome de Exibição */}
             <div className="col-span-3">
-              <Label htmlFor="name">Nome do Cliente/Fornecedor <span className="text-destructive">*</span></Label>
+              <Label htmlFor="display-name">Nome de Exibição</Label>
               <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Nome do cliente ou fornecedor"
-                required
+                id="display-name"
+                value={displayName || nomeFantasia}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Nome exibido na listagem de contatos"
               />
             </div>
 
-            {/* Linha 3: E-mail + Telefone + WhatsApp */}
-            <div className="col-span-3 grid grid-cols-3 gap-4">
+            {/* Campos exclusivos de PJ */}
+            {showPJFields && (
+              <>
+                <div>
+                  <Label htmlFor="porte">Porte</Label>
+                  <Select value={porte} onValueChange={setPorte}>
+                    <SelectTrigger id="porte"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      {PORTE_OPTIONS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="tipo-estabelecimento">Tipo de Estabelecimento</Label>
+                  <Select value={tipoEstabelecimento} onValueChange={setTipoEstabelecimento}>
+                    <SelectTrigger id="tipo-estabelecimento"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Matriz">Matriz</SelectItem>
+                      <SelectItem value="Filial">Filial</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-3 sm:col-span-2">
+                  <Label htmlFor="representative-legal">Representante Legal</Label>
+                  <Input
+                    id="representative-legal"
+                    value={representativeLegal}
+                    onChange={(e) => setRepresentativeLegal(e.target.value)}
+                  />
+                </div>
+                <div className="col-span-3 sm:col-span-1">
+                  <Label htmlFor="natureza-juridica">Natureza Jurídica</Label>
+                  <Input
+                    id="natureza-juridica"
+                    value={naturezaJuridica}
+                    onChange={(e) => setNaturezaJuridica(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="data-abertura">Data de Abertura / Fundação</Label>
+                  <Input
+                    id="data-abertura"
+                    type="date"
+                    value={dataAberturaReceita}
+                    onChange={(e) => setDataAberturaReceita(e.target.value)}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="situacao-cadastral">Situação na Receita Federal</Label>
+                  <Input id="situacao-cadastral" value={situacaoCadastral} readOnly className="bg-muted/40" />
+                </div>
+              </>
+            )}
+
+            {/* E-mail + Telefone / WhatsApp + Segundo E-mail */}
+            <div className="col-span-3 grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="email">E-mail</Label>
                 <Input
@@ -319,6 +486,16 @@ export function ContactFormDialog({
                   onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
                   placeholder="(XX) XXXXX-XXXX"
                   maxLength={15}
+                />
+              </div>
+              <div>
+                <Label htmlFor="segundo-email">Segundo E-mail</Label>
+                <Input
+                  id="segundo-email"
+                  type="email"
+                  value={segundoEmail}
+                  onChange={(e) => setSegundoEmail(e.target.value)}
+                  placeholder="email@exemplo.com"
                 />
               </div>
             </div>
@@ -354,8 +531,8 @@ export function ContactFormDialog({
               </div>
             </div>
 
-            {/* Linha 4b: Número + Bairro + Cidade + Estado */}
-            <div className="col-span-3 grid grid-cols-4 gap-4">
+            {/* Linha 4b: Número + Complemento */}
+            <div className="col-span-3 grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="address-number">Número</Label>
                 <Input
@@ -366,6 +543,19 @@ export function ContactFormDialog({
                   disabled={addressFieldsLocked}
                 />
               </div>
+              <div>
+                <Label htmlFor="complemento">Complemento</Label>
+                <Input
+                  id="complemento"
+                  value={complemento}
+                  onChange={(e) => setComplemento(e.target.value)}
+                  disabled={addressFieldsLocked}
+                />
+              </div>
+            </div>
+
+            {/* Linha 4c: Bairro + Cidade + Estado */}
+            <div className="col-span-3 grid grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="neighborhood">Bairro</Label>
                 <Input
@@ -403,7 +593,7 @@ export function ContactFormDialog({
 
             {/* Linha 5: Observações */}
             <div className="col-span-3">
-              <Label htmlFor="notes">Observações</Label>
+              <Label htmlFor="notes">Observações Gerais</Label>
               <Textarea
                 id="notes"
                 value={notes}

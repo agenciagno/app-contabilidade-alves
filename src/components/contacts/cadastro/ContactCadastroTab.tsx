@@ -167,9 +167,9 @@ export function ContactCadastroTab({ contactId }: Props) {
 
   return (
     <Tabs defaultValue="identificacao" className="w-full">
-      <TabsList className={`w-full grid gap-1 ${isPessoaFisica ? 'grid-cols-3' : 'grid-cols-2 md:grid-cols-4'}`}>
+      <TabsList className={`w-full grid gap-1 ${isPessoaFisica ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-4'}`}>
         <TabsTrigger value="identificacao">Identificação</TabsTrigger>
-        <TabsTrigger value="fiscal">Fiscal</TabsTrigger>
+        {!isPessoaFisica && <TabsTrigger value="fiscal">Fiscal</TabsTrigger>}
         <TabsTrigger value="operacional">Operacional</TabsTrigger>
         {!isPessoaFisica && <TabsTrigger value="socios">Sócios</TabsTrigger>}
       </TabsList>
@@ -324,12 +324,12 @@ export function ContactCadastroTab({ contactId }: Props) {
         </div>
       </TabsContent>
 
-      {/* FISCAL */}
-      <TabsContent value="fiscal" className="mt-6 space-y-4">
-        <Card>
-          <CardHeader><CardTitle className="text-base">Regime e Inscrições</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {!isPessoaFisica && (
+      {/* FISCAL (só PJ — para PF, Status do Cliente vive na aba Operacional) */}
+      {!isPessoaFisica && (
+        <TabsContent value="fiscal" className="mt-6 space-y-4">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Regime e Inscrições</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="Regime Tributário">
                 <Select value={form.tax_regime || ''} onValueChange={v => set('tax_regime', v)}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
@@ -338,25 +338,19 @@ export function ContactCadastroTab({ contactId }: Props) {
                   </SelectContent>
                 </Select>
               </Field>
-            )}
-            <Field label="Status do Cliente">
-              <Select value={form.status_cliente || ''} onValueChange={v => set('status_cliente', v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  {STATUS_CLIENTE.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
-            {!isPessoaFisica && (
-              <>
-                <Field label="Inscrição Municipal (IM)"><Input value={form.im || ''} onChange={e => set('im', e.target.value)} /></Field>
-                <Field label="Inscrição Estadual (IE)"><Input value={form.ie || ''} onChange={e => set('ie', e.target.value)} /></Field>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              <Field label="Status do Cliente">
+                <Select value={form.status_cliente || ''} onValueChange={v => set('status_cliente', v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {STATUS_CLIENTE.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Inscrição Municipal (IM)"><Input value={form.im || ''} onChange={e => set('im', e.target.value)} /></Field>
+              <Field label="Inscrição Estadual (IE)"><Input value={form.ie || ''} onChange={e => set('ie', e.target.value)} /></Field>
+            </CardContent>
+          </Card>
 
-        {!isPessoaFisica && (
           <Card>
             <CardHeader><CardTitle className="text-base">CNAE (Receita Federal)</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -384,9 +378,7 @@ export function ContactCadastroTab({ contactId }: Props) {
               </div>
             </CardContent>
           </Card>
-        )}
 
-        {!isPessoaFisica && (
           <Card>
             <CardHeader><CardTitle className="text-base">Registros e Livros</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -403,20 +395,20 @@ export function ContactCadastroTab({ contactId }: Props) {
               ))}
             </CardContent>
           </Card>
-        )}
 
-        <ObligationsSection contactId={contactId} />
+          <ObligationsSection contactId={contactId} />
 
-        <div className="flex justify-end">
-          <Button onClick={() => saveSection([
-            'tax_regime', 'status_cliente', 'im', 'ie',
-            'registro_entradas', 'registro_saidas', 'registro_icms', 'inventario',
-          ])} disabled={updateSuperPerfil.isPending}>
-            {updateSuperPerfil.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Salvar
-          </Button>
-        </div>
-      </TabsContent>
+          <div className="flex justify-end">
+            <Button onClick={() => saveSection([
+              'tax_regime', 'status_cliente', 'im', 'ie',
+              'registro_entradas', 'registro_saidas', 'registro_icms', 'inventario',
+            ])} disabled={updateSuperPerfil.isPending}>
+              {updateSuperPerfil.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Salvar
+            </Button>
+          </div>
+        </TabsContent>
+      )}
 
       {/* OPERACIONAL */}
       <TabsContent value="operacional" className="mt-6 space-y-4">
@@ -424,7 +416,7 @@ export function ContactCadastroTab({ contactId }: Props) {
           form={form}
           set={set}
           onSave={() => saveSection([
-            'responsible_id', 'categorias',
+            'responsible_id', 'categorias', 'status_cliente',
             'data_inicio_contrato', 'data_saida_cliente',
             'data_abertura_junta', 'data_encerramento_junta',
             'data_abertura_rf', 'data_encerramento_rf',
@@ -583,6 +575,16 @@ function OperacionalSection({
       <Card>
         <CardHeader><CardTitle className="text-base">Responsável & Categorias</CardTitle></CardHeader>
         <CardContent className="space-y-4">
+          {isPessoaFisica && (
+            <Field label="Status do Cliente">
+              <Select value={form.status_cliente || ''} onValueChange={v => set('status_cliente', v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {STATUS_CLIENTE.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
           <Field label="Colaborador Responsável">
             <Select value={form.responsible_id || 'none'} onValueChange={v => set('responsible_id', v === 'none' ? null : v)}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
