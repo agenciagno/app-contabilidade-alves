@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Contact, ContactInsert } from '@/hooks/useContacts';
@@ -46,14 +45,12 @@ export function ContactFormDialog({
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
-  const [segundoEmail, setSegundoEmail] = useState('');
   const [cep, setCep] = useState('');
   const [address, setAddress] = useState('');
   const [addressNumber, setAddressNumber] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
-  const [notes, setNotes] = useState('');
   const [complemento, setComplemento] = useState('');
   // Campos exclusivos de Pessoa Jurídica (mesmo conjunto da aba Identificação do Super Perfil)
   const [razaoSocial, setRazaoSocial] = useState('');
@@ -84,7 +81,6 @@ export function ContactFormDialog({
       setEmail(contact.email || '');
       setPhone(maskPhone(contact.phone || ''));
       setWhatsapp(maskPhone(contact.whatsapp || ''));
-      setSegundoEmail(contact.segundo_email_contato || '');
 
       setCep(contact.cep || '');
       setAddress(contact.address || '');
@@ -93,7 +89,6 @@ export function ContactFormDialog({
       setNeighborhood(contact.neighborhood || '');
       setCity(contact.city || '');
       setState(contact.state || '');
-      setNotes(contact.notes || '');
 
       setRazaoSocial(contact.razao_social || '');
       setNomeFantasia(contact.nome_fantasia || '');
@@ -114,7 +109,6 @@ export function ContactFormDialog({
       setEmail('');
       setPhone('');
       setWhatsapp('');
-      setSegundoEmail('');
       setCep('');
       setAddress('');
       setAddressNumber('');
@@ -122,7 +116,6 @@ export function ContactFormDialog({
       setNeighborhood('');
       setCity('');
       setState('');
-      setNotes('');
       setRazaoSocial('');
       setNomeFantasia('');
       setPorte('');
@@ -273,7 +266,6 @@ export function ContactFormDialog({
       phone: unmaskPhone(phone) || null,
       whatsapp: unmaskPhone(whatsapp) || null,
       display_name: displayName.trim() || null,
-      segundo_email_contato: segundoEmail.trim() || null,
       cep: cep.trim() || null,
       address: address.trim() || null,
       address_number: addressNumber.trim() || null,
@@ -281,7 +273,6 @@ export function ContactFormDialog({
       neighborhood: neighborhood.trim() || null,
       city: city.trim() || null,
       state: state || null,
-      notes: notes.trim() || null,
       is_active: true,
       ...cnaeExtras,
     };
@@ -306,7 +297,7 @@ export function ContactFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{contact ? 'Editar Cliente/Fornecedor' : 'Novo Cliente/Fornecedor'}</DialogTitle>
         </DialogHeader>
@@ -440,24 +431,15 @@ export function ContactFormDialog({
                     onChange={(e) => setNaturezaJuridica(e.target.value)}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="data-abertura">Data de Abertura / Fundação</Label>
-                  <Input
-                    id="data-abertura"
-                    type="date"
-                    value={dataAberturaReceita}
-                    onChange={(e) => setDataAberturaReceita(e.target.value)}
-                  />
-                </div>
-                <div className="col-span-2">
+                <div className="col-span-3 sm:col-span-2">
                   <Label htmlFor="situacao-cadastral">Situação na Receita Federal</Label>
                   <Input id="situacao-cadastral" value={situacaoCadastral} readOnly className="bg-muted/40" />
                 </div>
               </>
             )}
 
-            {/* E-mail + Telefone / WhatsApp + Segundo E-mail */}
-            <div className="col-span-3 grid grid-cols-2 gap-4">
+            {/* E-mail + Telefone + WhatsApp */}
+            <div className="col-span-3 grid grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="email">E-mail</Label>
                 <Input
@@ -486,16 +468,6 @@ export function ContactFormDialog({
                   onChange={(e) => setWhatsapp(maskPhone(e.target.value))}
                   placeholder="(XX) XXXXX-XXXX"
                   maxLength={15}
-                />
-              </div>
-              <div>
-                <Label htmlFor="segundo-email">Segundo E-mail</Label>
-                <Input
-                  id="segundo-email"
-                  type="email"
-                  value={segundoEmail}
-                  onChange={(e) => setSegundoEmail(e.target.value)}
-                  placeholder="email@exemplo.com"
                 />
               </div>
             </div>
@@ -589,19 +561,6 @@ export function ContactFormDialog({
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            {/* Linha 5: Observações */}
-            <div className="col-span-3">
-              <Label htmlFor="notes">Observações Gerais</Label>
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Observações adicionais"
-                rows={1}
-                className="min-h-[40px] resize-none"
-              />
             </div>
           </div>
 

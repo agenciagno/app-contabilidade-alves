@@ -8,7 +8,7 @@ import { lookupCnpj as cnpjLookupFn } from '@/lib/cnpj-lookup';
 const SUPER_PERFIL_COLUMNS = [
   'id', 'company_id', 'name', 'document', 'email', 'phone', 'whatsapp', 'notes',
   'is_active', 'created_at', 'updated_at', 'origin', 'type',
-  'razao_social', 'nome_fantasia', 'porte', 'natureza_juridica', 'situacao_cadastral',
+  'razao_social', 'nome_fantasia', 'display_name', 'porte', 'natureza_juridica', 'situacao_cadastral',
   'tipo_estabelecimento', 'status_cliente', 'tipo_cliente', 'grupo_escritorio',
   'cnae_principal', 'cnaes_secundarios', 'data_abertura_receita',
   'representative_legal', 'segundo_email_contato',
