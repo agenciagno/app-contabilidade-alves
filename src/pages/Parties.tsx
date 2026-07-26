@@ -45,6 +45,7 @@ export default function PartiesPage() {
       if (!q) return true;
       return (
         p.nome.toLowerCase().includes(q) ||
+        (p.display_name ?? '').toLowerCase().includes(q) ||
         (p.documento ?? '').toLowerCase().includes(q)
       );
     });
@@ -146,7 +147,7 @@ export default function PartiesPage() {
               <TableBody>
                 {filtered.map((p) => (
                   <TableRow key={p.id} className={p.is_active ? '' : 'opacity-60'}>
-                    <TableCell className="font-medium">{p.nome}</TableCell>
+                    <TableCell className="font-medium">{p.display_name || p.nome}</TableCell>
                     <TableCell>{tipoBadge(p.tipo)}</TableCell>
                     <TableCell className="font-mono text-xs">{p.documento || '—'}</TableCell>
                     <TableCell className="text-sm">

@@ -10,9 +10,18 @@ export interface Party {
   company_id: string;
   tipo: PartyTipo;
   nome: string;
+  display_name: string | null;
   documento: string | null;
   email: string | null;
   telefone: string | null;
+  whatsapp: string | null;
+  cep: string | null;
+  address: string | null;
+  address_number: string | null;
+  complemento: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
   observacoes: string | null;
   is_active: boolean;
   created_at: string;
@@ -22,9 +31,18 @@ export interface Party {
 export interface PartyInput {
   tipo: PartyTipo;
   nome: string;
+  display_name?: string | null;
   documento?: string | null;
   email?: string | null;
   telefone?: string | null;
+  whatsapp?: string | null;
+  cep?: string | null;
+  address?: string | null;
+  address_number?: string | null;
+  complemento?: string | null;
+  neighborhood?: string | null;
+  city?: string | null;
+  state?: string | null;
   observacoes?: string | null;
   is_active?: boolean;
 }

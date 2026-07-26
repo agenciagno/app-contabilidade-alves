@@ -2866,43 +2866,70 @@ export type Database = {
       }
       parties: {
         Row: {
+          address: string | null
+          address_number: string | null
+          cep: string | null
+          city: string | null
           company_id: string
+          complemento: string | null
           created_at: string
+          display_name: string | null
           documento: string | null
           email: string | null
           id: string
           is_active: boolean
+          neighborhood: string | null
           nome: string
           observacoes: string | null
+          state: string | null
           telefone: string | null
           tipo: string
           updated_at: string
+          whatsapp: string | null
         }
         Insert: {
+          address?: string | null
+          address_number?: string | null
+          cep?: string | null
+          city?: string | null
           company_id: string
+          complemento?: string | null
           created_at?: string
+          display_name?: string | null
           documento?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
+          neighborhood?: string | null
           nome: string
           observacoes?: string | null
+          state?: string | null
           telefone?: string | null
           tipo: string
           updated_at?: string
+          whatsapp?: string | null
         }
         Update: {
+          address?: string | null
+          address_number?: string | null
+          cep?: string | null
+          city?: string | null
           company_id?: string
+          complemento?: string | null
           created_at?: string
+          display_name?: string | null
           documento?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
+          neighborhood?: string | null
           nome?: string
           observacoes?: string | null
+          state?: string | null
           telefone?: string | null
           tipo?: string
           updated_at?: string
+          whatsapp?: string | null
         }
         Relationships: [
           {
