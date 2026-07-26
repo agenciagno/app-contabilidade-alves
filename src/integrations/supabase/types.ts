@@ -1003,6 +1003,7 @@ export type Database = {
         Row: {
           cnpj: string
           created_at: string
+          email: string | null
           id: string
           logo_url: string | null
           name: string
@@ -1014,6 +1015,7 @@ export type Database = {
         Insert: {
           cnpj: string
           created_at?: string
+          email?: string | null
           id?: string
           logo_url?: string | null
           name: string
@@ -1025,6 +1027,7 @@ export type Database = {
         Update: {
           cnpj?: string
           created_at?: string
+          email?: string | null
           id?: string
           logo_url?: string | null
           name?: string
