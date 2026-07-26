@@ -13,9 +13,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { maskCPFCNPJ } from '@/lib/utils';
+import { maskCPFCNPJ, getDocumentType } from '@/lib/utils';
 import type { Party, PartyInput, PartyTipo } from '@/hooks/useParties';
 
 interface Props {
@@ -59,16 +60,19 @@ export function PartyFormDialog({ open, onOpenChange, onSubmit, isLoading, initi
   const set = <K extends keyof PartyInput>(k: K, v: PartyInput[K]) =>
     setForm((p) => ({ ...p, [k]: v }));
 
+  const documentType = getDocumentType(form.documento);
+
   const handleLookup = async () => {
-    const digits = (form.documento ?? '').replace(/\D/g, '');
-    if (digits.length !== 14) {
-      toast.error('Informe um CNPJ com 14 dígitos para busca.');
+    // Mantém letras — CNPJ alfanumérico (IN RFB 2.229/2024, novas inscrições a partir de 31/07/2026)
+    const clean = (form.documento ?? '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+    if (clean.length !== 14) {
+      toast.error('Informe um CNPJ completo (14 caracteres) para busca.');
       return;
     }
     setLooking(true);
     try {
       const { data, error } = await supabase.functions.invoke('cnpj-lookup', {
-        body: { cnpj: digits },
+        body: { cnpj: clean },
       });
       if (error) throw error;
       const d = data as { razao_social?: string; nome_fantasia?: string; email?: string; phone?: string } | null;
@@ -126,16 +130,32 @@ export function PartyFormDialog({ open, onOpenChange, onSubmit, isLoading, initi
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Documento (CPF/CNPJ)</Label>
+              <Label className="flex items-center">
+                Documento (CPF/CNPJ)
+                {documentType && (
+                  <Badge variant="outline" className="ml-2 text-[10px] font-normal">
+                    {documentType === 'CPF' ? 'Pessoa Física' : 'Pessoa Jurídica'}
+                  </Badge>
+                )}
+              </Label>
               <div className="flex gap-2">
                 <Input
                   value={form.documento ?? ''}
                   onChange={(e) => set('documento', maskCPFCNPJ(e.target.value))}
-                  placeholder="00.000.000/0000-00"
+                  placeholder="CNPJ ou CPF"
                 />
-                <Button type="button" variant="outline" size="icon" onClick={handleLookup} disabled={looking}>
-                  {looking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                </Button>
+                {documentType !== 'CPF' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleLookup}
+                    disabled={looking || (form.documento ?? '').replace(/[^0-9A-Za-z]/g, '').length < 14}
+                    title="Buscar dados do CNPJ"
+                  >
+                    {looking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  </Button>
+                )}
               </div>
             </div>
           </div>
