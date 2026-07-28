@@ -196,13 +196,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const sessionUuid = crypto.randomUUID();
           localStorage.setItem('session_uuid', sessionUuid);
 
-          await (supabase as any).from('active_sessions').insert({
+          await supabase.from('active_sessions').insert({
             user_id: authData.user.id,
-            company_id: profile.company_id,
             session_uuid: sessionUuid,
-            device_info: navigator.userAgent,
-            logged_in_at: new Date().toISOString(),
-            last_seen_at: new Date().toISOString(),
+            metadata: { device_info: navigator.userAgent },
           });
         }
       }

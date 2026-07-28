@@ -113,6 +113,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   const [showPassword, setShowPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [sendingResetEmail, setSendingResetEmail] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -152,6 +153,22 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   const handleClose = () => {
     resetForm();
     onOpenChange(false);
+  };
+
+  const handleSendResetEmail = async () => {
+    if (!editUser) return;
+    setSendingResetEmail(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(editUser.email, {
+        redirectTo: `${window.location.origin}/redefinir-senha`,
+      });
+      if (error) throw error;
+      toast.success('E-mail de redefinição enviado');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao enviar e-mail de redefinição');
+    } finally {
+      setSendingResetEmail(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -447,6 +464,27 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
                 </button>
               </div>
               {newPassword && <PasswordStrength password={newPassword} />}
+
+              <div className="flex items-center gap-2 pt-1">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground">ou</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleSendResetEmail}
+                disabled={sendingResetEmail}
+              >
+                {sendingResetEmail ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4 mr-2" />
+                )}
+                Enviar e-mail de redefinição de senha
+              </Button>
             </div>
           )}
 

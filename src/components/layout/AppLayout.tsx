@@ -47,14 +47,13 @@ export function AppLayout({ children }: AppLayoutProps) {
         return;
       }
 
-      const { error: upsertError } = await (supabase as any)
+      const { error: upsertError } = await supabase
         .from('active_sessions')
         .upsert(
           {
             user_id: user.id,
-            company_id: profile.company_id,
             session_uuid: sessionUuid,
-            device_info: navigator.userAgent,
+            metadata: { device_info: navigator.userAgent },
             last_seen_at: new Date().toISOString(),
           },
           { onConflict: 'session_uuid', ignoreDuplicates: false }
@@ -62,7 +61,6 @@ export function AppLayout({ children }: AppLayoutProps) {
       if (upsertError) {
         console.error('[active_sessions:upsert] falhou', upsertError, {
           user_id: user.id,
-          company_id: profile.company_id,
           session_uuid: sessionUuid,
         });
         return;

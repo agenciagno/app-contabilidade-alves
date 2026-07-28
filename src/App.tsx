@@ -13,6 +13,7 @@ import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 
 // Pages
 import Auth from "@/pages/Auth";
+import RedefinirSenha from "@/pages/RedefinirSenha";
 import Home from "@/pages/Home";
 import Dashboard from "@/pages/Dashboard";
 import Transactions from "@/pages/Transactions";
@@ -67,6 +68,7 @@ const App = () => (
             <NotificationProvider>
               <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/redefinir-senha" element={<RedefinirSenha />} />
               <Route path="/newsletter/:slug" element={<Newsletter />} />
               <Route path="/sem-acesso" element={<NoAccess />} />
               <Route path="/" element={<AppLayout><ModuleGuard moduleName="home"><Home /></ModuleGuard></AppLayout>} />

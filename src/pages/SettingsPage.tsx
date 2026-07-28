@@ -7,13 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Upload, Building2, Trash2, History, Users, Building, Database } from 'lucide-react';
+import { Loader2, Upload, Building2, Trash2, History, Users, Database } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import UsersTab from '@/components/users/UsersTab';
 import GlobalLogsTab from '@/components/settings/GlobalLogsTab';
-import ClientCompaniesTab from '@/components/settings/ClientCompaniesTab';
 import TrashTab from '@/components/settings/TrashTab';
 import BackupTab from '@/components/settings/BackupTab';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -197,9 +196,6 @@ export default function SettingsPage() {
     tabs.push({ value: 'empresa', label: 'Dados da Empresa', icon: Building2 });
     tabs.push({ value: 'equipe', label: 'Minha Equipe', icon: Users });
   }
-  if (!isColaborador) {
-    tabs.push({ value: 'empresas', label: 'Empresas Clientes', icon: Building });
-  }
   if (isSuperAdmin) {
     tabs.push({ value: 'logs', label: 'Logs Globais', icon: History });
   }
@@ -312,13 +308,6 @@ export default function SettingsPage() {
             <UsersTab companyId={companyId} currentUserId={user.id} />
           )}
         </TabsContent>
-
-        {/* Empresas Clientes */}
-        {!isColaborador && (
-          <TabsContent value="empresas" className="mt-0">
-            <ClientCompaniesTab />
-          </TabsContent>
-        )}
 
         {/* Logs Globais */}
         {isSuperAdmin && (

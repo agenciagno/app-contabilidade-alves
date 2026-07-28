@@ -44,32 +44,36 @@ export default function ActiveSessionsPanel() {
   const { data: sessions = [], isLoading, refetch } = useQuery({
     queryKey: ['active-sessions', isSuperAdmin],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('active_sessions')
-        .select('id, user_id, company_id, session_uuid, device_info, logged_in_at, last_seen_at')
+        .select('id, user_id, session_uuid, metadata, started_at, last_seen_at')
         .order('last_seen_at', { ascending: false });
       if (error) throw error;
 
-      const userIds: string[] = Array.from(new Set((data || []).map((s: any) => s.user_id as string)));
-      const companyIds: string[] = Array.from(new Set((data || []).map((s: any) => s.company_id as string).filter(Boolean)));
+      const userIds: string[] = Array.from(new Set((data || []).map((s) => s.user_id).filter(Boolean) as string[]));
 
-      const [profilesRes, companiesRes] = await Promise.all([
-        userIds.length
-          ? supabase.from('profiles').select('user_id, full_name, email').in('user_id', userIds)
-          : Promise.resolve({ data: [] as any[] }),
-        companyIds.length
-          ? supabase.from('companies').select('id, name').in('id', companyIds)
-          : Promise.resolve({ data: [] as any[] }),
-      ]);
+      const profilesRes = userIds.length
+        ? await supabase.from('profiles').select('user_id, full_name, email, company_id').in('user_id', userIds)
+        : { data: [] as any[] };
 
       const profileMap = new Map((profilesRes.data || []).map((p: any) => [p.user_id, p]));
+
+      const companyIds: string[] = Array.from(
+        new Set((profilesRes.data || []).map((p: any) => p.company_id as string).filter(Boolean))
+      );
+      const companiesRes = companyIds.length
+        ? await supabase.from('companies').select('id, name').in('id', companyIds)
+        : { data: [] as any[] };
       const companyMap = new Map((companiesRes.data || []).map((c: any) => [c.id, c]));
 
-      return (data || []).map((s) => ({
-        ...s,
-        profile: profileMap.get(s.user_id) || null,
-        company: companyMap.get(s.company_id) || null,
-      }));
+      return (data || []).map((s) => {
+        const profile = profileMap.get(s.user_id) || null;
+        return {
+          ...s,
+          profile,
+          company: profile?.company_id ? companyMap.get(profile.company_id) || null : null,
+        };
+      });
     },
     refetchInterval: 30000,
     enabled: isSuperAdmin,
@@ -164,11 +168,11 @@ export default function ActiveSessionsPanel() {
                       {session.company?.name || '-'}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {parseDeviceInfo(session.device_info)}
+                      {parseDeviceInfo(session.metadata?.device_info ?? null)}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {session.logged_in_at
-                        ? format(new Date(session.logged_in_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })
+                      {session.started_at
+                        ? format(new Date(session.started_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })
                         : '-'}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
