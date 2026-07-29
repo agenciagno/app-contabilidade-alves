@@ -33,7 +33,7 @@ import { format, parseISO, startOfMonth, endOfMonth, subMonths, isWithinInterval
 import { ptBR } from 'date-fns/locale';
 import { DashboardWidgetsConfig, useDashboardWidgets } from '@/components/dashboard/DashboardWidgets';
 import { UnifiedFilterBox, PeriodFilter, getDateRangeFromPeriod } from '@/components/filters/UnifiedFilterBox';
-import { exportToCSV, exportToPDF, useReportData, processReportData } from '@/hooks/useReportData';
+import { exportToCSV, exportToPDF } from '@/hooks/useReportData';
 import { PeriodComparison } from '@/components/reports/PeriodComparison';
 import { BudgetTracker } from '@/components/financeiro/BudgetTracker';
 import { FinancialHealthBadge } from '@/components/financeiro/FinancialHealthBadge';
@@ -228,20 +228,40 @@ export default function Dashboard() {
   const categoryChartData = useMemo(() => montarPizza(categoryRpc), [categoryRpc, categories]);
   const revenueCategoryChartData = useMemo(() => montarPizza(revenueCategoryRpc), [revenueCategoryRpc, categories]);
 
-  // Period comparison data
+  // Period comparison data.
+  // Antes buscava a tabela INTEIRA da empresa (paginada, 1000 em 1000, via useReportData) e
+  // filtrava por mês no cliente, só para chegar em 2 números. Isso tinha dois problemas:
+  // (1) a busca demora vários round-trips, e enquanto ela ainda não terminou o hook devolve
+  //     `data: []` por padrão — e `hasData()` no PeriodComparison não distingue "carregando"
+  //     de "não tem nada", então mostrava "Sem dados no período anterior" mesmo com Junho
+  //     cheio de lançamento, só porque a resposta ainda não tinha chegado.
+  // (2) reimplementava em JS uma soma que a RPC get_dashboard_summary já faz no Postgres —
+  //     a mesma que alimenta os cards do topo desta tela, com a mesma regra de "pago".
+  // Agora usa a RPC (1 chamada por mês, não uma varredura da tabela inteira) e o card
+  // fica coerente com "Receitas Recebidas"/"Contas Pagas" logo acima: comparação de
+  // REALIZADO (o que entrou/saiu de fato), não do que ainda estava previsto.
   const thisMonthStart = startOfMonth(now);
   const lastMonthStart = startOfMonth(subMonths(now, 1));
   const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
-  const invisibleBankIdArray = useMemo<string[]>(
-    () => banks.filter(b => b.is_invisible).map(b => b.id),
-    [banks],
+  const { data: thisMonthSummary, isLoading: loadingThisMonthCmp } = useDashboardSummary(
+    format(thisMonthStart, 'yyyy-MM-dd'),
+    format(now, 'yyyy-MM-dd'),
   );
-  const { data: thisMonthTx = [] } = useReportData({ startDate: thisMonthStart, endDate: now, invisibleBankIds: invisibleBankIdArray });
-  const { data: lastMonthTx = [] } = useReportData({ startDate: lastMonthStart, endDate: lastMonthEnd, invisibleBankIds: invisibleBankIdArray });
+  const { data: lastMonthSummary, isLoading: loadingLastMonthCmp } = useDashboardSummary(
+    format(lastMonthStart, 'yyyy-MM-dd'),
+    format(lastMonthEnd, 'yyyy-MM-dd'),
+  );
 
-  const thisMonthData = useMemo(() => processReportData(thisMonthTx), [thisMonthTx]);
-  const lastMonthData = useMemo(() => processReportData(lastMonthTx), [lastMonthTx]);
+  const thisMonthData = useMemo(() => ({
+    receitas: Number(thisMonthSummary?.receitas_pagas ?? 0),
+    despesas: Number(thisMonthSummary?.despesas_pagas ?? 0),
+  }), [thisMonthSummary]);
+  const lastMonthData = useMemo(() => ({
+    receitas: Number(lastMonthSummary?.receitas_pagas ?? 0),
+    despesas: Number(lastMonthSummary?.despesas_pagas ?? 0),
+  }), [lastMonthSummary]);
+  const loadingComparison = loadingThisMonthCmp || loadingLastMonthCmp;
 
   const isLoading = loadingBanks || loadingSummary || loadingAnnual || loadingMonthly || loadingCategory;
 
@@ -714,15 +734,16 @@ export default function Dashboard() {
       {/* Period Comparison */}
       {isWidgetEnabled('periodComparison') && (
         <PeriodComparison
+          isLoading={loadingComparison}
           currentPeriod={{
-            receitas: thisMonthData.totals.receitas,
-            despesas: thisMonthData.totals.despesas,
-            saldo: thisMonthData.totals.receitas - thisMonthData.totals.despesas,
+            receitas: thisMonthData.receitas,
+            despesas: thisMonthData.despesas,
+            saldo: thisMonthData.receitas - thisMonthData.despesas,
           }}
           previousPeriod={{
-            receitas: lastMonthData.totals.receitas,
-            despesas: lastMonthData.totals.despesas,
-            saldo: lastMonthData.totals.receitas - lastMonthData.totals.despesas,
+            receitas: lastMonthData.receitas,
+            despesas: lastMonthData.despesas,
+            saldo: lastMonthData.receitas - lastMonthData.despesas,
           }}
         />
       )}

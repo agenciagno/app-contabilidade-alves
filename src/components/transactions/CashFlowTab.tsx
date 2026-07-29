@@ -443,14 +443,12 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
   const [reportOpen, setReportOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; row: any | null }>({ open: false, row: null });
 
-  // Janela padrão: início do ano → +90 dias.
-  // A janela antiga terminava HOJE — numa tela de contas a pagar e receber, isso escondia
-  // todo o futuro: 1.397 lançamentos em aberto (R$ 903 mil a pagar e R$ 442 mil a receber)
-  // ficavam invisíveis e a tela mostrava 13 linhas. O passado continua no recorte para que
-  // o vencido apareça junto.
+  // Janela padrão: início do ano → +30 dias (pedido de Gabriel, 29/07 — só o essencial de
+  // curto prazo, sem previsão de 90 dias). Antes a janela terminava HOJE, o que escondia
+  // todo o futuro; o passado continua no recorte para que o vencido apareça junto.
   const today = new Date();
   const defaultStart = format(startOfYear(today), 'yyyy-MM-dd');
-  const defaultEnd = format(addDays(today, 90), 'yyyy-MM-dd');
+  const defaultEnd = format(addDays(today, 30), 'yyyy-MM-dd');
   const [globalStartDate, setGlobalStartDate] = useState(defaultStart);
   const [globalEndDate, setGlobalEndDate] = useState(defaultEnd);
 

@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { TrendingUp, TrendingDown, Minus, AlertCircle } from 'lucide-react';
 
 interface PeriodData {
@@ -12,6 +13,10 @@ interface PeriodComparisonProps {
   previousPeriod: PeriodData;
   currentLabel?: string;
   previousLabel?: string;
+  /** Enquanto a busca ainda não voltou, `period.receitas === 0` é indistinguível de
+   * "mês sem lançamento" — sem esse flag, a tela mostrava "Sem dados" no instante
+   * antes do fetch responder, mesmo com o mês cheio de lançamento. */
+  isLoading?: boolean;
 }
 
 const formatCurrency = (value: number) =>
@@ -54,6 +59,7 @@ export function PeriodComparison({
   previousPeriod,
   currentLabel = 'Este Mês',
   previousLabel = 'Mês Anterior',
+  isLoading = false,
 }: PeriodComparisonProps) {
   const receitasVariation = calculateVariation(currentPeriod.receitas, previousPeriod.receitas);
   const despesasVariation = calculateVariation(currentPeriod.despesas, previousPeriod.despesas);
@@ -71,7 +77,13 @@ export function PeriodComparison({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {!hasCurrentData && !hasPreviousData ? (
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32 md:col-span-2" />
+          </div>
+        ) : !hasCurrentData && !hasPreviousData ? (
           <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
             <AlertCircle className="h-10 w-10 mb-3 opacity-50" />
             <p className="text-sm font-medium">Sem dados para comparação</p>
