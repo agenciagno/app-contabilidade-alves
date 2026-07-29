@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useContacts } from './useContacts';
 import { useTransactions } from './useTransactions';
-import { startOfDay, format, parseISO, isBefore } from 'date-fns';
+import { isEffectivelyPaid } from '@/lib/financial-utils';
+import { startOfDay, format } from 'date-fns';
 
 export interface InadimplentContact {
   id: string;
@@ -21,9 +22,13 @@ export function useInadimplentContacts() {
     const todayStr = format(today, 'yyyy-MM-dd');
     const contactsMap = new Map<string, InadimplentContact>();
     
-    // Find all unpaid transactions with due_date < today
+    // Recebíveis vencidos e em aberto. Só `receita`: conta a pagar vencida é dívida da CA com
+    // fornecedor, não inadimplência de cliente — sem esse filtro o selo somava as duas coisas
+    // (R$ 19.328 no lugar de R$ 10.492 em 29/07/2026). Regra de "pago" é a estrita, igual às RPCs.
     const overdueTransactions = transactions.filter(t => {
-      if (t.is_paid || !t.due_date || !t.contact_id) return false;
+      if (t.type !== 'receita') return false;
+      if (t.is_transfer) return false;
+      if (isEffectivelyPaid(t) || !t.due_date || !t.contact_id) return false;
       return t.due_date < todayStr;
     });
     

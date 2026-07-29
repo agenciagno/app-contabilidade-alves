@@ -129,6 +129,7 @@ export type Database = {
           id: string
           is_active: boolean
           mensagem_feriado: string | null
+          mensagem_fim_de_semana: string | null
           mensagem_fora_horario: string | null
           mensagem_handoff_template: string | null
           mensagem_saudacao: string | null
@@ -146,6 +147,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           mensagem_feriado?: string | null
+          mensagem_fim_de_semana?: string | null
           mensagem_fora_horario?: string | null
           mensagem_handoff_template?: string | null
           mensagem_saudacao?: string | null
@@ -163,6 +165,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           mensagem_feriado?: string | null
+          mensagem_fim_de_semana?: string | null
           mensagem_fora_horario?: string | null
           mensagem_handoff_template?: string | null
           mensagem_saudacao?: string | null
@@ -1338,6 +1341,7 @@ export type Database = {
           canal_entrega: string | null
           categorias: string[] | null
           cep: string | null
+          chatwoot_contact_ids: number[]
           city: string | null
           cnae_principal: Json | null
           cnaes_secundarios: Json | null
@@ -1417,6 +1421,7 @@ export type Database = {
           canal_entrega?: string | null
           categorias?: string[] | null
           cep?: string | null
+          chatwoot_contact_ids?: number[]
           city?: string | null
           cnae_principal?: Json | null
           cnaes_secundarios?: Json | null
@@ -1496,6 +1501,7 @@ export type Database = {
           canal_entrega?: string | null
           categorias?: string[] | null
           cep?: string | null
+          chatwoot_contact_ids?: number[]
           city?: string | null
           cnae_principal?: Json | null
           cnaes_secundarios?: Json | null
@@ -2203,12 +2209,13 @@ export type Database = {
           completed_at: string | null
           completion_notes: string | null
           completion_type: string | null
-          contact_id: string
+          contact_id: string | null
           created_at: string
           delivery_date: string | null
           description: string | null
           due_date: string
           fiscal_due_date: string | null
+          group_key: string | null
           id: string
           is_auto_generated: boolean | null
           notes: string | null
@@ -2229,12 +2236,13 @@ export type Database = {
           completed_at?: string | null
           completion_notes?: string | null
           completion_type?: string | null
-          contact_id: string
+          contact_id?: string | null
           created_at?: string
           delivery_date?: string | null
           description?: string | null
           due_date: string
           fiscal_due_date?: string | null
+          group_key?: string | null
           id?: string
           is_auto_generated?: boolean | null
           notes?: string | null
@@ -2255,12 +2263,13 @@ export type Database = {
           completed_at?: string | null
           completion_notes?: string | null
           completion_type?: string | null
-          contact_id?: string
+          contact_id?: string | null
           created_at?: string
           delivery_date?: string | null
           description?: string | null
           due_date?: string
           fiscal_due_date?: string | null
+          group_key?: string | null
           id?: string
           is_auto_generated?: boolean | null
           notes?: string | null
@@ -3591,6 +3600,10 @@ export type Database = {
       }
     }
     Functions: {
+      bulk_settle_transactions: {
+        Args: { p_ids: string[]; p_payment_date: string }
+        Returns: number
+      }
       can_access_company: { Args: { _company_id: string }; Returns: boolean }
       cofre_decrypt_internal: {
         Args: { p_encrypted: string; p_key: string }
@@ -3632,6 +3645,7 @@ export type Database = {
           p_contact_id?: string
           p_end_date: string
           p_limit?: number
+          p_only_paid?: boolean
           p_start_date: string
           p_type: string
         }
@@ -3676,9 +3690,16 @@ export type Database = {
         Args: {
           p_bank_id?: string
           p_category_id?: string
+          p_category_ids?: string[]
           p_company_id: string
           p_contact_id?: string
+          p_contact_ids?: string[]
+          p_date_column?: string
           p_end_date?: string
+          p_exclude_bank_ids?: string[]
+          p_include_null_category?: boolean
+          p_include_null_contact?: boolean
+          p_null_bank_only?: boolean
           p_payment_status?: string
           p_search?: string
           p_start_date?: string

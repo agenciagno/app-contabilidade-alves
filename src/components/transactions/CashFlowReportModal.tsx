@@ -15,6 +15,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { format, parseISO, isWithinInterval } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { zebraPorData } from '@/lib/pdf-zebra';
 import type { Transaction } from '@/hooks/useTransactions';
 import type { Bank } from '@/hooks/useBanks';
 import type { Contact } from '@/hooks/useContacts';
@@ -538,14 +539,23 @@ export function CashFlowReportModal({
       9: { cellWidth: 12, halign: 'center' as const },
     };
 
+    // Chave do agrupamento visual: a data que a tabela usa como referência em cada modo
+    // (vencimento em "A Receber", data prevista no fluxo completo).
+    const chavesDeData = rowsWithBalance.map(r =>
+      isReceivables
+        ? (r.due_date ? formatDateBR(r.due_date) : '')
+        : formatDateBR(r.expected_date || r.due_date || '')
+    );
+
     autoTable(doc, {
       startY: sepY + 10,
       head,
       body,
-      theme: 'striped',
-      styles: { fontSize: 7, cellPadding: 1.5, halign: 'center' },
+      theme: 'grid',
+      styles: { fontSize: 7, cellPadding: 1.5, halign: 'center', lineColor: [235, 238, 242], lineWidth: 0.1 },
       headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold', fontSize: 6.5, halign: 'center' },
-      alternateRowStyles: { fillColor: [248, 248, 248] },
+      // Destaque agrupado por data (não linha sim/linha não).
+      ...zebraPorData(chavesDeData),
       rowPageBreak: 'avoid',
       columnStyles,
       didDrawPage: (data) => {

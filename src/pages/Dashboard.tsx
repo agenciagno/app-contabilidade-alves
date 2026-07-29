@@ -31,7 +31,6 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { format, parseISO, startOfMonth, endOfMonth, subMonths, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useNavigate } from 'react-router-dom';
 import { DashboardWidgetsConfig, useDashboardWidgets } from '@/components/dashboard/DashboardWidgets';
 import { UnifiedFilterBox, PeriodFilter, getDateRangeFromPeriod } from '@/components/filters/UnifiedFilterBox';
 import { exportToCSV, exportToPDF, useReportData, processReportData } from '@/hooks/useReportData';
@@ -61,7 +60,6 @@ const CHART_COLORS = [
 ];
 
 export default function Dashboard() {
-  const navigate = useNavigate();
   const now = new Date();
 
   const { widgets, toggleWidget, isWidgetEnabled } = useDashboardWidgets();
@@ -131,11 +129,15 @@ export default function Dashboard() {
   const currentYear = now.getFullYear();
   const { data: annualRpc, isLoading: loadingAnnual } = useAnnualMetrics(currentYear);
   const { data: monthlyRpc, isLoading: loadingMonthly } = useMonthlyEvolution(6);
+  // Busca TODAS as categorias (limite alto) e agrupa a cauda em "Outros" no cliente.
+  // Antes o RPC devolvia só o top 5 e o Recharts calculava a porcentagem sobre esse
+  // subconjunto: uma categoria que era 30% da despesa real aparecia rotulada como 45%,
+  // e as fatias não somavam o total.
   const { data: categoryRpc, isLoading: loadingCategory } = useCategoryBreakdown(
     'despesa',
     _summaryRange.start,
     _summaryRange.end,
-    5,
+    1000,
     {
       bankId: _summaryFilters.bankId,
       contactId: _summaryFilters.contactId,
@@ -145,7 +147,7 @@ export default function Dashboard() {
     'receita',
     _summaryRange.start,
     _summaryRange.end,
-    5,
+    1000,
     {
       bankId: _summaryFilters.bankId,
       contactId: _summaryFilters.contactId,
@@ -202,10 +204,13 @@ export default function Dashboard() {
     });
   }, [monthlyRpc]);
 
-  // Category chart data (expenses) — colors looked up from categories list
-  const categoryChartData = useMemo(() => {
-    const rows = categoryRpc ?? [];
-    return rows.map((r, idx) => {
+  // Top N categorias + fatia "Outros" com a cauda, para que as porcentagens da pizza
+  // fechem 100% do total real do período.
+  const TOP_CATEGORIAS = 5;
+  const montarPizza = (
+    rows: { category_id: string | null; category_name: string | null; total: number | string }[] | undefined,
+  ) => {
+    const todas = (rows ?? []).map((r, idx) => {
       const cat = r.category_id ? categories.find(c => c.id === r.category_id) : null;
       return {
         name: r.category_name || 'Sem categoria',
@@ -213,21 +218,15 @@ export default function Dashboard() {
         color: cat?.color || CHART_COLORS[idx % CHART_COLORS.length],
       };
     });
-  }, [categoryRpc, categories]);
+    if (todas.length <= TOP_CATEGORIAS + 1) return todas;
 
+    const top = todas.slice(0, TOP_CATEGORIAS);
+    const resto = todas.slice(TOP_CATEGORIAS).reduce((s, c) => s + c.value, 0);
+    return [...top, { name: `Outros (${todas.length - TOP_CATEGORIAS})`, value: resto, color: 'hsl(215 16% 65%)' }];
+  };
 
-  // Revenue category chart data (via RPC)
-  const revenueCategoryChartData = useMemo(() => {
-    const rows = revenueCategoryRpc ?? [];
-    return rows.map((r, idx) => {
-      const cat = r.category_id ? categories.find(c => c.id === r.category_id) : null;
-      return {
-        name: r.category_name || 'Sem categoria',
-        value: Number(r.total) || 0,
-        color: cat?.color || CHART_COLORS[idx % CHART_COLORS.length],
-      };
-    });
-  }, [revenueCategoryRpc, categories]);
+  const categoryChartData = useMemo(() => montarPizza(categoryRpc), [categoryRpc, categories]);
+  const revenueCategoryChartData = useMemo(() => montarPizza(revenueCategoryRpc), [revenueCategoryRpc, categories]);
 
   // Period comparison data
   const thisMonthStart = startOfMonth(now);
@@ -246,24 +245,40 @@ export default function Dashboard() {
 
   const isLoading = loadingBanks || loadingSummary || loadingAnnual || loadingMonthly || loadingCategory;
 
-  // Lazy fetch for exports — only runs when user clicks export
+  // Lazy fetch for exports — only runs when user clicks export.
+  // Pagina de 1000 em 1000: sem .range() o PostgREST corta em 1000 linhas sem erro nenhum,
+  // então a exportação truncava em silêncio.
   const fetchExportData = async () => {
-    let query = supabase
-      .from('transactions')
-      .select('*, category:categories(id, name, color), bank:banks(id, name, color), contact:contacts(id, name, type)')
-      .eq('company_id', activeCompanyId!)
-      .is('deleted_at', null)
-      .eq('is_transfer', false)
-      .order('date', { ascending: false });
+    const PAGE = 1000;
+    const rows: any[] = [];
+    try {
+      for (let from = 0; ; from += PAGE) {
+        let query = supabase
+          .from('transactions')
+          .select('*, category:categories(id, name, color), bank:banks(id, name, color), contact:contacts(id, name, type)')
+          .eq('company_id', activeCompanyId!)
+          .is('deleted_at', null)
+          .eq('is_transfer', false)
+          .order('id', { ascending: true })
+          .range(from, from + PAGE - 1);
 
-    if (selectedBankId !== 'all') query = query.eq('bank_id', selectedBankId);
-    if (categoryFilter !== 'all') query = query.eq('category_id', categoryFilter);
-    if (contactFilter !== 'all') query = query.eq('contact_id', contactFilter);
-    if (paymentStatusFilter === 'paid') query = query.eq('is_paid', true);
-    if (paymentStatusFilter === 'pending') query = query.eq('is_paid', false);
+        if (selectedBankId !== 'all') query = query.eq('bank_id', selectedBankId);
+        if (categoryFilter !== 'all') query = query.eq('category_id', categoryFilter);
+        if (contactFilter !== 'all') query = query.eq('contact_id', contactFilter);
+        // Regra estrita de "pago", igual às RPCs que alimentam os cards desta mesma tela.
+        if (paymentStatusFilter === 'paid') {
+          query = query.eq('is_paid', true).not('date', 'is', null).not('paid_amount', 'is', null);
+        } else if (paymentStatusFilter === 'pending') {
+          query = query.or('is_paid.eq.false,date.is.null,paid_amount.is.null');
+        }
 
-    const { data, error } = await query;
-    if (error || !data) {
+        const { data, error } = await query;
+        if (error) throw error;
+        const batch = data ?? [];
+        rows.push(...batch);
+        if (batch.length < PAGE) break;
+      }
+    } catch {
       toast.error('Erro ao carregar dados para exportação');
       return [] as any[];
     }
@@ -271,20 +286,23 @@ export default function Dashboard() {
     // Date filter (COALESCE date/due_date/issue_date) — applied client-side after fetch
     const dateRange = getDateRange();
     const filtered = dateRange
-      ? data.filter((t: any) => {
+      ? rows.filter((t: any) => {
           const d = t.date || t.due_date || t.issue_date;
           if (!d) return false;
           const txDate = parseISO(d);
           return isWithinInterval(txDate, { start: dateRange.start, end: dateRange.end });
         })
-      : data;
+      : rows;
 
     return filtered.map((t: any) => ({
       id: t.id,
       description: t.description,
       amount: Number(t.amount),
+      paid_amount: t.paid_amount,
       type: t.type,
       date: t.date,
+      due_date: t.due_date,
+      issue_date: t.issue_date,
       is_paid: t.is_paid,
       category: t.category ? { id: t.category.id, name: t.category.name, color: t.category.color || '' } : null,
       bank: t.bank ? { id: t.bank.id, name: t.bank.name, color: t.bank.color || '' } : null,
@@ -360,10 +378,6 @@ export default function Dashboard() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="outline" size="sm" onClick={() => navigate('/relatorios')}>
-            <FileText className="w-4 h-4 mr-2" />
-            Relatórios
-          </Button>
         </div>
       </div>
 

@@ -74,8 +74,24 @@ function parseAmount(value: unknown): number | null {
     if (s === '' || s === '—' || s === '–' || s === '-') return null;
     const isNeg = s.startsWith('(') && s.endsWith(')');
     if (isNeg) s = s.slice(1, -1);
-    s = s.replace(/[R$\u00A0\s]/gi, '');
-    s = s.replace(/\./g, '').replace(',', '.');
+    s = s.replace(/[R$\u00A0\s]/g, '');
+
+    // Detecta o separador decimal em vez de assumir pt-BR. Antes todo ponto era tratado
+    // como separador de milhar, ent\u00E3o uma c\u00E9lula de texto em formato americano vinda de
+    // outro sistema entrava 100x errada ("1234.56" virava R$ 123.456,00).
+    const lastComma = s.lastIndexOf(',');
+    const lastDot = s.lastIndexOf('.');
+    if (lastComma > lastDot) {
+      // pt-BR: 1.234,56 \u2192 ponto \u00E9 milhar, v\u00EDrgula \u00E9 decimal
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else if (lastDot > lastComma) {
+      // en-US: 1,234.56 \u2192 v\u00EDrgula \u00E9 milhar, ponto \u00E9 decimal
+      s = s.replace(/,/g, '');
+    } else {
+      // sem separador decimal \u2014 s\u00F3 limpa agrupadores
+      s = s.replace(/[.,]/g, '');
+    }
+
     s = s.replace(/[^\d.\-]/g, '');
     const num = parseFloat(s);
     if (isNaN(num)) return null;
@@ -331,6 +347,14 @@ export function ImportSpreadsheetDialog({ open, onOpenChange, banks, categories,
         // Se pago mas ambos vazios
         if (amount == null && rawPaidAmount == null) {
           skipped.push({ rowNumber: idx + 2, reason: 'Valor e Valor Pago/Recebido ambos vazios' });
+          continue;
+        }
+        // Linha marcada como paga sem Data de Pagamento: o banco não aceita mais esse estado
+        // (lançamento pago precisa de data + valor pago, senão entra no saldo do banco e ao
+        // mesmo tempo aparece como "a receber" nos cards). Pular a linha em vez de rebaixá-la
+        // para Pendente — silenciar isso apagaria a informação de que ela foi paga.
+        if (isPaid && !paymentDateStr) {
+          skipped.push({ rowNumber: idx + 2, reason: 'Marcada como Paga sem Data de Pagamento' });
           continue;
         }
 

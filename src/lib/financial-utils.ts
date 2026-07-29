@@ -19,3 +19,71 @@ export function getEffectiveAmount(t: { is_paid: boolean; amount: number; paid_a
   const paid = isEffectivelyPaid({ is_paid: t.is_paid, date: t.date ?? null, paid_amount: t.paid_amount });
   return paid && t.paid_amount != null ? Number(t.paid_amount) : Number(t.amount);
 }
+
+/**
+ * Data efetiva de um lançamento para exibição/agrupamento: pagamento quando existe,
+ * senão vencimento, senão emissão. Mesma ordem do COALESCE usado nas RPCs de agregação
+ * (get_dashboard_summary, get_transaction_kpis) — manter as duas em sincronia.
+ * Retorna null quando o lançamento não tem nenhuma data (não deve acontecer, mas
+ * export e formatação precisam sobreviver a isso — ver histórico de parseISO(null)).
+ */
+export function getEffectiveDate(t: {
+  date?: string | null;
+  due_date?: string | null;
+  issue_date?: string | null;
+}): string | null {
+  return t.date || t.due_date || t.issue_date || null;
+}
+
+// ── Encargos por atraso ───────────────────────────────────────────────────────
+// Fonte única das regras de multa e juros. Os mesmos números são enviados ao Sicoob
+// na emissão do boleto (supabase/functions/sicoob-boletos/index.ts) e usados na tela
+// Pagar/Receber. Antes divergiam: o boleto cobrava 0,07%/dia desde o dia seguinte ao
+// vencimento e a tela mostrava 0,15%/dia a partir do 5º dia — a equipe informava ao
+// cliente um valor maior do que o boleto efetivamente cobrava.
+// Regra confirmada por Gabriel em 29/07/2026: vale a do boleto.
+
+/** Juros de mora ao dia (0,07%), a partir do dia seguinte ao vencimento. */
+export const JUROS_MORA_DIA = 0.0007;
+
+/** Multa por atraso (2%), aplicada uma única vez. */
+export const MULTA_ATRASO_PCT = 0.02;
+
+/** Dias de carência antes de começar a cobrar. 0 = cobra a partir do dia seguinte. */
+export const CARENCIA_DIAS = 0;
+
+export interface EncargosAtraso {
+  diasAtraso: number;
+  multa: number;
+  juros: number;
+  /** valor original + multa + juros */
+  total: number;
+  /** true quando há algum encargo a cobrar */
+  temEncargos: boolean;
+}
+
+/**
+ * Calcula multa e juros de mora de um título vencido.
+ * `diasAtraso` conta a partir do dia seguinte ao vencimento (mesma contagem do Sicoob).
+ */
+export function calcularEncargosAtraso(
+  amount: number,
+  dueDate: string | null | undefined,
+  hoje: Date = new Date()
+): EncargosAtraso {
+  const base = Number(amount) || 0;
+  const semEncargos: EncargosAtraso = { diasAtraso: 0, multa: 0, juros: 0, total: base, temEncargos: false };
+  if (!dueDate) return semEncargos;
+
+  const venc = new Date(`${dueDate}T12:00:00`);
+  if (Number.isNaN(venc.getTime())) return semEncargos;
+
+  const ref = new Date(hoje);
+  ref.setHours(12, 0, 0, 0);
+  const diasAtraso = Math.floor((ref.getTime() - venc.getTime()) / 86_400_000);
+  if (diasAtraso <= CARENCIA_DIAS) return semEncargos;
+
+  const multa = base * MULTA_ATRASO_PCT;
+  const juros = base * JUROS_MORA_DIA * diasAtraso;
+  return { diasAtraso, multa, juros, total: base + multa + juros, temEncargos: true };
+}

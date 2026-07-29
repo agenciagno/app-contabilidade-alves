@@ -142,10 +142,16 @@ export default function Boletos() {
   const kpis = useMemo(() => {
     const total = boletoList.length;
     const pago = boletoList.filter((b: BoletoWithContact) => b.status === 'PAGO');
-    const totalPago = pago.reduce((s: number, b: BoletoWithContact) => s + (b.valor_pago ?? 0), 0);
+    // `valor_pago` só é preenchido pela baixa manual na Conciliação — a sincronização com o
+    // Sicoob marca PAGO mas não traz o valor (a API de cobrança não expõe valor pago em
+    // nenhum endpoint). Somar só `valor_pago` fazia o card mostrar R$ 0,00 mesmo com dezenas
+    // de boletos quitados; o fallback usa o valor emitido, e `estimado` avisa quando isso
+    // acontece para ninguém ler o número como conciliado.
+    const totalPago = pago.reduce((s: number, b: BoletoWithContact) => s + (b.valor_pago ?? b.valor ?? 0), 0);
+    const estimado = pago.some((b: BoletoWithContact) => b.valor_pago == null);
     const pendentes = boletoList.filter((b: BoletoWithContact) => b.status === 'PENDENTE').length;
     const vencidos = boletoList.filter((b: BoletoWithContact) => isOverdue(b)).length;
-    return { total, totalPago, pendentes, vencidos };
+    return { total, totalPago, estimado, pendentes, vencidos };
   }, [boletoList]);
 
   // Filtro
@@ -238,7 +244,7 @@ export default function Boletos() {
       {/* KPIs */}
       <div className="px-6 grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard icon={<FileText className="h-4 w-4" />} label="Boletos gerados" value={String(kpis.total)} />
-        <KpiCard icon={<CheckCircle2 className="h-4 w-4 text-success" />} label="Total pago" value={fmtBRL(kpis.totalPago)} valueClass="text-success" />
+        <KpiCard icon={<CheckCircle2 className="h-4 w-4 text-success" />} label={kpis.estimado ? 'Total pago (estimado)' : 'Total pago'} value={fmtBRL(kpis.totalPago)} valueClass="text-success" />
         <KpiCard icon={<Clock className="h-4 w-4 text-amber-500" />} label="Pendentes" value={String(kpis.pendentes)} valueClass="text-amber-600 dark:text-amber-400" />
         <KpiCard icon={<AlertCircle className="h-4 w-4 text-destructive" />} label="Vencidos" value={String(kpis.vencidos)} valueClass="text-destructive" />
       </div>

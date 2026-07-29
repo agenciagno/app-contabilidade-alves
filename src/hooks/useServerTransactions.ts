@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Transaction } from '@/hooks/useTransactions';
-import { isEffectivelyPaid } from '@/lib/financial-utils';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 
 export const PAGE_SIZE = 99;
@@ -167,11 +166,18 @@ function applyFilters(
     query = query.or(orParts.join(','));
   }
 
-  // Status filter
+  // Status filter — resolvido inteiro no servidor.
+  // Antes, "Pendente" não aplicava filtro nenhum aqui e o descarte acontecia no cliente,
+  // depois do `count: 'exact'`: a página vinha com menos linhas do que deveria e o total /
+  // número de páginas ficava superestimado. "Pago" tinha o mesmo problema em menor escala,
+  // porque o `.eq('is_paid', true)` não checa data e valor pago.
   if (cf.status === 'Pago') {
-    query = query.eq('is_paid', true);
+    query = query
+      .eq('is_paid', true)
+      .not('date', 'is', null)
+      .not('paid_amount', 'is', null);
   } else if (cf.status === 'Pendente') {
-    // Frontend will re-check with isEffectivelyPaid
+    query = query.or('is_paid.eq.false,date.is.null,paid_amount.is.null');
   }
 
   return query;
@@ -209,15 +215,9 @@ export function useServerTransactions(page: number, filters: ServerFilters) {
       const { data, error, count } = await query;
       if (error) throw error;
 
-      let rows = data as Transaction[];
-
-      // Frontend defense: if status filter is "Pendente", also include is_paid=true that fail isEffectivelyPaid
-      // If status is "Pago", exclude rows that don't pass isEffectivelyPaid
-      if (filters.columnFilters.status === 'Pago') {
-        rows = rows.filter(t => isEffectivelyPaid(t));
-      } else if (filters.columnFilters.status === 'Pendente') {
-        rows = rows.filter(t => !isEffectivelyPaid(t));
-      }
+      // O filtro de status já foi aplicado no servidor (applyFilters), então o `count`
+      // e as linhas estão coerentes entre si — não há refiltragem no cliente.
+      const rows = data as Transaction[];
 
       return { rows, count: count ?? 0 };
     },
@@ -234,49 +234,62 @@ export function useServerTransactions(page: number, filters: ServerFilters) {
   };
 }
 
-// Separate KPI query — delegates aggregation to Postgres RPC `get_transaction_kpis`
+// Separate KPI query — delegates aggregation to Postgres RPC `get_transaction_kpis`.
+// O RPC passou a aceitar arrays e a coluna de data que a tabela está filtrando, para que
+// os cards e a lista respondam exatamente ao mesmo recorte. Antes, multi-seleção de
+// categoria/contato era descartada (voltava ao total geral) e o período sempre usava
+// COALESCE(date,due_date,issue_date), independente da coluna escolhida pelo usuário.
 export function useTransactionKPIs(filters: ServerFilters) {
   const { activeCompanyId } = useActiveCompany();
   const cf = filters.columnFilters;
 
-  // Map ServerFilters → RPC scalar params (single-value RPC).
-  // We pick the most relevant date range present in column filters, in priority order.
-  const dateRange =
-    cf.date ?? cf.due_date ?? cf.issue_date ?? cf.expected_date ?? undefined;
-  const p_start_date = dateRange?.start || null;
-  const p_end_date = dateRange?.end || null;
+  // Qual coluna de data a tabela está filtrando (a primeira preenchida, mesma prioridade
+  // de antes) — agora essa informação vai junto para o RPC.
+  const dateColumn: 'date' | 'due_date' | 'issue_date' | 'expected_date' | null =
+    cf.date ? 'date'
+    : cf.due_date ? 'due_date'
+    : cf.issue_date ? 'issue_date'
+    : cf.expected_date ? 'expected_date'
+    : null;
+  const dateRange = dateColumn ? cf[dateColumn] : undefined;
 
   const p_type =
     filters.type && filters.type !== 'all' && filters.type !== IS_EMPTY
       ? filters.type
       : null;
 
+  const bankIsEmpty = filters.bankId === IS_EMPTY;
   const p_bank_id =
-    filters.bankId && filters.bankId !== 'all' && filters.bankId !== IS_EMPTY
-      ? filters.bankId
-      : null;
+    filters.bankId && filters.bankId !== 'all' && !bankIsEmpty ? filters.bankId : null;
 
-  const realCategoryIds = (filters.categoryIds || []).filter(id => id !== IS_EMPTY);
-  const p_category_id = realCategoryIds.length === 1 ? realCategoryIds[0] : null;
-
-  const realContactIds = (cf.contactIds || []).filter(id => id !== IS_EMPTY);
-  const p_contact_id = realContactIds.length === 1 ? realContactIds[0] : null;
-
-  const p_payment_status =
-    cf.status === 'Pago' ? 'paid' : cf.status === 'Pendente' ? 'pending' : null;
-
-  const p_search = filters.searchTerm || null;
+  const allCategoryIds = filters.categoryIds || [];
+  const realCategoryIds = allCategoryIds.filter(id => id !== IS_EMPTY);
+  const allContactIds = cf.contactIds || [];
+  const realContactIds = allContactIds.filter(id => id !== IS_EMPTY);
 
   const rpcParams = {
     p_company_id: activeCompanyId,
-    p_start_date,
-    p_end_date,
+    p_start_date: dateRange?.start || null,
+    p_end_date: dateRange?.end || null,
     p_type,
     p_bank_id,
-    p_category_id,
-    p_contact_id,
-    p_payment_status,
-    p_search,
+    p_category_id: null,
+    p_contact_id: null,
+    p_payment_status:
+      cf.status === 'Pago' ? 'paid' : cf.status === 'Pendente' ? 'pending' : null,
+    p_search: filters.searchTerm || null,
+    p_category_ids: realCategoryIds.length ? realCategoryIds : null,
+    p_contact_ids: realContactIds.length ? realContactIds : null,
+    // bancos invisíveis só são excluídos quando nenhum banco específico foi escolhido,
+    // exatamente como a tabela faz em applyFilters()
+    p_exclude_bank_ids:
+      !p_bank_id && !bankIsEmpty && filters.invisibleBankIds?.length
+        ? filters.invisibleBankIds
+        : null,
+    p_date_column: dateColumn,
+    p_include_null_category: allCategoryIds.includes(IS_EMPTY),
+    p_include_null_contact: allContactIds.includes(IS_EMPTY),
+    p_null_bank_only: bankIsEmpty,
   };
 
   const { data, isLoading } = useQuery({
@@ -293,7 +306,7 @@ export function useTransactionKPIs(filters: ServerFilters) {
         despesasPendentes: Number(d?.despesas_pendentes ?? 0),
         contasEmAtraso: Number(d?.contas_em_atraso ?? 0),
         receitasEmAtraso: Number(d?.receitas_em_atraso ?? 0),
-        totalFiltered: 0,
+        totalFiltered: Number(d?.total_transacoes ?? 0),
       };
     },
     staleTime: 1000 * 30,
@@ -304,6 +317,41 @@ export function useTransactionKPIs(filters: ServerFilters) {
     kpis: data ?? { receitasPagas: 0, receitasPendentes: 0, despesasPagas: 0, despesasPendentes: 0, contasEmAtraso: 0, receitasEmAtraso: 0, totalFiltered: 0 },
     isLoading,
   };
+}
+
+// Conjunto filtrado COMPLETO, para exportação. A tela exportava só a página corrente
+// (99 linhas) com os totais do filtro inteiro no cabeçalho do PDF — números que não
+// correspondiam às linhas listadas. Pagina de 1000 em 1000 porque o PostgREST corta aí.
+export async function fetchFilteredTransactionsForExport(
+  companyId: string,
+  filters: ServerFilters
+): Promise<Transaction[]> {
+  const PAGE = 1000;
+  const all: Transaction[] = [];
+  for (let from = 0; ; from += PAGE) {
+    let query = supabase
+      .from('transactions')
+      .select(`
+        *,
+        category:categories(id, name, color),
+        bank:banks(id, name, color),
+        contact:contacts(id, name, type)
+      `)
+      .eq('company_id', companyId);
+
+    query = applyFilters(query, filters);
+    query = query
+      .order(filters.sortField || 'due_date', { ascending: filters.sortOrder === 'asc', nullsFirst: false })
+      .order('id', { ascending: false })
+      .range(from, from + PAGE - 1);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    const batch = (data ?? []) as Transaction[];
+    all.push(...batch);
+    if (batch.length < PAGE) break;
+  }
+  return all;
 }
 
 // Distinct values for column filters (e.g. Valor, Recebido) — full dataset, not paginated.

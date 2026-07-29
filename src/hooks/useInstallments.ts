@@ -22,17 +22,38 @@ function shiftDate(dateStr: string | null | undefined, months: number): string |
   return format(shifted, 'yyyy-MM-dd');
 }
 
+/**
+ * Gera as ocorrências de um lançamento recorrente/parcelado.
+ *
+ * Regra (confirmada por Gabriel em 29/07/2026): lançar recorrente significa que a
+ * PRIMEIRA parcela já aconteceu — ela mantém o estado que veio do formulário (liquidada,
+ * se foi lançada como "À Vista") e as seguintes nascem EM ABERTO, com vencimento e data
+ * prevista deslocados mês a mês.
+ *
+ * O valor é repetido integralmente em cada ocorrência (é recorrência, não divisão de um
+ * total). Antes, o estado de pagamento também era copiado para todas: um lançamento
+ * "À Vista" em 12x criava 12 transações já marcadas como pagas, com data de pagamento no
+ * futuro — inflava o realizado em 12x e produzia linhas pagas com data futura, que ficavam
+ * fora do saldo do banco e dentro dos KPIs.
+ */
 export function generateInstallments(
   basePayload: TransactionInsert,
   count: number
 ): TransactionInsert[] {
   const installments: TransactionInsert[] = [];
+  // "À Vista" não pede Data Prevista no formulário, então ela chega vazia. Sem esse
+  // fallback, as parcelas futuras ficariam invisíveis nas telas que se apoiam nela.
+  const baseExpected = basePayload.expected_date || basePayload.due_date;
   for (let i = 0; i < count; i++) {
+    const isFirst = i === 0;
     installments.push({
       ...basePayload,
       due_date: shiftDate(basePayload.due_date, i) as string | null,
-      expected_date: shiftDate(basePayload.expected_date, i) as string | null,
-      date: i === 0 ? basePayload.date : (basePayload.date ? shiftDate(basePayload.date, i) as string : undefined),
+      expected_date: shiftDate(baseExpected, i) as string | null,
+      // Só a primeira herda a liquidação; as próximas ainda vão acontecer.
+      is_paid: isFirst ? basePayload.is_paid : false,
+      paid_amount: isFirst ? basePayload.paid_amount : null,
+      date: isFirst ? basePayload.date : null,
     });
   }
   return installments;

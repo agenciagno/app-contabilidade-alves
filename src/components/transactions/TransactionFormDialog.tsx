@@ -286,7 +286,12 @@ export function TransactionFormDialog({
       setBulkSaving(true);
       try {
         await onBulkSubmit(installments);
-        toast({ title: `${count} transações criadas com sucesso.` });
+        toast({
+          title: `${count} lançamentos criados.`,
+          description: payload.is_paid
+            ? `O 1º já entrou como liquidado; os outros ${count - 1} ficaram em aberto.`
+            : `Todos em aberto, um por mês.`,
+        });
         onOpenChange(false);
       } catch (err: any) {
         toast({ title: 'Erro ao criar parcelas', description: err?.message || 'Erro desconhecido', variant: 'destructive' });
@@ -754,8 +759,12 @@ export function TransactionFormDialog({
                     {/* Dynamic summary */}
                     <p className="text-sm text-muted-foreground">
                       {installmentSummary
-                        ? `${installmentSummary.count} parcelas · Primeira em ${installmentSummary.firstDate} · Última em ${installmentSummary.lastDate}`
-                        : '— parcelas · —'}
+                        ? `${installmentSummary.count} lançamentos de ${amount || '0,00'} · Primeiro em ${installmentSummary.firstDate} · Último em ${installmentSummary.lastDate}`
+                        : '— lançamentos · —'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      O valor se repete em cada mês (não é divisão de um total).
+                      {isAVista ? ' O primeiro entra como liquidado; os demais ficam em aberto.' : ''}
                     </p>
                   </div>
                 </div>

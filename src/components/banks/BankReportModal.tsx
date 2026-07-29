@@ -13,6 +13,7 @@ import { useBankTransactions } from '@/hooks/useBankTransactions';
 import { useCompany } from '@/hooks/useCompany';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { zebraPorData } from '@/lib/pdf-zebra';
 
 interface BankReportModalProps {
   open: boolean;
@@ -217,10 +218,12 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
         r.type === 'despesa' ? formatCurrency(r.amount) : '',
         formatCurrency(r.running_balance),
       ]),
-      theme: 'striped',
-      styles: { fontSize: 8, cellPadding: 2 },
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2, lineColor: [235, 238, 242], lineWidth: 0.1 },
       headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [248, 248, 248] },
+      // Destaque agrupado por dia: todas as linhas da mesma data saem juntas em cinza ou
+      // em branco, em vez de alternar a cada linha.
+      ...zebraPorData(filteredRows.map(r => r.date)),
       columnStyles: {
         4: { halign: 'right', textColor: [22, 163, 74] },
         5: { halign: 'right', textColor: [239, 68, 68] },

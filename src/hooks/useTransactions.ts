@@ -339,24 +339,19 @@ export function useTransactions() {
   });
 
 
+  // Liquidação em massa via RPC atômica. Antes era um UPDATE por lançamento num laço:
+  // um erro na linha 40 de 100 deixava 39 liquidados e 61 não, sem rollback e sem forma
+  // de saber onde parou. Agora ou liquida tudo, ou não liquida nada.
   const bulkSettleWithDate = useMutation({
     mutationFn: async ({ ids, paymentDate }: { ids: string[]; paymentDate: string }) => {
-      const { data: txns, error: fetchErr } = await supabase
-        .from('transactions')
-        .select('id, amount, paid_amount')
-        .in('id', ids);
-      if (fetchErr) throw fetchErr;
-
-      for (const txn of (txns || [])) {
-        const paid_amount = txn.paid_amount ?? txn.amount;
-        const { error } = await supabase
-          .from('transactions')
-          .update({ is_paid: true, date: paymentDate, paid_amount })
-          .eq('id', txn.id);
-        if (error) throw error;
-      }
+      const { data, error } = await supabase.rpc('bulk_settle_transactions', {
+        p_ids: ids,
+        p_payment_date: paymentDate,
+      });
+      if (error) throw error;
+      return Number(data ?? 0);
     },
-    onSuccess: (_data, vars) => {
+    onSuccess: (count, vars) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['server-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['transaction-kpis'] });
@@ -366,7 +361,11 @@ export function useTransactions() {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       queryClient.invalidateQueries({ queryKey: ['dre-previsto'] });
       queryClient.invalidateQueries({ queryKey: ['dre-realizado'] });
-      toast({ title: `${vars.ids.length} transação(ões) liquidada(s) com sucesso!` });
+      const jaLiquidadas = vars.ids.length - count;
+      toast({
+        title: `${count} transação(ões) liquidada(s) com sucesso!`,
+        description: jaLiquidadas > 0 ? `${jaLiquidadas} já estava(m) liquidada(s).` : undefined,
+      });
     },
     onError: (error: Error) => {
       toast({ title: 'Erro ao liquidar em massa', description: error.message, variant: 'destructive' });

@@ -22,21 +22,24 @@ function getEasterDate(year: number): Date {
 }
 
 /**
- * Retorna lista de feriados nacionais brasileiros para um dado ano
+ * Feriados nacionais brasileiros de um ano, com o nome de cada um.
+ * Mapa 'yyyy-MM-dd' → nome. Feriado estadual/municipal não entra aqui
+ * (Juatuba/MG teria os próprios, mas não há fonte cadastrada no sistema).
  */
-function getBrazilianHolidays(year: number): Set<string> {
-  const holidays = new Set<string>();
+function getBrazilianHolidays(year: number): Map<string, string> {
+  const holidays = new Map<string, string>();
   const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
 
   // Feriados fixos
-  holidays.add(`${year}-01-01`); // Ano Novo
-  holidays.add(`${year}-04-21`); // Tiradentes
-  holidays.add(`${year}-05-01`); // Dia do Trabalho
-  holidays.add(`${year}-09-07`); // Independência
-  holidays.add(`${year}-10-12`); // N.S. Aparecida
-  holidays.add(`${year}-11-02`); // Finados
-  holidays.add(`${year}-11-15`); // Proclamação da República
-  holidays.add(`${year}-12-25`); // Natal
+  holidays.set(`${year}-01-01`, 'Confraternização Universal');
+  holidays.set(`${year}-04-21`, 'Tiradentes');
+  holidays.set(`${year}-05-01`, 'Dia do Trabalho');
+  holidays.set(`${year}-09-07`, 'Independência do Brasil');
+  holidays.set(`${year}-10-12`, 'Nossa Senhora Aparecida');
+  holidays.set(`${year}-11-02`, 'Finados');
+  holidays.set(`${year}-11-15`, 'Proclamação da República');
+  holidays.set(`${year}-11-20`, 'Consciência Negra');
+  holidays.set(`${year}-12-25`, 'Natal');
 
   // Feriados móveis baseados na Páscoa
   const easter = getEasterDate(year);
@@ -46,25 +49,27 @@ function getBrazilianHolidays(year: number): Set<string> {
   carnivalTue.setDate(easter.getDate() - 47);
   const carnivalMon = new Date(carnivalTue);
   carnivalMon.setDate(carnivalTue.getDate() - 1);
-  holidays.add(fmt(carnivalMon));
-  holidays.add(fmt(carnivalTue));
+  holidays.set(fmt(carnivalMon), 'Carnaval');
+  holidays.set(fmt(carnivalTue), 'Carnaval');
 
   // Sexta-feira Santa: 2 dias antes da Páscoa
   const goodFriday = new Date(easter);
   goodFriday.setDate(easter.getDate() - 2);
-  holidays.add(fmt(goodFriday));
+  holidays.set(fmt(goodFriday), 'Sexta-feira Santa');
+
+  holidays.set(fmt(easter), 'Páscoa');
 
   // Corpus Christi: 60 dias após a Páscoa
   const corpusChristi = new Date(easter);
   corpusChristi.setDate(easter.getDate() + 60);
-  holidays.add(fmt(corpusChristi));
+  holidays.set(fmt(corpusChristi), 'Corpus Christi');
 
   return holidays;
 }
 
-const holidayCache = new Map<number, Set<string>>();
+const holidayCache = new Map<number, Map<string, string>>();
 
-function getHolidays(year: number): Set<string> {
+function getHolidays(year: number): Map<string, string> {
   if (!holidayCache.has(year)) {
     holidayCache.set(year, getBrazilianHolidays(year));
   }
@@ -74,6 +79,19 @@ function getHolidays(year: number): Set<string> {
 export function isBrazilianHoliday(date: Date): boolean {
   const key = format(date, 'yyyy-MM-dd');
   return getHolidays(date.getFullYear()).has(key);
+}
+
+/** Nome do feriado nacional na data, ou null se for dia comum. */
+export function getHolidayName(date: Date): string | null {
+  const key = format(date, 'yyyy-MM-dd');
+  return getHolidays(date.getFullYear()).get(key) ?? null;
+}
+
+/** Todos os feriados nacionais de um ano, ordenados. Usado pelo calendário do header. */
+export function listHolidays(year: number): { date: Date; name: string }[] {
+  return Array.from(getHolidays(year).entries())
+    .map(([key, name]) => ({ date: new Date(`${key}T12:00:00`), name }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
 export function isBusinessDay(date: Date): boolean {
