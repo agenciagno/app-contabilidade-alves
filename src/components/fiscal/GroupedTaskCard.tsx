@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { FiscalTask } from '@/hooks/useFiscalTasks';
+import { isFiscalTaskDone } from '@/lib/fiscal-filters';
 import { TaskCompletionDialog } from './TaskCompletionDialog';
 
 interface GroupedTaskCardProps {
@@ -59,7 +60,7 @@ export function GroupedTaskCard({
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [completingTask, setCompletingTask] = useState<FiscalTask | null>(null);
 
-  const isTaskDone = (t: FiscalTask) => t.status === 'concluido' || !!t.attachment_url;
+  const isTaskDone = isFiscalTaskDone;
   const isTaskOverdue = (t: FiscalTask) => {
     if (isTaskDone(t)) return false;
     try { return daysLeft(effDate(t)) < 0; } catch { return false; }

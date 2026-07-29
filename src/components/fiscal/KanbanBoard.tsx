@@ -23,7 +23,7 @@ import { TaskCard } from './TaskCard';
 import { GroupedTaskCard } from './GroupedTaskCard';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveCoverageByContact } from '@/hooks/useTemporaryTransfers';
-import { fiscalTaskContactLabel } from '@/lib/fiscal-filters';
+import { fiscalTaskContactLabel, isFiscalTaskDone } from '@/lib/fiscal-filters';
 
 const COLUMNS = [
   { id: 'a_fazer', label: 'A Fazer', color: 'bg-blue-500' },
@@ -148,7 +148,7 @@ function SortableSingle({ item, contactsMap, profilesMap, onTaskClick, onEdit, o
     <div ref={setNodeRef} style={style}>
       <TaskCard
         task={item.task}
-        contactName={fiscalTaskContactLabel(item.task.contact_id, contactsMap)}
+        contactName={fiscalTaskContactLabel(item.task.contact_id, contactsMap, item.task.title)}
         responsibleName={profile.name}
         responsibleInitials={profile.initials}
         onClick={() => onTaskClick(item.task)}
@@ -184,7 +184,7 @@ function SortableGroup({ item, contactsMap, profilesMap, onUploadAttachment, onC
     <div ref={setNodeRef} style={style}>
       <GroupedTaskCard
         groupId={item.id}
-        contactName={fiscalTaskContactLabel(item.contactId, contactsMap)}
+        contactName={fiscalTaskContactLabel(item.contactId, contactsMap, item.tasks[0]?.title)}
         dueDate={item.dueDate}
         tasks={item.tasks}
         responsibleInitials={profile.initials}
@@ -214,7 +214,7 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
   }, []);
   const effDate = (t: FiscalTask) => ((t as any).fiscal_due_date as string | null) || t.due_date;
   const isOverdueTask = (t: FiscalTask) => {
-    if (t.status === 'concluido') return false;
+    if (isFiscalTaskDone(t)) return false;
     try { return differenceInDays(parseISO(effDate(t)), today) < 0; } catch { return false; }
   };
 
@@ -241,8 +241,8 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
       });
       // Priority: aguardando_cliente > all done → concluido > some done → em_progresso > a_fazer
       const hasWaiting = sorted.some((t) => t.status === 'aguardando_cliente');
-      const allDone = sorted.every((t) => t.status === 'concluido');
-      const someDone = sorted.some((t) => t.status === 'concluido');
+      const allDone = sorted.every(isFiscalTaskDone);
+      const someDone = sorted.some(isFiscalTaskDone);
       let best: string;
       if (hasWaiting) best = 'aguardando_cliente';
       else if (allDone) best = 'concluido';
@@ -250,7 +250,7 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
       else best = 'a_fazer';
 
       // Badge date: min due date among pending tasks; if all done, use max completed date
-      const pending = sorted.filter((t) => t.status !== 'concluido');
+      const pending = sorted.filter((t) => !isFiscalTaskDone(t));
       const badgeDate = pending.length > 0
         ? pending.map(effDate).sort()[0]
         : sorted.map(effDate).sort().slice(-1)[0];
@@ -357,8 +357,7 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
     // Apply to all tasks in the group whose status differs — nunca mexe em quem já está
     // concluído (nenhuma mudança de coluna pode desfazer uma tarefa já feita).
     for (const t of item.tasks) {
-      const isDone = t.status === 'concluido' || !!t.attachment_url;
-      if (!isDone && t.status !== targetStatus) onStatusChange(t.id, targetStatus);
+      if (!isFiscalTaskDone(t) && t.status !== targetStatus) onStatusChange(t.id, targetStatus);
     }
   };
 
@@ -419,7 +418,7 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
         {activeItem && activeItem.type === 'single' && (
           <TaskCard
             task={activeItem.task}
-            contactName={fiscalTaskContactLabel(activeItem.task.contact_id, contactsMap)}
+            contactName={fiscalTaskContactLabel(activeItem.task.contact_id, contactsMap, activeItem.task.title)}
             responsibleName={profilesMap[activeItem.task.responsible_id || '']?.name || '?'}
             responsibleInitials={profilesMap[activeItem.task.responsible_id || '']?.initials || '?'}
             onClick={() => {}}
@@ -429,7 +428,7 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
         {activeItem && activeItem.type === 'group' && (
           <GroupedTaskCard
             groupId={activeItem.id}
-            contactName={fiscalTaskContactLabel(activeItem.contactId, contactsMap)}
+            contactName={fiscalTaskContactLabel(activeItem.contactId, contactsMap, activeItem.tasks[0]?.title)}
             dueDate={activeItem.dueDate}
             tasks={activeItem.tasks}
             responsibleInitials={profilesMap[activeItem.tasks[0]?.responsible_id || '']?.initials || '?'}

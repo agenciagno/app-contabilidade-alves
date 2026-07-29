@@ -231,6 +231,9 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
   const [newNote, setNewNote] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  // Espelho local das obrigações do grupo — o painel some as próprias mutações não
+  // voltam via prop (groupTasks é congelado no momento em que o card foi aberto).
+  const [groupTasksState, setGroupTasksState] = useState<FiscalTask[]>([]);
 
   // Completion flow (shared confirm dialog; target = task being completed)
   const [completionTarget, setCompletionTarget] = useState<{ task: FiscalTask; closeOnConfirm: boolean } | null>(null);
@@ -256,6 +259,14 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
       setMentionQuery(null);
     }
   }, [task]);
+
+  useEffect(() => {
+    setGroupTasksState(groupTasks ?? []);
+  }, [groupTasks]);
+
+  const patchGroupTask = (id: string, patch: Partial<FiscalTask>) => {
+    setGroupTasksState((prev) => prev.map((t) => (t.id === id ? ({ ...t, ...patch } as FiscalTask) : t)));
+  };
 
   // Current user's profile (for authoring notes)
   const { data: currentProfile } = useQuery({
@@ -381,7 +392,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     toast({ title: '✅ Nota adicionada.' });
 
     if (effectiveMentions.length && companyId) {
-      const contactName = task.contact_id ? (contacts.find((c) => c.id === task.contact_id)?.name || '—') : 'Tarefa Interna';
+      const contactName = task.contact_id ? (contacts.find((c) => c.id === task.contact_id)?.name || '—') : task.title;
       await notifyTaskMention({
         taskId: task.id,
         taskTitle: task.title,
@@ -398,11 +409,10 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
   // closeOnConfirm: whether to close the whole sheet once completion is confirmed
   const handleOpenCompletion = (t: FiscalTask = task, closeOnConfirm = true) => {
     if (t.attachment_url) {
-      onUpdate(t.id, {
-        status: 'concluido',
-        completion_type: 'attachment',
-        completed_at: new Date().toISOString(),
-      } as any);
+      const patch = { status: 'concluido' as const, completion_type: 'attachment', completed_at: new Date().toISOString() };
+      onUpdate(t.id, patch as any);
+      patchGroupTask(t.id, patch as any);
+      if (t.id === task.id) setStatus('concluido');
       if (closeOnConfirm) onOpenChange(false);
       return;
     }
@@ -413,34 +423,48 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     if (!completionTarget) return;
     const { task: t, closeOnConfirm } = completionTarget;
     const completion_type = data.protocolNumber ? 'protocol' : 'transmitted';
-    onUpdate(t.id, {
-      status: 'concluido',
+    const patch = {
+      status: 'concluido' as const,
       completion_type,
       protocol_number: data.protocolNumber,
       completion_notes: data.completionNotes,
       completed_at: new Date().toISOString(),
-    } as any);
+    };
+    onUpdate(t.id, patch as any);
+    patchGroupTask(t.id, patch as any);
+    if (t.id === task.id) setStatus('concluido');
     setCompletionTarget(null);
     if (closeOnConfirm) onOpenChange(false);
   };
 
   const handleUncomplete = (t: FiscalTask) => {
-    onUpdate(t.id, {
-      status: 'a_fazer',
+    const patch = {
+      status: 'a_fazer' as const,
       attachment_url: null,
       completion_type: null,
       protocol_number: null,
       completion_notes: null,
       completed_at: null,
-    } as any);
-    if (t.id === task.id) setAttachmentUrl(null);
+    };
+    onUpdate(t.id, patch as any);
+    patchGroupTask(t.id, patch as any);
+    if (t.id === task.id) {
+      setStatus('a_fazer');
+      setAttachmentUrl(null);
+    }
     toast({ title: 'Tarefa desmarcada.' });
+  };
+
+  const handleChecklistUpload = async (t: FiscalTask, file: File) => {
+    await onUploadForTask?.(t, file);
+    patchGroupTask(t.id, { status: 'concluido' } as any);
+    if (t.id === task.id) setStatus('concluido');
   };
 
 
 
 
-  const contactName = task.contact_id ? (contacts.find(c => c.id === task.contact_id)?.name || '—') : 'Tarefa Interna';
+  const contactName = task.contact_id ? (contacts.find(c => c.id === task.contact_id)?.name || '—') : task.title;
   const responsibleName = profiles.find(p => p.id === responsibleId)?.full_name || '—';
   const competencia = task.due_date ? format(parseISO(task.due_date), 'MM/yyyy') : '—';
 
@@ -621,11 +645,11 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
 
             {groupTasks && groupTasks.length > 1 ? (
               <div className="rounded-md border border-border/50 p-3 space-y-2">
-                {groupTasks.map((gt) => (
+                {groupTasksState.map((gt) => (
                   <ChecklistRow
                     key={gt.id}
                     task={gt}
-                    onUpload={onUploadForTask}
+                    onUpload={handleChecklistUpload}
                     onComplete={(t) => handleOpenCompletion(t, false)}
                     onUncomplete={handleUncomplete}
                   />

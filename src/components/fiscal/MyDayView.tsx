@@ -82,7 +82,7 @@ function TaskItem({
   urgencyBadge?: React.ReactNode;
 }) {
   const [uploading, setUploading] = useState(false);
-  const clientName = fiscalTaskContactLabel(task.contact_id, contactsMap);
+  const clientName = fiscalTaskContactLabel(task.contact_id, contactsMap, task.title);
   const inputId = `myday-att-${task.id}`;
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {

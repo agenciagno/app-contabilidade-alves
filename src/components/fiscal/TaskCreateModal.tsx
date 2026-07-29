@@ -53,7 +53,7 @@ export function TaskCreateModal({ open, onOpenChange, contacts, profiles, onSubm
     onOpenChange(false);
   };
 
-  const isValid = title.trim() && dueDate;
+  const isValid = title.trim() && dueDate && responsibleId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -80,7 +80,7 @@ export function TaskCreateModal({ open, onOpenChange, contacts, profiles, onSubm
           </div>
 
           <div>
-            <Label>Responsável</Label>
+            <Label>Responsável <span className="text-destructive">*</span></Label>
             <Select value={responsibleId} onValueChange={setResponsibleId}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>

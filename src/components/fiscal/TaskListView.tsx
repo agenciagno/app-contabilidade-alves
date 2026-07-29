@@ -140,7 +140,7 @@ export function TaskListView({
                 )}
                 <TableCell className="font-medium text-sm">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span>{fiscalTaskContactLabel(task.contact_id, contactsMap)}</span>
+                    <span>{fiscalTaskContactLabel(task.contact_id, contactsMap, task.title)}</span>
                     {coverageMap[task.contact_id] && (
                       <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30">
                         Temporário até {format(parseISO(coverageMap[task.contact_id].end_date), 'dd/MM')}

@@ -31,8 +31,20 @@ export function isContactFiscalEligible(c: { is_active?: boolean | null; tax_reg
   return Array.isArray(c.categorias) && c.categorias.includes('cliente');
 }
 
-/** Nome de exibição do cliente de uma tarefa fiscal — 'Tarefa Interna' quando não há cliente vinculado. */
-export function fiscalTaskContactLabel(contactId: string | null | undefined, contactsMap: Record<string, string>): string {
-  if (!contactId) return 'Tarefa Interna';
+/**
+ * Nome de exibição do card de uma tarefa fiscal — nome do cliente quando há um vinculado;
+ * sem cliente (tarefa avulsa/interna), usa o próprio título da tarefa.
+ */
+export function fiscalTaskContactLabel(
+  contactId: string | null | undefined,
+  contactsMap: Record<string, string>,
+  fallbackTitle?: string | null,
+): string {
+  if (!contactId) return fallbackTitle || 'Tarefa Interna';
   return contactsMap[contactId] || 'Cliente';
+}
+
+/** Uma tarefa fiscal é "feita" por status=concluido OU por já ter anexo — nunca só um dos dois. */
+export function isFiscalTaskDone(t: { status: string; attachment_url?: string | null }): boolean {
+  return t.status === 'concluido' || !!t.attachment_url;
 }

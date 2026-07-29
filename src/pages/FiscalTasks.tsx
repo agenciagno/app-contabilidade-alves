@@ -405,8 +405,11 @@ export default function FiscalTasks() {
     setDetailOpen(true);
   };
 
-  const handleCreate = (data: { contact_id: string; responsible_id: string | null; title: string; description: string | null; due_date: string }) => {
+  const handleCreate = (data: { contact_id: string | null; responsible_id: string | null; title: string; description: string | null; due_date: string }) => {
     if (!companyId) return;
+    // Competência é derivada do vencimento — sem isso a tarefa fica invisível no filtro
+    // padrão de "Competência" (mês atual), que exclui linhas com competence_month nulo.
+    const dueDateObj = new Date(`${data.due_date}T00:00:00`);
     createTask.mutate({
       company_id: companyId,
       contact_id: data.contact_id,
@@ -417,7 +420,9 @@ export default function FiscalTasks() {
       due_date: data.due_date,
       attachment_url: null,
       notes: null,
-    });
+      competence_month: dueDateObj.getMonth() + 1,
+      competence_year: dueDateObj.getFullYear(),
+    } as any);
   };
 
   const canDelete = isSuperAdmin || isAdmin;
