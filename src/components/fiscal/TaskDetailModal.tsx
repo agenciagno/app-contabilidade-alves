@@ -424,6 +424,19 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     if (closeOnConfirm) onOpenChange(false);
   };
 
+  const handleUncomplete = (t: FiscalTask) => {
+    onUpdate(t.id, {
+      status: 'a_fazer',
+      attachment_url: null,
+      completion_type: null,
+      protocol_number: null,
+      completion_notes: null,
+      completed_at: null,
+    } as any);
+    if (t.id === task.id) setAttachmentUrl(null);
+    toast({ title: 'Tarefa desmarcada.' });
+  };
+
 
 
 
@@ -614,6 +627,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                     task={gt}
                     onUpload={onUploadForTask}
                     onComplete={(t) => handleOpenCompletion(t, false)}
+                    onUncomplete={handleUncomplete}
                   />
                 ))}
               </div>
@@ -622,7 +636,14 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     {status === 'concluido' || attachmentUrl ? (
-                      <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <button
+                        type="button"
+                        onClick={() => handleUncomplete(task)}
+                        aria-label="Desmarcar conclusão"
+                        className="shrink-0"
+                      >
+                        <CheckCircle className="w-4 h-4 text-emerald-600 hover:text-emerald-700 transition-colors" />
+                      </button>
                     ) : (
                       <button
                         type="button"
@@ -863,10 +884,12 @@ function ChecklistRow({
   task,
   onUpload,
   onComplete,
+  onUncomplete,
 }: {
   task: FiscalTask;
   onUpload?: (task: FiscalTask, file: File) => Promise<void>;
   onComplete?: (task: FiscalTask) => void;
+  onUncomplete?: (task: FiscalTask) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const done = task.status === 'concluido' || !!task.attachment_url;
@@ -888,7 +911,14 @@ function ChecklistRow({
     <div className="flex items-center justify-between gap-2">
       <div className="flex items-center gap-2 min-w-0">
         {done ? (
-          <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+          <button
+            type="button"
+            onClick={() => onUncomplete?.(task)}
+            aria-label="Desmarcar conclusão"
+            className="shrink-0"
+          >
+            <CheckCircle className="w-4 h-4 text-emerald-600 hover:text-emerald-700 transition-colors" />
+          </button>
         ) : (
           <button
             type="button"

@@ -378,6 +378,20 @@ export default function FiscalTasks() {
     } as any);
   };
 
+  const handleUncompleteTask = (task: FiscalTask) => {
+    if (guardLocked(task.id)) return;
+    updateTask.mutate({
+      id: task.id,
+      status: 'a_fazer',
+      attachment_url: null,
+      completion_type: null,
+      protocol_number: null,
+      completion_notes: null,
+      completed_at: null,
+    } as any);
+    toast.success('Tarefa desmarcada.');
+  };
+
   const handleTaskClick = (task: FiscalTask) => {
     setSelectedTask(task);
     setSelectedGroupTasks(null);
@@ -840,6 +854,7 @@ export default function FiscalTasks() {
           onDelete={canDelete ? (id) => { if (!guardLocked(id)) deleteTask.mutate(id); } : undefined}
           onUploadAttachment={handleUploadAttachment}
           onCompleteTask={handleCompleteTask}
+          onUncompleteTask={handleUncompleteTask}
           onGroupClick={handleGroupClick}
           profileOptions={!isColaborador ? profileOptions : undefined}
           onReassign={!isColaborador ? handleInlineReassign : undefined}

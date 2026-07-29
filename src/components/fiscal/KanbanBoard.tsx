@@ -54,6 +54,7 @@ interface KanbanBoardProps {
   onDelete?: (taskId: string) => void;
   onUploadAttachment?: (task: FiscalTask, file: File) => Promise<void>;
   onCompleteTask?: (task: FiscalTask, data: { protocolNumber: string | null; completionNotes: string | null }) => void;
+  onUncompleteTask?: (task: FiscalTask) => void;
   onGroupClick?: (tasks: FiscalTask[]) => void;
   profileOptions?: { id: string; name: string }[];
   onReassign?: (taskId: string, profileId: string) => void;
@@ -162,12 +163,14 @@ function SortableSingle({ item, contactsMap, profilesMap, onTaskClick, onEdit, o
   );
 }
 
-function SortableGroup({ item, contactsMap, profilesMap, onUploadAttachment, onCompleteTask, onCardClick }: {
+function SortableGroup({ item, contactsMap, profilesMap, onUploadAttachment, onCompleteTask, onUncompleteTask, columnId, onCardClick }: {
   item: GroupItem;
   contactsMap: Record<string, string>;
   profilesMap: Record<string, { name: string; initials: string }>;
   onUploadAttachment: (task: FiscalTask, file: File) => Promise<void>;
   onCompleteTask?: (task: FiscalTask, data: { protocolNumber: string | null; completionNotes: string | null }) => void;
+  onUncompleteTask?: (task: FiscalTask) => void;
+  columnId?: string;
   onCardClick?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -188,6 +191,8 @@ function SortableGroup({ item, contactsMap, profilesMap, onUploadAttachment, onC
         responsibleName={profile.name}
         onUploadAttachment={onUploadAttachment}
         onCompleteTask={onCompleteTask}
+        onUncompleteTask={onUncompleteTask}
+        columnId={columnId}
         dragProps={{ ...attributes, ...listeners }}
         onCardClick={onCardClick}
       />
@@ -195,7 +200,7 @@ function SortableGroup({ item, contactsMap, profilesMap, onUploadAttachment, onC
   );
 }
 
-export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, onTaskClick, onEdit, onDelete, onUploadAttachment, onCompleteTask, onGroupClick, profileOptions, onReassign }: KanbanBoardProps) {
+export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, onTaskClick, onEdit, onDelete, onUploadAttachment, onCompleteTask, onUncompleteTask, onGroupClick, profileOptions, onReassign }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [columnSort, setColumnSort] = useState<Record<string, SortDir>>(() =>
     COLUMNS.reduce((acc, c) => ({ ...acc, [c.id]: 'asc' as SortDir }), {}),
@@ -349,9 +354,11 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
       // Block drops to a_fazer for grouped cards
       return;
     }
-    // Apply to all tasks in the group whose status differs
+    // Apply to all tasks in the group whose status differs — nunca mexe em quem já está
+    // concluído (nenhuma mudança de coluna pode desfazer uma tarefa já feita).
     for (const t of item.tasks) {
-      if (t.status !== targetStatus) onStatusChange(t.id, targetStatus);
+      const isDone = t.status === 'concluido' || !!t.attachment_url;
+      if (!isDone && t.status !== targetStatus) onStatusChange(t.id, targetStatus);
     }
   };
 
@@ -397,6 +404,8 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
                     profilesMap={profilesMap}
                     onUploadAttachment={onUploadAttachment ?? noopUpload}
                     onCompleteTask={onCompleteTask}
+                    onUncompleteTask={onUncompleteTask}
+                    columnId={col.id}
                     onCardClick={onGroupClick ? () => onGroupClick(item.tasks) : undefined}
                   />
                 )

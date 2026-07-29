@@ -20,6 +20,8 @@ interface GroupedTaskCardProps {
   responsibleName: string;
   onUploadAttachment: (task: FiscalTask, file: File) => Promise<void>;
   onCompleteTask?: (task: FiscalTask, data: { protocolNumber: string | null; completionNotes: string | null }) => void;
+  onUncompleteTask?: (task: FiscalTask) => void;
+  columnId?: string;
   dragProps?: Record<string, any>;
   onCardClick?: () => void;
 }
@@ -48,6 +50,8 @@ export function GroupedTaskCard({
   responsibleInitials,
   onUploadAttachment,
   onCompleteTask,
+  onUncompleteTask,
+  columnId,
   dragProps,
   onCardClick,
 }: GroupedTaskCardProps) {
@@ -64,6 +68,11 @@ export function GroupedTaskCard({
   const pendingTasks = tasks.filter((t) => !isTaskDone(t));
   const allDone = pendingTasks.length === 0;
   const anyOverdue = tasks.some(isTaskOverdue);
+  // Na coluna "Aguardando Cliente" o alerta de vencido é amarelo (aviso), não vermelho
+  // (vermelho fica reservado para as colunas de trabalho ativo).
+  const overdueBorderClass = columnId === 'aguardando_cliente'
+    ? 'border-amber-500 border-2 shadow-[0_0_0_1px_hsl(38_92%_50%/0.15)]'
+    : 'border-destructive border-2 shadow-[0_0_0_1px_hsl(var(--destructive)/0.15)]';
 
   // Badge date: min due among pending; hide when all done
   const badgeDate = !allDone
@@ -94,9 +103,7 @@ export function GroupedTaskCard({
     <Card
       className={cn(
         'bg-card relative cursor-grab active:cursor-grabbing',
-        anyOverdue
-          ? 'border-destructive border-2 shadow-[0_0_0_1px_hsl(var(--destructive)/0.15)]'
-          : 'border-border/50',
+        anyOverdue ? overdueBorderClass : 'border-border/50',
         onCardClick && 'hover:shadow-md transition-shadow',
       )}
       onClick={onCardClick}
@@ -154,8 +161,10 @@ export function GroupedTaskCard({
               >
                 <Checkbox
                   checked={done}
-                  disabled={done}
-                  onCheckedChange={() => { if (!done) setCompletingTask(task); }}
+                  onCheckedChange={(next) => {
+                    if (next && !done) setCompletingTask(task);
+                    else if (!next && done) onUncompleteTask?.(task);
+                  }}
                   className="h-3.5 w-3.5 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
                 />
                 <span className={cn('flex-1 truncate', done && 'line-through text-muted-foreground')}>
