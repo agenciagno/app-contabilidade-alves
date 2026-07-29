@@ -23,6 +23,7 @@ import {
 import { Eye, Trash2, Paperclip } from 'lucide-react';
 import { FiscalTask } from '@/hooks/useFiscalTasks';
 import { useActiveCoverageByContact } from '@/hooks/useTemporaryTransfers';
+import { fiscalTaskContactLabel } from '@/lib/fiscal-filters';
 import { cn } from '@/lib/utils';
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
@@ -139,7 +140,7 @@ export function TaskListView({
                 )}
                 <TableCell className="font-medium text-sm">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span>{contactsMap[task.contact_id] || '—'}</span>
+                    <span>{fiscalTaskContactLabel(task.contact_id, contactsMap)}</span>
                     {coverageMap[task.contact_id] && (
                       <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30">
                         Temporário até {format(parseISO(coverageMap[task.contact_id].end_date), 'dd/MM')}

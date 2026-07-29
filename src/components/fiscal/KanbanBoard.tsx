@@ -23,6 +23,7 @@ import { TaskCard } from './TaskCard';
 import { GroupedTaskCard } from './GroupedTaskCard';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveCoverageByContact } from '@/hooks/useTemporaryTransfers';
+import { fiscalTaskContactLabel } from '@/lib/fiscal-filters';
 
 const COLUMNS = [
   { id: 'a_fazer', label: 'A Fazer', color: 'bg-blue-500' },
@@ -68,7 +69,7 @@ interface GroupItem {
   type: 'group';
   id: string; // group-<contactId>-<dueDate>
   dueDate: string;
-  contactId: string;
+  contactId: string | null;
   tasks: FiscalTask[];
   displayStatus: string;
 }
@@ -146,7 +147,7 @@ function SortableSingle({ item, contactsMap, profilesMap, onTaskClick, onEdit, o
     <div ref={setNodeRef} style={style}>
       <TaskCard
         task={item.task}
-        contactName={contactsMap[item.task.contact_id] || 'Cliente'}
+        contactName={fiscalTaskContactLabel(item.task.contact_id, contactsMap)}
         responsibleName={profile.name}
         responsibleInitials={profile.initials}
         onClick={() => onTaskClick(item.task)}
@@ -180,7 +181,7 @@ function SortableGroup({ item, contactsMap, profilesMap, onUploadAttachment, onC
     <div ref={setNodeRef} style={style}>
       <GroupedTaskCard
         groupId={item.id}
-        contactName={contactsMap[item.contactId] || 'Cliente'}
+        contactName={fiscalTaskContactLabel(item.contactId, contactsMap)}
         dueDate={item.dueDate}
         tasks={item.tasks}
         responsibleInitials={profile.initials}
@@ -214,16 +215,19 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
 
   // Build items: 1 card per contact within the current period (competence)
   const itemsByStatus = useMemo(() => {
+    // Tarefas sem cliente (contact_id nulo) nunca se agrupam entre si — cada uma
+    // vira seu próprio card, com chave única por tarefa.
     const groupsMap = new Map<string, FiscalTask[]>();
     for (const t of tasks) {
-      const key = t.contact_id;
+      const key = t.contact_id ?? `__sem_cliente_${t.id}`;
       const arr = groupsMap.get(key) ?? [];
       arr.push(t);
       groupsMap.set(key, arr);
     }
 
     const items: KanbanItem[] = [];
-    for (const [contactId, group] of groupsMap.entries()) {
+    for (const [key, group] of groupsMap.entries()) {
+      const contactId = group[0].contact_id;
       const sorted = [...group].sort((a, b) => {
         const da = effDate(a);
         const db = effDate(b);
@@ -248,7 +252,7 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
 
       items.push({
         type: 'group',
-        id: `group-${contactId}`,
+        id: `group-${key}`,
         contactId,
         dueDate: badgeDate,
         tasks: sorted,
@@ -406,7 +410,7 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
         {activeItem && activeItem.type === 'single' && (
           <TaskCard
             task={activeItem.task}
-            contactName={contactsMap[activeItem.task.contact_id] || 'Cliente'}
+            contactName={fiscalTaskContactLabel(activeItem.task.contact_id, contactsMap)}
             responsibleName={profilesMap[activeItem.task.responsible_id || '']?.name || '?'}
             responsibleInitials={profilesMap[activeItem.task.responsible_id || '']?.initials || '?'}
             onClick={() => {}}
@@ -416,7 +420,7 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
         {activeItem && activeItem.type === 'group' && (
           <GroupedTaskCard
             groupId={activeItem.id}
-            contactName={contactsMap[activeItem.contactId] || 'Cliente'}
+            contactName={fiscalTaskContactLabel(activeItem.contactId, contactsMap)}
             dueDate={activeItem.dueDate}
             tasks={activeItem.tasks}
             responsibleInitials={profilesMap[activeItem.tasks[0]?.responsible_id || '']?.initials || '?'}

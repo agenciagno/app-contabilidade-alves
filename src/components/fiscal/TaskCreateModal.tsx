@@ -12,7 +12,7 @@ interface TaskCreateModalProps {
   contacts: { id: string; name: string; responsible_id?: string | null }[];
   profiles: { id: string; full_name: string | null }[];
   onSubmit: (data: {
-    contact_id: string;
+    contact_id: string | null;
     responsible_id: string | null;
     title: string;
     description: string | null;
@@ -39,7 +39,7 @@ export function TaskCreateModal({ open, onOpenChange, contacts, profiles, onSubm
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({
-      contact_id: contactId,
+      contact_id: contactId || null,
       responsible_id: responsibleId || null,
       title: title.trim(),
       description: description.trim() || null,
@@ -53,19 +53,19 @@ export function TaskCreateModal({ open, onOpenChange, contacts, profiles, onSubm
     onOpenChange(false);
   };
 
-  const isValid = contactId && title.trim() && dueDate;
+  const isValid = title.trim() && dueDate;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Nova Tarefa Fiscal</DialogTitle>
+          <DialogTitle>Nova Tarefa</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label>Cliente <span className="text-destructive">*</span></Label>
+            <Label>Cliente</Label>
             <Select value={contactId} onValueChange={handleContactChange}>
-              <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Selecione o cliente (opcional)" /></SelectTrigger>
               <SelectContent>
                 {contacts.map(c => (
                   <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
@@ -75,7 +75,7 @@ export function TaskCreateModal({ open, onOpenChange, contacts, profiles, onSubm
           </div>
 
           <div>
-            <Label>Obrigação <span className="text-destructive">*</span></Label>
+            <Label>Tarefa <span className="text-destructive">*</span></Label>
             <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex: DCTF, ECD, ECF..." />
           </div>
 

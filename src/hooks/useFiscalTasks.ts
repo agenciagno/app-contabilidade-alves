@@ -11,7 +11,7 @@ import { notifyTaskCompleted, notifyTaskAssigned } from '@/lib/fiscal-notificati
 export interface FiscalTask {
   id: string;
   company_id: string;
-  contact_id: string;
+  contact_id: string | null;
   responsible_id: string | null;
   title: string;
   description: string | null;
@@ -75,10 +75,13 @@ export function useFiscalTasks(filters: FiscalTaskFilters = {}) {
         query = query.eq('company_id', companyId);
       }
 
-      if (validContactIds.length === 0) {
-        return [] as FiscalTask[];
+      // Tarefas sem cliente (contact_id nulo) sempre aparecem; as demais só se o
+      // cliente for elegível ao módulo Fiscal.
+      if (validContactIds.length > 0) {
+        query = query.or(`contact_id.in.(${validContactIds.join(',')}),contact_id.is.null`);
+      } else {
+        query = query.is('contact_id', null);
       }
-      query = query.in('contact_id', validContactIds);
 
       // RBAC: colaborador only sees their own tasks
       if (isColaborador && currentProfile?.id) {

@@ -30,3 +30,9 @@ export function isContactFiscalEligible(c: { is_active?: boolean | null; tax_reg
   if (v === '' || v.toLowerCase() === 'nenhum') return false;
   return Array.isArray(c.categorias) && c.categorias.includes('cliente');
 }
+
+/** Nome de exibição do cliente de uma tarefa fiscal — 'Tarefa Interna' quando não há cliente vinculado. */
+export function fiscalTaskContactLabel(contactId: string | null | undefined, contactsMap: Record<string, string>): string {
+  if (!contactId) return 'Tarefa Interna';
+  return contactsMap[contactId] || 'Cliente';
+}

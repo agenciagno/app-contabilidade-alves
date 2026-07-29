@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Label } from '@/components/ui/label';
 import { FiscalTask } from '@/hooks/useFiscalTasks';
+import { fiscalTaskContactLabel } from '@/lib/fiscal-filters';
 
 const STATUS_OPTIONS = [
   { value: 'a_fazer', label: 'A Fazer' },
@@ -81,7 +82,7 @@ function TaskItem({
   urgencyBadge?: React.ReactNode;
 }) {
   const [uploading, setUploading] = useState(false);
-  const clientName = contactsMap[task.contact_id] || '—';
+  const clientName = fiscalTaskContactLabel(task.contact_id, contactsMap);
   const inputId = `myday-att-${task.id}`;
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {

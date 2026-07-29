@@ -382,7 +382,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     toast({ title: '✅ Nota adicionada.' });
 
     if (effectiveMentions.length && companyId) {
-      const contactName = contacts.find((c) => c.id === task.contact_id)?.name || '—';
+      const contactName = task.contact_id ? (contacts.find((c) => c.id === task.contact_id)?.name || '—') : 'Tarefa Interna';
       await notifyTaskMention({
         taskId: task.id,
         taskTitle: task.title,
@@ -428,7 +428,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
 
 
 
-  const contactName = contacts.find(c => c.id === task.contact_id)?.name || '—';
+  const contactName = task.contact_id ? (contacts.find(c => c.id === task.contact_id)?.name || '—') : 'Tarefa Interna';
   const responsibleName = profiles.find(p => p.id === responsibleId)?.full_name || '—';
   const competencia = task.due_date ? format(parseISO(task.due_date), 'MM/yyyy') : '—';
 
@@ -518,7 +518,14 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                 )}
               </div>
               {canEdit ? (
-                <Select value={responsibleId} onValueChange={setResponsibleId}>
+                <Select
+                  value={responsibleId}
+                  onValueChange={(value) => {
+                    setResponsibleId(value);
+                    onUpdate(task.id, { responsible_id: value || null });
+                    toast({ title: '✅ Responsável atualizado.' });
+                  }}
+                >
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
                     {profiles.map(p => (

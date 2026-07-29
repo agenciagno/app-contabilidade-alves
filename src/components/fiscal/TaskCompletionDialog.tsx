@@ -35,9 +35,9 @@ export function TaskCompletionDialog({ open, onOpenChange, onConfirm }: TaskComp
   const handleConfirm = () => {
     const proto = protocolNumber.trim();
     const obs = completionNotes.trim();
-    if (!proto && obs.length < 10) {
+    if (!proto && obs.length < 3) {
       toast({
-        title: 'Informe um protocolo ou uma observação com pelo menos 10 caracteres',
+        title: 'Informe um protocolo ou uma observação com pelo menos 3 caracteres',
         variant: 'destructive',
       });
       return;
@@ -52,7 +52,7 @@ export function TaskCompletionDialog({ open, onOpenChange, onConfirm }: TaskComp
           <DialogTitle>Concluir tarefa</DialogTitle>
           <DialogDescription>
             Como esta tarefa não tem anexo, informe o <strong>número de protocolo</strong> e/ou
-            uma <strong>observação</strong> (mínimo 10 caracteres) para justificar a conclusão.
+            uma <strong>observação</strong> (mínimo 3 caracteres) para justificar a conclusão.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">
@@ -75,7 +75,7 @@ export function TaskCompletionDialog({ open, onOpenChange, onConfirm }: TaskComp
               maxLength={1000}
             />
             <p className="text-[10px] text-muted-foreground mt-1">
-              Se não houver protocolo, a observação precisa ter pelo menos 10 caracteres.
+              Se não houver protocolo, a observação precisa ter pelo menos 3 caracteres.
             </p>
           </div>
         </div>

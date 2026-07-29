@@ -203,25 +203,16 @@ export default function FiscalTasks() {
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
-  // Profiles for responsible dropdown — only collaborators with active clients assigned
+  // Profiles for responsible dropdown — todos os colaboradores ativos da equipe
   const { data: companyProfiles = [] } = useQuery({
-    queryKey: ['company-profiles-fiscal-with-clients', companyId],
+    queryKey: ['company-profiles-fiscal', companyId],
     queryFn: async () => {
-      const { data: contactRows, error: e1 } = await supabase
-        .from('contacts')
-        .select('responsible_id')
-        .eq('company_id', companyId!)
-        .eq('is_active', true)
-        .not('responsible_id', 'is', null);
-      if (e1) throw e1;
-      const ids = Array.from(new Set((contactRows ?? []).map((r: any) => r.responsible_id).filter(Boolean)));
-      if (ids.length === 0) return [];
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, email')
         .eq('company_id', companyId!)
         .eq('status_active', true)
-        .in('id', ids);
+        .order('full_name', { ascending: true });
       if (error) throw error;
       return data;
     },
