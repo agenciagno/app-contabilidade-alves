@@ -220,11 +220,12 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
 
   // Build items: 1 card per contact within the current period (competence)
   const itemsByStatus = useMemo(() => {
-    // Tarefas sem cliente (contact_id nulo) nunca se agrupam entre si — cada uma
+    // Tarefas sem cliente (contact_id nulo) só se agrupam entre si quando compartilham
+    // group_key (checklist criado junto no modal de Nova Tarefa); sem isso, cada uma
     // vira seu próprio card, com chave única por tarefa.
     const groupsMap = new Map<string, FiscalTask[]>();
     for (const t of tasks) {
-      const key = t.contact_id ?? `__sem_cliente_${t.id}`;
+      const key = t.contact_id ?? t.group_key ?? `__sem_cliente_${t.id}`;
       const arr = groupsMap.get(key) ?? [];
       arr.push(t);
       groupsMap.set(key, arr);

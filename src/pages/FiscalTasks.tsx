@@ -405,24 +405,30 @@ export default function FiscalTasks() {
     setDetailOpen(true);
   };
 
-  const handleCreate = (data: { contact_id: string | null; responsible_id: string | null; title: string; description: string | null; due_date: string }) => {
+  const handleCreate = (data: { contact_id: string | null; responsible_id: string | null; titles: string[]; description: string | null; due_date: string }) => {
     if (!companyId) return;
     // Competência é derivada do vencimento — sem isso a tarefa fica invisível no filtro
     // padrão de "Competência" (mês atual), que exclui linhas com competence_month nulo.
     const dueDateObj = new Date(`${data.due_date}T00:00:00`);
-    createTask.mutate({
-      company_id: companyId,
-      contact_id: data.contact_id,
-      responsible_id: data.responsible_id,
-      title: data.title,
-      description: data.description,
-      status: 'a_fazer',
-      due_date: data.due_date,
-      attachment_url: null,
-      notes: null,
-      competence_month: dueDateObj.getMonth() + 1,
-      competence_year: dueDateObj.getFullYear(),
-    } as any);
+    // Checklist com mais de 1 item (sem cliente) ganha group_key compartilhado, senão
+    // cada tarefa avulsa vira seu próprio card isolado no Kanban.
+    const groupKey = data.titles.length > 1 ? crypto.randomUUID() : null;
+    data.titles.forEach((title) => {
+      createTask.mutate({
+        company_id: companyId,
+        contact_id: data.contact_id,
+        responsible_id: data.responsible_id,
+        title,
+        description: data.description,
+        status: 'a_fazer',
+        due_date: data.due_date,
+        attachment_url: null,
+        notes: null,
+        competence_month: dueDateObj.getMonth() + 1,
+        competence_year: dueDateObj.getFullYear(),
+        group_key: groupKey,
+      } as any);
+    });
   };
 
   const canDelete = isSuperAdmin || isAdmin;

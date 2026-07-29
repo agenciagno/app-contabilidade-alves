@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, X } from 'lucide-react';
 
 interface TaskCreateModalProps {
   open: boolean;
@@ -14,7 +15,7 @@ interface TaskCreateModalProps {
   onSubmit: (data: {
     contact_id: string | null;
     responsible_id: string | null;
-    title: string;
+    titles: string[];
     description: string | null;
     due_date: string;
   }) => void;
@@ -27,6 +28,7 @@ export function TaskCreateModal({ open, onOpenChange, contacts, profiles, onSubm
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [checklistItems, setChecklistItems] = useState<string[]>([]);
 
   const handleContactChange = (id: string) => {
     setContactId(id);
@@ -36,12 +38,19 @@ export function TaskCreateModal({ open, onOpenChange, contacts, profiles, onSubm
     }
   };
 
+  const addChecklistItem = () => setChecklistItems((prev) => [...prev, '']);
+  const updateChecklistItem = (idx: number, value: string) =>
+    setChecklistItems((prev) => prev.map((v, i) => (i === idx ? value : v)));
+  const removeChecklistItem = (idx: number) =>
+    setChecklistItems((prev) => prev.filter((_, i) => i !== idx));
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const extraTitles = checklistItems.map((t) => t.trim()).filter(Boolean);
     onSubmit({
       contact_id: contactId || null,
       responsible_id: responsibleId || null,
-      title: title.trim(),
+      titles: [title.trim(), ...extraTitles],
       description: description.trim() || null,
       due_date: dueDate,
     });
@@ -50,6 +59,7 @@ export function TaskCreateModal({ open, onOpenChange, contacts, profiles, onSubm
     setTitle('');
     setDescription('');
     setDueDate('');
+    setChecklistItems([]);
     onOpenChange(false);
   };
 
@@ -99,6 +109,34 @@ export function TaskCreateModal({ open, onOpenChange, contacts, profiles, onSubm
           <div>
             <Label>Descrição</Label>
             <Textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Descrição opcional" />
+          </div>
+
+          <div>
+            <Label>Checklist (opcional)</Label>
+            <div className="space-y-2 mt-1">
+              {checklistItems.map((item, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <Input
+                    value={item}
+                    onChange={e => updateChecklistItem(idx, e.target.value)}
+                    placeholder={`Item do checklist`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={() => removeChecklistItem(idx)}
+                    aria-label="Remover item"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={addChecklistItem}>
+                <Plus className="w-3.5 h-3.5" /> Adicionar item ao checklist
+              </Button>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
