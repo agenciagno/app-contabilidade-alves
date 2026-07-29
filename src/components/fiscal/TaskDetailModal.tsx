@@ -319,7 +319,6 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
       title,
       description: description || null,
       due_date: dueDate,
-      responsible_id: responsibleId || null,
       status: status as FiscalTask['status'],
     });
     toast({ title: '✅ Tarefa atualizada.' });
@@ -522,8 +521,15 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                   value={responsibleId}
                   onValueChange={(value) => {
                     setResponsibleId(value);
-                    onUpdate(task.id, { responsible_id: value || null });
-                    toast({ title: '✅ Responsável atualizado.' });
+                    // Reatribuição sempre vale para o card inteiro (todas as obrigações do grupo),
+                    // não só para a tarefa representante.
+                    const targets = groupTasks && groupTasks.length > 1 ? groupTasks : [task];
+                    targets.forEach((t) => onUpdate(t.id, { responsible_id: value || null }));
+                    toast({
+                      title: targets.length > 1
+                        ? `✅ Responsável atualizado nas ${targets.length} obrigações.`
+                        : '✅ Responsável atualizado.',
+                    });
                   }}
                 >
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
