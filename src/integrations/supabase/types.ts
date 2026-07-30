@@ -1008,6 +1008,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          is_internal: boolean
           logo_url: string | null
           name: string
           phone: string | null
@@ -1020,6 +1021,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          is_internal?: boolean
           logo_url?: string | null
           name: string
           phone?: string | null
@@ -1032,6 +1034,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          is_internal?: boolean
           logo_url?: string | null
           name?: string
           phone?: string | null
@@ -2959,13 +2962,17 @@ export type Database = {
           avatar_url: string | null
           chatwoot_agent_id: number | null
           company_id: string
+          cpf: string | null
           created_at: string
           email: string
+          first_name: string | null
           force_password_change: boolean
           full_name: string | null
           id: string
           is_super_admin: boolean
+          last_name: string | null
           password_changed_at: string | null
+          phone: string | null
           role: string
           status: string | null
           status_active: boolean
@@ -2978,13 +2985,17 @@ export type Database = {
           avatar_url?: string | null
           chatwoot_agent_id?: number | null
           company_id: string
+          cpf?: string | null
           created_at?: string
           email: string
+          first_name?: string | null
           force_password_change?: boolean
           full_name?: string | null
           id?: string
           is_super_admin?: boolean
+          last_name?: string | null
           password_changed_at?: string | null
+          phone?: string | null
           role?: string
           status?: string | null
           status_active?: boolean
@@ -2997,13 +3008,17 @@ export type Database = {
           avatar_url?: string | null
           chatwoot_agent_id?: number | null
           company_id?: string
+          cpf?: string | null
           created_at?: string
           email?: string
+          first_name?: string | null
           force_password_change?: boolean
           full_name?: string | null
           id?: string
           is_super_admin?: boolean
+          last_name?: string | null
           password_changed_at?: string | null
+          phone?: string | null
           role?: string
           status?: string | null
           status_active?: boolean

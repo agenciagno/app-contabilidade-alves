@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { HeaderCalculator } from './HeaderCalculator';
 import { HeaderCalendar } from './HeaderCalendar';
+import { UserMenu } from './UserMenu';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { isDevEnvironment } from '@/lib/environment';
 
@@ -23,15 +24,18 @@ export function AppHeader() {
           )}
         </div>
 
+        {/* Ordem: Calculadora · Calendário · Notificações · Tema · Perfil */}
         <div className="flex items-center gap-2">
           <HeaderCalculator />
           <HeaderCalendar />
-          
+          <NotificationBell />
+
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
             className="text-muted-foreground hover:text-foreground"
+            title={resolvedTheme === 'dark' ? 'Tema claro' : 'Tema escuro'}
           >
             {resolvedTheme === 'dark' ? (
               <Sun className="w-5 h-5" />
@@ -40,7 +44,7 @@ export function AppHeader() {
             )}
           </Button>
 
-          <NotificationBell />
+          <UserMenu />
         </div>
       </div>
     </header>

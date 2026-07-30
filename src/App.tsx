@@ -38,9 +38,6 @@ import FiscalDashboard from "@/pages/FiscalDashboard";
 import FiscalCollaborators from "@/pages/FiscalCollaborators";
 import FiscalObrigacoes from "@/pages/FiscalObrigacoes";
 
-import MonitorCNPJ from "@/pages/MonitorCNPJ";
-import Legalizacao from "@/pages/Legalizacao";
-import PessoalRH from "@/pages/PessoalRH";
 import NoAccess from "@/pages/NoAccess";
 import NotFound from "@/pages/NotFound";
 import Newsletter from "@/pages/Newsletter";
@@ -51,6 +48,11 @@ import TechLGPD from "@/pages/TechLGPD";
 import TechAgenteIA from "@/pages/TechAgenteIA";
 import CentralNotificacoes from "@/pages/CentralNotificacoes";
 import MetasOrcamentos from "@/pages/MetasOrcamentos";
+import MinhaConta from "@/pages/MinhaConta";
+import Suporte from "@/pages/Suporte";
+import Faturas from "@/pages/Faturas";
+import Equipe from "@/pages/Equipe";
+import { EmBreve } from "@/components/EmBreve";
 
 
 const queryClient = new QueryClient();
@@ -99,15 +101,49 @@ const App = () => (
               <Route path="/fiscal/colaboradores" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_colaboradores" requireAdmin><FiscalCollaborators /></ModuleGuard></AppLayout>} />
               <Route path="/fiscal/obrigacoes" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_calendario" requireAdmin><FiscalObrigacoes /></ModuleGuard></AppLayout>} />
               
-              <Route path="/fiscal/monitor-cnpj" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_monitor_cnpj" requireAdmin><MonitorCNPJ /></ModuleGuard></AppLayout>} />
-              <Route path="/legalizacao" element={<AppLayout><ModuleGuard moduleName="legalizacao"><Legalizacao /></ModuleGuard></AppLayout>} />
-              <Route path="/pessoal-rh" element={<AppLayout><ModuleGuard moduleName="pessoal_rh"><PessoalRH /></ModuleGuard></AppLayout>} />
               <Route path="/acessos" element={<AppLayout><ModuleGuard moduleName="acessos"><CofreGlobal /></ModuleGuard></AppLayout>} />
               <Route path="/admin/provisionar-cliente" element={<AppLayout><AdminProvisionarCliente /></AppLayout>} />
               <Route path="/tech/operacao" element={<AppLayout><TechOperacao /></AppLayout>} />
               <Route path="/tech/lgpd" element={<AppLayout><TechLGPD /></AppLayout>} />
               <Route path="/tech/agente-ia" element={<AppLayout><TechAgenteIA /></AppLayout>} />
               <Route path="/central-notificacoes" element={<AppLayout><CentralNotificacoes /></AppLayout>} />
+
+              {/* Conta do usuário */}
+              <Route path="/minha-conta" element={<AppLayout><MinhaConta /></AppLayout>} />
+              <Route path="/suporte" element={<AppLayout><Suporte /></AppLayout>} />
+              <Route path="/faturas" element={<AppLayout><Faturas /></AppLayout>} />
+
+              {/* Reforma Tributária */}
+              <Route path="/reforma-tributaria" element={<AppLayout><ModuleGuard moduleName="reforma_tributaria"><EmBreve moduleKey="reforma_tributaria" /></ModuleGuard></AppLayout>} />
+
+              {/* Gestão 360° */}
+              <Route path="/gestao-360/portal" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_portal"><EmBreve moduleKey="gestao360_portal" /></ModuleGuard></AppLayout>} />
+              <Route path="/gestao-360/ausencias" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_ausencias"><EmBreve moduleKey="gestao360_ausencias" /></ModuleGuard></AppLayout>} />
+              <Route path="/gestao-360/diagnosticos" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_diagnosticos"><EmBreve moduleKey="gestao360_diagnosticos" /></ModuleGuard></AppLayout>} />
+              <Route path="/gestao-360/indicadores" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_indicadores"><EmBreve moduleKey="gestao360_indicadores" /></ModuleGuard></AppLayout>} />
+
+              {/* Tarefas — subrotas novas */}
+              <Route path="/fiscal/obrigacoes-fiscais" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_obrigacoes" requireAdmin><EmBreve moduleKey="fiscal_obrigacoes" /></ModuleGuard></AppLayout>} />
+              <Route path="/fiscal/agenda" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_agenda" requireAdmin><EmBreve moduleKey="fiscal_agenda" /></ModuleGuard></AppLayout>} />
+
+              {/* Monitoramento */}
+              <Route path="/mensagens" element={<AppLayout><ModuleGuard moduleName="mensagens"><EmBreve moduleKey="mensagens" /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><EmBreve moduleKey="dashboard_federal" /></ModuleGuard></AppLayout>} />
+              <Route path="/parcelamentos" element={<AppLayout><ModuleGuard moduleName="parcelamentos"><EmBreve moduleKey="parcelamentos" /></ModuleGuard></AppLayout>} />
+              <Route path="/certidoes" element={<AppLayout><ModuleGuard moduleName="certidoes"><EmBreve moduleKey="certidoes" /></ModuleGuard></AppLayout>} />
+              <Route path="/processos" element={<AppLayout><ModuleGuard moduleName="processos"><EmBreve moduleKey="processos" /></ModuleGuard></AppLayout>} />
+
+              {/* Diagnóstico Fiscal */}
+              <Route path="/score-fiscal" element={<AppLayout><ModuleGuard moduleName="score_fiscal"><EmBreve moduleKey="score_fiscal" /></ModuleGuard></AppLayout>} />
+              <Route path="/analise-fiscal" element={<AppLayout><ModuleGuard moduleName="analise_fiscal"><EmBreve moduleKey="analise_fiscal" /></ModuleGuard></AppLayout>} />
+              <Route path="/simulador-tributario" element={<AppLayout><ModuleGuard moduleName="simulador_tributario"><EmBreve moduleKey="simulador_tributario" /></ModuleGuard></AppLayout>} />
+              <Route path="/diagnostico-ca" element={<AppLayout><ModuleGuard moduleName="diagnostico_ca"><EmBreve moduleKey="diagnostico_ca" /></ModuleGuard></AppLayout>} />
+
+              {/* Cadastros */}
+              <Route path="/cadastros/procuracoes" element={<AppLayout><ModuleGuard moduleName="cadastros_procuracoes"><EmBreve moduleKey="cadastros_procuracoes" /></ModuleGuard></AppLayout>} />
+              <Route path="/cadastros/certificados" element={<AppLayout><ModuleGuard moduleName="cadastros_certificados"><EmBreve moduleKey="cadastros_certificados" /></ModuleGuard></AppLayout>} />
+              <Route path="/cadastros/alvaras" element={<AppLayout><ModuleGuard moduleName="cadastros_alvaras"><EmBreve moduleKey="cadastros_alvaras" /></ModuleGuard></AppLayout>} />
+              <Route path="/cadastros/equipe" element={<AppLayout><ModuleGuard moduleName="equipe"><Equipe /></ModuleGuard></AppLayout>} />
 
               <Route path="*" element={<NotFound />} />
               </Routes>

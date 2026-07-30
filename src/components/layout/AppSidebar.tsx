@@ -1,30 +1,24 @@
 import { useState } from 'react';
-import { 
-  LayoutDashboard, 
-  ArrowLeftRight, 
+import {
+  LayoutDashboard,
+  ArrowLeftRight,
   ArrowUpDown,
-  CalendarClock, 
-  Users, 
-  Building2, 
-  Tags, 
-  FileBarChart, 
+  CalendarClock,
+  Building2,
+  Tags,
+  FileBarChart,
   Settings,
-  LogOut,
   Home,
   Pin,
   PinOff,
   ChevronDown,
   Send,
-  UserCircle,
   FileCheck,
   Wallet,
   Scale,
   UsersRound,
   LockKeyhole,
   UserPlus,
-  Shield,
-  BookOpen,
-  Gauge,
   ShieldCheck,
   Contact,
   TrendingUp,
@@ -33,18 +27,36 @@ import {
   Target,
   ListChecks,
   Bot,
-
+  Gauge,
+  Compass,
+  MessageSquare,
+  CreditCard,
+  ScrollText,
+  Gavel,
+  FileSearch,
+  Calculator,
+  Stethoscope,
+  FolderOpen,
+  FileSignature,
+  BadgeCheck,
+  FileText,
+  LifeBuoy,
+  BookOpen,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
-import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/hooks/useCompany';
 import { usePinnedShortcuts, PinnedShortcut } from '@/hooks/usePinnedShortcuts';
 import { useUserRole } from '@/hooks/useUserRole';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
+import {
+  DEFAULT_PLAN_MODULES,
+  LEGACY_MODULE_ALIASES,
+  LEGACY_SUBMODULE_ALIASES,
+  SUB_MODULES_BY_PARENT,
+} from '@/constants/modules';
 
-import { ProfileModal } from '@/components/profile/ProfileModal';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   Sidebar,
   SidebarContent,
@@ -58,7 +70,6 @@ import {
   SidebarFooter,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
   Collapsible,
@@ -67,18 +78,52 @@ import {
 } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 
+/**
+ * Ícone dos atalhos fixados, resolvido pelo `iconName` gravado no atalho.
+ * Todo item do menu precisa ter o `iconName` dele aqui, senão o atalho fixado
+ * aparece com o ícone genérico de fallback.
+ */
 const iconMap: Record<string, LucideIcon> = {
   'layout-dashboard': LayoutDashboard,
   'arrow-left-right': ArrowLeftRight,
   'arrow-up-down': ArrowUpDown,
   'calendar-clock': CalendarClock,
   'users': Users,
+  'users-round': UsersRound,
   'building-2': Building2,
   'tags': Tags,
   'file-bar-chart': FileBarChart,
   'send': Send,
-  'user-circle': UserCircle,
   'file-check': FileCheck,
+  'home': Home,
+  'gauge': Gauge,
+  'shield-check': ShieldCheck,
+  'bot': Bot,
+  'user-plus': UserPlus,
+  'bell-ring': BellRing,
+  'scale': Scale,
+  'compass': Compass,
+  'stethoscope': Stethoscope,
+  'trending-up': TrendingUp,
+  'book-open': BookOpen,
+  'message-square': MessageSquare,
+  'landmark': Landmark,
+  'credit-card': CreditCard,
+  'scroll-text': ScrollText,
+  'gavel': Gavel,
+  'file-search': FileSearch,
+  'calculator': Calculator,
+  'contact': Contact,
+  'target': Target,
+  'folder-open': FolderOpen,
+  'file-signature': FileSignature,
+  'badge-check': BadgeCheck,
+  'file-text': FileText,
+  'lock-keyhole': LockKeyhole,
+  'settings': Settings,
+  'wallet': Wallet,
+  'list-checks': ListChecks,
+  'life-buoy': LifeBuoy,
 };
 
 interface MenuItem {
@@ -88,7 +133,28 @@ interface MenuItem {
   iconName: string;
 }
 
-// Simple items (no sub-items)
+interface SubMenuItem extends MenuItem {
+  /** Chave de submódulo, checada contra o módulo pai. */
+  subKey?: string;
+  /**
+   * Chave de módulo de topo própria. Usada em Cadastros, que é grupo visual:
+   * cada item guarda a permissão dele em vez de herdar a do grupo.
+   */
+  moduleKey?: string;
+  /** Rótulo de um mini-divisor visual exibido ANTES deste item, dentro do mesmo menu. */
+  sectionBreak?: string;
+  requireAdmin?: boolean;
+  requireSuperAdmin?: boolean;
+  /** Esconde de colaborador (mesma regra de Configurações). */
+  hideFromColaborador?: boolean;
+}
+
+/** Divisor com rótulo, separando categorias do menu. */
+interface SectionDivider {
+  kind: 'section';
+  label: string;
+}
+
 interface SimpleModule {
   kind: 'simple';
   title: string;
@@ -96,39 +162,25 @@ interface SimpleModule {
   icon: LucideIcon;
   iconName: string;
   moduleKey: string;
+  hideFromColaborador?: boolean;
 }
 
-// Collapsible items (with sub-items)
 interface CollapsibleModule {
   kind: 'collapsible';
   title: string;
   icon: LucideIcon;
-  moduleKey: string;
-  defaultOpen?: boolean;
-  items: MenuItem[];
-}
-
-type MenuEntry = SimpleModule | CollapsibleModule;
-
-interface SubMenuItem extends MenuItem {
-  subKey?: string;
-  /** Rótulo de um mini-divisor visual exibido ANTES deste item, dentro do mesmo menu. */
-  sectionBreak?: string;
-}
-
-interface CollapsibleModuleExt {
-  kind: 'collapsible';
-  title: string;
-  icon: LucideIcon;
-  moduleKey: string;
+  /** Ausente = grupo puramente visual; a visibilidade vem dos itens. */
+  moduleKey?: string;
   defaultOpen?: boolean;
   items: SubMenuItem[];
 }
 
-const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
+type MenuEntry = SectionDivider | SimpleModule | CollapsibleModule;
+
+const menuEntries: MenuEntry[] = [
   {
     kind: 'simple',
-    title: 'Home',
+    title: 'Início',
     url: '/',
     icon: Home,
     iconName: 'home',
@@ -141,21 +193,32 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
     moduleKey: 'tech',
     items: [
       { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'tech_disparos' },
-      { title: 'Operação Interna', url: '/tech/operacao', icon: Gauge, iconName: 'gauge' },
-      { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check' },
-      { title: 'Agente IA', url: '/tech/agente-ia', icon: Bot, iconName: 'bot' },
-      { title: 'Cadastrar Cliente', url: '/admin/provisionar-cliente', icon: UserPlus, iconName: 'user-plus' },
-      { title: 'Central de Notificações', url: '/central-notificacoes', icon: BellRing, iconName: 'bell-ring' },
+      { title: 'Operação Interna', url: '/tech/operacao', icon: Gauge, iconName: 'gauge', requireSuperAdmin: true },
+      { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check', requireAdmin: true },
+      { title: 'Agente IA', url: '/tech/agente-ia', icon: Bot, iconName: 'bot', requireAdmin: true },
+      { title: 'Cadastrar Cliente', url: '/admin/provisionar-cliente', icon: UserPlus, iconName: 'user-plus', requireSuperAdmin: true },
+      { title: 'Central de Notificações', url: '/central-notificacoes', icon: BellRing, iconName: 'bell-ring', requireSuperAdmin: true },
     ],
   },
-
   {
     kind: 'simple',
-    title: 'Legalização',
-    url: '/legalizacao',
+    title: 'Reforma Tributária',
+    url: '/reforma-tributaria',
     icon: Scale,
     iconName: 'scale',
-    moduleKey: 'legalizacao',
+    moduleKey: 'reforma_tributaria',
+  },
+  {
+    kind: 'collapsible',
+    title: 'Gestão 360°',
+    icon: Compass,
+    moduleKey: 'gestao360',
+    items: [
+      { title: 'Portal 360°', url: '/gestao-360/portal', icon: Compass, iconName: 'compass', subKey: 'gestao360_portal' },
+      { title: 'CA · Ausências', url: '/gestao-360/ausencias', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'gestao360_ausencias' },
+      { title: 'CA · Diagnósticos', url: '/gestao-360/diagnosticos', icon: Stethoscope, iconName: 'stethoscope', subKey: 'gestao360_diagnosticos' },
+      { title: 'CA · Indicadores', url: '/gestao-360/indicadores', icon: TrendingUp, iconName: 'trending-up', subKey: 'gestao360_indicadores' },
+    ],
   },
   {
     kind: 'collapsible',
@@ -163,30 +226,93 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
     icon: ListChecks,
     moduleKey: 'fiscal',
     items: [
-      { title: 'Dashboard', url: '/fiscal/dashboard', icon: LayoutDashboard, iconName: 'layout-dashboard', subKey: 'fiscal_dashboard' },
+      { title: 'Dashboard', url: '/fiscal/dashboard', icon: LayoutDashboard, iconName: 'layout-dashboard', subKey: 'fiscal_dashboard', requireAdmin: true },
       { title: 'Tarefas', url: '/fiscal/tarefas', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_tarefas' },
-      { title: 'Colaboradores', url: '/fiscal/colaboradores', icon: UsersRound, iconName: 'users-round', subKey: 'fiscal_colaboradores' },
-      { title: 'Obrigações e Declarações', url: '/fiscal/obrigacoes', icon: BookOpen, iconName: 'book-open', subKey: 'fiscal_calendario' },
-      { title: 'Calendário Fiscal', url: '/fiscal/calendario', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_calendario' },
+      { title: 'Colaboradores', url: '/fiscal/colaboradores', icon: UsersRound, iconName: 'users-round', subKey: 'fiscal_colaboradores', requireAdmin: true },
+      { title: 'Obrigações e Declarações', url: '/fiscal/obrigacoes', icon: BookOpen, iconName: 'book-open', subKey: 'fiscal_calendario', requireAdmin: true },
+      { title: 'Calendário Fiscal', url: '/fiscal/calendario', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_calendario', requireAdmin: true },
+      { title: 'Obrigações Fiscais', url: '/fiscal/obrigacoes-fiscais', icon: FileCheck, iconName: 'file-check', subKey: 'fiscal_obrigacoes', requireAdmin: true },
+      { title: 'Agenda', url: '/fiscal/agenda', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_agenda', requireAdmin: true },
     ],
   },
+
+  { kind: 'section', label: 'Monitoramento' },
   {
-    kind: 'collapsible',
-    title: 'Fiscal',
-    icon: FileCheck,
-    moduleKey: 'fiscal',
-    items: [
-      { title: 'Monitor CNPJ', url: '/fiscal/monitor-cnpj', icon: Shield, iconName: 'shield', subKey: 'fiscal_monitor_cnpj' },
-    ],
+    kind: 'simple',
+    title: 'Mensagens',
+    url: '/mensagens',
+    icon: MessageSquare,
+    iconName: 'message-square',
+    moduleKey: 'mensagens',
   },
   {
     kind: 'simple',
-    title: 'Pessoal / RH',
-    url: '/pessoal-rh',
-    icon: UsersRound,
-    iconName: 'users-round',
-    moduleKey: 'pessoal_rh',
+    title: 'Dashboard Federal',
+    url: '/dashboard-federal',
+    icon: Landmark,
+    iconName: 'landmark',
+    moduleKey: 'dashboard_federal',
   },
+  {
+    kind: 'simple',
+    title: 'Parcelamentos',
+    url: '/parcelamentos',
+    icon: CreditCard,
+    iconName: 'credit-card',
+    moduleKey: 'parcelamentos',
+  },
+  {
+    kind: 'simple',
+    title: 'Certidões',
+    url: '/certidoes',
+    icon: ScrollText,
+    iconName: 'scroll-text',
+    moduleKey: 'certidoes',
+  },
+  {
+    kind: 'simple',
+    title: 'Processos',
+    url: '/processos',
+    icon: Gavel,
+    iconName: 'gavel',
+    moduleKey: 'processos',
+  },
+
+  { kind: 'section', label: 'Diagnóstico Fiscal' },
+  {
+    kind: 'simple',
+    title: 'Score Fiscal',
+    url: '/score-fiscal',
+    icon: Gauge,
+    iconName: 'gauge',
+    moduleKey: 'score_fiscal',
+  },
+  {
+    kind: 'simple',
+    title: 'Análise Fiscal',
+    url: '/analise-fiscal',
+    icon: FileSearch,
+    iconName: 'file-search',
+    moduleKey: 'analise_fiscal',
+  },
+  {
+    kind: 'simple',
+    title: 'Simulador Tributário',
+    url: '/simulador-tributario',
+    icon: Calculator,
+    iconName: 'calculator',
+    moduleKey: 'simulador_tributario',
+  },
+  {
+    kind: 'simple',
+    title: 'Diagnóstico CA',
+    url: '/diagnostico-ca',
+    icon: Stethoscope,
+    iconName: 'stethoscope',
+    moduleKey: 'diagnostico_ca',
+  },
+
+  { kind: 'section', label: 'Administração' },
   {
     kind: 'collapsible',
     title: 'Financeiro',
@@ -209,41 +335,32 @@ const menuEntries: (SimpleModule | CollapsibleModuleExt)[] = [
     ],
   },
   {
-    kind: 'simple',
-    title: 'Contatos',
-    url: '/contatos',
-    icon: Users,
-    iconName: 'users',
-    moduleKey: 'contatos',
+    // Grupo visual: cada item carrega a própria chave de módulo, porque `contatos`
+    // e `acessos` já existem como permissão de topo desde antes do agrupamento.
+    kind: 'collapsible',
+    title: 'Cadastros',
+    icon: FolderOpen,
+    items: [
+      { title: 'Empresas', url: '/contatos', icon: Building2, iconName: 'building-2', moduleKey: 'contatos' },
+      { title: 'Procurações', url: '/cadastros/procuracoes', icon: FileSignature, iconName: 'file-signature', moduleKey: 'cadastros_procuracoes' },
+      { title: 'Certificados', url: '/cadastros/certificados', icon: BadgeCheck, iconName: 'badge-check', moduleKey: 'cadastros_certificados' },
+      { title: 'Alvarás', url: '/cadastros/alvaras', icon: FileText, iconName: 'file-text', moduleKey: 'cadastros_alvaras' },
+      { title: 'Acessos', url: '/acessos', icon: LockKeyhole, iconName: 'lock-keyhole', moduleKey: 'acessos' },
+      { title: 'Equipe', url: '/cadastros/equipe', icon: UsersRound, iconName: 'users-round', moduleKey: 'equipe', hideFromColaborador: true },
+    ],
   },
   {
     kind: 'simple',
-    title: 'Acessos',
-    url: '/acessos',
-    icon: LockKeyhole,
-    iconName: 'lock-keyhole',
-    moduleKey: 'acessos',
+    title: 'Configurações',
+    url: '/configuracoes',
+    icon: Settings,
+    iconName: 'settings',
+    moduleKey: 'configuracoes',
+    hideFromColaborador: true,
   },
 ];
 
-const SUB_MODULES_BY_PARENT: Record<string, string[]> = {
-  fiscal: ['fiscal_dashboard', 'fiscal_tarefas', 'fiscal_calendario', 'fiscal_colaboradores', 'fiscal_monitor_cnpj'],
-  financeiro: ['financeiro_dashboard', 'financeiro_lancamentos', 'financeiro_pagar_receber', 'financeiro_fluxo_caixa', 'financeiro_boletos', 'financeiro_conta_corrente', 'financeiro_conciliacao_sicoob', 'financeiro_eventos_contabeis', 'financeiro_dre', 'financeiro_clientes_fornecedores', 'financeiro_metas_orcamentos', 'financeiro_categorias'],
-  tech: ['tech_disparos'],
-};
-
-// Legacy aliases — keep old saved keys working until users are re-saved.
-const LEGACY_MODULE_ALIASES: Record<string, string[]> = {
-  contatos: ['clientes'],
-};
-const LEGACY_SUBMODULE_ALIASES: Record<string, string[]> = {
-  tech_disparos: ['clientes_disparos'],
-};
-
-
-
 export function AppSidebar() {
-  const { signOut } = useAuth();
   const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === 'collapsed';
   const showLabels = isMobile || !collapsed;
@@ -254,12 +371,10 @@ export function AppSidebar() {
   };
   const { companyName, companyCnpj, company } = useCompany();
   const { pinnedShortcuts, isPinned, togglePin } = usePinnedShortcuts();
-  const { isSuperAdmin, isAdmin, isColaborador, allowedModules, fullName, avatarUrl } = useUserRole();
-  const [profileOpen, setProfileOpen] = useState(false);
+  const { isSuperAdmin, isAdmin, isColaborador, allowedModules } = useUserRole();
   const { pendingCount } = usePendingApprovals();
-  
 
-  const planModules: string[] = (company as any)?.plan_modules ?? ['home', 'tech', 'legalizacao', 'fiscal', 'pessoal_rh', 'financeiro', 'contatos', 'acessos', 'configuracoes'];
+  const planModules: string[] = (company as any)?.plan_modules ?? DEFAULT_PLAN_MODULES;
   const logoUrl: string | null = (company as any)?.logo_url ?? null;
 
   const isModuleVisible = (moduleKey: string) => {
@@ -293,15 +408,45 @@ export function AppSidebar() {
     return keys.some((k) => allowedModules.includes(k));
   };
 
+  const passesRoleGate = (item: { requireAdmin?: boolean; requireSuperAdmin?: boolean; hideFromColaborador?: boolean }) => {
+    if (item.requireSuperAdmin && !isSuperAdmin) return false;
+    if (item.requireAdmin && !isAdmin && !isSuperAdmin) return false;
+    if (item.hideFromColaborador && isColaborador && !isSuperAdmin) return false;
+    return true;
+  };
 
+  /** Itens visíveis de um grupo — respeita permissão própria do item, do pai e papel. */
+  const visibleItems = (entry: CollapsibleModule) =>
+    entry.items.filter((item) => {
+      if (!passesRoleGate(item)) return false;
+      if (item.moduleKey) return isModuleVisible(item.moduleKey);
+      return isSubItemVisible(entry.moduleKey ?? '', item.subKey);
+    });
 
-  const visibleEntries = menuEntries.filter(e => isModuleVisible(e.moduleKey));
+  const isEntryVisible = (entry: MenuEntry): boolean => {
+    if (entry.kind === 'section') return false; // resolvido na montagem da lista
+    if (!passesRoleGate(entry)) return false;
+    if (entry.kind === 'simple') return isModuleVisible(entry.moduleKey);
+    // Grupo sem moduleKey (Cadastros) depende só dos itens.
+    if (entry.moduleKey && !isModuleVisible(entry.moduleKey)) return false;
+    return visibleItems(entry).length > 0;
+  };
 
-  const showSettings = isSuperAdmin || (!isColaborador && isModuleVisible('configuracoes'));
+  // Divisor só aparece se existir ao menos um item visível abaixo dele,
+  // antes do próximo divisor — senão sobra um rótulo órfão no menu.
+  const visibleEntries = menuEntries.filter((entry, index) => {
+    if (entry.kind !== 'section') return isEntryVisible(entry);
+    for (let i = index + 1; i < menuEntries.length; i++) {
+      const next = menuEntries[i];
+      if (next.kind === 'section') break;
+      if (isEntryVisible(next)) return true;
+    }
+    return false;
+  });
 
   const [openModules, setOpenModules] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
-    menuEntries.forEach(entry => {
+    menuEntries.forEach((entry) => {
       if (entry.kind === 'collapsible') {
         initial[entry.title] = entry.defaultOpen ?? false;
       }
@@ -318,8 +463,6 @@ export function AppSidebar() {
     e.stopPropagation();
     togglePin({ title: item.title, url: item.url, icon: item.iconName });
   };
-
-  const initials = (fullName || 'U').substring(0, 2).toUpperCase();
 
   const renderPinnedItem = (shortcut: PinnedShortcut) => {
     const IconComponent = iconMap[shortcut.icon] || Tags;
@@ -349,6 +492,22 @@ export function AppSidebar() {
     );
   };
 
+  const renderSectionDivider = (entry: SectionDivider) => {
+    if (!showLabels) {
+      return (
+        <Separator key={`sec-${entry.label}`} className="my-2 mx-3 w-auto bg-sidebar-border" />
+      );
+    }
+    return (
+      <div
+        key={`sec-${entry.label}`}
+        className="mt-4 mb-1 px-3 pt-3 border-t border-sidebar-border text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/60"
+      >
+        {entry.label}
+      </div>
+    );
+  };
+
   const renderSimpleEntry = (entry: SimpleModule) => (
     <SidebarGroup key={entry.title}>
       <SidebarGroupContent>
@@ -362,7 +521,12 @@ export function AppSidebar() {
                 activeClassName="bg-accent text-foreground font-semibold [&_svg]:opacity-100"
               >
                 <entry.icon className="w-[18px] h-[18px] shrink-0 opacity-60" strokeWidth={1.75} />
-                {showLabels && <span>{entry.title}</span>}
+                {showLabels && <span className="flex-1 truncate">{entry.title}</span>}
+                {entry.moduleKey === 'configuracoes' && pendingCount > 0 && (
+                  <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-medium text-destructive-foreground">
+                    {pendingCount}
+                  </span>
+                )}
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -371,7 +535,7 @@ export function AppSidebar() {
     </SidebarGroup>
   );
 
-  const renderCollapsibleEntry = (entry: CollapsibleModuleExt) => (
+  const renderCollapsibleEntry = (entry: CollapsibleModule) => (
     <SidebarGroup key={entry.title}>
       <Collapsible open={openModules[entry.title]} onOpenChange={() => handleToggleModule(entry.title)}>
         <CollapsibleTrigger asChild>
@@ -388,16 +552,7 @@ export function AppSidebar() {
         <CollapsibleContent>
           <SidebarGroupContent>
             <SidebarMenu>
-              {entry.items
-                .filter((item) => item.url !== '/tech/operacao' || isSuperAdmin)
-                .filter((item) => item.url !== '/tech/lgpd' || isAdmin || isSuperAdmin)
-                .filter((item) => item.url !== '/tech/agente-ia' || isAdmin || isSuperAdmin)
-                .filter((item) => item.url !== '/admin/provisionar-cliente' || isSuperAdmin)
-                .filter((item) => item.url !== '/central-notificacoes' || isSuperAdmin)
-                .filter((item) => (!['/fiscal/calendario', '/fiscal/dashboard', '/fiscal/colaboradores', '/fiscal/monitor-cnpj'].includes(item.url)) || isAdmin || isSuperAdmin)
-                .filter((item) => isSubItemVisible(entry.moduleKey, item.subKey))
-                .map((item) => (
-
+              {visibleItems(entry).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   {item.sectionBreak && showLabels && (
                     <div className="px-3 pt-3 pb-1 text-[10px] uppercase tracking-[0.05em] text-muted-foreground/50 border-t border-sidebar-border/60 mt-1">
@@ -426,7 +581,6 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-
             </SidebarMenu>
           </SidebarGroupContent>
         </CollapsibleContent>
@@ -435,104 +589,66 @@ export function AppSidebar() {
   );
 
   return (
-    <>
-      <Sidebar collapsible="icon" className="border-r border-border">
-        <SidebarHeader className="p-3">
-          <div className="flex items-center gap-3 justify-center">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary shrink-0 overflow-hidden">
-              {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
-              ) : (
-                <Building2 className="w-4 h-4 text-primary-foreground" strokeWidth={1.5} />
-              )}
+    <Sidebar collapsible="icon" className="border-r border-border">
+      <SidebarHeader className="p-3">
+        <div className="flex items-center gap-3 justify-center">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary shrink-0 overflow-hidden">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+            ) : (
+              <Building2 className="w-4 h-4 text-primary-foreground" strokeWidth={1.5} />
+            )}
+          </div>
+          {showLabels && (
+            <div className="flex flex-col min-w-0">
+              <span className="font-semibold text-sidebar-foreground truncate">{companyName}</span>
+              <span className="text-xs text-sidebar-foreground/60 truncate">{companyCnpj || 'CNPJ não informado'}</span>
             </div>
-            {showLabels && (
-              <div className="flex flex-col min-w-0">
-                <span className="font-semibold text-sidebar-foreground truncate">{companyName}</span>
-                <span className="text-xs text-sidebar-foreground/60 truncate">{companyCnpj || 'CNPJ não informado'}</span>
-              </div>
-            )}
-          </div>
-        </SidebarHeader>
-
-        <Separator className="bg-sidebar-border" />
-
-        <SidebarContent className="px-2">
-          {/* Atalhos Fixados */}
-          {pinnedShortcuts.length > 0 && (
-            <SidebarGroup>
-              <SidebarGroupLabel className="text-muted-foreground text-[11px] uppercase tracking-[0.05em] px-3 py-2 font-medium">
-                <Pin className="w-3 h-3 inline mr-1.5" />
-                Atalhos
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {pinnedShortcuts.map(renderPinnedItem)}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
           )}
+        </div>
+      </SidebarHeader>
 
-          {visibleEntries.map(entry =>
-            entry.kind === 'simple' ? renderSimpleEntry(entry) : renderCollapsibleEntry(entry)
-          )}
+      <Separator className="bg-sidebar-border" />
 
-        </SidebarContent>
+      <SidebarContent className="px-2">
+        {/* Atalhos Fixados */}
+        {pinnedShortcuts.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-muted-foreground text-[11px] uppercase tracking-[0.05em] px-3 py-2 font-medium">
+              <Pin className="w-3 h-3 inline mr-1.5" />
+              Atalhos
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {pinnedShortcuts.map(renderPinnedItem)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-        <SidebarFooter className="p-4">
-          <SidebarMenu>
-            {showSettings && (
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Configurações">
-                  <NavLink onClick={handleMobileNav}
-                    to="/configuracoes"
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] text-muted-foreground hover:bg-accent hover:text-foreground transition-[background,color] duration-[120ms]"
-                    activeClassName="bg-accent text-foreground font-semibold"
+        {visibleEntries.map((entry) => {
+          if (entry.kind === 'section') return renderSectionDivider(entry);
+          if (entry.kind === 'simple') return renderSimpleEntry(entry);
+          return renderCollapsibleEntry(entry);
+        })}
+      </SidebarContent>
 
-                  >
-                    <Settings className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
-                    {showLabels && (
-                      <span className="flex-1">Configurações</span>
-                    )}
-                    {pendingCount > 0 && (
-                      <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-medium text-destructive-foreground">
-                        {pendingCount}
-                      </span>
-                    )}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-          </SidebarMenu>
-
-          {/* Profile + Logout */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setProfileOpen(true)}
-              className="flex items-center gap-2 flex-1 min-w-0 px-2 py-1.5 rounded-lg hover:bg-sidebar-accent transition-colors"
-            >
-              <Avatar className="w-8 h-8 shrink-0">
-                {avatarUrl && <AvatarImage src={avatarUrl} alt="Avatar" />}
-                <AvatarFallback className="text-xs bg-primary/10 text-primary">{initials}</AvatarFallback>
-              </Avatar>
-              {showLabels && (
-                <span className="text-sm text-sidebar-foreground truncate">{fullName || 'Usuário'}</span>
-              )}
-            </button>
-            <Button 
-              variant="ghost" 
-              size="icon"
-              className="shrink-0 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-              onClick={signOut}
-              title="Sair"
-            >
-              <LogOut className="w-[18px] h-[18px]" strokeWidth={1.5} />
-            </Button>
-          </div>
-        </SidebarFooter>
-      </Sidebar>
-
-      <ProfileModal open={profileOpen} onOpenChange={setProfileOpen} />
-    </>
+      <SidebarFooter className="p-4">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Suporte">
+              <NavLink onClick={handleMobileNav}
+                to="/suporte"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] text-muted-foreground hover:bg-accent hover:text-foreground transition-[background,color] duration-[120ms]"
+                activeClassName="bg-accent text-foreground font-semibold"
+              >
+                <LifeBuoy className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
+                {showLabels && <span className="flex-1">Suporte</span>}
+              </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
   );
 }

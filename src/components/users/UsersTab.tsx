@@ -23,14 +23,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-const MODULE_LABELS: Record<string, string> = {
-  financeiro: 'Financeiro',
-  crm: 'CRM',
-  comercial: 'Comercial',
-  fiscal: 'Fiscal',
-  pessoal_rh: 'Pessoal/RH',
-  configuracoes: 'Config.',
-};
+import { MODULE_LABELS } from '@/constants/modules';
 
 const ROLE_LABELS: Record<string, string> = {
   colaborador: 'Colaborador',

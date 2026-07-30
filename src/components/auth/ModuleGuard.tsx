@@ -3,35 +3,16 @@ import { Navigate } from 'react-router-dom';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
 
-const MODULE_ROUTE_MAP: Record<string, string> = {
-  home: '/',
-  tech: '/disparos',
-  financeiro: '/painel-financeiro',
-  fiscal: '/fiscal/tarefas',
-  contatos: '/contatos',
-  legalizacao: '/legalizacao',
-  pessoal_rh: '/pessoal-rh',
-  acessos: '/acessos',
-  configuracoes: '/configuracoes',
-};
-
-const MODULE_PRIORITY = ['home', 'tech', 'financeiro', 'fiscal', 'contatos', 'legalizacao', 'pessoal_rh', 'acessos', 'configuracoes'];
-
-// Sub-module keys grouped by parent module — used for backward compatibility:
-// users that have the parent module but no sub-keys at all keep full access.
-const SUB_MODULES_BY_PARENT: Record<string, string[]> = {
-  fiscal: ['fiscal_dashboard', 'fiscal_tarefas', 'fiscal_calendario', 'fiscal_colaboradores', 'fiscal_monitor_cnpj'],
-  financeiro: ['financeiro_dashboard', 'financeiro_lancamentos', 'financeiro_pagar_receber', 'financeiro_fluxo_caixa', 'financeiro_boletos', 'financeiro_conta_corrente', 'financeiro_conciliacao_sicoob', 'financeiro_eventos_contabeis', 'financeiro_dre', 'financeiro_clientes_fornecedores', 'financeiro_metas_orcamentos', 'financeiro_categorias'],
-  tech: ['tech_disparos'],
-};
-
-// Legacy module/sub-module aliases — keeps users with old keys working until they're re-saved.
-const LEGACY_MODULE_ALIASES: Record<string, string[]> = {
-  contatos: ['clientes'],
-};
-const LEGACY_SUBMODULE_ALIASES: Record<string, string[]> = {
-  tech_disparos: ['clientes_disparos'],
-};
+// Chaves, rótulos e agrupamentos vivem em src/constants/modules.ts — fonte única
+// compartilhada com o menu e o cadastro de usuário.
+import {
+  DEFAULT_PLAN_MODULES,
+  LEGACY_MODULE_ALIASES,
+  LEGACY_SUBMODULE_ALIASES,
+  MODULE_PRIORITY,
+  MODULE_ROUTE_MAP,
+  SUB_MODULES_BY_PARENT,
+} from '@/constants/modules';
 
 interface ModuleGuardProps {
   moduleName: string;
@@ -48,9 +29,7 @@ export function ModuleGuard({ moduleName, subModule, children, requireAdmin = fa
 
   if (isSuperAdmin) return <>{children}</>;
 
-  const planModules: string[] = (company as any)?.plan_modules ?? [
-    'home', 'tech', 'legalizacao', 'fiscal', 'pessoal_rh', 'financeiro', 'contatos', 'acessos', 'configuracoes',
-  ];
+  const planModules: string[] = (company as any)?.plan_modules ?? DEFAULT_PLAN_MODULES;
 
   const moduleKeysToCheck = [moduleName, ...(LEGACY_MODULE_ALIASES[moduleName] ?? [])];
   const userHasModule = moduleKeysToCheck.some((k) => allowedModules.includes(k));

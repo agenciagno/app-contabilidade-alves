@@ -13,62 +13,7 @@ import { useNotifications } from '@/contexts/NotificationContext';
 import { z } from 'zod';
 import { PasswordStrength, isPasswordStrong } from '@/components/ui/PasswordStrength';
 
-interface ModuleNode {
-  key: string;
-  label: string;
-  children?: { key: string; label: string }[];
-}
-
-const MODULE_TREE: ModuleNode[] = [
-  { key: 'home', label: 'Home' },
-  {
-    key: 'tech',
-    label: 'Tech',
-    children: [
-      { key: 'tech_disparos', label: 'Disparos' },
-    ],
-  },
-  { key: 'legalizacao', label: 'Legalização' },
-  {
-    key: 'fiscal',
-    label: 'Fiscal',
-    children: [
-      { key: 'fiscal_dashboard', label: 'Dashboard' },
-      { key: 'fiscal_tarefas', label: 'Tarefas' },
-      { key: 'fiscal_calendario', label: 'Calendário Fiscal' },
-      { key: 'fiscal_colaboradores', label: 'Colaboradores' },
-      { key: 'fiscal_monitor_cnpj', label: 'Monitor CNPJ' },
-    ],
-  },
-  { key: 'pessoal_rh', label: 'Pessoal / RH' },
-  {
-    key: 'financeiro',
-    label: 'Financeiro',
-    children: [
-      { key: 'financeiro_dashboard', label: 'Dashboard' },
-      { key: 'financeiro_lancamentos', label: 'Lançamentos' },
-      { key: 'financeiro_pagar_receber', label: 'Pagar/Receber' },
-      { key: 'financeiro_fluxo_caixa', label: 'Fluxo de Caixa' },
-      { key: 'financeiro_boletos', label: 'Boletos' },
-      { key: 'financeiro_conta_corrente', label: 'Conta Corrente' },
-      { key: 'financeiro_conciliacao_sicoob', label: 'Conciliação Sicoob' },
-      { key: 'financeiro_eventos_contabeis', label: 'Eventos Contábeis' },
-      { key: 'financeiro_dre', label: 'DRE' },
-      { key: 'financeiro_clientes_fornecedores', label: 'Clientes & Fornecedores' },
-      { key: 'financeiro_metas_orcamentos', label: 'Metas & Orçamentos' },
-    ],
-  },
-  { key: 'contatos', label: 'Contatos' },
-  { key: 'acessos', label: 'Acessos' },
-  { key: 'configuracoes', label: 'Configurações' },
-];
-
-
-// Flat list of every valid key (parents + children) — used for defaults / full-access roles.
-const ALL_MODULE_KEYS: string[] = MODULE_TREE.flatMap((m) => [m.key, ...(m.children?.map((c) => c.key) ?? [])]);
-
-// Legacy export name kept for compatibility with the original code paths below.
-const ALL_MODULES = MODULE_TREE.map((m) => ({ key: m.key, label: m.label, soon: false }));
+import { ALL_MODULE_KEYS, MODULE_TREE } from '@/constants/modules';
 
 
 const ROLE_OPTIONS = [

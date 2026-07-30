@@ -7,11 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Upload, Building2, Trash2, History, Users, Database } from 'lucide-react';
+import { Loader2, Upload, Building2, Trash2, History, Database } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import UsersTab from '@/components/users/UsersTab';
 import GlobalLogsTab from '@/components/settings/GlobalLogsTab';
 import TrashTab from '@/components/settings/TrashTab';
 import BackupTab from '@/components/settings/BackupTab';
@@ -192,9 +191,9 @@ export default function SettingsPage() {
 
   // Build tabs based on role
   const tabs: { value: string; label: string; icon: React.ElementType }[] = [];
+  // "Minha Equipe" saiu daqui — virou rota própria em Cadastros > Equipe.
   if (!isColaborador) {
     tabs.push({ value: 'empresa', label: 'Dados da Empresa', icon: Building2 });
-    tabs.push({ value: 'equipe', label: 'Minha Equipe', icon: Users });
   }
   if (isSuperAdmin) {
     tabs.push({ value: 'logs', label: 'Logs Globais', icon: History });
@@ -210,7 +209,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
-        <p className="text-muted-foreground">Gerencie a empresa e a equipe</p>
+        <p className="text-muted-foreground">Dados da empresa e manutenção do sistema</p>
       </div>
 
       <Tabs defaultValue={tabs.some(t => t.value === defaultTab) ? defaultTab : tabs[0]?.value} className="w-full">
@@ -300,13 +299,6 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Minha Equipe */}
-        <TabsContent value="equipe" className="mt-0">
-          {companyId && user && (
-            <UsersTab companyId={companyId} currentUserId={user.id} />
-          )}
         </TabsContent>
 
         {/* Logs Globais */}

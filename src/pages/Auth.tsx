@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, User, Lock, Eye, EyeOff, ShieldX, Shield } from 'lucide-react';
 import { PendingApprovalScreen } from '@/components/auth/PendingApprovalScreen';
+import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 
 const loginSchema = z.object({
@@ -24,6 +25,7 @@ export default function Auth() {
     password: ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [sendingReset, setSendingReset] = useState(false);
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -83,6 +85,37 @@ export default function Auth() {
     } else {
       navigate('/');
     }
+  };
+
+  // O campo de login aceita e-mail ou usuário, mas o reset do Supabase só
+  // funciona por e-mail — por isso a exigência do '@' antes de disparar.
+  const handleForgotPassword = async () => {
+    const email = loginData.emailOrUsername.trim();
+    if (!email.includes('@')) {
+      toast({
+        title: 'Informe seu e-mail',
+        description: 'Digite o e-mail da sua conta no campo acima para receber o link.',
+      });
+      return;
+    }
+    setSendingReset(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/redefinir-senha`,
+    });
+    setSendingReset(false);
+    if (error) {
+      toast({
+        title: 'Erro ao enviar o link',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return;
+    }
+    // Mensagem igual exista ou não a conta — não confirmar e-mail cadastrado.
+    toast({
+      title: 'Link enviado',
+      description: `Se existir uma conta com ${email}, o link de redefinição chega em instantes.`,
+    });
   };
 
   if (statusBlock === 'pending') {
@@ -216,6 +249,18 @@ export default function Auth() {
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 Entrar
               </Button>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={sendingReset}
+                  className="text-xs underline underline-offset-2 disabled:opacity-60"
+                  style={{ background: 'none', border: 'none', color: 'var(--apple-text-secondary)' }}
+                >
+                  {sendingReset ? 'Enviando...' : 'Esqueci minha senha'}
+                </button>
+              </div>
             </form>
 
             <p className="text-xs text-center mt-4" style={{ color: 'var(--apple-text-secondary)' }}>
