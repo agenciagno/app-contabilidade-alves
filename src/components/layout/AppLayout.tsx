@@ -132,9 +132,15 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <SidebarProvider>
       
-      <div className="min-h-screen flex w-full max-w-[100vw] overflow-x-hidden">
+      {/*
+        No desktop o shell tem altura fixa e quem rola é o conteúdo — é isso que
+        faz o header `sticky` realmente fixar. Antes o `overflow-x-hidden` do
+        wrapper virava contexto de rolagem e o header subia junto com a página.
+        No mobile segue rolando a página inteira.
+      */}
+      <div className="min-h-screen md:h-svh flex w-full max-w-[100vw] overflow-x-hidden md:overflow-hidden">
         <AppSidebar />
-        <SidebarInset className="flex-1 min-w-0">
+        <SidebarInset className="flex-1 min-w-0 md:h-svh md:overflow-y-auto md:overflow-x-hidden">
           <DevEnvironmentBanner />
           <AppHeader />
           <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 min-w-0 max-w-full">

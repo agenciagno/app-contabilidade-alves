@@ -1,6 +1,18 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { format, subMonths, startOfMonth, endOfMonth, isToday, isBefore, addDays, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
+import {
+  format,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+  isToday,
+  isBefore,
+  addDays,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  differenceInCalendarDays,
+} from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Wallet,
@@ -9,10 +21,14 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
-  Calendar,
-  DollarSign,
+  ArrowRight,
+  ArrowUpRight,
+  Plus,
+  Sparkles,
   UserPlus,
   Receipt,
+  ListChecks,
+  ScrollText,
 } from 'lucide-react';
 import {
   BarChart,
@@ -26,13 +42,16 @@ import {
 } from 'recharts';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Tooltip as TooltipUI, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 
 import { useProfile } from '@/hooks/useProfile';
 import { useBanks } from '@/hooks/useBanks';
@@ -57,6 +76,163 @@ const getGreeting = () => {
   return 'Boa noite';
 };
 
+/**
+ * Marcos legais da Reforma Tributária usados no destaque do topo.
+ * Fonte: `_context/reforma-tributaria.md` (LC 214/2025, Resolução CGSN 186/2026).
+ * Reverificar perto de cada data — já houve adiamento de prazo nesta reforma.
+ */
+const MARCOS_RT: { data: string; titulo: string; detalhe: string }[] = [
+  {
+    data: '2026-08-03',
+    titulo: 'Campos IBS/CBS passam a ser obrigatórios na nota',
+    detalhe: 'Acaba a tolerância: a nota sem os campos pode ser rejeitada.',
+  },
+  {
+    data: '2026-09-01',
+    titulo: 'Abre a janela de opção do Simples para 2027',
+    detalhe: 'Até 30/09 cada cliente escolhe entre regime unificado (DAS) e IBS/CBS por fora.',
+  },
+  {
+    data: '2026-11-30',
+    titulo: 'Último dia para cancelar a opção feita em setembro',
+    detalhe: 'Sem manifestação, o cliente segue no regime unificado.',
+  },
+];
+
+/** Anel de progresso do card, no mesmo espírito dos medidores do painel. */
+const GaugeRing = ({
+  value,
+  tone,
+}: {
+  value: number;
+  tone: 'ok' | 'atencao' | 'critico';
+}) => {
+  const clamped = Math.max(0, Math.min(100, value));
+  const radius = 52;
+  const circumference = 2 * Math.PI * radius;
+  const dash = (clamped / 100) * circumference;
+
+  const stroke =
+    tone === 'ok'
+      ? 'hsl(var(--success))'
+      : tone === 'atencao'
+        ? 'hsl(var(--warning))'
+        : 'hsl(var(--destructive))';
+
+  return (
+    <div className="relative w-[124px] h-[124px]">
+      <svg viewBox="0 0 124 124" className="w-full h-full -rotate-90">
+        <circle
+          cx="62"
+          cy="62"
+          r={radius}
+          fill="none"
+          strokeWidth="6"
+          className="stroke-border"
+        />
+        <circle
+          cx="62"
+          cy="62"
+          r={radius}
+          fill="none"
+          strokeWidth="6"
+          strokeLinecap="round"
+          stroke={stroke}
+          strokeDasharray={`${dash} ${circumference}`}
+        />
+      </svg>
+      {/* Marca de status no topo do anel, como no painel de referência. */}
+      <span
+        className="absolute left-1/2 top-[6px] -translate-x-1/2 w-2 h-2 rounded-full"
+        style={{ backgroundColor: stroke }}
+      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-[28px] font-bold tracking-tight text-foreground">
+          {clamped}%
+        </span>
+      </div>
+    </div>
+  );
+};
+
+const GaugeCell = ({
+  value,
+  tone,
+  label,
+  hint,
+}: {
+  value: number;
+  tone: 'ok' | 'atencao' | 'critico';
+  label: string;
+  hint: string;
+}) => (
+  <div className="flex flex-col items-center gap-3 px-6 py-8">
+    <GaugeRing value={value} tone={tone} />
+    <div className="text-center space-y-1">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="text-[13px] text-muted-foreground">{hint}</p>
+    </div>
+  </div>
+);
+
+const StatCell = ({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  valueClassName,
+}: {
+  icon?: typeof Wallet;
+  label: string;
+  value: string;
+  hint?: string;
+  valueClassName?: string;
+}) => (
+  <div className="px-6 py-5">
+    <div className="flex items-center gap-1.5 mb-1.5">
+      {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.75} />}
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </p>
+    </div>
+    <p className={cn('text-xl font-bold tracking-tight text-foreground', valueClassName)}>
+      {value}
+    </p>
+    {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
+  </div>
+);
+
+const SectionHeading = ({
+  number,
+  eyebrow,
+  title,
+  children,
+}: {
+  number: string;
+  eyebrow: string;
+  title: string;
+  children?: React.ReactNode;
+}) => (
+  <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-4">
+    <div>
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-[11px] font-bold text-foreground">{number}</span>
+        <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          {eyebrow}
+        </span>
+      </div>
+      <h2 className="text-2xl font-bold tracking-tight text-foreground">{title}</h2>
+    </div>
+    {children}
+  </div>
+);
+
+/** Moldura dos cards. No escuro ganha borda mais clara para separar do fundo. */
+const cardShell =
+  'rounded-2xl border border-border dark:border-white/10 bg-card overflow-hidden';
+
 const Home = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -70,11 +246,11 @@ const Home = () => {
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [revenueDialogOpen, setRevenueDialogOpen] = useState(false);
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
-  
-  // New states for improvements
+
   const [chartPeriod, setChartPeriod] = useState<'month' | 'week'>('month');
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [cardFilter, setCardFilter] = useState<'todos' | 'financeiro' | 'carteira'>('todos');
 
   const today = new Date();
   const currentMonthStart = startOfMonth(today);
@@ -107,11 +283,10 @@ const Home = () => {
 
   // KPI: Previsto do Mês (recorrentes + pendentes)
   const previstoMes = useMemo(() => {
-    // Soma das receitas recorrentes ativas para o mês
     const receitasRecorrentes = recurringTransactions.filter(
       (r) => r.is_active && r.type === 'receita'
     );
-    
+
     const totalRecorrente = receitasRecorrentes.reduce((sum, r) => {
       if (r.frequency === 'monthly') return sum + Number(r.amount);
       if (r.frequency === 'weekly') return sum + Number(r.amount) * 4;
@@ -119,7 +294,6 @@ const Home = () => {
       return sum;
     }, 0);
 
-    // Receitas pendentes no mês
     const receitasPendentes = transactions
       .filter((t) => {
         if (t.type !== 'receita' || t.is_paid) return false;
@@ -170,7 +344,6 @@ const Home = () => {
       (r) => r.is_active && r.type === 'receita'
     );
 
-    // Total previsto para o mês (simplificado: soma das receitas recorrentes ativas)
     const totalPrevisto = receitasRecorrentes.reduce((sum, r) => {
       if (r.frequency === 'monthly') return sum + Number(r.amount);
       if (r.frequency === 'weekly') return sum + Number(r.amount) * 4;
@@ -178,9 +351,7 @@ const Home = () => {
       return sum;
     }, 0);
 
-    // Receitas já recebidas no mês
     const recebido = monthlyResult.receitas;
-
     const percentual = totalPrevisto > 0 ? Math.min((recebido / totalPrevisto) * 100, 100) : 0;
 
     return {
@@ -190,13 +361,22 @@ const Home = () => {
     };
   }, [recurringTransactions, monthlyResult.receitas]);
 
-  // Refresh function for honorários
-  const handleRefreshHonorarios = async () => {
+  // Proporção da carteira em atraso — razão entre os dois números do card de carteira.
+  const inadimplenciaPct = useMemo(() => {
+    if (crmStats.total <= 0) return 0;
+    return Math.round((crmStats.inadimplentes / crmStats.total) * 100);
+  }, [crmStats]);
+
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ['recurring_transactions'] });
-    await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['recurring_transactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['banks'] }),
+      queryClient.invalidateQueries({ queryKey: ['contacts'] }),
+    ]);
     setLastRefresh(new Date());
-    setTimeout(() => setIsRefreshing(false), 1000);
+    setTimeout(() => setIsRefreshing(false), 800);
   };
 
   // Gráfico: Últimos 6 meses
@@ -231,7 +411,7 @@ const Home = () => {
 
   // Gráfico: Esta Semana (por dia)
   const weeklyChartData = useMemo(() => {
-    const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
     const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
@@ -279,7 +459,21 @@ const Home = () => {
       .slice(0, 5);
   }, [transactions, today]);
 
-  const isLoading = profileLoading || banksLoading || contactsLoading || transactionsLoading || recurringLoading || categoriesLoading;
+  // Próximo marco da Reforma Tributária ainda não vencido.
+  const proximoMarcoRt = useMemo(() => {
+    return MARCOS_RT.map((m) => {
+      const data = new Date(`${m.data}T00:00:00`);
+      return { ...m, dataObj: data, dias: differenceInCalendarDays(data, today) };
+    }).find((m) => m.dias >= 0);
+  }, [today]);
+
+  const isLoading =
+    profileLoading ||
+    banksLoading ||
+    contactsLoading ||
+    transactionsLoading ||
+    recurringLoading ||
+    categoriesLoading;
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -297,342 +491,518 @@ const Home = () => {
     return null;
   };
 
-  // Determine which chart data to use
   const activeChartData = chartPeriod === 'week' ? weeklyChartData : chartData;
 
+  const shortcuts = [
+    {
+      title: 'Nova receita',
+      hint: 'Honorário, avulso',
+      icon: TrendingUp,
+      accent: true,
+      onClick: () => setRevenueDialogOpen(true),
+    },
+    {
+      title: 'Nova despesa',
+      hint: 'Custo, imposto',
+      icon: TrendingDown,
+      onClick: () => setExpenseDialogOpen(true),
+    },
+    {
+      title: 'Novo cliente',
+      hint: 'Cadastro rápido',
+      icon: UserPlus,
+      onClick: () => setContactDialogOpen(true),
+    },
+    {
+      title: 'Tarefas do dia',
+      hint: 'Obrigações',
+      icon: ListChecks,
+      onClick: () => navigate('/fiscal/tarefas'),
+    },
+  ];
+
+  const showFinanceiro = cardFilter === 'todos' || cardFilter === 'financeiro';
+  const showCarteira = cardFilter === 'todos' || cardFilter === 'carteira';
+
   return (
-    <div className="space-y-6">
-      {/* Header de Boas-Vindas */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between py-4 gap-4">
-        <div>
+    <div className="max-w-[1400px] mx-auto space-y-12">
+      {/* Cabeçalho */}
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-2">
+            ~/dashboard
+          </p>
           {isLoading ? (
-            <Skeleton className="h-8 w-64 mb-2" />
+            <Skeleton className="h-12 w-72 mb-2" />
           ) : (
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-              {getGreeting()}, {userName} 👋
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground">
+              {getGreeting()}, {userName}.
             </h1>
           )}
-          <p className="text-muted-foreground flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            {format(today, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+          <p className="text-muted-foreground mt-2">
+            {isLoading ? (
+              <Skeleton className="h-5 w-56" />
+            ) : (
+              <>
+                {crmStats.total} {crmStats.total === 1 ? 'cliente ativo' : 'clientes ativos'} e{' '}
+                {criticalAlerts.length}{' '}
+                {criticalAlerts.length === 1 ? 'pendência urgente' : 'pendências urgentes'}.
+              </>
+            )}
           </p>
         </div>
 
-        {/* Atalhos Rápidos */}
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={() => setContactDialogOpen(true)}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Cliente
-          </Button>
+        <div className="flex items-center gap-3 shrink-0">
           <Button
-            size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={() => setRevenueDialogOpen(true)}
+            variant="ghost"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="text-muted-foreground hover:text-foreground gap-2"
           >
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Receita
+            <RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />
+            atualizar
           </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => setExpenseDialogOpen(true)}
-          >
-            <TrendingDown className="h-4 w-4 mr-2" />
-            Despesa
-          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="gap-2 rounded-xl bg-[#101923] text-white hover:bg-[#101923]/90 dark:border dark:border-white/15">
+                <Plus className="w-4 h-4" />
+                Novo lançamento
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => setRevenueDialogOpen(true)} className="gap-2">
+                <TrendingUp className="w-4 h-4 text-success" />
+                Receita
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setExpenseDialogOpen(true)} className="gap-2">
+                <TrendingDown className="w-4 h-4 text-destructive" />
+                Despesa
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setContactDialogOpen(true)} className="gap-2">
+                <UserPlus className="w-4 h-4" />
+                Cliente
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      {/* Cards de KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card Financeiro */}
-        <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Financeiro
-            </CardTitle>
-            <Wallet className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isLoading ? (
-              <>
-                <Skeleton className="h-7 w-32" />
-                <Skeleton className="h-5 w-24" />
-              </>
-            ) : (
-              <>
-                <div>
-                  <p className="text-xs text-muted-foreground">Saldo Total em Contas</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {formatCurrency(totalBalance)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Resultado do Mês</p>
-                  <div className="flex items-baseline gap-2">
-                    <p
-                      className={`text-lg font-semibold flex items-center gap-1 ${
-                        monthlyResult.resultado >= 0 ? 'text-emerald-500' : 'text-destructive'
-                      }`}
-                    >
-                      {monthlyResult.resultado >= 0 ? (
-                        <TrendingUp className="h-4 w-4" />
-                      ) : (
-                        <TrendingDown className="h-4 w-4" />
-                      )}
-                      {formatCurrency(monthlyResult.resultado)}
-                    </p>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    / {formatCurrency(previstoMes)} previsto
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Progress value={percentualRealizado} className="h-1.5 flex-1" />
-                    <span className={`text-xs font-medium ${
-                      percentualRealizado >= 100 ? 'text-emerald-500' : 
-                      percentualRealizado >= 50 ? 'text-yellow-500' : 'text-destructive'
-                    }`}>
-                      {percentualRealizado}%
-                    </span>
-                  </div>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+      {/* Destaque — próximo marco da Reforma Tributária */}
+      {proximoMarcoRt && (
+        <div className="rounded-2xl bg-[#101923] dark:border dark:border-white/10 px-8 py-9 text-white">
+          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-8">
+            <div className="min-w-0 max-w-2xl">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/90">
+                <Sparkles className="w-3.5 h-3.5" />
+                Reforma Tributária · prazo
+              </span>
 
-        {/* Card CRM */}
-        <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">CRM</CardTitle>
-            <Users className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isLoading ? (
-              <>
-                <Skeleton className="h-7 w-20" />
-                <Skeleton className="h-5 w-24" />
-              </>
-            ) : (
-              <>
-                <div>
-                  <p className="text-xs text-muted-foreground">Clientes Ativos</p>
-                  <p className="text-2xl font-bold text-foreground">{crmStats.total}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant={crmStats.inadimplentes > 0 ? 'destructive' : 'secondary'}
-                    className="text-xs cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => navigate('/crm', { state: { filterStatus: 'inadimplente' } })}
-                  >
-                    {crmStats.inadimplentes > 0 && (
-                      <AlertTriangle className="h-3 w-3 mr-1" />
-                    )}
-                    {crmStats.inadimplentes} Inadimplente{crmStats.inadimplentes !== 1 && 's'}
-                  </Badge>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              <h2 className="mt-5 text-2xl md:text-[32px] font-bold leading-tight tracking-tight">
+                {proximoMarcoRt.titulo}
+              </h2>
+              <p className="mt-3 text-white/70">
+                {proximoMarcoRt.detalhe} Avise a carteira antes que o prazo feche.
+              </p>
 
-        {/* Card Honorários */}
-        <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Honorários do Mês
-            </CardTitle>
-            <TooltipProvider>
-              <TooltipUI>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={handleRefreshHonorarios}
-                  >
-                    <RefreshCw className={`h-4 w-4 text-violet-500 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Última atualização: {format(lastRefresh, 'HH:mm')}
-                </TooltipContent>
-              </TooltipUI>
-            </TooltipProvider>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isLoading ? (
-              <>
-                <Skeleton className="h-7 w-16" />
-                <Skeleton className="h-2 w-full" />
-              </>
-            ) : (
-              <>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-2xl font-bold text-foreground">
-                    {honorariosStats.percentual}%
-                  </p>
-                  <p className="text-xs text-muted-foreground">recebido</p>
-                </div>
-                <Progress value={honorariosStats.percentual} className="h-2" />
-                <p className="text-xs text-muted-foreground">
-                  {formatCurrency(honorariosStats.recebido)} / {formatCurrency(honorariosStats.previsto)}
+              <div className="mt-7 flex flex-wrap gap-3">
+                <Button
+                  onClick={() => navigate('/reforma-tributaria')}
+                  className="rounded-full bg-white text-[#101923] hover:bg-white/90 gap-2"
+                >
+                  <ScrollText className="w-4 h-4" />
+                  Ver o que muda
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate('/fiscal/tarefas')}
+                  className="rounded-full text-white hover:bg-white/10 hover:text-white gap-2"
+                >
+                  <ListChecks className="w-4 h-4" />
+                  Abrir tarefas
+                </Button>
+              </div>
+            </div>
+
+            <div className="shrink-0 rounded-xl bg-white/[0.07] border border-white/10 px-7 py-6 text-center">
+              <p className="text-5xl font-bold tracking-tight">
+                {proximoMarcoRt.dias === 0 ? 'hoje' : proximoMarcoRt.dias}
+              </p>
+              {proximoMarcoRt.dias > 0 && (
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/60 mt-1">
+                  {proximoMarcoRt.dias === 1 ? 'dia' : 'dias'}
                 </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              )}
+              <p className="mt-3 pt-3 border-t border-white/10 text-sm text-white/70">
+                {format(proximoMarcoRt.dataObj, "d 'de' MMMM", { locale: ptBR })}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* Seção Principal - Grid de 2 Colunas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gráfico de Desempenho */}
-        <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-emerald-500" />
-              {chartPeriod === 'week' ? 'Desempenho Semanal' : 'Desempenho Mensal'}
-            </CardTitle>
-            <ToggleGroup
-              type="single"
-              value={chartPeriod}
-              onValueChange={(value) => value && setChartPeriod(value as 'month' | 'week')}
-              className="bg-muted/50 rounded-lg p-0.5"
+      {/* Faixas de alerta — vencidas e vencendo */}
+      {criticalAlerts.length > 0 && (
+        <div className="space-y-3">
+          {criticalAlerts.slice(0, 3).map((alert) => (
+            <div
+              key={alert.id}
+              className="flex items-center gap-4 rounded-xl border border-border dark:border-white/10 bg-muted/40 px-5 py-4"
             >
-              <ToggleGroupItem
-                value="week"
-                className="text-xs px-3 py-1 h-7 data-[state=on]:bg-background data-[state=on]:shadow-sm"
+              <div
+                className={cn(
+                  'flex items-center justify-center w-10 h-10 rounded-xl shrink-0',
+                  alert.status === 'overdue'
+                    ? 'bg-destructive/10 text-destructive'
+                    : 'bg-warning/10 text-warning'
+                )}
               >
-                Semana
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="month"
-                className="text-xs px-3 py-1 h-7 data-[state=on]:bg-background data-[state=on]:shadow-sm"
-              >
-                Mês
-              </ToggleGroupItem>
-            </ToggleGroup>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-[250px] w-full" />
-            ) : (
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={activeChartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickLine={false}
-                    className="capitalize"
-                  />
-                  <YAxis
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickLine={false}
-                    tickFormatter={(value) =>
-                      value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value
-                    }
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend
-                    formatter={(value) => (value === 'receitas' ? 'Receitas' : 'Despesas')}
-                    wrapperStyle={{ fontSize: '12px' }}
-                  />
-                  <Bar
-                    dataKey="receitas"
-                    fill="hsl(142.1 76.2% 36.3%)"
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={40}
-                  />
-                  <Bar
-                    dataKey="despesas"
-                    fill="hsl(0 84.2% 60.2%)"
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={40}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+                <AlertTriangle className="w-5 h-5" strokeWidth={1.75} />
+              </div>
 
-        {/* Alertas Críticos */}
-        <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
-              Atenção Imediata
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs"
-              onClick={() => navigate('/transacoes')}
-            >
-              Ver todas
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[...Array(3)].map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-foreground truncate">
+                  {alert.description}{' '}
+                  {alert.status === 'overdue'
+                    ? 'está vencida'
+                    : alert.status === 'today'
+                      ? 'vence hoje'
+                      : 'vence amanhã'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {alert.type === 'receita' ? 'A receber' : 'A pagar'} ·{' '}
+                  {formatCurrency(Number(alert.amount))} · vencimento{' '}
+                  {format(new Date(alert.due_date!), 'dd/MM')}
+                </p>
               </div>
-            ) : criticalAlerts.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Receipt className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Nenhuma pendência urgente</p>
-                <p className="text-xs">Suas contas estão em dia! 🎉</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {criticalAlerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div
-                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          alert.status === 'overdue'
-                            ? 'bg-destructive'
-                            : alert.status === 'today'
-                            ? 'bg-orange-500'
-                            : 'bg-yellow-500'
-                        }`}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {alert.description}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {alert.status === 'overdue'
-                            ? 'Vencida'
-                            : alert.status === 'today'
-                            ? 'Vence hoje'
-                            : 'Vence amanhã'}{' '}
-                          • {format(new Date(alert.due_date!), 'dd/MM')}
-                        </p>
-                      </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 rounded-lg"
+                onClick={() => navigate('/financeiro/pagar-receber')}
+              >
+                Ver detalhes
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 01 — Visão geral */}
+      <section>
+        <SectionHeading number="01" eyebrow="Visão geral" title="Financeiro & carteira">
+          <div className="flex items-center gap-1 rounded-xl border border-border dark:border-white/10 bg-card p-1">
+            {(
+              [
+                { key: 'todos', label: 'Todos', count: 2 },
+                { key: 'financeiro', label: 'Financeiro', count: 1 },
+                { key: 'carteira', label: 'Carteira', count: 1 },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setCardFilter(tab.key)}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] transition-colors',
+                  cardFilter === tab.key
+                    ? 'bg-accent font-semibold text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {tab.label}
+                <span className="text-[11px] text-muted-foreground">{tab.count}</span>
+              </button>
+            ))}
+          </div>
+        </SectionHeading>
+
+        <div className="space-y-5">
+          {/* Card Financeiro */}
+          {showFinanceiro && (
+            <div className={cardShell}>
+              <div className="flex items-center justify-between gap-4 px-6 py-5">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-success/10 shrink-0">
+                    <Wallet className="w-5 h-5 text-success" strokeWidth={1.75} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="text-lg font-bold tracking-tight text-foreground truncate">
+                        Financeiro do mês
+                      </h3>
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
+                        <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                        ativo
+                      </span>
                     </div>
-                    <p
-                      className={`text-sm font-semibold ${
-                        alert.type === 'receita' ? 'text-emerald-500' : 'text-destructive'
-                      }`}
-                    >
-                      {alert.type === 'receita' ? '+' : '-'}
-                      {formatCurrency(Number(alert.amount))}
+                    {/* first-letter, não capitalize: "julho de 2026" viraria "Julho De 2026". */}
+                    <p className="text-sm text-muted-foreground first-letter:uppercase">
+                      {format(today, "MMMM 'de' yyyy", { locale: ptBR })}
                     </p>
                   </div>
-                ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 rounded-lg gap-1.5"
+                  onClick={() => navigate('/painel-financeiro')}
+                >
+                  Gerenciar
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+
+              {isLoading ? (
+                <div className="border-t border-border dark:border-white/10 p-8">
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 border-t border-border dark:border-white/10 divide-y sm:divide-y-0 sm:divide-x divide-border dark:divide-white/10">
+                    <GaugeCell
+                      value={honorariosStats.percentual}
+                      tone={
+                        honorariosStats.percentual >= 80
+                          ? 'ok'
+                          : honorariosStats.percentual >= 50
+                            ? 'atencao'
+                            : 'critico'
+                      }
+                      label="Honorários"
+                      hint={`${formatCurrency(honorariosStats.recebido)} de ${formatCurrency(honorariosStats.previsto)}`}
+                    />
+                    <GaugeCell
+                      value={percentualRealizado}
+                      tone={
+                        percentualRealizado >= 80
+                          ? 'ok'
+                          : percentualRealizado >= 50
+                            ? 'atencao'
+                            : 'critico'
+                      }
+                      label="Realizado"
+                      hint={`sobre ${formatCurrency(previstoMes)} previsto`}
+                    />
+                    <GaugeCell
+                      value={inadimplenciaPct}
+                      tone={
+                        inadimplenciaPct <= 10 ? 'ok' : inadimplenciaPct <= 25 ? 'atencao' : 'critico'
+                      }
+                      label="Inadimplência"
+                      hint={`${crmStats.inadimplentes} de ${crmStats.total} clientes`}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 border-t border-border dark:border-white/10 divide-y sm:divide-y-0 sm:divide-x divide-border dark:divide-white/10">
+                    <StatCell
+                      icon={Wallet}
+                      label="Saldo em contas"
+                      value={formatCurrency(totalBalance)}
+                      hint={`${banks.filter((b) => b.is_active).length} contas ativas`}
+                    />
+                    <StatCell
+                      icon={monthlyResult.resultado >= 0 ? TrendingUp : TrendingDown}
+                      label="Resultado do mês"
+                      value={formatCurrency(monthlyResult.resultado)}
+                      hint={`${formatCurrency(monthlyResult.receitas)} recebido`}
+                      valueClassName={
+                        monthlyResult.resultado >= 0 ? 'text-success' : 'text-destructive'
+                      }
+                    />
+                    <StatCell
+                      icon={Receipt}
+                      label="Despesas do mês"
+                      value={formatCurrency(monthlyResult.despesas)}
+                      hint="pagas neste mês"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 border-t border-border dark:border-white/10 bg-muted/30 px-6 py-3">
+                    <p className="text-[13px] text-muted-foreground">
+                      atualizado às <span className="font-semibold text-foreground">{format(lastRefresh, 'HH:mm')}</span>
+                    </p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      Financeiro
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Card Carteira */}
+          {showCarteira && (
+            <div className={cardShell}>
+              <div className="flex items-center justify-between gap-4 px-6 py-5">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-primary/10 shrink-0">
+                    <Users className="w-5 h-5 text-primary" strokeWidth={1.75} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="text-lg font-bold tracking-tight text-foreground truncate">
+                        Carteira de clientes
+                      </h3>
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
+                        <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                        ativo
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Empresas atendidas</p>
+                  </div>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 rounded-lg gap-1.5"
+                  onClick={() => navigate('/contatos')}
+                >
+                  Gerenciar
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+
+              {isLoading ? (
+                <div className="border-t border-border dark:border-white/10 p-8">
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 border-t border-border dark:border-white/10 divide-y sm:divide-y-0 sm:divide-x divide-border dark:divide-white/10">
+                    <StatCell
+                      label="Clientes ativos"
+                      value={String(crmStats.total)}
+                      hint="clientes e ambos"
+                    />
+                    <StatCell
+                      label="Inadimplentes"
+                      value={String(crmStats.inadimplentes)}
+                      hint="com título vencido"
+                      valueClassName={crmStats.inadimplentes > 0 ? 'text-destructive' : undefined}
+                    />
+                    <StatCell
+                      label="Pendências urgentes"
+                      value={String(criticalAlerts.length)}
+                      hint="vencidas ou vencendo"
+                      valueClassName={criticalAlerts.length > 0 ? 'text-warning' : undefined}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 border-t border-border dark:border-white/10 bg-muted/30 px-6 py-3">
+                    <button
+                      onClick={() => navigate('/contatos')}
+                      className="text-[13px] text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      ver a carteira completa
+                    </button>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                      Carteira
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 02 — Atalhos */}
+      <section>
+        <SectionHeading number="02" eyebrow="Atalhos" title="Operação rápida">
+          <button
+            onClick={() => navigate('/movimentacoes')}
+            className="flex items-center gap-1.5 text-[13px] font-medium text-primary hover:underline"
+          >
+            ver tudo
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </SectionHeading>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {shortcuts.map((s) => (
+            <button
+              key={s.title}
+              onClick={s.onClick}
+              className="group flex items-center gap-3 rounded-2xl border border-border dark:border-white/10 bg-card px-4 py-4 text-left transition-colors hover:bg-accent/50"
+            >
+              <div
+                className={cn(
+                  'flex items-center justify-center w-9 h-9 rounded-xl shrink-0',
+                  s.accent ? 'bg-[#101923] text-white dark:border dark:border-white/15' : 'bg-muted text-foreground'
+                )}
+              >
+                <s.icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-semibold text-foreground leading-tight">{s.title}</p>
+                <p className="text-xs text-muted-foreground truncate">{s.hint}</p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* 03 — Desempenho */}
+      <section>
+        <SectionHeading number="03" eyebrow="Desempenho" title="Receitas e despesas">
+          <ToggleGroup
+            type="single"
+            value={chartPeriod}
+            onValueChange={(value) => value && setChartPeriod(value as 'month' | 'week')}
+            className="rounded-xl border border-border dark:border-white/10 bg-card p-1"
+          >
+            <ToggleGroupItem
+              value="week"
+              className="text-[13px] px-3 py-1 h-7 rounded-lg data-[state=on]:bg-accent data-[state=on]:font-semibold"
+            >
+              Semana
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="month"
+              className="text-[13px] px-3 py-1 h-7 rounded-lg data-[state=on]:bg-accent data-[state=on]:font-semibold"
+            >
+              Mês
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </SectionHeading>
+
+        <div className={cn(cardShell, 'p-6')}>
+          {isLoading ? (
+            <Skeleton className="h-[280px] w-full" />
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={activeChartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                  axisLine={{ stroke: 'hsl(var(--border))' }}
+                  tickLine={false}
+                  className="capitalize"
+                />
+                <YAxis
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                  axisLine={{ stroke: 'hsl(var(--border))' }}
+                  tickLine={false}
+                  tickFormatter={(value) => (value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value)}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend
+                  formatter={(value) => (value === 'receitas' ? 'Receitas' : 'Despesas')}
+                  wrapperStyle={{ fontSize: '12px' }}
+                />
+                <Bar dataKey="receitas" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="despesas" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </section>
 
       {/* Dialogs */}
       <ContactFormDialog

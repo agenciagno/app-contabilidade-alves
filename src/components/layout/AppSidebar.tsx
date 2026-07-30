@@ -48,14 +48,8 @@ import {
 import { NavLink } from '@/components/NavLink';
 import { useCompany } from '@/hooks/useCompany';
 import { usePinnedShortcuts, PinnedShortcut } from '@/hooks/usePinnedShortcuts';
-import { useUserRole } from '@/hooks/useUserRole';
+import { useModuleAccess, type RoleGated } from '@/hooks/useModuleAccess';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
-import {
-  DEFAULT_PLAN_MODULES,
-  LEGACY_MODULE_ALIASES,
-  LEGACY_SUBMODULE_ALIASES,
-  SUB_MODULES_BY_PARENT,
-} from '@/constants/modules';
 
 import {
   Sidebar,
@@ -133,7 +127,7 @@ interface MenuItem {
   iconName: string;
 }
 
-interface SubMenuItem extends MenuItem {
+interface SubMenuItem extends MenuItem, RoleGated {
   /** Chave de submódulo, checada contra o módulo pai. */
   subKey?: string;
   /**
@@ -143,10 +137,6 @@ interface SubMenuItem extends MenuItem {
   moduleKey?: string;
   /** Rótulo de um mini-divisor visual exibido ANTES deste item, dentro do mesmo menu. */
   sectionBreak?: string;
-  requireAdmin?: boolean;
-  requireSuperAdmin?: boolean;
-  /** Esconde de colaborador (mesma regra de Configurações). */
-  hideFromColaborador?: boolean;
 }
 
 /** Divisor com rótulo, separando categorias do menu. */
@@ -155,17 +145,16 @@ interface SectionDivider {
   label: string;
 }
 
-interface SimpleModule {
+interface SimpleModule extends RoleGated {
   kind: 'simple';
   title: string;
   url: string;
   icon: LucideIcon;
   iconName: string;
   moduleKey: string;
-  hideFromColaborador?: boolean;
 }
 
-interface CollapsibleModule {
+interface CollapsibleModule extends RoleGated {
   kind: 'collapsible';
   title: string;
   icon: LucideIcon;
@@ -175,9 +164,10 @@ interface CollapsibleModule {
   items: SubMenuItem[];
 }
 
-type MenuEntry = SectionDivider | SimpleModule | CollapsibleModule;
+export type MenuEntry = SectionDivider | SimpleModule | CollapsibleModule;
 
-const menuEntries: MenuEntry[] = [
+/** Fonte única do menu. A busca do header também consome esta lista. */
+export const menuEntries: MenuEntry[] = [
   {
     kind: 'simple',
     title: 'Início',
@@ -371,49 +361,10 @@ export function AppSidebar() {
   };
   const { companyName, companyCnpj, company } = useCompany();
   const { pinnedShortcuts, isPinned, togglePin } = usePinnedShortcuts();
-  const { isSuperAdmin, isAdmin, isColaborador, allowedModules } = useUserRole();
+  const { isModuleVisible, isSubItemVisible, passesRoleGate } = useModuleAccess();
   const { pendingCount } = usePendingApprovals();
 
-  const planModules: string[] = (company as any)?.plan_modules ?? DEFAULT_PLAN_MODULES;
   const logoUrl: string | null = (company as any)?.logo_url ?? null;
-
-  const isModuleVisible = (moduleKey: string) => {
-    if (isSuperAdmin) return true;
-    const keys = [moduleKey, ...(LEGACY_MODULE_ALIASES[moduleKey] ?? [])];
-    const planOk = keys.some((k) => planModules.includes(k));
-    const userOk = keys.some((k) => allowedModules.includes(k));
-    return planOk && userOk;
-  };
-
-  // For collaborators, hide sub-items they don't have permission for.
-  // Backward compat: if the user has the parent module but no sub-keys at all,
-  // show every sub-item (legacy users keep full access until the admin re-saves them).
-  const subEnabledByPlan = (parentKey: string, subKey?: string) => {
-    if (!subKey) return true;
-    const siblings = SUB_MODULES_BY_PARENT[parentKey] ?? [];
-    const explicit = siblings.filter((k) => planModules.includes(k));
-    if (explicit.length === 0) return true; // plano "grosso" (ex.: CA) => todos os submódulos habilitados
-    return planModules.includes(subKey);    // plano com recorte => só os submódulos contratados
-  };
-
-  const isSubItemVisible = (parentKey: string, subKey?: string) => {
-    if (isSuperAdmin) return true;
-    if (!subEnabledByPlan(parentKey, subKey)) return false;
-    if (isAdmin) return true;
-    if (!subKey) return true;
-    const siblings = SUB_MODULES_BY_PARENT[parentKey] ?? [];
-    const hasAnySibling = siblings.some((k) => allowedModules.includes(k));
-    if (!hasAnySibling) return true;
-    const keys = [subKey, ...(LEGACY_SUBMODULE_ALIASES[subKey] ?? [])];
-    return keys.some((k) => allowedModules.includes(k));
-  };
-
-  const passesRoleGate = (item: { requireAdmin?: boolean; requireSuperAdmin?: boolean; hideFromColaborador?: boolean }) => {
-    if (item.requireSuperAdmin && !isSuperAdmin) return false;
-    if (item.requireAdmin && !isAdmin && !isSuperAdmin) return false;
-    if (item.hideFromColaborador && isColaborador && !isSuperAdmin) return false;
-    return true;
-  };
 
   /** Itens visíveis de um grupo — respeita permissão própria do item, do pai e papel. */
   const visibleItems = (entry: CollapsibleModule) =>
