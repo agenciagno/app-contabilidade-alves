@@ -16,9 +16,9 @@ import {
   AlertTriangle, FileText, TrendingUp, TrendingDown, Building2,
   Filter, Search, X, ChevronUp, ChevronDown, CalendarDays,
 } from 'lucide-react';
-import { format, parseISO, startOfYear, addDays } from 'date-fns';
+import { format, parseISO, isWithinInterval, startOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
-import { calcularEncargosAtraso, isEffectivelyPaid } from '@/lib/financial-utils';
+import { calcularEncargosAtraso } from '@/lib/financial-utils';
 import { CashFlowReportModal } from './CashFlowReportModal';
 import type { Transaction } from '@/hooks/useTransactions';
 import type { Bank } from '@/hooks/useBanks';
@@ -443,12 +443,10 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
   const [reportOpen, setReportOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; row: any | null }>({ open: false, row: null });
 
-  // Janela padrão: início do ano → +30 dias (pedido de Gabriel, 29/07 — só o essencial de
-  // curto prazo, sem previsão de 90 dias). Antes a janela terminava HOJE, o que escondia
-  // todo o futuro; o passado continua no recorte para que o vencido apareça junto.
+  // Global date filter — defaults to Jan 1 of current year → today
   const today = new Date();
   const defaultStart = format(startOfYear(today), 'yyyy-MM-dd');
-  const defaultEnd = format(addDays(today, 30), 'yyyy-MM-dd');
+  const defaultEnd = format(today, 'yyyy-MM-dd');
   const [globalStartDate, setGlobalStartDate] = useState(defaultStart);
   const [globalEndDate, setGlobalEndDate] = useState(defaultEnd);
 
@@ -485,11 +483,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
 
   // Filtered + sorted transactions
   const filtered = useMemo(() => {
-    // Exigir expected_date preenchido deixava de fora lançamentos em aberto que só têm
-    // vencimento — agora basta ter uma das duas datas. Regra de "pago" é a estrita.
-    let result = transactions.filter(
-      t => !isEffectivelyPaid(t) && !t.is_transfer && (t.expected_date || t.due_date)
-    );
+    let result = transactions.filter(t => !t.is_paid && (isReceivables ? (t.due_date || t.expected_date) : t.expected_date));
 
     // Global date filter
     if (globalStartDate || globalEndDate) {
@@ -634,60 +628,47 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
     return { receitasPendentes, despesasPendentes };
   }, [finalFiltered]);
 
-  // Saldo corrido + encargos de atraso.
-  // O acúmulo é feito em ordem CRONOLÓGICA de vencimento, independente de como a tabela
-  // está ordenada na tela — antes ele seguia a ordem visual, então trocar para "mais
-  // recente primeiro" produzia um saldo corrido sem sentido.
+  // Running balance with juros/multa
   const rows = useMemo(() => {
-    const ordemCronologica = [...finalFiltered].sort((a, b) => {
-      const da = a.due_date || a.expected_date || '';
-      const db = b.due_date || b.expected_date || '';
-      return da.localeCompare(db);
-    });
-
     let saldoAcumulado = totalBankBalance;
-    const saldoPorId = new Map<string, number>();
-    for (const t of ordemCronologica) {
-      saldoAcumulado += t.type === 'receita' ? Number(t.amount) : -Number(t.amount);
-      saldoPorId.set(t.id, saldoAcumulado);
-    }
-    const saldoFinalProjetado = saldoAcumulado;
 
-    const mapped = finalFiltered.map(t => {
+    return finalFiltered.map(t => {
       const amt = Number(t.amount);
       const status = getStatus(t.is_paid, t.due_date);
       const isHonorarios = t.category?.name === 'Honorários Contábeis';
+      let displayAmount = amt;
+      let hasJuros = false;
+      let jurosValue = 0;
+      let multaValue = 0;
+      let diasAtrasoValue = 0;
 
-      // Multa e juros vêm de financial-utils — as MESMAS constantes enviadas ao Sicoob na
-      // emissão do boleto (2% + 0,07%/dia desde o dia seguinte ao vencimento). Esta tela
-      // usava 0,15%/dia a partir do 5º dia, então informava ao cliente um valor maior do
-      // que o boleto efetivamente cobrava.
-      const encargos = t.type === 'receita' && isHonorarios && status === 'vencido'
-        ? calcularEncargosAtraso(amt, t.due_date)
-        : null;
+      // Multa 2% + juros 0,07%/dia desde o dia seguinte ao vencimento — mesma regra
+      // enviada ao Sicoob na emissão do boleto (financial-utils.ts). Antes esta tela
+      // cobrava 0,15%/dia só a partir do 5º dia, informando ao cliente um valor maior
+      // do que o boleto de fato cobra.
+      if (t.type === 'receita' && isHonorarios && status === 'vencido' && t.due_date) {
+        const encargos = calcularEncargosAtraso(amt, t.due_date);
+        if (encargos.temEncargos) {
+          multaValue = encargos.multa;
+          jurosValue = encargos.juros;
+          displayAmount = encargos.total;
+          hasJuros = true;
+          diasAtrasoValue = encargos.diasAtraso;
+        }
+      }
 
-      return {
-        ...t,
-        status,
-        displayAmount: encargos?.temEncargos ? encargos.total : amt,
-        hasJuros: !!encargos?.temEncargos,
-        originalAmount: amt,
-        saldoAtual: saldoPorId.get(t.id) ?? totalBankBalance,
-        jurosValue: encargos?.juros ?? 0,
-        multaValue: encargos?.multa ?? 0,
-        diasAtrasoValue: encargos?.diasAtraso ?? 0,
-      };
+      if (t.type === 'receita') {
+        saldoAcumulado += amt;
+      } else {
+        saldoAcumulado -= amt;
+      }
+
+      return { ...t, status, displayAmount, hasJuros, originalAmount: amt, saldoAtual: saldoAcumulado, jurosValue, multaValue, diasAtrasoValue };
     });
-
-    return { mapped, saldoFinalProjetado };
   }, [finalFiltered, totalBankBalance]);
 
-  const tableRows = rows.mapped;
-
-  // Saldo projetado ao fim do recorte — mesma fórmula do card de Movimentações
-  // (saldo atual + o que ainda entra − o que ainda sai). Antes era "o saldo da última
-  // linha da tabela", que mudava conforme a ordenação escolhida na tela.
-  const capitalDeGiro = rows.saldoFinalProjetado;
+  // Capital de Giro = last row balance or totalBankBalance
+  const capitalDeGiro = rows.length > 0 ? rows[rows.length - 1].saldoAtual : totalBankBalance;
 
   // Unique receita/despesa amounts for numeric filters
   const receitaAmounts = useMemo(() => finalFiltered.filter(t => t.type === 'receita').map(t => Number(t.amount)), [finalFiltered]);
@@ -742,11 +723,10 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Saldo Projetado</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Capital de Giro</p>
                 <p className={`text-2xl font-extrabold ${capitalDeGiro >= 0 ? 'text-blue-400' : 'text-red-500'}`}>
                   {formatCurrency(capitalDeGiro)}
                 </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Saldo atual + em aberto no período</p>
               </div>
               <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center">
                 <Building2 className="w-4 h-4 text-blue-500" />
@@ -913,13 +893,13 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tableRows.length === 0 ? (
+                  {rows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={isReceivables ? 8 : 10} className="text-center text-muted-foreground py-8">
                         Nenhuma transação encontrada.
                       </TableCell>
                     </TableRow>
-                  ) : tableRows.map(row => (
+                  ) : rows.map(row => (
                     <TableRow key={row.id} className="text-xs">
                       {/* Data Prevista */}
                       {!isReceivables && (
@@ -946,7 +926,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   <p>Multa 2%: {formatCurrency(row.multaValue)}</p>
-                                  <p>Juros 0,15%/dia ({row.diasAtrasoValue} dias): {formatCurrency(row.jurosValue)}</p>
+                                  <p>Juros 0,07%/dia ({row.diasAtrasoValue} dias): {formatCurrency(row.jurosValue)}</p>
                                 </TooltipContent>
                               </Tooltip>
                             </div>

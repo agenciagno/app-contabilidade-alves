@@ -20,28 +20,11 @@ export function getEffectiveAmount(t: { is_paid: boolean; amount: number; paid_a
   return paid && t.paid_amount != null ? Number(t.paid_amount) : Number(t.amount);
 }
 
-/**
- * Data efetiva de um lançamento para exibição/agrupamento: pagamento quando existe,
- * senão vencimento, senão emissão. Mesma ordem do COALESCE usado nas RPCs de agregação
- * (get_dashboard_summary, get_transaction_kpis) — manter as duas em sincronia.
- * Retorna null quando o lançamento não tem nenhuma data (não deve acontecer, mas
- * export e formatação precisam sobreviver a isso — ver histórico de parseISO(null)).
- */
-export function getEffectiveDate(t: {
-  date?: string | null;
-  due_date?: string | null;
-  issue_date?: string | null;
-}): string | null {
-  return t.date || t.due_date || t.issue_date || null;
-}
-
 // ── Encargos por atraso ───────────────────────────────────────────────────────
 // Fonte única das regras de multa e juros. Os mesmos números são enviados ao Sicoob
 // na emissão do boleto (supabase/functions/sicoob-boletos/index.ts) e usados na tela
-// Pagar/Receber. Antes divergiam: o boleto cobrava 0,07%/dia desde o dia seguinte ao
-// vencimento e a tela mostrava 0,15%/dia a partir do 5º dia — a equipe informava ao
-// cliente um valor maior do que o boleto efetivamente cobrava.
-// Regra confirmada por Gabriel em 29/07/2026: vale a do boleto.
+// Pagar/Receber. Confirmado por Gabriel: vale a regra do boleto (0,07%/dia desde o
+// dia seguinte ao vencimento), não a que a tela usava antes (0,15%/dia a partir do 5º dia).
 
 /** Juros de mora ao dia (0,07%), a partir do dia seguinte ao vencimento. */
 export const JUROS_MORA_DIA = 0.0007;

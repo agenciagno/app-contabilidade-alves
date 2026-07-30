@@ -128,11 +128,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       const today = new Date();
       const start = `${monthYear}-01`;
       const end = format(new Date(today.getFullYear(), today.getMonth() + 1, 0), 'yyyy-MM-dd');
-      // Só o que foi pago — mesma regra do painel de Metas & Orçamentos, senão o alerta
-      // de estouro dispara por conta que ainda nem venceu.
       const { data, error } = await supabase.rpc('get_category_breakdown', {
         p_company_id: ownCompanyId!, p_type: 'despesa', p_start_date: start, p_end_date: end, p_limit: 1000,
-        p_only_paid: true,
       });
       if (error) return {} as Record<string, { total: number; name: string }>;
       const map: Record<string, { total: number; name: string }> = {};
@@ -166,16 +163,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const today = startOfDay(new Date());
     const todayStr = format(today, 'yyyy-MM-dd');
 
-    // Inadimplência notifications - group by contact.
-    // Só RECEBÍVEIS: conta a pagar vencida é dívida nossa com fornecedor, não inadimplência
-    // de cliente (o filtro sem `type` rotulava fornecedor como "cliente devendo").
-    // A query-fonte já restringe a is_paid = false e due_date preenchido.
+    // Inadimplência notifications - group by contact
     const overdueByContact = new Map<string, { name: string; count: number; oldestDate: string }>();
-
+    
     filteredTransactions.forEach((t) => {
-      if (t.type !== 'receita') return;
       if (!t.due_date || !t.contact_id || t.due_date >= todayStr) return;
-
+      
       const existing = overdueByContact.get(t.contact_id);
       const contactName = t.contact?.name || 'Cliente';
       
@@ -209,28 +202,19 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       });
     });
 
-    // Vencimentos do dia — entrada e saída separadas. Somar os dois num total só
-    // produzia um número que não significa nada (recebimento cancelando pagamento).
+    // Vencimentos do dia
     const dueTodayTransactions = filteredTransactions.filter(
       (t) => t.due_date && isToday(parseISO(t.due_date))
     );
-
+    
     if (dueTodayTransactions.length > 0) {
-      const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-      const aReceber = dueTodayTransactions.filter((t) => t.type === 'receita');
-      const aPagar = dueTodayTransactions.filter((t) => t.type === 'despesa');
-      const soma = (list: SimpleTransaction[]) => list.reduce((s, t) => s + Number(t.amount), 0);
-
-      const partes: string[] = [];
-      if (aReceber.length) partes.push(`${aReceber.length} a receber (${brl(soma(aReceber))})`);
-      if (aPagar.length) partes.push(`${aPagar.length} a pagar (${brl(soma(aPagar))})`);
-
+      const totalAmount = dueTodayTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
       const id = `vencimento-hoje-${todayStr}`;
       notifications.push({
         id,
         type: 'warning',
         title: 'Vencimentos do Dia',
-        description: `Vencendo hoje: ${partes.join(' · ')}.`,
+        description: `Você tem ${dueTodayTransactions.length} conta(s) vencendo hoje, totalizando R$ ${totalAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`,
         timestamp: new Date(),
         read: readIds.has(id),
         category: 'vencimento',
@@ -276,17 +260,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const totalBalance = banks.reduce((sum, b) => sum + Number(b.current_balance || 0), 0);
     const HORIZON = 30;
     const horizonStr = format(addDays(today, HORIZON), 'yyyy-MM-dd');
-    // Net por vencimento das contas em aberto. O que já venceu e continua em aberto entra
-    // em D0: é obrigação real que ainda vai bater no caixa, e ignorá-la deixava a projeção
-    // otimista (R$ 8,8 mil a pagar vencidos ficavam fora da conta).
+    // Net por vencimento das contas em aberto (a partir de hoje).
     const netByDue = new Map<string, number>();
-    let vencidoEmAberto = 0;
     filteredTransactions.forEach((t) => {
-      if (!t.due_date || t.due_date > horizonStr) return;
+      if (!t.due_date || t.due_date < todayStr || t.due_date > horizonStr) return;
       const net = t.type === 'receita' ? Number(t.amount) : -Number(t.amount);
-      const bucket = t.due_date < todayStr ? todayStr : t.due_date;
-      if (t.due_date < todayStr) vencidoEmAberto += net;
-      netByDue.set(bucket, (netByDue.get(bucket) ?? 0) + net);
+      netByDue.set(t.due_date, (netByDue.get(t.due_date) ?? 0) + net);
     });
     let cum = totalBalance;
     let firstNegDate: string | null = null;
@@ -299,18 +278,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (firstNegDate) {
       const id = `saldo-negativo-${firstNegDate}`;
       const [y, m, d] = firstNegDate.split('-');
-      const nota = vencidoEmAberto !== 0
-        ? ` Inclui R$ ${Math.abs(vencidoEmAberto).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} já vencido em aberto.`
-        : '';
       notifications.push({
         id,
         type: 'error',
         title: 'Projeção de Saldo Negativo',
-        description: `Atenção: a projeção de caixa fica negativa em ${d}/${m}/${y} (saldo previsto R$ ${firstNegSaldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}). Saldo atual: R$ ${totalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.${nota}`,
+        description: `Atenção: a projeção de caixa fica negativa em ${d}/${m}/${y} (saldo previsto R$ ${firstNegSaldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}). Saldo atual: R$ ${totalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`,
         timestamp: new Date(),
         read: readIds.has(id),
         category: 'saldo',
-        actionUrl: '/financeiro/fluxo-caixa',
+        actionUrl: '/relatorios',
       });
     }
 
@@ -329,7 +305,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         timestamp: new Date(),
         read: readIds.has(id),
         category: 'sistema',
-        actionUrl: '/financeiro/metas-orcamentos',
+        actionUrl: '/',
       });
     });
 

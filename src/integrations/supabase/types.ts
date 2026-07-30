@@ -3615,10 +3615,6 @@ export type Database = {
       }
     }
     Functions: {
-      bulk_settle_transactions: {
-        Args: { p_ids: string[]; p_payment_date: string }
-        Returns: number
-      }
       can_access_company: { Args: { _company_id: string }; Returns: boolean }
       cofre_decrypt_internal: {
         Args: { p_encrypted: string; p_key: string }
@@ -3660,7 +3656,6 @@ export type Database = {
           p_contact_id?: string
           p_end_date: string
           p_limit?: number
-          p_only_paid?: boolean
           p_start_date: string
           p_type: string
         }
@@ -3705,16 +3700,9 @@ export type Database = {
         Args: {
           p_bank_id?: string
           p_category_id?: string
-          p_category_ids?: string[]
           p_company_id: string
           p_contact_id?: string
-          p_contact_ids?: string[]
-          p_date_column?: string
           p_end_date?: string
-          p_exclude_bank_ids?: string[]
-          p_include_null_category?: boolean
-          p_include_null_contact?: boolean
-          p_null_bank_only?: boolean
           p_payment_status?: string
           p_search?: string
           p_start_date?: string

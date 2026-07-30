@@ -5,7 +5,6 @@ import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useActiveCompany } from '@/contexts/CompanyContext';
-import { getEffectiveAmount, getEffectiveDate } from '@/lib/financial-utils';
 import { zebraPorData } from '@/lib/pdf-zebra';
 
 interface ReportFilters {
@@ -23,11 +22,9 @@ export interface ReportTransaction {
   id: string;
   description: string;
   amount: number;
-  paid_amount?: number | null;
   type: 'receita' | 'despesa';
-  date: string | null;
+  date: string;
   due_date?: string | null;
-  issue_date?: string | null;
   is_paid: boolean;
   category?: { id: string; name: string; color: string } | null;
   bank?: { id: string; name: string; color: string } | null;
@@ -40,101 +37,64 @@ export function useReportData(filters: ReportFilters) {
     queryKey: ['report-data', activeCompanyId, filters],
     enabled: !!activeCompanyId,
     queryFn: async () => {
-      // Pagina de 1000 em 1000: sem .range() o PostgREST corta em 1000 linhas e devolve
-      // sem erro nenhum, então o relatório truncava em silêncio.
-      const PAGE = 1000;
-      const all: ReportTransaction[] = [];
+      let query = supabase
+        .from('transactions')
+        .select(`
+          id,
+          description,
+          amount,
+          type,
+          date,
+          due_date,
+          is_paid,
+          category:categories(id, name, color),
+          bank:banks(id, name, color),
+          contact:contacts(id, name, type, tax_regime, phone)
+        `)
+        .eq('company_id', activeCompanyId!)
+        .is('deleted_at', null)
+        .eq('is_transfer', false)
+        .order('date', { ascending: false });
 
-      for (let from = 0; ; from += PAGE) {
-        let query = supabase
-          .from('transactions')
-          .select(`
-            id,
-            description,
-            amount,
-            paid_amount,
-            type,
-            date,
-            due_date,
-            issue_date,
-            is_paid,
-            category:categories(id, name, color),
-            bank:banks(id, name, color),
-            contact:contacts(id, name, type, tax_regime, phone)
-          `)
-          .eq('company_id', activeCompanyId!)
-          .is('deleted_at', null)
-          .eq('is_transfer', false)
-          .order('id', { ascending: true })
-          .range(from, from + PAGE - 1);
-
-        // Período pela data efetiva (pagamento → vencimento → emissão), igual às RPCs de
-        // agregação. Filtrar só por `date` deixava de fora TODO lançamento em aberto (que
-        // tem date NULL): o comparativo do Dashboard só enxergava o que já havia sido pago,
-        // e ainda assim divergia dos cards, que somam paid_amount e usam o COALESCE.
-        // PostgREST não filtra expressão, então o recorte de data é aplicado no cliente.
-        if (filters.categoryId && filters.categoryId !== 'all') {
-          query = query.eq('category_id', filters.categoryId);
-        }
-        if (filters.bankId && filters.bankId !== 'all') {
-          query = query.eq('bank_id', filters.bankId);
-        }
-        if (filters.transactionType && filters.transactionType !== 'all') {
-          query = query.eq('type', filters.transactionType);
-        }
-        if (filters.contactId && filters.contactId !== 'all') {
-          query = query.eq('contact_id', filters.contactId);
-        }
-        if (filters.paymentStatus === 'paid') {
-          query = query.eq('is_paid', true).not('date', 'is', null).not('paid_amount', 'is', null);
-        } else if (filters.paymentStatus === 'pending') {
-          query = query.or('is_paid.eq.false,date.is.null,paid_amount.is.null');
-        }
-        // Exclude invisible bank transactions
-        if (filters.invisibleBankIds && filters.invisibleBankIds.length > 0) {
-          const notInFilter = filters.invisibleBankIds.map(id => `bank_id.neq.${id}`).join(',');
-          query = query.or(`bank_id.is.null,and(${notInFilter})`);
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-        const batch = (data ?? []) as ReportTransaction[];
-        all.push(...batch);
-        if (batch.length < PAGE) break;
+      if (filters.startDate) {
+        query = query.gte('date', format(filters.startDate, 'yyyy-MM-dd'));
+      }
+      if (filters.endDate) {
+        query = query.lte('date', format(filters.endDate, 'yyyy-MM-dd'));
+      }
+      if (filters.categoryId && filters.categoryId !== 'all') {
+        query = query.eq('category_id', filters.categoryId);
+      }
+      if (filters.bankId && filters.bankId !== 'all') {
+        query = query.eq('bank_id', filters.bankId);
+      }
+      if (filters.transactionType && filters.transactionType !== 'all') {
+        query = query.eq('type', filters.transactionType);
+      }
+      if (filters.contactId && filters.contactId !== 'all') {
+        query = query.eq('contact_id', filters.contactId);
+      }
+      if (filters.paymentStatus && filters.paymentStatus !== 'all') {
+        query = query.eq('is_paid', filters.paymentStatus === 'paid');
+      }
+      // Exclude invisible bank transactions
+      if (filters.invisibleBankIds && filters.invisibleBankIds.length > 0) {
+        const notInFilter = filters.invisibleBankIds.map(id => `bank_id.neq.${id}`).join(',');
+        query = query.or(`bank_id.is.null,and(${notInFilter})`);
       }
 
-      const start = filters.startDate ? format(filters.startDate, 'yyyy-MM-dd') : null;
-      const end = filters.endDate ? format(filters.endDate, 'yyyy-MM-dd') : null;
-      if (!start && !end) return all;
-
-      return all.filter((t) => {
-        const d = getEffectiveDate(t);
-        if (!d) return false;
-        if (start && d < start) return false;
-        if (end && d > end) return false;
-        return true;
-      });
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as ReportTransaction[];
     },
   });
 }
-
-// Valor efetivo de uma linha do relatório: pago quando liquidado, previsto quando em aberto.
-// Antes tudo somava `amount` cru, então o bloco "Comparativo de Períodos" do Dashboard e o
-// card "Receitas Recebidas" mostravam receitas diferentes para o MESMO mês (R$ 175.852,67 x
-// R$ 172.703,73 em jul/26) — há 491 lançamentos com paid_amount diferente de amount.
-const rowAmount = (t: ReportTransaction) =>
-  getEffectiveAmount({
-    is_paid: t.is_paid,
-    amount: Number(t.amount),
-    paid_amount: t.paid_amount ?? null,
-    date: t.date,
-  });
 
 export function processReportData(transactions: ReportTransaction[]) {
   // Totals
   const totals = transactions.reduce(
     (acc, t) => {
-      const amount = rowAmount(t);
+      const amount = Number(t.amount);
       if (t.type === 'receita') {
         acc.receitas += amount;
       } else {
@@ -153,9 +113,9 @@ export function processReportData(transactions: ReportTransaction[]) {
     const key = `${catName}-${t.type}`;
     const existing = categoryMap.get(key);
     if (existing) {
-      existing.value += rowAmount(t);
+      existing.value += Number(t.amount);
     } else {
-      categoryMap.set(key, { name: catName, value: rowAmount(t), color: catColor, type: t.type });
+      categoryMap.set(key, { name: catName, value: Number(t.amount), color: catColor, type: t.type });
     }
   });
 
@@ -170,13 +130,11 @@ export function processReportData(transactions: ReportTransaction[]) {
   // Monthly breakdown
   const monthlyMap = new Map<string, { month: string; receitas: number; despesas: number }>();
   transactions.forEach((t) => {
-    const eff = getEffectiveDate(t);
-    if (!eff) return; // sem nenhuma data não há como agrupar (parseISO(null) estourava aqui)
-    const monthKey = format(parseISO(eff), 'yyyy-MM');
-    const monthLabel = format(parseISO(eff), 'MMM/yy', { locale: ptBR });
+    const monthKey = format(parseISO(t.date), 'yyyy-MM');
+    const monthLabel = format(parseISO(t.date), 'MMM/yy', { locale: ptBR });
     const existing = monthlyMap.get(monthKey);
-    const amount = rowAmount(t);
-
+    const amount = Number(t.amount);
+    
     if (existing) {
       if (t.type === 'receita') {
         existing.receitas += amount;
@@ -214,15 +172,13 @@ export function processReportData(transactions: ReportTransaction[]) {
   // Weekly breakdown for balance evolution
   const weeklyMap = new Map<string, { week: string; receitas: number; despesas: number }>();
   transactions.forEach((t) => {
-    const eff = getEffectiveDate(t);
-    if (!eff) return;
-    const date = parseISO(eff);
+    const date = parseISO(t.date);
     const weekStart = startOfWeek(date, { weekStartsOn: 0 });
     const weekKey = format(weekStart, 'yyyy-MM-dd');
     const weekLabel = `Sem ${format(weekStart, 'dd/MM', { locale: ptBR })}`;
     const existing = weeklyMap.get(weekKey);
-    const amount = rowAmount(t);
-
+    const amount = Number(t.amount);
+    
     if (existing) {
       if (t.type === 'receita') {
         existing.receitas += amount;
@@ -265,24 +221,16 @@ export function processReportData(transactions: ReportTransaction[]) {
 const formatCurrencyValue = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-/** Data formatada da linha, tolerante a lançamento em aberto (sem data de pagamento). */
-function rowDateBR(t: ReportTransaction): string {
-  const d = getEffectiveDate(t);
-  return d ? format(parseISO(d), 'dd/MM/yyyy') : '—';
-}
-
 export function exportToCSV(transactions: ReportTransaction[]) {
   const headers = ['Data', 'Descrição', 'Tipo', 'Categoria', 'Banco', 'Cliente/Fornecedor', 'Valor', 'Status'];
-  // `parseISO(t.date)` estourava (TypeError) em qualquer lançamento pendente, que tem
-  // date NULL — na prática o botão de exportar não gerava arquivo nenhum.
   const rows = transactions.map((t) => [
-    rowDateBR(t),
+    format(parseISO(t.date), 'dd/MM/yyyy'),
     t.description,
     t.type === 'receita' ? 'Receita' : 'Despesa',
     t.category?.name || 'Sem categoria',
     t.bank?.name || 'Sem banco',
     t.contact?.name || '',
-    rowAmount(t).toFixed(2).replace('.', ','),
+    Number(t.amount).toFixed(2).replace('.', ','),
     t.is_paid ? 'Pago' : 'Pendente',
   ]);
 
@@ -343,20 +291,19 @@ export function exportToPDF(
   doc.setTextColor(40, 40, 40);
   doc.text('Transações', 14, 90);
   
-  // Exporta o relatório inteiro (antes cortava em 50 linhas enquanto o resumo acima
-  // anunciava o total de transações — o PDF não conferia com o próprio cabeçalho).
-  const ordered = [...transactions].sort((a, b) =>
-    (getEffectiveDate(a) ?? '').localeCompare(getEffectiveDate(b) ?? '')
-  );
-  const tableData = ordered.map((t) => [
-    rowDateBR(t),
+  const tableData = transactions.slice(0, 50).map((t) => [
+    format(parseISO(t.date), 'dd/MM/yyyy'),
     t.description.substring(0, 30),
     t.type === 'receita' ? 'Receita' : 'Despesa',
     t.category?.name || '-',
     t.bank?.name || '-',
-    `${t.type === 'receita' ? '+' : '-'} ${formatCurrencyValue(rowAmount(t))}`,
+    `${t.type === 'receita' ? '+' : '-'} ${formatCurrencyValue(Number(t.amount))}`,
     t.is_paid ? 'Pago' : 'Pendente',
   ]);
+  
+  // Destaque agrupado por data (não linha sim/linha não): todas as linhas do mesmo dia
+  // saem no mesmo tom (cinza ou branco), alternando quando a data muda.
+  const chavesDeData = transactions.slice(0, 50).map((t) => format(parseISO(t.date), 'dd/MM/yyyy'));
 
   autoTable(doc, {
     startY: 95,
@@ -373,7 +320,7 @@ export function exportToPDF(
       lineColor: [235, 238, 242],
       lineWidth: 0.1,
     },
-    ...zebraPorData(ordered.map(rowDateBR)),
+    ...zebraPorData(chavesDeData),
   });
   
   // Footer

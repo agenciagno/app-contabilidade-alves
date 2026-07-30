@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useActiveCompany } from '@/contexts/CompanyContext';
 
 // A API devolve valores monetários como string (ex.: "427.00") — não converter pra number na
 // interface, os componentes formatam com Intl.NumberFormat, que aceita string numérica direto.
@@ -56,20 +55,16 @@ async function invoke<T>(action: string, body: Record<string, unknown> = {}): Pr
 export function useSicoobConciliacao(mes: number, ano: number) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  // Escopo explícito de empresa: as queries dependiam só da RLS e as chaves de cache não
-  // tinham a empresa, então saldo/extrato/boletos de um tenant podiam ser servidos do
-  // cache para outro assim que o módulo for vendido a um segundo cliente.
-  const { activeCompanyId } = useActiveCompany();
 
   const saldoQuery = useQuery({
-    queryKey: ['sicoob-saldo', activeCompanyId],
+    queryKey: ['sicoob-saldo'],
     queryFn: () => invoke<SicoobSaldo>('saldo'),
     staleTime: 1000 * 60,
     retry: false,
   });
 
   const extratoQuery = useQuery({
-    queryKey: ['sicoob-extrato', activeCompanyId, mes, ano],
+    queryKey: ['sicoob-extrato', mes, ano],
     queryFn: () => invoke<SicoobExtrato>('extrato', { mes, ano }),
     staleTime: 1000 * 60,
     retry: false,
@@ -79,12 +74,11 @@ export function useSicoobConciliacao(mes: number, ano: number) {
   // Tabela é pequena (algumas centenas de linhas); não vale a pena filtrar por mês aqui e correr
   // risco de perder boleto pago fora do mês de vencimento.
   const boletosQuery = useQuery({
-    queryKey: ['boleto-controls-para-match', activeCompanyId],
+    queryKey: ['boleto-controls-para-match'],
     queryFn: async (): Promise<BoletoParaMatch[]> => {
       const { data, error } = await (supabase as any)
         .from('boleto_controls')
         .select('id, nosso_numero, valor, status, data_vencimento, data_pagamento, contacts:contact_id ( name )')
-        .eq('company_id', activeCompanyId!)
         .not('nosso_numero', 'is', null);
       if (error) throw error;
       return (data || []).map((b: any) => ({
@@ -97,7 +91,6 @@ export function useSicoobConciliacao(mes: number, ano: number) {
         contact_name: b.contacts?.name ?? '—',
       }));
     },
-    enabled: !!activeCompanyId,
     staleTime: 1000 * 30,
   });
 

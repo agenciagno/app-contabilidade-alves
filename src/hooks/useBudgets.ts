@@ -45,9 +45,6 @@ export function useBudgets(monthYear: string) {
     },
   });
 
-  // "Realizado" = o que foi efetivamente PAGO no mês (p_only_paid).
-  // Sem esse flag a RPC somava todo lançamento do período, pago ou não — uma conta que
-  // ainda ia vencer já contava como gasto e podia disparar o alerta de orçamento estourado.
   const realizadoQuery = useQuery({
     queryKey: ['budget-realizado', companyId, monthYear],
     enabled: !!companyId,
@@ -58,7 +55,6 @@ export function useBudgets(monthYear: string) {
         p_start_date: start,
         p_end_date: end,
         p_limit: 1000,
-        p_only_paid: true,
       });
       if (error) throw error;
       const map: Record<string, number> = {};

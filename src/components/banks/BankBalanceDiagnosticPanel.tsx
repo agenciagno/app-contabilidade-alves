@@ -7,7 +7,6 @@ import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import { useBanks } from '@/hooks/useBanks';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { useActiveCompany } from '@/contexts/CompanyContext';
 
 function fmt(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -15,7 +14,7 @@ function fmt(v: number) {
 
 const PAGE_SIZE = 1000;
 
-async function fetchAllPaidTxThisYear(companyId: string) {
+async function fetchAllPaidTxThisYear() {
   const firstOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
   const today = new Date().toISOString().split('T')[0];
   let all: any[] = [];
@@ -24,7 +23,6 @@ async function fetchAllPaidTxThisYear(companyId: string) {
     const { data, error } = await supabase
       .from('transactions')
       .select('id, bank_id, type, amount, paid_amount, date, is_paid')
-      .eq('company_id', companyId)
       .is('deleted_at', null)
       .eq('is_paid', true)
       .gte('date', firstOfYear)
@@ -41,7 +39,7 @@ async function fetchAllPaidTxThisYear(companyId: string) {
   return all;
 }
 
-async function fetchAllPriorPaidTx(companyId: string) {
+async function fetchAllPriorPaidTx() {
   const firstOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
   let all: any[] = [];
   let offset = 0;
@@ -49,7 +47,6 @@ async function fetchAllPriorPaidTx(companyId: string) {
     const { data, error } = await supabase
       .from('transactions')
       .select('id, bank_id, type, amount, paid_amount')
-      .eq('company_id', companyId)
       .is('deleted_at', null)
       .eq('is_paid', true)
       .lt('date', firstOfYear)
@@ -68,20 +65,19 @@ async function fetchAllPriorPaidTx(companyId: string) {
 export function BankBalanceDiagnosticPanel() {
   const { isSuperAdmin } = useSuperAdmin();
   const { banks } = useBanks();
-  const { activeCompanyId } = useActiveCompany();
   const [open, setOpen] = useState(false);
 
   const { data: paidThisYear = [] } = useQuery({
-    queryKey: ['diag-paid-this-year', activeCompanyId],
-    queryFn: () => fetchAllPaidTxThisYear(activeCompanyId!),
-    enabled: isSuperAdmin && open && !!activeCompanyId,
+    queryKey: ['diag-paid-this-year'],
+    queryFn: fetchAllPaidTxThisYear,
+    enabled: isSuperAdmin && open,
     staleTime: 1000 * 30,
   });
 
   const { data: priorPaid = [] } = useQuery({
-    queryKey: ['diag-prior-paid', activeCompanyId],
-    queryFn: () => fetchAllPriorPaidTx(activeCompanyId!),
-    enabled: isSuperAdmin && open && !!activeCompanyId,
+    queryKey: ['diag-prior-paid'],
+    queryFn: fetchAllPriorPaidTx,
+    enabled: isSuperAdmin && open,
     staleTime: 1000 * 30,
   });
 

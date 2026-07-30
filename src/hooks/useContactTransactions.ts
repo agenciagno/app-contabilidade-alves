@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useActiveCompany } from '@/contexts/CompanyContext';
 
 export interface ContactTransaction {
   id: string;
@@ -17,10 +16,8 @@ export interface ContactTransaction {
 }
 
 export function useContactTransactions(contactId: string | undefined, invisibleBankIds?: string[]) {
-  // Filtro de empresa explícito (defesa em profundidade — não substitui a RLS).
-  const { activeCompanyId } = useActiveCompany();
   return useQuery({
-    queryKey: ['contact-transactions', activeCompanyId, contactId, invisibleBankIds],
+    queryKey: ['contact-transactions', contactId, invisibleBankIds],
     queryFn: async () => {
       if (!contactId) return [];
       
@@ -40,7 +37,6 @@ export function useContactTransactions(contactId: string | undefined, invisibleB
           bank:banks(id, name)
         `)
         .is('deleted_at', null)
-        .eq('company_id', activeCompanyId!)
         .eq('contact_id', contactId);
 
       // Exclude transactions from invisible banks
@@ -54,7 +50,7 @@ export function useContactTransactions(contactId: string | undefined, invisibleB
       if (error) throw error;
       return data as ContactTransaction[];
     },
-    enabled: !!contactId && !!activeCompanyId,
+    enabled: !!contactId,
   });
 }
 

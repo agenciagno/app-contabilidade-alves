@@ -31,9 +31,10 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { format, parseISO, startOfMonth, endOfMonth, subMonths, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
 import { DashboardWidgetsConfig, useDashboardWidgets } from '@/components/dashboard/DashboardWidgets';
 import { UnifiedFilterBox, PeriodFilter, getDateRangeFromPeriod } from '@/components/filters/UnifiedFilterBox';
-import { exportToCSV, exportToPDF } from '@/hooks/useReportData';
+import { exportToCSV, exportToPDF, useReportData, processReportData } from '@/hooks/useReportData';
 import { PeriodComparison } from '@/components/reports/PeriodComparison';
 import { BudgetTracker } from '@/components/financeiro/BudgetTracker';
 import { FinancialHealthBadge } from '@/components/financeiro/FinancialHealthBadge';
@@ -60,6 +61,7 @@ const CHART_COLORS = [
 ];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const now = new Date();
 
   const { widgets, toggleWidget, isWidgetEnabled } = useDashboardWidgets();
@@ -129,15 +131,11 @@ export default function Dashboard() {
   const currentYear = now.getFullYear();
   const { data: annualRpc, isLoading: loadingAnnual } = useAnnualMetrics(currentYear);
   const { data: monthlyRpc, isLoading: loadingMonthly } = useMonthlyEvolution(6);
-  // Busca TODAS as categorias (limite alto) e agrupa a cauda em "Outros" no cliente.
-  // Antes o RPC devolvia só o top 5 e o Recharts calculava a porcentagem sobre esse
-  // subconjunto: uma categoria que era 30% da despesa real aparecia rotulada como 45%,
-  // e as fatias não somavam o total.
   const { data: categoryRpc, isLoading: loadingCategory } = useCategoryBreakdown(
     'despesa',
     _summaryRange.start,
     _summaryRange.end,
-    1000,
+    5,
     {
       bankId: _summaryFilters.bankId,
       contactId: _summaryFilters.contactId,
@@ -147,7 +145,7 @@ export default function Dashboard() {
     'receita',
     _summaryRange.start,
     _summaryRange.end,
-    1000,
+    5,
     {
       bankId: _summaryFilters.bankId,
       contactId: _summaryFilters.contactId,
@@ -204,13 +202,10 @@ export default function Dashboard() {
     });
   }, [monthlyRpc]);
 
-  // Top N categorias + fatia "Outros" com a cauda, para que as porcentagens da pizza
-  // fechem 100% do total real do período.
-  const TOP_CATEGORIAS = 5;
-  const montarPizza = (
-    rows: { category_id: string | null; category_name: string | null; total: number | string }[] | undefined,
-  ) => {
-    const todas = (rows ?? []).map((r, idx) => {
+  // Category chart data (expenses) — colors looked up from categories list
+  const categoryChartData = useMemo(() => {
+    const rows = categoryRpc ?? [];
+    return rows.map((r, idx) => {
       const cat = r.category_id ? categories.find(c => c.id === r.category_id) : null;
       return {
         name: r.category_name || 'Sem categoria',
@@ -218,87 +213,57 @@ export default function Dashboard() {
         color: cat?.color || CHART_COLORS[idx % CHART_COLORS.length],
       };
     });
-    if (todas.length <= TOP_CATEGORIAS + 1) return todas;
+  }, [categoryRpc, categories]);
 
-    const top = todas.slice(0, TOP_CATEGORIAS);
-    const resto = todas.slice(TOP_CATEGORIAS).reduce((s, c) => s + c.value, 0);
-    return [...top, { name: `Outros (${todas.length - TOP_CATEGORIAS})`, value: resto, color: 'hsl(215 16% 65%)' }];
-  };
 
-  const categoryChartData = useMemo(() => montarPizza(categoryRpc), [categoryRpc, categories]);
-  const revenueCategoryChartData = useMemo(() => montarPizza(revenueCategoryRpc), [revenueCategoryRpc, categories]);
+  // Revenue category chart data (via RPC)
+  const revenueCategoryChartData = useMemo(() => {
+    const rows = revenueCategoryRpc ?? [];
+    return rows.map((r, idx) => {
+      const cat = r.category_id ? categories.find(c => c.id === r.category_id) : null;
+      return {
+        name: r.category_name || 'Sem categoria',
+        value: Number(r.total) || 0,
+        color: cat?.color || CHART_COLORS[idx % CHART_COLORS.length],
+      };
+    });
+  }, [revenueCategoryRpc, categories]);
 
-  // Period comparison data.
-  // Antes buscava a tabela INTEIRA da empresa (paginada, 1000 em 1000, via useReportData) e
-  // filtrava por mês no cliente, só para chegar em 2 números. Isso tinha dois problemas:
-  // (1) a busca demora vários round-trips, e enquanto ela ainda não terminou o hook devolve
-  //     `data: []` por padrão — e `hasData()` no PeriodComparison não distingue "carregando"
-  //     de "não tem nada", então mostrava "Sem dados no período anterior" mesmo com Junho
-  //     cheio de lançamento, só porque a resposta ainda não tinha chegado.
-  // (2) reimplementava em JS uma soma que a RPC get_dashboard_summary já faz no Postgres —
-  //     a mesma que alimenta os cards do topo desta tela, com a mesma regra de "pago".
-  // Agora usa a RPC (1 chamada por mês, não uma varredura da tabela inteira) e o card
-  // fica coerente com "Receitas Recebidas"/"Contas Pagas" logo acima: comparação de
-  // REALIZADO (o que entrou/saiu de fato), não do que ainda estava previsto.
+  // Period comparison data
   const thisMonthStart = startOfMonth(now);
   const lastMonthStart = startOfMonth(subMonths(now, 1));
   const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
-  const { data: thisMonthSummary, isLoading: loadingThisMonthCmp } = useDashboardSummary(
-    format(thisMonthStart, 'yyyy-MM-dd'),
-    format(now, 'yyyy-MM-dd'),
+  const invisibleBankIdArray = useMemo<string[]>(
+    () => banks.filter(b => b.is_invisible).map(b => b.id),
+    [banks],
   );
-  const { data: lastMonthSummary, isLoading: loadingLastMonthCmp } = useDashboardSummary(
-    format(lastMonthStart, 'yyyy-MM-dd'),
-    format(lastMonthEnd, 'yyyy-MM-dd'),
-  );
+  const { data: thisMonthTx = [] } = useReportData({ startDate: thisMonthStart, endDate: now, invisibleBankIds: invisibleBankIdArray });
+  const { data: lastMonthTx = [] } = useReportData({ startDate: lastMonthStart, endDate: lastMonthEnd, invisibleBankIds: invisibleBankIdArray });
 
-  const thisMonthData = useMemo(() => ({
-    receitas: Number(thisMonthSummary?.receitas_pagas ?? 0),
-    despesas: Number(thisMonthSummary?.despesas_pagas ?? 0),
-  }), [thisMonthSummary]);
-  const lastMonthData = useMemo(() => ({
-    receitas: Number(lastMonthSummary?.receitas_pagas ?? 0),
-    despesas: Number(lastMonthSummary?.despesas_pagas ?? 0),
-  }), [lastMonthSummary]);
-  const loadingComparison = loadingThisMonthCmp || loadingLastMonthCmp;
+  const thisMonthData = useMemo(() => processReportData(thisMonthTx), [thisMonthTx]);
+  const lastMonthData = useMemo(() => processReportData(lastMonthTx), [lastMonthTx]);
 
   const isLoading = loadingBanks || loadingSummary || loadingAnnual || loadingMonthly || loadingCategory;
 
-  // Lazy fetch for exports — only runs when user clicks export.
-  // Pagina de 1000 em 1000: sem .range() o PostgREST corta em 1000 linhas sem erro nenhum,
-  // então a exportação truncava em silêncio.
+  // Lazy fetch for exports — only runs when user clicks export
   const fetchExportData = async () => {
-    const PAGE = 1000;
-    const rows: any[] = [];
-    try {
-      for (let from = 0; ; from += PAGE) {
-        let query = supabase
-          .from('transactions')
-          .select('*, category:categories(id, name, color), bank:banks(id, name, color), contact:contacts(id, name, type)')
-          .eq('company_id', activeCompanyId!)
-          .is('deleted_at', null)
-          .eq('is_transfer', false)
-          .order('id', { ascending: true })
-          .range(from, from + PAGE - 1);
+    let query = supabase
+      .from('transactions')
+      .select('*, category:categories(id, name, color), bank:banks(id, name, color), contact:contacts(id, name, type)')
+      .eq('company_id', activeCompanyId!)
+      .is('deleted_at', null)
+      .eq('is_transfer', false)
+      .order('date', { ascending: false });
 
-        if (selectedBankId !== 'all') query = query.eq('bank_id', selectedBankId);
-        if (categoryFilter !== 'all') query = query.eq('category_id', categoryFilter);
-        if (contactFilter !== 'all') query = query.eq('contact_id', contactFilter);
-        // Regra estrita de "pago", igual às RPCs que alimentam os cards desta mesma tela.
-        if (paymentStatusFilter === 'paid') {
-          query = query.eq('is_paid', true).not('date', 'is', null).not('paid_amount', 'is', null);
-        } else if (paymentStatusFilter === 'pending') {
-          query = query.or('is_paid.eq.false,date.is.null,paid_amount.is.null');
-        }
+    if (selectedBankId !== 'all') query = query.eq('bank_id', selectedBankId);
+    if (categoryFilter !== 'all') query = query.eq('category_id', categoryFilter);
+    if (contactFilter !== 'all') query = query.eq('contact_id', contactFilter);
+    if (paymentStatusFilter === 'paid') query = query.eq('is_paid', true);
+    if (paymentStatusFilter === 'pending') query = query.eq('is_paid', false);
 
-        const { data, error } = await query;
-        if (error) throw error;
-        const batch = data ?? [];
-        rows.push(...batch);
-        if (batch.length < PAGE) break;
-      }
-    } catch {
+    const { data, error } = await query;
+    if (error || !data) {
       toast.error('Erro ao carregar dados para exportação');
       return [] as any[];
     }
@@ -306,23 +271,20 @@ export default function Dashboard() {
     // Date filter (COALESCE date/due_date/issue_date) — applied client-side after fetch
     const dateRange = getDateRange();
     const filtered = dateRange
-      ? rows.filter((t: any) => {
+      ? data.filter((t: any) => {
           const d = t.date || t.due_date || t.issue_date;
           if (!d) return false;
           const txDate = parseISO(d);
           return isWithinInterval(txDate, { start: dateRange.start, end: dateRange.end });
         })
-      : rows;
+      : data;
 
     return filtered.map((t: any) => ({
       id: t.id,
       description: t.description,
       amount: Number(t.amount),
-      paid_amount: t.paid_amount,
       type: t.type,
       date: t.date,
-      due_date: t.due_date,
-      issue_date: t.issue_date,
       is_paid: t.is_paid,
       category: t.category ? { id: t.category.id, name: t.category.name, color: t.category.color || '' } : null,
       bank: t.bank ? { id: t.bank.id, name: t.bank.name, color: t.bank.color || '' } : null,
@@ -398,6 +360,10 @@ export default function Dashboard() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button variant="outline" size="sm" onClick={() => navigate('/relatorios')}>
+            <FileText className="w-4 h-4 mr-2" />
+            Relatórios
+          </Button>
         </div>
       </div>
 
@@ -734,16 +700,15 @@ export default function Dashboard() {
       {/* Period Comparison */}
       {isWidgetEnabled('periodComparison') && (
         <PeriodComparison
-          isLoading={loadingComparison}
           currentPeriod={{
-            receitas: thisMonthData.receitas,
-            despesas: thisMonthData.despesas,
-            saldo: thisMonthData.receitas - thisMonthData.despesas,
+            receitas: thisMonthData.totals.receitas,
+            despesas: thisMonthData.totals.despesas,
+            saldo: thisMonthData.totals.receitas - thisMonthData.totals.despesas,
           }}
           previousPeriod={{
-            receitas: lastMonthData.receitas,
-            despesas: lastMonthData.despesas,
-            saldo: lastMonthData.receitas - lastMonthData.despesas,
+            receitas: lastMonthData.totals.receitas,
+            despesas: lastMonthData.totals.despesas,
+            saldo: lastMonthData.totals.receitas - lastMonthData.totals.despesas,
           }}
         />
       )}

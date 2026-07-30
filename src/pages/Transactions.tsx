@@ -11,10 +11,8 @@ import {
   Building2, CheckCircle2, Search, Filter, X, ArrowUpDown, CircleDollarSign, ArrowLeftRight
 } from 'lucide-react';
 import { useTransactions, Transaction, TransactionInsert } from '@/hooks/useTransactions';
-import { useServerTransactions, useTransactionKPIs, useDistinctTransactionValues, fetchFilteredTransactionsForExport, PAGE_SIZE, ServerFilters, IS_EMPTY } from '@/hooks/useServerTransactions';
-import { isEffectivelyPaid, getEffectiveDate } from '@/lib/financial-utils';
-import { useActiveCompany } from '@/contexts/CompanyContext';
-import { useToast } from '@/hooks/use-toast';
+import { useServerTransactions, useTransactionKPIs, useDistinctTransactionValues, PAGE_SIZE, ServerFilters, IS_EMPTY } from '@/hooks/useServerTransactions';
+import { isEffectivelyPaid } from '@/lib/financial-utils';
 import { useCategories } from '@/hooks/useCategories';
 import { useBanks } from '@/hooks/useBanks';
 import { useContacts } from '@/hooks/useContacts';
@@ -628,27 +626,13 @@ function PaginationControls({ currentPage, totalPages, totalCount, onPageChange,
   );
 }
 
-// Período inicial da tela: mês corrente, por VENCIMENTO.
-// Antes a tela abria sem nenhum filtro de data e os cards agregavam o histórico inteiro
-// (01/1999 a 09/2029) enquanto o rodapé deles escrevia o nome do mês atual — "Lucro
-// Previsto · Julho" mostrava −R$ 458 mil no lugar dos −R$ 2,1 mil de julho.
-function currentMonthRange() {
-  const now = new Date();
-  return {
-    start: format(startOfMonth(now), 'yyyy-MM-dd'),
-    end: format(endOfMonth(now), 'yyyy-MM-dd'),
-  };
-}
-
 export default function Transactions() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [bankFilter, setBankFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
-  const [columnFilters, setColumnFilters] = useState<ColumnFilters>(() => ({
-    due_date: currentMonthRange(),
-  }));
+  const [columnFilters, setColumnFilters] = useState<ColumnFilters>({});
   const [currentPage, setCurrentPage] = useState(1);
 
   const [sortField, setSortField] = useState<SortField>('due_date');
@@ -664,8 +648,6 @@ export default function Transactions() {
   const { banks, createBank } = useBanks();
   const { contacts, createContact } = useContacts();
   const { uploadAttachment } = useTransactionAttachments();
-  const { activeCompanyId } = useActiveCompany();
-  const { toast } = useToast();
 
   // Build server filters object
   const invisibleBankIds = useMemo(() => banks.filter(b => b.is_invisible).map(b => b.id), [banks]);
@@ -721,40 +703,24 @@ export default function Transactions() {
     return { totalBalance };
   }, [banks]);
 
-  // Rótulo do período realmente filtrado. Os cards escreviam o nome do mês corrente
-  // independentemente do filtro — agora dizem o recorte que estão de fato somando.
-  const periodoLabel = useMemo(() => {
-    const col = columnFilters.date ? 'date'
-      : columnFilters.due_date ? 'due_date'
-      : columnFilters.issue_date ? 'issue_date'
-      : columnFilters.expected_date ? 'expected_date'
-      : null;
-    const range = col ? columnFilters[col] : undefined;
-    if (!range?.start && !range?.end) return 'Todo o período';
+  // BI Ticker — uses allTransactions from original hook for global metrics
+  const biMetrics = useMemo(() => {
+    const today = new Date();
+    const monthStart = startOfMonth(today);
+    const monthEnd = endOfMonth(today);
+    const monthStartStr = format(monthStart, 'yyyy-MM-dd');
+    const monthEndStr = format(monthEnd, 'yyyy-MM-dd');
 
-    const fmt = (s?: string) => (s ? format(new Date(s + 'T12:00:00'), 'dd/MM/yy') : '…');
-    // Mês fechado vira só o nome do mês, que é o caso normal.
-    if (range?.start && range?.end) {
-      const ini = new Date(range.start + 'T12:00:00');
-      const fim = new Date(range.end + 'T12:00:00');
-      const mesmoMes = ini.getMonth() === fim.getMonth() && ini.getFullYear() === fim.getFullYear();
-      if (mesmoMes && ini.getDate() === 1 && fim.getDate() === endOfMonth(fim).getDate()) {
-        return format(ini, "MMMM 'de' yyyy", { locale: ptBR }).replace(/^\w/, c => c.toUpperCase());
-      }
-    }
-    return `${fmt(range?.start)} – ${fmt(range?.end)}`;
-  }, [columnFilters]);
-
-  const biMetrics = useMemo(() => ({
-    contasEmAtraso: kpis.contasEmAtraso,
-    receitasEmAtraso: kpis.receitasEmAtraso,
-    // Saldo atual das contas + o que ainda vai entrar e sair dentro do período filtrado.
-    saldoProjetado: bankTotals.totalBalance + kpis.receitasPendentes - kpis.despesasPendentes,
-    // Receitas − despesas do período, pagas e em aberto.
-    resultadoPeriodo: (kpis.receitasPagas + kpis.receitasPendentes) - (kpis.despesasPagas + kpis.despesasPendentes),
-    acumuladoReceitas: kpis.receitasPagas,
-    acumuladoDespesas: kpis.despesasPagas,
-  }), [kpis, bankTotals]);
+    return {
+      contasEmAtraso: kpis.contasEmAtraso,
+      receitasEmAtraso: kpis.receitasEmAtraso,
+      capitalDeGiroMes: bankTotals.totalBalance + kpis.receitasPendentes - kpis.despesasPendentes,
+      capitalDeGiroHoje: bankTotals.totalBalance + kpis.receitasPendentes - kpis.despesasPendentes,
+      lucroPrevisto: (kpis.receitasPagas + kpis.receitasPendentes) - (kpis.despesasPagas + kpis.despesasPendentes),
+      acumuladoReceitas: kpis.receitasPagas,
+      acumuladoDespesas: kpis.despesasPagas,
+    };
+  }, [kpis, bankTotals]);
 
   // Contact options for the multi-filter (from contacts list, not transactions)
   const uniqueContactOptions = useMemo(() => {
@@ -842,20 +808,7 @@ export default function Transactions() {
     });
   };
 
-  // "Limpar" volta ao mês corrente (o estado inicial), não a "todo o histórico" — abrir a
-  // tela com 30 anos de lançamentos agregados nos cards é o que gerava os números irreais.
-  // O botão só aparece quando há algo além do período padrão.
-  const defaultRange = currentMonthRange();
-  const hasActiveColumnFilters = useMemo(() => {
-    const keys = Object.keys(columnFilters);
-    if (keys.length === 0) return false;
-    const isDefaultOnly =
-      keys.length === 1 &&
-      keys[0] === 'due_date' &&
-      columnFilters.due_date?.start === defaultRange.start &&
-      columnFilters.due_date?.end === defaultRange.end;
-    return !isDefaultOnly;
-  }, [columnFilters, defaultRange.start, defaultRange.end]);
+  const hasActiveColumnFilters = Object.keys(columnFilters).length > 0;
 
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
@@ -869,40 +822,13 @@ export default function Transactions() {
     );
   }
 
-  // Exporta o conjunto filtrado inteiro, não a página. `date` cai para vencimento/emissão
-  // quando o lançamento ainda não foi pago — com null, o formatador de data quebrava
-  // (parseISO(null)) e a exportação não gerava arquivo nenhum.
-  const exportTransactions = async (): Promise<ReportTransaction[]> => {
-    const rows = activeCompanyId
-      ? await fetchFilteredTransactionsForExport(activeCompanyId, serverFilters)
-      : transactions;
-    return rows.map(t => ({
-      id: t.id,
-      description: t.description,
-      amount: Number(t.amount),
-      type: t.type as 'receita' | 'despesa',
-      date: getEffectiveDate(t) as string,
-      due_date: t.due_date,
-      is_paid: t.is_paid,
-      category: t.category ? { id: t.category.id, name: t.category.name, color: t.category.color || '#6B7280' } : null,
-      bank: t.bank ? { id: t.bank.id, name: t.bank.name, color: t.bank.color || '#3B82F6' } : null,
-      contact: t.contact ? { id: t.contact.id, name: t.contact.name, type: t.contact.type } : null,
-    })) as ReportTransaction[];
-  };
-
-  const handleExport = async (kind: 'csv' | 'pdf') => {
-    try {
-      const rows = await exportTransactions();
-      if (!rows.length) {
-        toast({ title: 'Nenhum lançamento no filtro atual para exportar.' });
-        return;
-      }
-      if (kind === 'csv') exportToCSV(rows);
-      else exportToPDF(rows, totals);
-    } catch (e: any) {
-      toast({ title: 'Erro ao exportar', description: e?.message, variant: 'destructive' });
-    }
-  };
+  const exportTransactions = () => transactions.map(t => ({
+    id: t.id, description: t.description, amount: Number(t.amount), type: t.type as 'receita' | 'despesa',
+    date: t.date, is_paid: t.is_paid,
+    category: t.category ? { id: t.category.id, name: t.category.name, color: t.category.color || '#6B7280' } : null,
+    bank: t.bank ? { id: t.bank.id, name: t.bank.name, color: t.bank.color || '#3B82F6' } : null,
+    contact: t.contact ? { id: t.contact.id, name: t.contact.name, type: t.contact.type } : null,
+  })) as ReportTransaction[];
 
 
   return (
@@ -921,10 +847,10 @@ export default function Transactions() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExport('csv')} className="gap-2">
+              <DropdownMenuItem onClick={() => exportToCSV(exportTransactions())} className="gap-2">
                 <FileSpreadsheet className="w-4 h-4" /> CSV
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('pdf')} className="gap-2">
+              <DropdownMenuItem onClick={() => { exportToPDF(exportTransactions(), totals); }} className="gap-2">
                 <FileText className="w-4 h-4" /> PDF
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -987,20 +913,19 @@ export default function Transactions() {
           <CardContent className="px-3 py-[10px] min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <Building2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Saldo Projetado</p>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Capital de Giro</p>
             </div>
-            <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.saldoProjetado >= 0 ? 'text-blue-400' : 'text-red-500'}`}>{formatCurrency(biMetrics.saldoProjetado)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Saldo + em aberto no período</p>
+            <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.capitalDeGiroMes >= 0 ? 'text-blue-400' : 'text-red-500'}`}>{formatCurrency(biMetrics.capitalDeGiroMes)}</p>
           </CardContent>
         </Card>
         <Card className="border-l-2 border-l-emerald-500">
           <CardContent className="px-3 py-[10px] min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <BarChart3 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Resultado do Período</p>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Lucro Previsto</p>
             </div>
-            <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.resultadoPeriodo >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{formatCurrency(biMetrics.resultadoPeriodo)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{periodoLabel}</p>
+            <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.lucroPrevisto >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{formatCurrency(biMetrics.lucroPrevisto)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{format(new Date(), 'MMMM', { locale: ptBR }).replace(/^\w/, c => c.toUpperCase())}</p>
           </CardContent>
         </Card>
         <Card className="border-l-2 border-l-amber-500">
@@ -1010,7 +935,7 @@ export default function Transactions() {
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Realizado</p>
             </div>
             <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.acumuladoReceitas - biMetrics.acumuladoDespesas >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{formatCurrency(biMetrics.acumuladoReceitas - biMetrics.acumuladoDespesas)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{periodoLabel}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{format(new Date(), 'MMMM', { locale: ptBR }).replace(/^\w/, c => c.toUpperCase())}</p>
           </CardContent>
         </Card>
       </div>
@@ -1097,7 +1022,7 @@ export default function Transactions() {
           </Popover>
 
           {hasActiveColumnFilters && (
-            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 text-muted-foreground" onClick={() => setColumnFilters({ due_date: currentMonthRange() })}>
+            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 text-muted-foreground" onClick={() => setColumnFilters({})}>
               <X className="w-3 h-3" /> Limpar filtros de coluna
             </Button>
           )}

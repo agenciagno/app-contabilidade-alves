@@ -78,12 +78,9 @@ function classificar(c: Candidatos): CompStatus {
 }
 
 export default function ConciliacaoSicoob() {
-  // getMonthOptions() devolve do mais recente para o mais antigo (monta -5..0 e inverte),
-  // então o mês corrente é o índice 0. O default lia o ÚLTIMO item — ou seja, a tela abria
-  // no extrato de 5 meses atrás.
   const monthOptions = useMemo(() => getMonthOptions(), []);
-  const [periodo, setPeriodo] = useState(() => monthOptions[0].value);
-  const selected = monthOptions.find((m) => m.value === periodo) ?? monthOptions[0];
+  const [periodo, setPeriodo] = useState(() => monthOptions[monthOptions.length - 1].value);
+  const selected = monthOptions.find((m) => m.value === periodo) ?? monthOptions[monthOptions.length - 1];
 
   const {
     saldo, saldoLoading, saldoError,

@@ -45,9 +45,7 @@ async function fetchAllPriorRows(
   companyId: string,
   bankId: string | 'all',
   activeBankIds: string[],
-  startDate: string,
-  contactId?: string | null,
-  categoryId?: string | null
+  startDate: string
 ) {
   let allData: any[] = [];
   let offset = 0;
@@ -67,13 +65,6 @@ async function fetchAllPriorRows(
     } else {
       return [];
     }
-
-    // Os filtros de contato/categoria precisam valer também para o saldo de ABERTURA.
-    // Sem isso, filtrar o extrato por um cliente abria com o saldo global do período
-    // anterior e somava só as linhas daquele cliente — a coluna "Saldo" ficava
-    // aritmeticamente incoerente com as linhas exibidas.
-    if (contactId) query = query.eq('contact_id', contactId);
-    if (categoryId) query = query.eq('category_id', categoryId);
 
     query = query.order('created_at', { ascending: true }).order('id', { ascending: true });
 
@@ -146,8 +137,8 @@ export function useBankTransactions(
   const activeBankIds = banks.filter(b => b.is_active).map(b => b.id);
 
   const { data: priorTransactions = [], isLoading: isLoadingPrior } = useQuery({
-    queryKey: ['bank-transactions-prior', activeCompanyId, bankId, startDate, contactId, categoryId],
-    queryFn: () => fetchAllPriorRows(activeCompanyId!, bankId, activeBankIds, startDate!, contactId, categoryId),
+    queryKey: ['bank-transactions-prior', activeCompanyId, bankId, startDate],
+    queryFn: () => fetchAllPriorRows(activeCompanyId!, bankId, activeBankIds, startDate!),
     enabled: !!startDate && !!activeCompanyId,
     staleTime: 1000 * 30,
   });
@@ -159,14 +150,8 @@ export function useBankTransactions(
     staleTime: 1000 * 30,
   });
 
-  // Saldo inicial das contas. Com filtro de contato/categoria ativo ele não entra: o saldo
-  // de abertura da conta não é atribuível a um cliente, e somá-lo produziria uma coluna de
-  // saldo corrido que não fecha com as linhas exibidas.
-  const hasEntityFilter = !!contactId || !!categoryId;
   let baseBalance = 0;
-  if (hasEntityFilter) {
-    baseBalance = 0;
-  } else if (bankId === 'all') {
+  if (bankId === 'all') {
     baseBalance = banks
       .filter(b => b.is_active)
       .reduce((sum, b) => sum + Number(b.initial_balance), 0);
