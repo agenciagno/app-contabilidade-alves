@@ -247,8 +247,4 @@ export const EM_BREVE: Record<string, EmBreveInfo> = {
     titulo: 'Alvarás',
     descricao: 'Alvarás e licenças por cliente, com controle de vencimento.',
   },
-  faturas: {
-    titulo: 'Faturas',
-    descricao: 'Suas faturas e o histórico de pagamento da assinatura do sistema.',
-  },
 };

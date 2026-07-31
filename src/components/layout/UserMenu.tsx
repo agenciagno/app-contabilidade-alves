@@ -71,6 +71,13 @@ export function UserMenu() {
           Minha Conta
         </DropdownMenuItem>
 
+        {showFaturas && (
+          <DropdownMenuItem onClick={() => navigate('/faturas')} className="gap-2">
+            <Receipt className="w-4 h-4" strokeWidth={1.75} />
+            Faturas
+          </DropdownMenuItem>
+        )}
+
         <DropdownMenuItem onClick={() => navigate('/suporte')} className="gap-2">
           <LifeBuoy className="w-4 h-4" strokeWidth={1.75} />
           Suporte
@@ -89,13 +96,6 @@ export function UserMenu() {
             </DropdownMenuRadioGroup>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
-
-        {showFaturas && (
-          <DropdownMenuItem onClick={() => navigate('/faturas')} className="gap-2">
-            <Receipt className="w-4 h-4" strokeWidth={1.75} />
-            Faturas
-          </DropdownMenuItem>
-        )}
 
         <DropdownMenuSeparator />
 

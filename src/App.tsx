@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
@@ -42,8 +42,8 @@ import NoAccess from "@/pages/NoAccess";
 import NotFound from "@/pages/NotFound";
 import Newsletter from "@/pages/Newsletter";
 import CofreGlobal from "@/pages/CofreGlobal";
-import AdminProvisionarCliente from "@/pages/AdminProvisionarCliente";
-import TechOperacao from "@/pages/TechOperacao";
+import TechClientesExternos from "@/pages/TechClientesExternos";
+import TechClienteExternoDetalhe from "@/pages/TechClienteExternoDetalhe";
 import TechLGPD from "@/pages/TechLGPD";
 import TechAgenteIA from "@/pages/TechAgenteIA";
 import CentralNotificacoes from "@/pages/CentralNotificacoes";
@@ -89,7 +89,7 @@ const App = () => (
               <Route path="/financeiro/categorias-clientes" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_categorias"><ClientCategories /></ModuleGuard></AppLayout>} />
               <Route path="/dre" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_dre"><DRE /></ModuleGuard></AppLayout>} />
               
-              <Route path="/configuracoes" element={<AppLayout><ModuleGuard moduleName="configuracoes"><SettingsPage /></ModuleGuard></AppLayout>} />
+              <Route path="/configuracoes" element={<AppLayout><ModuleGuard moduleName="configuracoes" internalOnly><SettingsPage /></ModuleGuard></AppLayout>} />
               <Route path="/disparos" element={<AppLayout><ModuleGuard moduleName="tech" subModule="tech_disparos"><CrmDispatches /></ModuleGuard></AppLayout>} />
               <Route path="/relatorio-clientes" element={<AppLayout><ModuleGuard moduleName="contatos"><ClientReport /></ModuleGuard></AppLayout>} />
 
@@ -102,8 +102,11 @@ const App = () => (
               <Route path="/fiscal/obrigacoes" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_calendario" requireAdmin><FiscalObrigacoes /></ModuleGuard></AppLayout>} />
               
               <Route path="/acessos" element={<AppLayout><ModuleGuard moduleName="acessos"><CofreGlobal /></ModuleGuard></AppLayout>} />
-              <Route path="/admin/provisionar-cliente" element={<AppLayout><AdminProvisionarCliente /></AppLayout>} />
-              <Route path="/tech/operacao" element={<AppLayout><TechOperacao /></AppLayout>} />
+              <Route path="/tech/clientes-externos" element={<AppLayout><TechClientesExternos /></AppLayout>} />
+              <Route path="/tech/clientes-externos/:id" element={<AppLayout><TechClienteExternoDetalhe /></AppLayout>} />
+              {/* Rotas antigas: atalho fixado e link salvo continuam funcionando. */}
+              <Route path="/admin/provisionar-cliente" element={<Navigate to="/tech/clientes-externos" replace />} />
+              <Route path="/tech/operacao" element={<Navigate to="/tech/clientes-externos" replace />} />
               <Route path="/tech/lgpd" element={<AppLayout><TechLGPD /></AppLayout>} />
               <Route path="/tech/agente-ia" element={<AppLayout><TechAgenteIA /></AppLayout>} />
               <Route path="/central-notificacoes" element={<AppLayout><CentralNotificacoes /></AppLayout>} />

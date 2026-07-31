@@ -11,6 +11,8 @@ import { Loader2, Upload, User, KeyRound, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useCompany } from '@/hooks/useCompany';
+import CompanyDataCard from '@/components/settings/CompanyDataCard';
 import { maskCpf, maskPhone, unmaskPhone } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -18,10 +20,17 @@ import { toast } from 'sonner';
  * Minha Conta — substitui o antigo ProfileModal do rodapé do sidebar.
  * Senha aqui é só envio de link por e-mail: nenhuma tela do sistema
  * escreve senha, exceto /redefinir-senha (destino do próprio link).
+ *
+ * Cliente externo não tem Configurações, então os dados da empresa dele
+ * aparecem aqui — mesmo card que a equipe interna vê em Configurações.
  */
 export default function MinhaConta() {
   const { user } = useAuth();
-  const { avatarUrl, fullName } = useUserRole();
+  const { avatarUrl, fullName, isColaborador } = useUserRole();
+  const { company } = useCompany();
+
+  const isExterno = (company as any)?.is_internal === false;
+  const mostrarDadosDaEmpresa = isExterno && !isColaborador;
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -265,6 +274,8 @@ export default function MinhaConta() {
           )}
         </CardContent>
       </Card>
+
+      {mostrarDadosDaEmpresa && <CompanyDataCard />}
 
       <Card className="bg-card border-border/50">
         <CardHeader>

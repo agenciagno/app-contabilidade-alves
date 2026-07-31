@@ -19,15 +19,25 @@ interface ModuleGuardProps {
   subModule?: string;
   children: ReactNode;
   requireAdmin?: boolean;
+  /** Rota que cliente externo não acessa, mesmo tendo o módulo no plano. */
+  internalOnly?: boolean;
 }
 
-export function ModuleGuard({ moduleName, subModule, children, requireAdmin = false }: ModuleGuardProps) {
+export function ModuleGuard({
+  moduleName, subModule, children, requireAdmin = false, internalOnly = false,
+}: ModuleGuardProps) {
   const { isSuperAdmin, isAdmin, allowedModules, isLoading } = useUserRole();
-  const { company } = useCompany();
+  const { company, isLoading: loadingCompany } = useCompany();
 
-  if (isLoading) return null;
+  if (isLoading || loadingCompany) return null;
 
   if (isSuperAdmin) return <>{children}</>;
+
+  // Antes de qualquer checagem de plano: a regra de produto vale mesmo com o
+  // módulo contratado. Minha Conta é o destino porque é onde o dado foi parar.
+  if (internalOnly && (company as any)?.is_internal === false) {
+    return <Navigate to="/minha-conta" replace />;
+  }
 
   const planModules: string[] = (company as any)?.plan_modules ?? DEFAULT_PLAN_MODULES;
 

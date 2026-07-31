@@ -183,10 +183,9 @@ export const menuEntries: MenuEntry[] = [
     moduleKey: 'tech',
     items: [
       { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'tech_disparos' },
-      { title: 'Operação Interna', url: '/tech/operacao', icon: Gauge, iconName: 'gauge', requireSuperAdmin: true },
+      { title: 'Clientes Externos', url: '/tech/clientes-externos', icon: Building2, iconName: 'building-2', requireSuperAdmin: true },
       { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check', requireAdmin: true },
       { title: 'Agente IA', url: '/tech/agente-ia', icon: Bot, iconName: 'bot', requireAdmin: true },
-      { title: 'Cadastrar Cliente', url: '/admin/provisionar-cliente', icon: UserPlus, iconName: 'user-plus', requireSuperAdmin: true },
       { title: 'Central de Notificações', url: '/central-notificacoes', icon: BellRing, iconName: 'bell-ring', requireSuperAdmin: true },
     ],
   },
@@ -347,6 +346,9 @@ export const menuEntries: MenuEntry[] = [
     iconName: 'settings',
     moduleKey: 'configuracoes',
     hideFromColaborador: true,
+    // Cliente externo não tem Configurações por enquanto — os dados da empresa
+    // dele vivem em Minha Conta.
+    internalOnly: true,
   },
 ];
 

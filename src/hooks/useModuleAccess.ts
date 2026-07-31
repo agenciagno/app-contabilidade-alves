@@ -12,6 +12,12 @@ export interface RoleGated {
   requireSuperAdmin?: boolean;
   /** Esconde de colaborador (mesma regra de Configurações). */
   hideFromColaborador?: boolean;
+  /**
+   * Esconde de cliente externo (empresa com `is_internal = false`).
+   * É regra de produto — o que o cliente que assina não enxerga —, e não permissão
+   * por tenant. Por isso não sai de `plan_modules`: religar é trocar esta flag.
+   */
+  internalOnly?: boolean;
 }
 
 /**
@@ -26,6 +32,7 @@ export function useModuleAccess() {
   const { company } = useCompany();
 
   const planModules: string[] = (company as any)?.plan_modules ?? DEFAULT_PLAN_MODULES;
+  const isExternalCompany = (company as any)?.is_internal === false;
 
   const isModuleVisible = (moduleKey: string) => {
     if (isSuperAdmin) return true;
@@ -65,8 +72,9 @@ export function useModuleAccess() {
     if (item.requireSuperAdmin && !isSuperAdmin) return false;
     if (item.requireAdmin && !isAdmin && !isSuperAdmin) return false;
     if (item.hideFromColaborador && isColaborador && !isSuperAdmin) return false;
+    if (item.internalOnly && isExternalCompany && !isSuperAdmin) return false;
     return true;
   };
 
-  return { isModuleVisible, isSubItemVisible, passesRoleGate };
+  return { isModuleVisible, isSubItemVisible, passesRoleGate, isExternalCompany };
 }

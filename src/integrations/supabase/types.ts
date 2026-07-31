@@ -1004,45 +1004,122 @@ export type Database = {
       }
       companies: {
         Row: {
+          billing_cycle: string
+          billing_day: number | null
           cnpj: string
+          contract_start: string | null
           created_at: string
           email: string | null
           id: string
           is_internal: boolean
           logo_url: string | null
+          max_users: number | null
           name: string
+          notes: string | null
           phone: string | null
           plan_modules: string[]
+          plan_name: string | null
+          plan_price: number | null
           status: string
           updated_at: string
         }
         Insert: {
+          billing_cycle?: string
+          billing_day?: number | null
           cnpj: string
+          contract_start?: string | null
           created_at?: string
           email?: string | null
           id?: string
           is_internal?: boolean
           logo_url?: string | null
+          max_users?: number | null
           name: string
+          notes?: string | null
           phone?: string | null
           plan_modules?: string[]
+          plan_name?: string | null
+          plan_price?: number | null
           status?: string
           updated_at?: string
         }
         Update: {
+          billing_cycle?: string
+          billing_day?: number | null
           cnpj?: string
+          contract_start?: string | null
           created_at?: string
           email?: string | null
           id?: string
           is_internal?: boolean
           logo_url?: string | null
+          max_users?: number | null
           name?: string
+          notes?: string | null
           phone?: string | null
           plan_modules?: string[]
+          plan_name?: string | null
+          plan_price?: number | null
           status?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      tenant_invoices: {
+        Row: {
+          company_id: string
+          competencia: string
+          created_at: string
+          descricao: string | null
+          id: string
+          metodo: string | null
+          observacao: string | null
+          origem: string
+          pago_em: string | null
+          status: string
+          updated_at: string
+          valor: number
+          vencimento: string
+        }
+        Insert: {
+          company_id: string
+          competencia: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          metodo?: string | null
+          observacao?: string | null
+          origem?: string
+          pago_em?: string | null
+          status?: string
+          updated_at?: string
+          valor: number
+          vencimento: string
+        }
+        Update: {
+          company_id?: string
+          competencia?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          metodo?: string | null
+          observacao?: string | null
+          origem?: string
+          pago_em?: string | null
+          status?: string
+          updated_at?: string
+          valor?: number
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contact_documents: {
         Row: {
@@ -3639,6 +3716,10 @@ export type Database = {
         Returns: Json
       }
       generate_my_recurring_transactions: { Args: never; Returns: number }
+      generate_tenant_invoices_admin: {
+        Args: { p_company_id?: string }
+        Returns: number
+      }
       get_annual_metrics: {
         Args: {
           p_bank_id?: string
