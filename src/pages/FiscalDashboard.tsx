@@ -454,9 +454,9 @@ export default function FiscalDashboard() {
       {/* KPIs row 1 — 4 cards compactos */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard label="Pendentes" value={kpis.pendentes} icon={Clock} borderClass="border-l-blue-500" iconClass="text-blue-500" />
-        <KpiCard label="Em andamento" value={kpis.emAndamento} icon={ListChecks} borderClass="border-l-orange-500" iconClass="text-warn" />
-        <KpiCard label="Atrasadas" value={kpis.atrasadas} icon={AlertTriangle} borderClass="border-l-red-500" iconClass="text-danger" />
-        <KpiCard label="Concluídas" value={kpis.concluidas} icon={CheckCircle2} borderClass="border-l-green-500" iconClass="text-ok" />
+        <KpiCard label="Em andamento" value={kpis.emAndamento} icon={ListChecks} borderClass="border-l-warn" iconClass="text-warn" />
+        <KpiCard label="Atrasadas" value={kpis.atrasadas} icon={AlertTriangle} borderClass="border-l-danger" iconClass="text-danger" />
+        <KpiCard label="Concluídas" value={kpis.concluidas} icon={CheckCircle2} borderClass="border-l-ok" iconClass="text-ok" />
       </div>
 
       {/* Próximos Vencimentos */}

@@ -869,7 +869,7 @@ export default function Transactions() {
 
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-3">
-        <Card className="border-l-2 border-l-emerald-500">
+        <Card className="border-l-2 border-l-ok">
           <CardContent className="px-3 py-[10px] min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <TrendingUp className="w-3.5 h-3.5 text-ok shrink-0" />
@@ -879,7 +879,7 @@ export default function Transactions() {
             <p className="text-[10px] text-muted-foreground mt-0.5">Recebido: {formatCurrency(kpis.receitasPagas)}</p>
           </CardContent>
         </Card>
-        <Card className="border-l-2 border-l-red-500">
+        <Card className="border-l-2 border-l-danger">
           <CardContent className="px-3 py-[10px] min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <TrendingDown className="w-3.5 h-3.5 text-danger shrink-0" />
@@ -899,7 +899,7 @@ export default function Transactions() {
             <p className="text-[10px] text-muted-foreground mt-0.5">Total bancos visíveis</p>
           </CardContent>
         </Card>
-        <Card className="border-l-2 border-l-red-500">
+        <Card className="border-l-2 border-l-danger">
           <CardContent className="px-3 py-[10px] min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <AlertTriangle className="w-3.5 h-3.5 text-danger shrink-0" />
@@ -918,7 +918,7 @@ export default function Transactions() {
             <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.capitalDeGiroMes >= 0 ? 'text-blue-400' : 'text-danger'}`}>{formatCurrency(biMetrics.capitalDeGiroMes)}</p>
           </CardContent>
         </Card>
-        <Card className="border-l-2 border-l-emerald-500">
+        <Card className="border-l-2 border-l-ok">
           <CardContent className="px-3 py-[10px] min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <BarChart3 className="w-3.5 h-3.5 text-ok shrink-0" />
@@ -928,7 +928,7 @@ export default function Transactions() {
             <p className="text-[10px] text-muted-foreground mt-0.5">{format(new Date(), 'MMMM', { locale: ptBR }).replace(/^\w/, c => c.toUpperCase())}</p>
           </CardContent>
         </Card>
-        <Card className="border-l-2 border-l-amber-500">
+        <Card className="border-l-2 border-l-warn">
           <CardContent className="px-3 py-[10px] min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <CalendarCheck className="w-3.5 h-3.5 text-warn shrink-0" />

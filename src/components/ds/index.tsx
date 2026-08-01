@@ -268,6 +268,60 @@ export function StatCard({ index, label, value, hint, emphasis, className, ...pr
   );
 }
 
+/* ───────────────────────── PageHeader ────────────────────────
+   Cabeçalho de tela: kicker + título + subtítulo, ações à direita.
+   Mesmo desenho em todas as telas R1–R7 do protótipo. */
+
+export interface PageHeaderProps {
+  /** Rótulo de rota, estilo terminal — "~/tarefas · competência julho 2026" */
+  kicker: string;
+  title: string;
+  subtitle?: React.ReactNode;
+  actions?: React.ReactNode;
+  className?: string;
+}
+
+export function PageHeader({ kicker, title, subtitle, actions, className }: PageHeaderProps) {
+  return (
+    <div className={cn('flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between', className)}>
+      <div className="min-w-0">
+        <p className="text-kicker uppercase text-muted-ink-2">{kicker}</p>
+        <h1 className="mt-1 text-display first-letter:uppercase text-ink">{title}</h1>
+        {subtitle && <p className="mt-1 text-body text-muted-ink">{subtitle}</p>}
+      </div>
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  );
+}
+
+/* ──────────────────────── StatCardRow ────────────────────────
+   Fila de indicadores numerados (decisão 06): o índice ordinal entra
+   automático, então a ordem na tela é a ordem da lista. */
+
+export interface StatItem {
+  label: string;
+  value: React.ReactNode;
+  hint?: React.ReactNode;
+  emphasis?: 'none' | 'warm';
+}
+
+export function StatCardRow({ items, className }: { items: StatItem[]; className?: string }) {
+  return (
+    <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4', className)}>
+      {items.map((it, i) => (
+        <StatCard
+          key={it.label}
+          index={String(i + 1).padStart(2, '0')}
+          label={it.label}
+          value={it.value}
+          hint={it.hint}
+          emphasis={it.emphasis}
+        />
+      ))}
+    </div>
+  );
+}
+
 /* ─────────────────────────── Alert ───────────────────────────
    Faixa contextual · borda esquerda 3px · raio 10 */
 

@@ -736,7 +736,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
         </Card>
 
         {/* Entradas */}
-        <Card className="bg-card border-border/50 border-l-2 border-l-emerald-500">
+        <Card className="bg-card border-border/50 border-l-2 border-l-ok">
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
@@ -752,7 +752,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
 
         {/* Saídas */}
         {!isReceivables && (
-        <Card className="bg-card border-border/50 border-l-2 border-l-red-500">
+        <Card className="bg-card border-border/50 border-l-2 border-l-danger">
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
