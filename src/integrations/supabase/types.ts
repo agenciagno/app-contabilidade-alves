@@ -3332,6 +3332,7 @@ export type Database = {
           anexo_simples: string | null
           cnae_codigo: string | null
           cnae_descricao: string | null
+          cnpj: string | null
           company_id: string
           contact_id: string | null
           created_at: string
@@ -3357,6 +3358,7 @@ export type Database = {
           anexo_simples?: string | null
           cnae_codigo?: string | null
           cnae_descricao?: string | null
+          cnpj?: string | null
           company_id: string
           contact_id?: string | null
           created_at?: string
@@ -3382,6 +3384,7 @@ export type Database = {
           anexo_simples?: string | null
           cnae_codigo?: string | null
           cnae_descricao?: string | null
+          cnpj?: string | null
           company_id?: string
           contact_id?: string | null
           created_at?: string

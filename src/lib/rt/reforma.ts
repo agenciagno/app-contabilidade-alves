@@ -33,7 +33,7 @@ export function calcularPosReforma(input: DiagnosticoInput): ResultadoReforma {
   }
   if (comprasComCredito12m > 0) {
     observacoes.push(
-      `Na reforma quase toda compra com nota gera crédito. As compras informadas geram R$ ${credito.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} de crédito no ano, que abatem do imposto devido.`
+      `Na reforma quase toda compra com nota gera crédito. As compras informadas geram R$ ${(credito / 12).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} de crédito por mês, que abatem do imposto devido.`
     );
   } else {
     observacoes.push(
@@ -91,6 +91,9 @@ export function calcularHibrido(
   let justificativa: string;
 
   const custoDoHibrido = diferenca;
+  // Todo texto de recomendação fala em valor mensal — é a unidade em que o dono decide.
+  const porMes = (v: number) =>
+    `R$ ${Math.abs(v / 12).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`;
 
   if (input.pctB2B === undefined || input.pctB2B === null) {
     recomendacao = 'analise_individual';
@@ -98,16 +101,16 @@ export function calcularHibrido(
       'Sem saber quanto da receita vai para outras empresas, não dá para fechar a recomendação: o ganho do regime regular está justamente no crédito que você repassa a clientes PJ.';
   } else if (custoDoHibrido <= 0 && ganhoDeCredito > 0) {
     recomendacao = 'hibrido';
-    justificativa = `O regime regular sai mais barato (economia de R$ ${Math.abs(custoDoHibrido).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} no ano) e ainda repassa mais crédito aos seus clientes empresa. Nos dois lados ele ganha.`;
+    justificativa = `O regime regular sai mais barato (economia de ${porMes(custoDoHibrido)} por mês) e ainda repassa mais crédito aos seus clientes empresa. Nos dois lados ele ganha.`;
   } else if (pctB2B >= 0.5 && ganhoDeCredito > custoDoHibrido) {
     recomendacao = 'hibrido';
-    justificativa = `Você paga R$ ${custoDoHibrido.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} a mais por ano no regime regular, mas passa a repassar R$ ${ganhoDeCredito.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} a mais de crédito para seus clientes empresa. Com ${(pctB2B * 100).toFixed(0)}% das vendas indo para PJ, esse crédito vira argumento de preço e de permanência do cliente.`;
+    justificativa = `Você paga ${porMes(custoDoHibrido)} a mais por mês no regime regular, mas passa a repassar ${porMes(ganhoDeCredito)} a mais de crédito por mês para seus clientes empresa. Com ${(pctB2B * 100).toFixed(0)}% das vendas indo para PJ, esse crédito vira argumento de preço e de permanência do cliente.`;
   } else if (pctB2B < 0.3) {
     recomendacao = 'unificado';
     justificativa = `Com só ${(pctB2B * 100).toFixed(0)}% das vendas indo para outras empresas, o crédito cheio quase não tem para quem ser repassado — quem compra como consumidor final não aproveita crédito. Ficar no DAS unificado mantém a simplicidade e ${custoDoHibrido > 0 ? 'sai mais barato' : 'não custa mais caro'}.`;
   } else {
     recomendacao = 'analise_individual';
-    justificativa = `O resultado ficou apertado: o regime regular ${custoDoHibrido > 0 ? `custa R$ ${custoDoHibrido.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} a mais` : 'sai mais barato'} e devolve R$ ${ganhoDeCredito.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} a mais de crédito aos clientes PJ. Vale sentar com o contador e olhar a carteira de clientes um a um antes de decidir.`;
+    justificativa = `O resultado ficou apertado: o regime regular ${custoDoHibrido > 0 ? `custa ${porMes(custoDoHibrido)} a mais por mês` : 'sai mais barato'} e devolve ${porMes(ganhoDeCredito)} a mais de crédito por mês aos clientes PJ. Vale sentar com o contador e olhar a carteira de clientes um a um antes de decidir.`;
   }
 
   return {

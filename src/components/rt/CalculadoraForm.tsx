@@ -9,14 +9,19 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  CampoCnpj, CampoMoeda, CampoPercentual, numeroDeMoeda, numeroDePercentual,
+} from '@/components/rt/CamposMascarados';
 import type { Contact } from '@/hooks/useContacts';
 import { extrairCnae, setorPorCnae, sugereAnexoIV } from '@/lib/rt/cnae';
 import { REDUCOES_SETORIAIS, SETOR_LABEL, type RegimeAtual, type Setor } from '@/lib/rt/tabelas';
+import { maskCNPJ } from '@/lib/utils';
 import type { DiagnosticoInput } from '@/lib/rt/types';
 
 export interface FormState {
   contactId: string;
   nomeReferencia: string;
+  cnpj: string;
   setor: Setor;
   regimeAtual: RegimeAtual;
   faturamento12m: string;
@@ -33,6 +38,7 @@ export interface FormState {
 const INICIAL: FormState = {
   contactId: '',
   nomeReferencia: '',
+  cnpj: '',
   setor: 'servico',
   regimeAtual: 'simples_nacional',
   faturamento12m: '',
@@ -45,14 +51,6 @@ const INICIAL: FormState = {
   pctB2B: '',
   reducaoSetorial: 'nenhuma',
 };
-
-/** Aceita "1.234,56" e "1234.56" — o usuário digita como quiser. */
-function paraNumero(v: string): number | undefined {
-  if (!v?.trim()) return undefined;
-  const limpo = v.replace(/\s|R\$/g, '').replace(/\./g, '').replace(',', '.');
-  const n = Number(limpo);
-  return Number.isFinite(n) ? n : undefined;
-}
 
 const Dica = ({ children }: { children: string }) => (
   <TooltipProvider>
@@ -74,7 +72,14 @@ interface Props {
   carregandoAliquotas: boolean;
   onCalcular: (
     input: DiagnosticoInput,
-    meta: { contactId: string | null; nomeReferencia: string | null; uf: string | null; municipio: string | null; cnae: { codigo?: string; descricao?: string } | null }
+    meta: {
+      contactId: string | null;
+      nomeReferencia: string | null;
+      cnpj: string | null;
+      uf: string | null;
+      municipio: string | null;
+      cnae: { codigo?: string; descricao?: string } | null;
+    }
   ) => void;
 }
 
@@ -101,6 +106,7 @@ export function CalculadoraForm({
     const regime = selecionado.tax_regime;
     setForm((f) => ({
       ...f,
+      cnpj: selecionado.document ? maskCNPJ(selecionado.document) : f.cnpj,
       setor: setorSugerido ?? f.setor,
       regimeAtual:
         regime === 'simples_nacional' || regime === 'lucro_presumido' || regime === 'lucro_real'
@@ -110,7 +116,7 @@ export function CalculadoraForm({
     }));
   }, [selecionado]);
 
-  const faturamento = paraNumero(form.faturamento12m);
+  const faturamento = numeroDeMoeda(form.faturamento12m);
   const podeCalcular = !!faturamento && faturamento > 0;
   const ehSimples = form.regimeAtual === 'simples_nacional';
   const ehServico = form.setor === 'servico';
@@ -121,13 +127,13 @@ export function CalculadoraForm({
       setor: form.setor,
       regimeAtual: form.regimeAtual,
       faturamento12m: faturamento,
-      folha12m: paraNumero(form.folha12m),
-      comprasComCredito12m: paraNumero(form.comprasComCredito12m),
+      folha12m: numeroDeMoeda(form.folha12m),
+      comprasComCredito12m: numeroDeMoeda(form.comprasComCredito12m),
       atividadeAnexoIV: form.atividadeAnexoIV,
-      aliquotaIcms: paraNumero(form.aliquotaIcms),
-      aliquotaIss: paraNumero(form.aliquotaIss),
-      margemLucro: paraNumero(form.margemLucro),
-      pctB2B: paraNumero(form.pctB2B),
+      aliquotaIcms: numeroDePercentual(form.aliquotaIcms),
+      aliquotaIss: numeroDePercentual(form.aliquotaIss),
+      margemLucro: numeroDePercentual(form.margemLucro),
+      pctB2B: numeroDePercentual(form.pctB2B),
       reducaoSetorial: form.reducaoSetorial,
       aliquotaCbs: aliquotaCbs / 100,
       aliquotaIbs: aliquotaIbs / 100,
@@ -135,6 +141,7 @@ export function CalculadoraForm({
     onCalcular(input, {
       contactId: form.contactId || null,
       nomeReferencia: form.contactId ? null : form.nomeReferencia || null,
+      cnpj: form.cnpj || null,
       uf: selecionado?.state ?? null,
       municipio: selecionado?.city ?? null,
       cnae,
@@ -179,6 +186,14 @@ export function CalculadoraForm({
               />
             </div>
           )}
+
+          <div className="space-y-1.5">
+            <Label>
+              CNPJ
+              <Dica>Aparece no diagnóstico e no PDF entregue ao cliente. Ao escolher um cliente da carteira, vem preenchido do cadastro.</Dica>
+            </Label>
+            <CampoCnpj value={form.cnpj} onChange={(v) => set('cnpj', v)} />
+          </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -216,12 +231,22 @@ export function CalculadoraForm({
               Faturamento dos últimos 12 meses (R$)
               <Dica>É o RBT12. Se a empresa tem menos de 12 meses, use a média mensal multiplicada por 12.</Dica>
             </Label>
-            <Input
-              inputMode="decimal"
+            <CampoMoeda
               value={form.faturamento12m}
-              onChange={(e) => set('faturamento12m', e.target.value)}
+              onChange={(v) => set('faturamento12m', v)}
               placeholder="600.000,00"
             />
+            {faturamento ? (
+              <p className="text-xs text-muted-foreground">
+                Média de{' '}
+                {(faturamento / 12).toLocaleString('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                  maximumFractionDigits: 0,
+                })}{' '}
+                por mês.
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1.5">
@@ -229,10 +254,9 @@ export function CalculadoraForm({
               Compras e despesas com direito a crédito (R$)
               <Dica>Compras de mercadoria, insumos, energia, aluguel e serviços tomados com nota fiscal. É o campo que mais muda o resultado da reforma: quase tudo com nota vira crédito.</Dica>
             </Label>
-            <Input
-              inputMode="decimal"
+            <CampoMoeda
               value={form.comprasComCredito12m}
-              onChange={(e) => set('comprasComCredito12m', e.target.value)}
+              onChange={(v) => set('comprasComCredito12m', v)}
               placeholder="Opcional, mas recomendado"
             />
           </div>
@@ -245,10 +269,9 @@ export function CalculadoraForm({
                 Folha de pagamento 12 meses (R$)
                 <Dica>Salários + encargos, incluindo pró-labore e CPP, sem FGTS. Define o Fator R: 28% ou mais leva ao Anexo III, que é mais barato que o Anexo V.</Dica>
               </Label>
-              <Input
-                inputMode="decimal"
+              <CampoMoeda
                 value={form.folha12m}
-                onChange={(e) => set('folha12m', e.target.value)}
+                onChange={(v) => set('folha12m', v)}
                 placeholder="Sem isso, assumimos o Anexo V"
               />
             </div>
@@ -267,21 +290,21 @@ export function CalculadoraForm({
         <div className="grid gap-4 sm:grid-cols-3">
           {ehServico ? (
             <div className="space-y-1.5">
-              <Label>ISS do município (%)</Label>
-              <Input
-                inputMode="decimal"
+              <Label>ISS do município</Label>
+              <CampoPercentual
                 value={form.aliquotaIss}
-                onChange={(e) => set('aliquotaIss', e.target.value)}
+                onChange={(v) => set('aliquotaIss', v)}
+                max={5}
               />
               <p className="text-xs text-muted-foreground">Entre 2% e 5%.</p>
             </div>
           ) : (
             <div className="space-y-1.5">
-              <Label>ICMS do estado (%)</Label>
-              <Input
-                inputMode="decimal"
+              <Label>ICMS do estado</Label>
+              <CampoPercentual
                 value={form.aliquotaIcms}
-                onChange={(e) => set('aliquotaIcms', e.target.value)}
+                onChange={(v) => set('aliquotaIcms', v)}
+                max={35}
               />
               <p className="text-xs text-muted-foreground">Confira a alíquota interna do estado.</p>
             </div>
@@ -289,13 +312,12 @@ export function CalculadoraForm({
 
           <div className="space-y-1.5">
             <Label>
-              Margem de lucro (%)
+              Margem de lucro
               <Dica>Só é usada para comparar com o Lucro Real, onde o imposto incide sobre o lucro e não sobre o faturamento.</Dica>
             </Label>
-            <Input
-              inputMode="decimal"
+            <CampoPercentual
               value={form.margemLucro}
-              onChange={(e) => set('margemLucro', e.target.value)}
+              onChange={(v) => set('margemLucro', v)}
               placeholder="Opcional"
             />
           </div>
@@ -319,16 +341,16 @@ export function CalculadoraForm({
         {ehSimples && (
           <div className="rounded-lg border border-border bg-muted/40 p-4">
             <Label>
-              Quanto das vendas vai para outras empresas (%)
+              Quanto das vendas vai para outras empresas
               <Dica>Vendas para clientes PJ do regime regular. É a informação que decide entre continuar no DAS unificado ou apurar IBS/CBS por fora — quem vende para consumidor final não aproveita crédito.</Dica>
             </Label>
-            <Input
-              className="mt-1.5 max-w-[200px]"
-              inputMode="decimal"
-              value={form.pctB2B}
-              onChange={(e) => set('pctB2B', e.target.value)}
-              placeholder="Ex.: 70"
-            />
+            <div className="mt-1.5 max-w-[200px]">
+              <CampoPercentual
+                value={form.pctB2B}
+                onChange={(v) => set('pctB2B', v)}
+                placeholder="Ex.: 70"
+              />
+            </div>
             <p className="mt-2 text-xs text-muted-foreground">
               Sem esse número não conseguimos recomendar entre regime unificado e regime regular —
               a decisão da janela de setembro depende dele.

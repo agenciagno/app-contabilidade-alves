@@ -112,6 +112,8 @@ export interface Diagnostico {
   variacaoValor: number;
   variacaoPercentual: number;
   hibrido: ResultadoHibrido | null;
+  /** Carga ano a ano de 2026 a 2033, para o gráfico de trajetória. */
+  trajetoria: import('./trajetoria').PontoTrajetoria[];
   explicacao: string;
   alertas: string[];
 }

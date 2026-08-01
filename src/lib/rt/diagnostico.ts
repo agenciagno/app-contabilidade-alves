@@ -8,6 +8,7 @@
 
 import { calcularHibrido, calcularPosReforma } from './reforma';
 import { calcularPresumido, calcularReal, calcularSimples } from './regimes';
+import { calcularTrajetoria } from './trajetoria';
 import {
   PIS_COFINS_CUMULATIVO,
   PIS_COFINS_NAO_CUMULATIVO,
@@ -19,6 +20,8 @@ import type { Diagnostico, DiagnosticoInput, ResultadoRegime } from './types';
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 const pct = (v: number) => `${(v * 100).toFixed(2).replace('.', ',')}%`;
+/** Valor anual apresentado por mês — é assim que o empresário pensa a conta. */
+const mensal = (v: number) => brl(v / 12);
 
 function explicar(
   input: DiagnosticoInput,
@@ -34,20 +37,20 @@ function explicar(
   if (simplesFicaNoUnificado) {
     // Para quem fica no DAS, anunciar um salto de carga seria simplesmente falso.
     partes.push(
-      `Hoje a empresa paga ${brl(cargaHoje)} por ano em tributos sobre consumo — ${pct(cargaHoje / input.faturamento12m)} do faturamento. Ficando no regime unificado, que é o que acontece se ela não fizer nada, essa conta não muda: IBS e CBS continuam embutidos no DAS e as tabelas do Simples não foram alteradas pela reforma.`
+      `Hoje a empresa paga ${mensal(cargaHoje)} por mês em tributos sobre consumo (${brl(cargaHoje)} no ano) — ${pct(cargaHoje / input.faturamento12m)} do faturamento. Ficando no regime unificado, que é o que acontece se ela não fizer nada, essa conta não muda: IBS e CBS continuam embutidos no DAS e as tabelas do Simples não foram alteradas pela reforma.`
     );
     partes.push(
       'O que muda para o Simples é outra coisa, e é importante: o cliente que compra de você e é empresa passa a aproveitar um crédito menor do que aproveitaria comprando de um fornecedor do regime regular. Isso mexe na sua competitividade, não no seu boleto.'
     );
     partes.push(
-      `Se a empresa optar pelo regime regular na janela de setembro, aí sim a conta muda: o IBS/CBS sai do DAS e passa a ser apurado por fora, o que daria ${brl(cargaReforma)} por ano em CBS e IBS. A comparação completa dos dois caminhos está logo abaixo.`
+      `Se a empresa optar pelo regime regular na janela de setembro, aí sim a conta muda: o IBS/CBS sai do DAS e passa a ser apurado por fora, o que daria ${mensal(cargaReforma)} por mês em CBS e IBS. A comparação completa dos dois caminhos está logo abaixo.`
     );
     return partes.join(' ');
   }
 
   const direcao = subiu ? 'sobe' : 'cai';
   partes.push(
-    `Hoje a empresa paga ${brl(cargaHoje)} por ano em tributos sobre consumo — ${pct(cargaHoje / input.faturamento12m)} do faturamento. No cenário da reforma esse valor ${direcao} para ${brl(cargaReforma)} (${pct(cargaReforma / input.faturamento12m)}), uma diferença de ${brl(Math.abs(variacaoValor))} por ano.`
+    `Hoje a empresa paga ${mensal(cargaHoje)} por mês em tributos sobre consumo — ${pct(cargaHoje / input.faturamento12m)} do faturamento. No cenário da reforma esse valor ${direcao} para ${mensal(cargaReforma)} por mês (${pct(cargaReforma / input.faturamento12m)}), uma diferença de ${mensal(Math.abs(variacaoValor))} por mês, ou ${brl(Math.abs(variacaoValor))} no ano.`
   );
 
   // O porquê muda conforme o regime de origem — é aqui que mora a explicação de verdade.
@@ -167,6 +170,13 @@ export function gerarDiagnostico(input: DiagnosticoInput): Diagnostico {
     variacaoValor,
     variacaoPercentual,
     hibrido,
+    trajetoria: calcularTrajetoria(
+      input,
+      atual,
+      posReforma.aliquotaCbs,
+      posReforma.aliquotaIbs,
+      simplesFicaNoUnificado
+    ),
     explicacao: explicar(
       input,
       atual,

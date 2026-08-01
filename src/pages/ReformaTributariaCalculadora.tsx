@@ -27,6 +27,7 @@ import type { Diagnostico, DiagnosticoInput } from '@/lib/rt/types';
 interface MetaSimulacao {
   contactId: string | null;
   nomeReferencia: string | null;
+  cnpj: string | null;
   uf: string | null;
   municipio: string | null;
   cnae: { codigo?: string; descricao?: string } | null;
@@ -64,6 +65,7 @@ export default function ReformaTributariaCalculadora() {
       {
         contactId: meta.contactId,
         nomeReferencia: meta.nomeReferencia,
+        cnpj: meta.cnpj,
         diagnostico,
         cnae: meta.cnae,
         uf: meta.uf,
@@ -124,8 +126,9 @@ export default function ReformaTributariaCalculadora() {
             <DiagnosticoResultado
               diagnostico={diagnostico}
               nomeEmpresa={nomeDe(meta)}
+              cnpj={meta?.cnpj}
               onSalvar={salvarDiagnostico}
-              onExportarPdf={() => gerarPdfDiagnostico(diagnostico, nomeDe(meta))}
+              onExportarPdf={() => gerarPdfDiagnostico(diagnostico, nomeDe(meta), meta?.cnpj)}
               salvando={salvar.isPending}
               jaSalvo={salvo}
             />
@@ -151,7 +154,7 @@ export default function ReformaTributariaCalculadora() {
                       <TableHead>Empresa</TableHead>
                       <TableHead>Regime</TableHead>
                       <TableHead className="text-right">Faturamento 12m</TableHead>
-                      <TableHead className="text-right">Impacto/ano</TableHead>
+                      <TableHead className="text-right">Impacto/mês</TableHead>
                       <TableHead>Gerado em</TableHead>
                       <TableHead />
                     </TableRow>
@@ -182,7 +185,7 @@ export default function ReformaTributariaCalculadora() {
                           >
                             {noUnificado
                               ? 'Não muda no DAS'
-                              : `${variacao > 0 ? '+' : '−'}${brl(Math.abs(variacao))}`}
+                              : `${variacao > 0 ? '+' : '−'}${brl(Math.abs(variacao) / 12)}/mês`}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {format(new Date(s.created_at), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}
@@ -193,7 +196,7 @@ export default function ReformaTributariaCalculadora() {
                                 variant="ghost"
                                 size="icon"
                                 title="Baixar PDF"
-                                onClick={() => gerarPdfDiagnostico(s.resultado, nome)}
+                                onClick={() => gerarPdfDiagnostico(s.resultado, nome, s.cnpj)}
                               >
                                 <Download className="h-4 w-4" />
                               </Button>

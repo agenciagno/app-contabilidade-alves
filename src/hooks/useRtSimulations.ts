@@ -9,6 +9,7 @@ export interface RtSimulation {
   company_id: string;
   contact_id: string | null;
   nome_referencia: string | null;
+  cnpj: string | null;
   setor: string;
   regime_atual: string;
   anexo_simples: string | null;
@@ -24,6 +25,7 @@ export interface RtSimulation {
 export interface SalvarSimulacaoInput {
   contactId: string | null;
   nomeReferencia: string | null;
+  cnpj: string | null;
   diagnostico: Diagnostico;
   cnae?: { codigo?: string; descricao?: string } | null;
   uf?: string | null;
@@ -66,6 +68,7 @@ export function useRtSimulations(contactId?: string) {
           company_id: companyId,
           contact_id: input.contactId,
           nome_referencia: input.nomeReferencia,
+          cnpj: input.cnpj,
           setor: d.input.setor,
           cnae_codigo: input.cnae?.codigo ?? null,
           cnae_descricao: input.cnae?.descricao ?? null,

@@ -7,24 +7,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import { LinhaDoTempo } from '@/components/rt/LinhaDoTempo';
+import { TrajetoriaChart } from '@/components/rt/TrajetoriaChart';
 import { REGIME_LABEL } from '@/lib/rt/tabelas';
 import type { Diagnostico } from '@/lib/rt/types';
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 const pct = (v: number) => `${(v * 100).toFixed(2).replace('.', ',')}%`;
-
-/** Marcos reais da transição — LC 214/2025 e ADCT. */
-const LINHA_DO_TEMPO = [
-  { ano: '2026', texto: 'Ano de teste. CBS a 0,9% e IBS a 0,1% aparecem na nota, mas não são cobrados. O Simples está dispensado dessa fase.' },
-  { ano: '2027', texto: 'CBS passa a valer de verdade e PIS/Cofins são extintos. Começa o Imposto Seletivo e o split payment.' },
-  { ano: '2029–2032', texto: 'ICMS e ISS caem gradualmente (9/10, 8/10, 7/10, 6/10) enquanto o IBS sobe na mesma proporção. Benefícios fiscais estaduais acabam de forma escalonada.' },
-  { ano: '2033', texto: 'ICMS e ISS extintos. Só CBS, IBS e Imposto Seletivo — o sistema pleno.' },
-];
+/** O empresário raciocina no mês; o ano fica como referência secundária. */
+const mes = (v: number) => v / 12;
 
 interface Props {
   diagnostico: Diagnostico;
   nomeEmpresa: string;
+  cnpj?: string | null;
   onSalvar: () => void;
   onExportarPdf: () => void;
   salvando?: boolean;
@@ -32,7 +29,7 @@ interface Props {
 }
 
 export function DiagnosticoResultado({
-  diagnostico: d, nomeEmpresa, onSalvar, onExportarPdf, salvando, jaSalvo,
+  diagnostico: d, nomeEmpresa, cnpj, onSalvar, onExportarPdf, salvando, jaSalvo,
 }: Props) {
   const subiu = d.variacaoValor > 0;
   const semMudanca = Math.abs(d.variacaoValor) < 1;
@@ -56,7 +53,8 @@ export function DiagnosticoResultado({
                   <TrendingDown className="h-5 w-5 text-emerald-600" />
                 )}
                 <span className="text-sm font-medium text-muted-foreground">
-                  {nomeEmpresa} · {REGIME_LABEL[d.input.regimeAtual]}
+                  {nomeEmpresa}
+                  {cnpj ? ` · ${cnpj}` : ''} · {REGIME_LABEL[d.input.regimeAtual]}
                   {d.atual.anexo ? ` · Anexo ${d.atual.anexo}` : ''}
                 </span>
               </div>
@@ -71,17 +69,18 @@ export function DiagnosticoResultado({
               </h2>
               {noUnificado ? (
                 <p className="text-3xl font-bold">
-                  {brl(d.atual.cargaConsumo)}
+                  {brl(mes(d.atual.cargaConsumo))}
                   <span className="ml-2 text-base font-medium text-muted-foreground">
-                    por ano, como hoje
+                    por mês, como hoje ({brl(d.atual.cargaConsumo)} no ano)
                   </span>
                 </p>
               ) : (
                 !semMudanca && (
                   <p className={`text-3xl font-bold ${subiu ? 'text-destructive' : 'text-emerald-600'}`}>
-                    {subiu ? '+' : '−'}{brl(Math.abs(d.variacaoValor))}
+                    {subiu ? '+' : '−'}{brl(mes(Math.abs(d.variacaoValor)))}
                     <span className="ml-2 text-base font-medium text-muted-foreground">
-                      por ano ({subiu ? '+' : '−'}{Math.abs(d.variacaoPercentual * 100).toFixed(1).replace('.', ',')}%)
+                      por mês ({subiu ? '+' : '−'}{Math.abs(d.variacaoPercentual * 100).toFixed(1).replace('.', ',')}%) ·{' '}
+                      {brl(Math.abs(d.variacaoValor))} no ano
                     </span>
                   </p>
                 )
@@ -113,9 +112,12 @@ export function DiagnosticoResultado({
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <p className="text-2xl font-semibold">{brl(d.atual.cargaConsumo)}</p>
+              <p className="text-2xl font-semibold">
+                {brl(mes(d.atual.cargaConsumo))}
+                <span className="ml-1.5 text-sm font-normal text-muted-foreground">/mês</span>
+              </p>
               <p className="text-xs text-muted-foreground">
-                {pct(d.atual.aliquotaEfetivaConsumo)} do faturamento em tributos sobre consumo
+                {pct(d.atual.aliquotaEfetivaConsumo)} do faturamento · {brl(d.atual.cargaConsumo)} no ano
               </p>
             </div>
             <Table>
@@ -123,14 +125,16 @@ export function DiagnosticoResultado({
                 {d.atual.linhas.filter((l) => l.consumo).map((l) => (
                   <TableRow key={l.tributo}>
                     <TableCell className="py-1.5 text-xs">{l.tributo}</TableCell>
-                    <TableCell className="py-1.5 text-right text-xs tabular-nums">{brl(l.valor)}</TableCell>
+                    <TableCell className="py-1.5 text-right text-xs tabular-nums">
+                      {brl(mes(l.valor))}<span className="text-muted-foreground">/mês</span>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
             <p className="text-xs text-muted-foreground">
               Fora desta conta, sem mudança pela reforma:{' '}
-              <strong>{brl(d.atual.cargaNaoConsumo)}</strong> de IRPJ, CSLL e INSS patronal.
+              <strong>{brl(mes(d.atual.cargaNaoConsumo))}/mês</strong> de IRPJ, CSLL e INSS patronal.
             </p>
           </CardContent>
         </Card>
@@ -143,9 +147,12 @@ export function DiagnosticoResultado({
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
-              <p className="text-2xl font-semibold">{brl(d.posReforma.liquido)}</p>
+              <p className="text-2xl font-semibold">
+                {brl(mes(d.posReforma.liquido))}
+                <span className="ml-1.5 text-sm font-normal text-muted-foreground">/mês</span>
+              </p>
               <p className="text-xs text-muted-foreground">
-                {pct(d.posReforma.aliquotaEfetiva)} do faturamento, já descontado o crédito
+                {pct(d.posReforma.aliquotaEfetiva)} do faturamento · {brl(d.posReforma.liquido)} no ano
                 {noUnificado ? ' — só se a empresa optar na janela de setembro' : ''}
               </p>
             </div>
@@ -156,7 +163,7 @@ export function DiagnosticoResultado({
                     Débito ({pct(d.posReforma.aliquotaTotal)} sobre o faturamento)
                   </TableCell>
                   <TableCell className="py-1.5 text-right text-xs tabular-nums">
-                    {brl(d.posReforma.debito)}
+                    {brl(mes(d.posReforma.debito))}<span className="text-muted-foreground">/mês</span>
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -164,7 +171,7 @@ export function DiagnosticoResultado({
                     Crédito das compras
                   </TableCell>
                   <TableCell className="py-1.5 text-right text-xs tabular-nums text-emerald-600">
-                    − {brl(d.posReforma.credito)}
+                    − {brl(mes(d.posReforma.credito))}/mês
                   </TableCell>
                 </TableRow>
               </TableBody>
@@ -178,6 +185,23 @@ export function DiagnosticoResultado({
         </Card>
       </div>
 
+      {/* Trajetória ano a ano */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">A trajetória da sua carga até 2033</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            A reforma entra aos poucos. Veja como a carga sobre consumo caminha de hoje até o
+            modelo pleno.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <TrajetoriaChart
+            trajetoria={d.trajetoria}
+            temCredito={(d.input.comprasComCredito12m ?? 0) > 0}
+          />
+        </CardContent>
+      </Card>
+
       {/* Comparativo de regimes */}
       <Card>
         <CardHeader className="pb-3">
@@ -188,7 +212,8 @@ export function DiagnosticoResultado({
             <TableHeader>
               <TableRow>
                 <TableHead>Regime</TableHead>
-                <TableHead className="text-right">Total no ano</TableHead>
+                <TableHead className="text-right">Por mês</TableHead>
+                <TableHead className="text-right">No ano</TableHead>
                 <TableHead className="text-right">Alíquota efetiva</TableHead>
                 <TableHead />
               </TableRow>
@@ -203,7 +228,10 @@ export function DiagnosticoResultado({
                       {r.label}
                       {r.anexo ? <span className="ml-1 text-xs text-muted-foreground">· Anexo {r.anexo}</span> : null}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {r.indisponivel && r.totalAnual === 0 ? '—' : brl(mes(r.totalAnual))}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
                       {r.indisponivel && r.totalAnual === 0 ? '—' : brl(r.totalAnual)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
@@ -224,7 +252,8 @@ export function DiagnosticoResultado({
           {d.economiaMigracao > 0 && d.melhorRegime && (
             <p className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">
               Migrar para {d.melhorRegime.label} economizaria cerca de{' '}
-              <strong>{brl(d.economiaMigracao)}</strong> por ano. Vale confirmar com uma análise
+              <strong>{brl(mes(d.economiaMigracao))} por mês</strong> ({brl(d.economiaMigracao)} no
+              ano). Vale confirmar com uma análise
               individual antes de mudar — a troca de regime tem regras de prazo e efeitos que vão
               além do imposto.
             </p>
@@ -256,20 +285,31 @@ export function DiagnosticoResultado({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-lg border border-border p-4">
                 <p className="text-sm font-medium">Continuar no DAS unificado</p>
-                <p className="mt-1 text-xl font-semibold">{brl(d.hibrido.unificadoTotal)}</p>
-                <p className="text-xs text-muted-foreground">por ano, tudo em uma guia só</p>
+                <p className="mt-1 text-xl font-semibold">
+                  {brl(mes(d.hibrido.unificadoTotal))}
+                  <span className="ml-1 text-sm font-normal text-muted-foreground">/mês</span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  tudo em uma guia só · {brl(d.hibrido.unificadoTotal)} no ano
+                </p>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Crédito repassado a clientes PJ: <strong>{brl(d.hibrido.creditoRepassadoUnificado)}</strong>
+                  Crédito repassado a clientes PJ:{' '}
+                  <strong>{brl(mes(d.hibrido.creditoRepassadoUnificado))}/mês</strong>
                 </p>
               </div>
               <div className="rounded-lg border border-border p-4">
                 <p className="text-sm font-medium">Regime regular de IBS/CBS ("híbrido")</p>
-                <p className="mt-1 text-xl font-semibold">{brl(d.hibrido.hibridoTotal)}</p>
+                <p className="mt-1 text-xl font-semibold">
+                  {brl(mes(d.hibrido.hibridoTotal))}
+                  <span className="ml-1 text-sm font-normal text-muted-foreground">/mês</span>
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  {brl(d.hibrido.hibridoDasResidual)} no DAS + {brl(d.hibrido.hibridoCbsIbs)} de CBS/IBS
+                  {brl(mes(d.hibrido.hibridoDasResidual))} no DAS +{' '}
+                  {brl(mes(d.hibrido.hibridoCbsIbs))} de CBS/IBS · {brl(d.hibrido.hibridoTotal)} no ano
                 </p>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Crédito repassado a clientes PJ: <strong>{brl(d.hibrido.creditoRepassadoHibrido)}</strong>
+                  Crédito repassado a clientes PJ:{' '}
+                  <strong>{brl(mes(d.hibrido.creditoRepassadoHibrido))}/mês</strong>
                 </p>
               </div>
             </div>
@@ -294,15 +334,14 @@ export function DiagnosticoResultado({
       {/* Linha do tempo */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">O caminho até 2033</CardTitle>
+          <CardTitle className="text-base">A transição é gradual</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Nada muda de uma vez. Toque em cada etapa para ver o que acontece — e quando o negócio
+            precisa estar pronto.
+          </p>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {LINHA_DO_TEMPO.map((m) => (
-            <div key={m.ano} className="flex gap-3">
-              <span className="min-w-[80px] shrink-0 text-sm font-semibold tabular-nums">{m.ano}</span>
-              <p className="text-sm text-muted-foreground">{m.texto}</p>
-            </div>
-          ))}
+        <CardContent>
+          <LinhaDoTempo />
         </CardContent>
       </Card>
 
