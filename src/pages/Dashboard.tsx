@@ -18,6 +18,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { HeaderCalendar } from '@/components/layout/HeaderCalendar';
+import { HeaderCalculator } from '@/components/layout/HeaderCalculator';
 import { toast } from 'sonner';
 import { useDashboardSummary, useAnnualMetrics, useMonthlyEvolution, useCategoryBreakdown } from '@/hooks/useRpcDashboard';
 import { useBanks } from '@/hooks/useBanks';
@@ -340,6 +342,13 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="flex gap-2">
+          {/*
+            Calendário e calculadora saíram do header global (decisão 05) e vivem
+            aqui: o calendário lê lançamentos por dia, então o lugar dele é junto
+            dos números do Financeiro.
+          */}
+          <HeaderCalendar />
+          <HeaderCalculator />
           <DashboardWidgetsConfig widgets={widgets} onToggle={toggleWidget} />
           {/* Export Dropdown */}
           <DropdownMenu>

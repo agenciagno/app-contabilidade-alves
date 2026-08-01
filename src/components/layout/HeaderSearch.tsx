@@ -94,14 +94,14 @@ export function HeaderSearch() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="hidden md:flex items-center gap-2.5 w-full max-w-md h-9 px-3.5 rounded-full border border-border bg-muted/40 text-muted-foreground transition-colors hover:bg-muted hover:border-border/80"
+        className="hidden h-9 w-full max-w-[420px] items-center gap-2 rounded-sm border border-line bg-bg px-3 text-muted-ink-2 transition-colors hover:border-line hover:bg-bg-2 md:flex"
       >
-        <Search className="w-4 h-4 shrink-0" strokeWidth={1.75} />
-        <span className="flex-1 text-left text-[13px] truncate">
-          Buscar cliente, tarefa, lançamento...
+        <Search className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+        <span className="flex-1 truncate text-left text-ui">
+          Buscar empresa, CNPJ, obrigação ou lançamento…
         </span>
-        <kbd className="hidden lg:inline-flex items-center gap-0.5 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium">
-          ⌘ K
+        <kbd className="hidden shrink-0 items-center gap-0.5 rounded-[4px] border border-line bg-paper px-1.5 py-0.5 text-meta lg:inline-flex">
+          ⌘K
         </kbd>
       </button>
 

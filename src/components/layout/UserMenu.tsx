@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, UserCog, LifeBuoy, Languages, Receipt } from 'lucide-react';
+import { LogOut, UserCog, LifeBuoy, Languages, Receipt, ChevronsUpDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
@@ -19,12 +19,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 /**
- * Menu de conta no topo — substitui o bloco de perfil que ficava no rodapé do sidebar.
+ * Menu de conta. O gatilho tem duas formas:
+ * - `avatar`: só o avatar (usado quando o menu vive no topo).
+ * - `bar`: avatar + nome + papel + chevrons, ocupando a largura — é o bloco
+ *   "conta" do rodapé da sidebar no Figma (decisão 05, que traz o perfil de
+ *   volta para o rodapé).
  */
-export function UserMenu() {
+export function UserMenu({ variant = 'avatar' }: { variant?: 'avatar' | 'bar' }) {
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const { fullName, email, avatarUrl, isAdmin, isSuperAdmin } = useUserRole();
+  const { fullName, email, avatarUrl, isAdmin, isSuperAdmin, role } = useUserRole();
   const { company } = useCompany();
 
   // Faturas é da empresa que assina o sistema. Equipe interna da CA e
@@ -34,18 +38,40 @@ export function UserMenu() {
 
   const initials = (fullName || 'U').substring(0, 2).toUpperCase();
 
+  // O Figma mostra "Sócio · Tech" no rodapé, mas cargo não existe no banco —
+  // uso o papel real em vez de inventar um dado.
+  const roleLabel =
+    role === 'super_admin' ? 'Super admin' : role === 'admin' ? 'Administrador' : 'Colaborador';
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          className="rounded-full ring-offset-background transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          aria-label="Menu da conta"
-        >
-          <Avatar className="w-8 h-8">
-            {avatarUrl && <AvatarImage src={avatarUrl} alt="Avatar" />}
-            <AvatarFallback className="text-xs bg-primary/10 text-primary">{initials}</AvatarFallback>
-          </Avatar>
-        </button>
+        {variant === 'bar' ? (
+          <button
+            className="flex w-full items-center gap-2.5 rounded-sm border border-line bg-paper px-3 py-2 text-left ring-offset-background transition-colors hover:bg-bg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            aria-label="Menu da conta"
+          >
+            <Avatar className="h-[26px] w-[26px] shrink-0">
+              {avatarUrl && <AvatarImage src={avatarUrl} alt="Avatar" />}
+              <AvatarFallback className="bg-brand-tint text-badge text-brand">{initials}</AvatarFallback>
+            </Avatar>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-ui-strong text-ink">{fullName || 'Usuário'}</span>
+              <span className="truncate text-meta text-muted-ink">{roleLabel}</span>
+            </span>
+            <ChevronsUpDown className="h-[15px] w-[15px] shrink-0 text-muted-ink-2" strokeWidth={1.75} />
+          </button>
+        ) : (
+          <button
+            className="rounded-pill ring-offset-background transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            aria-label="Menu da conta"
+          >
+            <Avatar className="h-8 w-8">
+              {avatarUrl && <AvatarImage src={avatarUrl} alt="Avatar" />}
+              <AvatarFallback className="bg-brand-tint text-badge text-brand">{initials}</AvatarFallback>
+            </Avatar>
+          </button>
+        )}
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-64">
