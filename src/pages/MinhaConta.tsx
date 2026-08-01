@@ -153,7 +153,7 @@ export default function MinhaConta() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Minha Conta</h1>
+        <h1 className="text-h3-section text-foreground">Minha Conta</h1>
         <p className="text-muted-foreground">Seus dados de acesso ao sistema</p>
       </div>
 

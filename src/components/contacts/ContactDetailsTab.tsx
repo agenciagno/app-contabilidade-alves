@@ -48,9 +48,9 @@ const fmtCnae = (c: any): string => {
 function StatusBadge({ status }: { status: string | null }) {
   if (!status) return <span className="text-foreground">—</span>;
   const map: Record<string, string> = {
-    Ativo: 'bg-green-500/15 text-green-600',
-    Inativo: 'bg-red-500/15 text-red-600',
-    Prospect: 'bg-yellow-500/15 text-yellow-600',
+    Ativo: 'bg-ok/15 text-ok',
+    Inativo: 'bg-danger/15 text-danger',
+    Prospect: 'bg-warn/15 text-warn',
     'Em Processo de Abertura': 'bg-blue-500/15 text-blue-600',
   };
   const cls = map[status] || 'bg-muted text-foreground';

@@ -54,7 +54,7 @@ const actionColors: Record<GlobalLogAction, string> = {
   ALTERACAO: 'bg-primary/20 text-primary',
   DOWNLOAD: 'bg-blue-500/20 text-blue-500',
   UPLOAD: 'bg-violet-500/20 text-violet-500',
-  LOGIN: 'bg-amber-500/20 text-amber-500',
+  LOGIN: 'bg-warn/20 text-warn',
 };
 
 const moduleIcons: Record<GlobalLogModule, React.ComponentType<{ className?: string }>> = {

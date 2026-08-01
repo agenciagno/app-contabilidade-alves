@@ -26,10 +26,10 @@ import { useActiveCoverageByContact } from '@/hooks/useTemporaryTransfers';
 import { fiscalTaskContactLabel, isFiscalTaskDone } from '@/lib/fiscal-filters';
 
 const COLUMNS = [
-  { id: 'a_fazer', label: 'A Fazer', color: 'bg-blue-500' },
-  { id: 'em_progresso', label: 'Em Progresso', color: 'bg-orange-500' },
-  { id: 'aguardando_cliente', label: 'Aguardando Cliente', color: 'bg-yellow-500' },
-  { id: 'concluido', label: 'Concluído', color: 'bg-emerald-500' },
+  { id: 'a_fazer', label: 'A Fazer', color: 'bg-state-todo' },
+  { id: 'em_progresso', label: 'Em Progresso', color: 'bg-state-doing' },
+  { id: 'aguardando_cliente', label: 'Aguardando Cliente', color: 'bg-state-waiting' },
+  { id: 'concluido', label: 'Concluído', color: 'bg-ok' },
 ] as const;
 
 const COLUMN_IDS = COLUMNS.map((c) => c.id) as readonly string[];
@@ -94,11 +94,11 @@ function DroppableColumn({
     <div className="flex-1 min-w-[260px] flex-shrink-0 flex flex-col">
       <div
         className={`flex items-center gap-2 mb-3 px-2 py-1.5 rounded-md ${
-          isWaiting ? 'bg-amber-100 dark:bg-amber-900/20' : ''
+          isWaiting ? 'bg-warn-soft dark:bg-warn/20' : ''
         }`}
       >
         {isWaiting ? (
-          <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+          <Clock className="w-3.5 h-3.5 text-warn dark:text-warn" />
         ) : (
           <div className={`w-2.5 h-2.5 rounded-full ${color}`} />
         )}

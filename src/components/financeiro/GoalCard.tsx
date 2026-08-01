@@ -53,7 +53,7 @@ export function GoalCard({ goal, onUpdateProgress, onDelete, isSaving }: Props) 
         </div>
 
         <div className="space-y-1.5">
-          <Progress value={pct} className={reached ? '[&>div]:bg-emerald-500' : ''} />
+          <Progress value={pct} className={reached ? '[&>div]:bg-ok' : ''} />
           <div className="flex items-center justify-between text-xs">
             {editing ? (
               <div className="flex items-center gap-1">
@@ -65,7 +65,7 @@ export function GoalCard({ goal, onUpdateProgress, onDelete, isSaving }: Props) 
                   className="h-6 w-24 text-xs px-1.5"
                 />
                 <Button size="icon" variant="ghost" className="h-6 w-6" onClick={confirmEdit} disabled={isSaving}>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <Check className="w-3.5 h-3.5 text-ok" />
                 </Button>
                 <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditing(false)}>
                   <X className="w-3.5 h-3.5" />
@@ -81,7 +81,7 @@ export function GoalCard({ goal, onUpdateProgress, onDelete, isSaving }: Props) 
                 <Pencil className="w-3 h-3" />
               </button>
             )}
-            <span className={`font-semibold ${reached ? 'text-emerald-600' : 'text-foreground'}`}>
+            <span className={`font-semibold ${reached ? 'text-ok' : 'text-foreground'}`}>
               {Math.round(pct)}%
             </span>
           </div>

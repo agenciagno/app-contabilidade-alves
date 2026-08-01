@@ -36,8 +36,8 @@ export default function PagarReceber() {
     <div className="space-y-5">
       <div className="flex items-center justify-between py-4 flex-wrap gap-4">
         <div className="space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Financeiro</p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <p className="text-kicker uppercase text-muted-foreground">Financeiro</p>
+          <h1 className="text-display text-foreground flex items-center gap-2">
             Pagar / Receber.
             <TooltipProvider>
               <Tooltip>

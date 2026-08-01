@@ -51,8 +51,8 @@ export function getSlaInfo(task: FiscalTask) {
     return {
       daysLeft,
       label: `Atrasado há ${Math.abs(daysLeft)}d`,
-      badgeClass: 'bg-red-600 text-white border-red-700 animate-pulse',
-      barClass: 'bg-red-700 animate-pulse',
+      badgeClass: 'bg-danger text-white border-danger animate-pulse',
+      barClass: 'bg-danger animate-pulse',
       isOverdue: true,
     };
   }
@@ -60,8 +60,8 @@ export function getSlaInfo(task: FiscalTask) {
     return {
       daysLeft,
       label: `D-${daysLeft}`,
-      badgeClass: 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40 animate-pulse',
-      barClass: 'bg-red-500',
+      badgeClass: 'bg-danger/15 text-danger dark:text-danger border-danger/40 animate-pulse',
+      barClass: 'bg-danger',
       isOverdue: false,
     };
   }
@@ -69,16 +69,16 @@ export function getSlaInfo(task: FiscalTask) {
     return {
       daysLeft,
       label: `D-${daysLeft}`,
-      badgeClass: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/40',
-      barClass: 'bg-amber-500',
+      badgeClass: 'bg-warn/15 text-warn dark:text-warn border-warn/40',
+      barClass: 'bg-warn',
       isOverdue: false,
     };
   }
   return {
     daysLeft,
     label: `D-${daysLeft}`,
-    badgeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/40',
-    barClass: 'bg-emerald-500',
+    badgeClass: 'bg-ok/15 text-ok dark:text-ok border-ok/40',
+    barClass: 'bg-ok',
     isOverdue: false,
   };
 }
@@ -99,7 +99,7 @@ export function TaskCard({
       <Card
         className={cn(
           'group cursor-pointer hover:shadow-md transition-shadow bg-card relative overflow-hidden',
-          isWaiting && 'border-l-4 border-l-amber-500',
+          isWaiting && 'border-l-4 border-l-warn',
         )}
         onClick={onClick}
         {...dragProps}
@@ -113,7 +113,7 @@ export function TaskCard({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <p className="text-sm font-semibold text-foreground truncate">{contactName}</p>
                 {isWaiting && (
-                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/40">
+                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-warn/15 text-warn dark:text-warn border-warn/40">
                     Aguardando
                   </Badge>
                 )}

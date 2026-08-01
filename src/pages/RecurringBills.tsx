@@ -205,7 +205,7 @@ export default function RecurringBills() {
   return <div className="space-y-6">
       <div className="flex items-center justify-between py-4 flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Contas Recorrentes</h1>
+          <h1 className="text-h3-section text-foreground">Contas Recorrentes</h1>
           <p className="text-xs text-muted-foreground mt-1">
             Os lançamentos são gerados automaticamente todo dia às 06h para os recorrentes que vencem no dia.
           </p>

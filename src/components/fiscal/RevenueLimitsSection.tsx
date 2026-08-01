@@ -118,9 +118,9 @@ export function RevenueLimitsSection({ year, regime }: Props) {
   const loading = contactsQ.isLoading || ytdQ.isLoading;
 
   const statusBadge = (pct: number) => {
-    if (pct >= 95) return <Badge className="bg-red-500/15 text-red-700 border-red-500/30">Crítico</Badge>;
-    if (pct >= 80) return <Badge className="bg-yellow-500/15 text-yellow-700 border-yellow-500/30">Atenção</Badge>;
-    return <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30">Regular</Badge>;
+    if (pct >= 95) return <Badge className="bg-danger/15 text-danger border-danger/30">Crítico</Badge>;
+    if (pct >= 80) return <Badge className="bg-state-waiting/15 text-state-waiting border-state-waiting/30">Atenção</Badge>;
+    return <Badge className="bg-ok/15 text-ok border-ok/30">Regular</Badge>;
   };
 
   return (
@@ -151,8 +151,8 @@ export function RevenueLimitsSection({ year, regime }: Props) {
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {critical.length > 0 && (
-              <Alert className="bg-red-500/10 border-red-500/40">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
+              <Alert className="bg-danger/10 border-danger/40">
+                <AlertTriangle className="h-4 w-4 text-danger" />
                 <AlertDescription>
                   <div className="font-medium mb-1">Acima de 95% do teto ({critical.length})</div>
                   <ul className="text-sm space-y-0.5">
@@ -166,8 +166,8 @@ export function RevenueLimitsSection({ year, regime }: Props) {
               </Alert>
             )}
             {warning.length > 0 && (
-              <Alert className="bg-yellow-500/10 border-yellow-500/40">
-                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <Alert className="bg-state-waiting/10 border-state-waiting/40">
+                <AlertTriangle className="h-4 w-4 text-state-waiting" />
                 <AlertDescription>
                   <div className="font-medium mb-1">Entre 80% e 95% do teto ({warning.length})</div>
                   <ul className="text-sm space-y-0.5">
@@ -181,8 +181,8 @@ export function RevenueLimitsSection({ year, regime }: Props) {
               </Alert>
             )}
             {critical.length === 0 && warning.length === 0 && (
-              <Alert className="bg-emerald-500/10 border-emerald-500/40 md:col-span-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              <Alert className="bg-ok/10 border-ok/40 md:col-span-2">
+                <CheckCircle2 className="h-4 w-4 text-ok" />
                 <AlertDescription>Nenhum cliente próximo do teto do Simples Nacional.</AlertDescription>
               </Alert>
             )}
@@ -247,11 +247,11 @@ export function RevenueLimitsSection({ year, regime }: Props) {
         </div>
 
         {/* Sublimite MG */}
-        <Alert className={aboveSublimite.length > 0 ? 'bg-yellow-500/10 border-yellow-500/40' : ''}>
+        <Alert className={aboveSublimite.length > 0 ? 'bg-state-waiting/10 border-state-waiting/40' : ''}>
           <AlertDescription className="text-sm">
             <span className="font-medium">Sublimite ICMS/ISS MG:</span> {fmtBRL(SUBLIMITE_MG)}/ano
             {aboveSublimite.length > 0 && (
-              <span className="ml-2 text-yellow-700">
+              <span className="ml-2 text-state-waiting">
                 — {aboveSublimite.length} cliente(s) acima de 75% deste sublimite
               </span>
             )}

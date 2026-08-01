@@ -15,6 +15,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { PageHeader, StatCard } from '@/components/ds';
 import { useContacts } from '@/hooks/useContacts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -47,6 +48,8 @@ import { isContactFiscalEligible } from '@/lib/fiscal-filters';
 import { toast } from 'sonner';
 
 type ViewMode = 'myday' | 'kanban' | 'list' | 'calendar';
+
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] as const;
 
 // DateInput: accepts DD/MM/YYYY typing + popover calendar
 function DateInput({
@@ -532,21 +535,29 @@ export default function FiscalTasks() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between py-4 flex-wrap gap-4">
-        <h1 className="text-2xl font-bold text-foreground">Tarefas</h1>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2" onClick={() => setBulkCompleteOpen(true)}>
-            <CheckCheck className="w-4 h-4" />
-            Concluir em Lote
-          </Button>
-          {canDelete && (
-            <Button className="gap-2" onClick={() => setCreateOpen(true)}>
-              <Plus className="w-4 h-4" />
-              Nova Tarefa
+      <PageHeader
+        kicker={
+          competenceMonth !== 'all'
+            ? `~/tarefas · competência ${MESES[Number(competenceMonth) - 1] ?? ''} ${competenceYear}`
+            : '~/tarefas'
+        }
+        title="Tarefas."
+        subtitle={`${kpis.totalMonth} tarefas no board · ${kpis.overdue} atrasadas de competências anteriores.`}
+        actions={
+          <>
+            <Button variant="outline" onClick={() => setBulkCompleteOpen(true)}>
+              <CheckCheck className="h-4 w-4" />
+              Concluir em lote
             </Button>
-          )}
-        </div>
-      </div>
+            {canDelete && (
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Nova tarefa
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {isSelectedPeriodClosed && (
         <div className="flex items-center gap-2 rounded-md border border-muted-foreground/30 bg-muted px-3 py-2 text-sm text-muted-foreground">
@@ -557,73 +568,63 @@ export default function FiscalTasks() {
 
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <button
-          type="button"
-          onClick={() => setQuickFilter((q) => (q === 'overdue' ? null : 'overdue'))}
-          className="text-left"
-        >
-          <Card
+      {/*
+        Indicadores numerados (decisão 06): o índice ordinal dá um ponto de
+        entrada óbvio, e só o mais urgente recebe emphasis="warm" — antes eram
+        quatro cards igualmente coloridos, sem hierarquia. Continuam sendo
+        filtros rápidos; o clique não mudou.
+      */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {([
+          {
+            key: 'overdue' as const,
+            label: 'Atrasadas',
+            value: kpis.overdue,
+            hint: 'fora da competência atual',
+            onClick: () => setQuickFilter((q) => (q === 'overdue' ? null : 'overdue')),
+          },
+          {
+            key: 'today' as const,
+            label: 'Vencem hoje',
+            value: kpis.dueToday,
+            hint: kpis.dueToday === 0 ? 'nada crítico para hoje' : 'vencem na data de hoje',
+            onClick: () => setQuickFilter((q) => (q === 'today' ? null : 'today')),
+          },
+          {
+            key: 'awaiting' as const,
+            label: 'Aguardando cliente',
+            value: kpis.awaiting,
+            hint: 'há mais de 5 dias',
+            onClick: () => setQuickFilter((q) => (q === 'awaiting' ? null : 'awaiting')),
+          },
+          {
+            key: null,
+            label: 'Progresso do mês',
+            value: `${kpis.pct}%`,
+            hint: `${kpis.doneMonth} de ${kpis.totalMonth} concluídas`,
+            onClick: () => setQuickFilter(null),
+          },
+        ]).map((kpi, i) => (
+          <button
+            key={kpi.label}
+            type="button"
+            onClick={kpi.onClick}
             className={cn(
-              'p-3 border-l-4 border-l-destructive bg-destructive/5 hover:bg-destructive/10 transition-colors h-full',
-              quickFilter === 'overdue' && 'ring-2 ring-destructive',
+              'rounded-lg text-left transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              quickFilter === kpi.key && 'ring-2 ring-brand',
             )}
           >
-            <div className="text-xs font-medium text-muted-foreground">Atrasadas</div>
-            <div className="text-2xl font-bold text-destructive mt-1">{kpis.overdue}</div>
-          </Card>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setQuickFilter((q) => (q === 'today' ? null : 'today'))}
-          className="text-left"
-        >
-          <Card
-            className={cn(
-              'p-3 border-l-4 border-l-orange-500 bg-orange-500/5 hover:bg-orange-500/10 transition-colors h-full',
-              quickFilter === 'today' && 'ring-2 ring-orange-500',
-            )}
-          >
-            <div className="text-xs font-medium text-muted-foreground">Vencem Hoje</div>
-            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">{kpis.dueToday}</div>
-          </Card>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setQuickFilter((q) => (q === 'awaiting' ? null : 'awaiting'))}
-          className="text-left"
-        >
-          <Card
-            className={cn(
-              'p-3 border-l-4 border-l-yellow-500 bg-yellow-500/5 hover:bg-yellow-500/10 transition-colors h-full',
-              quickFilter === 'awaiting' && 'ring-2 ring-yellow-500',
-            )}
-          >
-            <div className="text-xs font-medium text-muted-foreground">Aguardando Cliente +5 dias</div>
-            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">{kpis.awaiting}</div>
-          </Card>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setQuickFilter(null)}
-          className="text-left"
-        >
-          <Card
-            className={cn(
-              'p-3 border-l-4 border-l-green-500 bg-green-500/5 hover:bg-green-500/10 transition-colors h-full',
-              quickFilter === null && 'ring-2 ring-green-500',
-            )}
-          >
-            <div className="text-xs font-medium text-muted-foreground">Progresso do Mês</div>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-              {kpis.pct}% <span className="text-sm font-normal text-muted-foreground">({kpis.doneMonth}/{kpis.totalMonth})</span>
-            </div>
-            <Progress value={kpis.pct} className="h-1.5 mt-2" />
-          </Card>
-        </button>
+            <StatCard
+              index={String(i + 1).padStart(2, '0')}
+              label={kpi.label}
+              value={kpi.value}
+              hint={kpi.hint}
+              /* só o de maior urgência ganha destaque, e só quando há o que destacar */
+              emphasis={kpi.key === 'overdue' && kpis.overdue > 0 ? 'warm' : 'none'}
+              className="h-full"
+            />
+          </button>
+        ))}
       </div>
 
       {/* Filters Bar */}
@@ -637,7 +638,7 @@ export default function FiscalTasks() {
             <SelectTrigger className="h-9 w-[130px] text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              {['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map((m, i) => (
+              {MESES.map((m, i) => (
                 <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
               ))}
             </SelectContent>

@@ -143,12 +143,12 @@ export function BankBalanceDiagnosticPanel() {
   const diff = aggregateTotal - sumOfCards;
 
   return (
-    <Card className="border-amber-500/40 bg-amber-500/5">
+    <Card className="border-warn/40 bg-warn/5">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Bug className="w-4 h-4 text-amber-600" />
-            <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+            <Bug className="w-4 h-4 text-warn" />
+            <h3 className="text-sm font-semibold text-warn dark:text-warn">
               Diagnóstico de Saldos (Super Admin)
             </h3>
           </div>
@@ -168,7 +168,7 @@ export function BankBalanceDiagnosticPanel() {
                 <p className="text-xs text-muted-foreground">Total agregado (hook)</p>
                 <p className="font-semibold">{fmt(aggregateTotal)}</p>
               </div>
-              <div className={`p-3 rounded-md border ${Math.abs(diff) > 0.005 ? 'bg-destructive/10 border-destructive/40' : 'bg-green-500/10 border-green-500/40'}`}>
+              <div className={`p-3 rounded-md border ${Math.abs(diff) > 0.005 ? 'bg-destructive/10 border-destructive/40' : 'bg-ok/10 border-ok/40'}`}>
                 <p className="text-xs text-muted-foreground">Diferença</p>
                 <p className="font-semibold">{fmt(diff)}</p>
               </div>
@@ -193,7 +193,7 @@ export function BankBalanceDiagnosticPanel() {
                       <td className="py-2 px-2">
                         <div className="flex flex-wrap gap-1">
                           {!r.exists && <Badge variant="destructive" className="text-[10px]">ÓRFÃO</Badge>}
-                          {r.exists && r.is_active && <Badge className="text-[10px] bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/40">Ativo</Badge>}
+                          {r.exists && r.is_active && <Badge className="text-[10px] bg-ok/20 text-ok dark:text-ok border-ok/40">Ativo</Badge>}
                           {r.exists && !r.is_active && <Badge variant="secondary" className="text-[10px]">Inativo</Badge>}
                           {r.is_invisible && <Badge variant="destructive" className="text-[10px]">Invisível</Badge>}
                         </div>

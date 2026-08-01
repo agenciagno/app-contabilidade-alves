@@ -129,11 +129,11 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
       .toUpperCase() || '?';
 
   return (
-    <Card className="p-5 space-y-5 border-emerald-500/20 bg-emerald-500/[0.03]">
+    <Card className="p-5 space-y-5 border-ok/20 bg-ok/[0.03]">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+            <CheckCircle2 className="h-5 w-5 text-ok" />
             Pré-lançamento
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
@@ -158,9 +158,9 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
           {overloaded.map((c) => (
             <div
               key={c.id ?? 'none'}
-              className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
+              className="flex items-start gap-3 rounded-lg border border-warn/40 bg-warn/10 p-3 text-sm"
             >
-              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <AlertTriangle className="h-4 w-4 shrink-0 text-warn dark:text-warn mt-0.5" />
               <p>
                 <strong>{c.name}</strong> ficará com <strong>{c.pct.toFixed(0)}%</strong> das tarefas ({c.count}) — considere
                 redistribuir.
@@ -235,9 +235,9 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
                       <div
                         className={
                           c.pct > 40
-                            ? 'h-full bg-amber-500'
+                            ? 'h-full bg-warn'
                             : c.pct > 25
-                              ? 'h-full bg-emerald-500'
+                              ? 'h-full bg-ok'
                               : 'h-full bg-primary'
                         }
                         style={{ width: `${Math.min(100, c.pct)}%` }}

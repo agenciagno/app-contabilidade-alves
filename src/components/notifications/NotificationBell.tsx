@@ -14,9 +14,9 @@ import { useNotifications, NotificationRow } from '@/hooks/useNotifications';
 import { PushOptIn } from '@/components/notifications/PushOptIn';
 
 const TYPE_META: Record<string, { icon: any; color: string }> = {
-  task_due: { icon: Clock, color: 'text-amber-500' },
-  task_overdue: { icon: AlertTriangle, color: 'text-red-500' },
-  task_completed: { icon: CheckCircle, color: 'text-green-500' },
+  task_due: { icon: Clock, color: 'text-warn' },
+  task_overdue: { icon: AlertTriangle, color: 'text-danger' },
+  task_completed: { icon: CheckCircle, color: 'text-ok' },
   task_assigned: { icon: UserPlus, color: 'text-blue-500' },
   transfer_start: { icon: ArrowRightLeft, color: 'text-purple-500' },
   transfer_end: { icon: ArrowRightLeft, color: 'text-purple-500' },
@@ -24,19 +24,19 @@ const TYPE_META: Record<string, { icon: any; color: string }> = {
   system: { icon: Info, color: 'text-gray-500' },
   // Deadline alerts
   prazo_5d: { icon: CalendarClock, color: 'text-blue-500' },
-  prazo_3d: { icon: CalendarClock, color: 'text-amber-500' },
-  prazo_hoje: { icon: Clock, color: 'text-orange-500' },
-  prazo_atraso: { icon: CalendarX, color: 'text-red-600' },
+  prazo_3d: { icon: CalendarClock, color: 'text-warn' },
+  prazo_hoje: { icon: Clock, color: 'text-warn' },
+  prazo_atraso: { icon: CalendarX, color: 'text-danger' },
   // legacy
-  due_alert: { icon: Clock, color: 'text-amber-500' },
-  overdue: { icon: AlertTriangle, color: 'text-red-500' },
+  due_alert: { icon: Clock, color: 'text-warn' },
+  overdue: { icon: AlertTriangle, color: 'text-danger' },
 };
 
 const DEADLINE_BADGES: Record<string, { label: string; className: string }> = {
   prazo_5d: { label: '5 dias', className: 'bg-blue-100 text-blue-700 border-blue-200' },
-  prazo_3d: { label: '3 dias', className: 'bg-amber-100 text-amber-800 border-amber-200' },
-  prazo_hoje: { label: 'Hoje', className: 'bg-orange-100 text-orange-800 border-orange-200' },
-  prazo_atraso: { label: 'Atraso', className: 'bg-red-100 text-red-700 border-red-200' },
+  prazo_3d: { label: '3 dias', className: 'bg-warn-soft text-warn border-warn' },
+  prazo_hoje: { label: 'Hoje', className: 'bg-warn-soft text-warn border-warn' },
+  prazo_atraso: { label: 'Atraso', className: 'bg-danger-soft text-danger border-danger' },
 };
 
 

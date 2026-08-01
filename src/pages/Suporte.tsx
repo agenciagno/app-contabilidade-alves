@@ -31,7 +31,7 @@ export default function Suporte() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Suporte</h1>
+        <h1 className="text-h3-section text-foreground">Suporte</h1>
         <p className="text-muted-foreground">Fale com a gente quando precisar</p>
       </div>
 

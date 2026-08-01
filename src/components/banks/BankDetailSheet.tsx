@@ -113,7 +113,7 @@ export function BankDetailSheet({ bank, open, onOpenChange }: BankDetailSheetPro
                     .join(' • ')}
                 </p>
               )}
-              <p className={`text-2xl font-bold mt-2 ${closingBalance >= 0 ? 'text-green-500' : 'text-destructive'}`}>
+              <p className={`text-h3-section mt-2 ${closingBalance >= 0 ? 'text-ok' : 'text-destructive'}`}>
                 {formatCurrency(closingBalance)}
               </p>
             </div>
@@ -131,10 +131,10 @@ export function BankDetailSheet({ bank, open, onOpenChange }: BankDetailSheetPro
             </div>
             <div className="bg-background rounded-lg p-3 border border-border/50">
               <div className="flex items-center gap-1">
-                <TrendingUp className="w-3 h-3 text-green-500" />
+                <TrendingUp className="w-3 h-3 text-ok" />
                 <p className="text-xs text-muted-foreground">Entradas</p>
               </div>
-              <p className="font-semibold text-sm text-green-500 mt-1">+{formatCurrency(totalIncome)}</p>
+              <p className="font-semibold text-sm text-ok mt-1">+{formatCurrency(totalIncome)}</p>
             </div>
             <div className="bg-background rounded-lg p-3 border border-border/50">
               <div className="flex items-center gap-1">
@@ -222,7 +222,7 @@ export function BankDetailSheet({ bank, open, onOpenChange }: BankDetailSheetPro
                     {/* Day header */}
                     <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border/30">
                       <span className="text-xs font-semibold text-foreground">{group.dateLabel}</span>
-                      <span className={`text-xs font-bold ${group.dayBalance >= 0 ? 'text-green-500' : 'text-destructive'}`}>
+                      <span className={`text-xs font-bold ${group.dayBalance >= 0 ? 'text-ok' : 'text-destructive'}`}>
                         Saldo {formatCurrency(group.dayBalance)}
                       </span>
                     </div>
@@ -242,7 +242,7 @@ export function BankDetailSheet({ bank, open, onOpenChange }: BankDetailSheetPro
                             </div>
                           </div>
                           <div className="text-right flex-shrink-0">
-                            <p className={`text-xs font-semibold ${row.type === 'receita' ? 'text-green-500' : 'text-destructive'}`}>
+                            <p className={`text-xs font-semibold ${row.type === 'receita' ? 'text-ok' : 'text-destructive'}`}>
                               {row.type === 'receita' ? '+' : '-'}{formatCurrency(row.amount)}
                             </p>
                             <p className="text-[11px] text-muted-foreground">{formatCurrency(row.running_balance)}</p>

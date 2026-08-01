@@ -37,7 +37,7 @@ export function LinhaDoTempo() {
                 }`}
               >
                 {e.destaque && (
-                  <span className="absolute -top-2 whitespace-nowrap rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  <span className="absolute -top-2 whitespace-nowrap rounded-full bg-warn px-2 py-0.5 text-[10px] font-semibold text-white">
                     maior virada
                   </span>
                 )}
@@ -46,7 +46,7 @@ export function LinhaDoTempo() {
                     selecionada
                       ? 'border-transparent bg-primary text-primary-foreground'
                       : e.destaque
-                        ? 'border-amber-500/60 text-amber-600'
+                        ? 'border-warn/60 text-warn'
                         : 'border-border text-muted-foreground'
                   }`}
                 >

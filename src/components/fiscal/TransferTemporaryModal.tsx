@@ -379,9 +379,9 @@ export function TransferTemporaryModal({
                 </p>
               </div>
 
-              <div className="flex items-start gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
-                <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-yellow-900 dark:text-yellow-200">
+              <div className="flex items-start gap-3 rounded-lg border border-state-waiting/30 bg-state-waiting/10 p-3">
+                <AlertTriangle className="w-5 h-5 text-state-waiting dark:text-state-waiting flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-state-waiting dark:text-state-waiting">
                   Na data de expiração ({format(endDate, 'dd/MM/yyyy')}), os clientes e tarefas
                   voltarão automaticamente para <span className="font-semibold">{absentName}</span>.
                 </p>

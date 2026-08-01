@@ -82,8 +82,8 @@ export function FinancialHealthBadge() {
   const health: Health = redCount > 0 ? 'critico' : yellowCount > 0 ? 'atencao' : 'saudavel';
 
   const config = {
-    saudavel: { label: 'Saudável', Icon: ShieldCheck, cls: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30' },
-    atencao: { label: 'Atenção', Icon: AlertTriangle, cls: 'bg-amber-500/15 text-amber-500 border-amber-500/30' },
+    saudavel: { label: 'Saudável', Icon: ShieldCheck, cls: 'bg-ok/15 text-ok border-ok/30' },
+    atencao: { label: 'Atenção', Icon: AlertTriangle, cls: 'bg-warn/15 text-warn border-warn/30' },
     critico: { label: 'Crítico', Icon: ShieldAlert, cls: 'bg-destructive/15 text-destructive border-destructive/30' },
   }[health];
 

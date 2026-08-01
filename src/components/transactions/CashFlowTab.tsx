@@ -724,7 +724,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Capital de Giro</p>
-                <p className={`text-2xl font-extrabold ${capitalDeGiro >= 0 ? 'text-blue-400' : 'text-red-500'}`}>
+                <p className={`text-2xl font-extrabold ${capitalDeGiro >= 0 ? 'text-blue-400' : 'text-danger'}`}>
                   {formatCurrency(capitalDeGiro)}
                 </p>
               </div>
@@ -736,15 +736,15 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
         </Card>
 
         {/* Entradas */}
-        <Card className="bg-card border-border/50 border-l-2 border-l-emerald-500">
+        <Card className="bg-card border-border/50 border-l-2 border-l-ok">
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Entradas</p>
-                <p className="text-2xl font-extrabold text-emerald-500">{formatCurrency(kpis.receitasPendentes)}</p>
+                <p className="text-2xl font-extrabold text-ok">{formatCurrency(kpis.receitasPendentes)}</p>
               </div>
-              <div className="w-9 h-9 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <TrendingUp className="w-4 h-4 text-emerald-500" />
+              <div className="w-9 h-9 rounded-full bg-ok/10 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 text-ok" />
               </div>
             </div>
           </CardContent>
@@ -752,15 +752,15 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
 
         {/* Saídas */}
         {!isReceivables && (
-        <Card className="bg-card border-border/50 border-l-2 border-l-red-500">
+        <Card className="bg-card border-border/50 border-l-2 border-l-danger">
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Saídas</p>
-                <p className="text-2xl font-extrabold text-red-500">{formatCurrency(kpis.despesasPendentes)}</p>
+                <p className="text-2xl font-extrabold text-danger">{formatCurrency(kpis.despesasPendentes)}</p>
               </div>
-              <div className="w-9 h-9 rounded-full bg-red-500/10 flex items-center justify-center">
-                <TrendingDown className="w-4 h-4 text-red-500" />
+              <div className="w-9 h-9 rounded-full bg-danger/10 flex items-center justify-center">
+                <TrendingDown className="w-4 h-4 text-danger" />
               </div>
             </div>
           </CardContent>
@@ -778,7 +778,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: b.color || 'hsl(var(--primary))' }} />
                     <span className="text-muted-foreground truncate">{b.name}</span>
                   </div>
-                  <span className={`font-semibold tabular-nums ${Number(b.current_balance) >= 0 ? 'text-foreground' : 'text-red-500'}`}>
+                  <span className={`font-semibold tabular-nums ${Number(b.current_balance) >= 0 ? 'text-foreground' : 'text-danger'}`}>
                     {formatCurrency(Number(b.current_balance))}
                   </span>
                 </div>
@@ -917,12 +917,12 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                             <div className="flex items-center justify-end gap-1">
                               <div className="flex flex-col items-end">
                                 <span className="text-muted-foreground text-[10px]">{formatCurrency(row.originalAmount)}</span>
-                                <span className="text-amber-500 text-[10px]">J+M: {formatCurrency(row.jurosValue + row.multaValue)}</span>
-                                <span className="text-emerald-500 font-bold">{formatCurrency(row.displayAmount)}</span>
+                                <span className="text-warn text-[10px]">J+M: {formatCurrency(row.jurosValue + row.multaValue)}</span>
+                                <span className="text-ok font-bold">{formatCurrency(row.displayAmount)}</span>
                               </div>
                               <Tooltip>
                                 <TooltipTrigger>
-                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                                  <AlertTriangle className="w-3.5 h-3.5 text-warn" />
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   <p>Multa 2%: {formatCurrency(row.multaValue)}</p>
@@ -931,7 +931,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                               </Tooltip>
                             </div>
                           ) : (
-                            <span className="text-emerald-500 font-semibold">{formatCurrency(row.originalAmount)}</span>
+                            <span className="text-ok font-semibold">{formatCurrency(row.originalAmount)}</span>
                           )
                         ) : (
                           <span className="text-muted-foreground">—</span>
@@ -942,7 +942,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                       {!isReceivables && (
                       <TableCell className="text-right whitespace-nowrap">
                         {row.type === 'despesa' ? (
-                          <span className="text-red-500 font-semibold">{formatCurrency(row.originalAmount)}</span>
+                          <span className="text-danger font-semibold">{formatCurrency(row.originalAmount)}</span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
@@ -959,7 +959,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                       <TableCell className="truncate max-w-[140px]"><Tooltip><TooltipTrigger asChild><span className="truncate block">{row.notes ?? '—'}</span></TooltipTrigger><TooltipContent side="top" className="apple-tooltip"><p>{row.notes ?? '—'}</p></TooltipContent></Tooltip></TableCell>
 
                       {/* Saldo Atual */}
-                      <TableCell className={`text-right font-bold tabular-nums whitespace-nowrap ${row.saldoAtual < 0 ? 'text-red-500' : 'text-foreground'}`}>
+                      <TableCell className={`text-right font-bold tabular-nums whitespace-nowrap ${row.saldoAtual < 0 ? 'text-danger' : 'text-foreground'}`}>
                         {formatCurrency(row.saldoAtual)}
                       </TableCell>
 
@@ -976,11 +976,11 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                           className="cursor-pointer"
                         >
                           {row.status === 'pago' ? (
-                            <Badge className="bg-emerald-500 text-white hover:bg-emerald-600 text-[10px]">Pago</Badge>
+                            <Badge className="bg-ok text-white hover:bg-ok text-[10px]">Pago</Badge>
                           ) : row.status === 'vencido' ? (
-                            <Badge className="bg-red-500 text-white hover:bg-red-600 text-[10px]">Vencido</Badge>
+                            <Badge className="bg-danger text-white hover:bg-danger text-[10px]">Vencido</Badge>
                           ) : (
-                            <Badge variant="outline" className="border-amber-500 text-amber-500 text-[10px]">Pendente</Badge>
+                            <Badge variant="outline" className="border-warn text-warn text-[10px]">Pendente</Badge>
                           )}
                         </button>
                       </TableCell>

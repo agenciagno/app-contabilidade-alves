@@ -12,7 +12,7 @@ import { invoiceState, type TenantInvoiceRow } from '@/hooks/useTenants';
 import { brl, dateBR, competenciaBR, BILLING_CYCLE_LABEL } from '@/lib/tenant-format';
 
 const ESTADO: Record<string, { label: string; className: string }> = {
-  paga: { label: 'Paga', className: 'bg-emerald-600 hover:bg-emerald-600' },
+  paga: { label: 'Paga', className: 'bg-ok hover:bg-ok' },
   aberta: { label: 'Em aberto', className: 'bg-blue-600 hover:bg-blue-600' },
   vencida: { label: 'Vencida', className: 'bg-destructive hover:bg-destructive' },
   cancelada: { label: 'Cancelada', className: 'bg-muted-foreground hover:bg-muted-foreground' },

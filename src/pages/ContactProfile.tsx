@@ -127,7 +127,7 @@ export default function ContactProfile() {
           </div>
 
           <div className="flex-1">
-            <h1 className="text-2xl font-bold text-foreground">{getContactDisplayName(contact)}</h1>
+            <h1 className="text-h3-section text-foreground">{getContactDisplayName(contact)}</h1>
             {contact.document && (
               <p className="text-sm text-muted-foreground mt-0.5">
                 {getDocumentType(contact.document) ?? 'CNPJ'}: {contact.document}
@@ -141,7 +141,7 @@ export default function ContactProfile() {
               )}
               <Badge
                 variant={isInadimplente ? 'destructive' : 'secondary'}
-                className={!isInadimplente ? 'bg-emerald-500/10 text-emerald-500' : ''}
+                className={!isInadimplente ? 'bg-ok/10 text-ok' : ''}
               >
                 {isInadimplente ? 'Inadimplente' : 'Adimplente'}
               </Badge>

@@ -28,7 +28,7 @@ export function DRECard({ faturamentoBruto, impostos, despesasOperacionais }: DR
           {/* Faturamento Bruto */}
           <div className="flex items-center justify-between py-2 border-b border-border/30">
             <span className="text-sm text-muted-foreground">Faturamento Bruto</span>
-            <span className="font-semibold text-emerald-500">{formatCurrency(faturamentoBruto)}</span>
+            <span className="font-semibold text-ok">{formatCurrency(faturamentoBruto)}</span>
           </div>
 
           {/* Impostos/Deduções */}
@@ -37,7 +37,7 @@ export function DRECard({ faturamentoBruto, impostos, despesasOperacionais }: DR
               <Minus className="h-3 w-3 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Impostos/Deduções</span>
             </div>
-            <span className="font-medium text-red-500">- {formatCurrency(impostos)}</span>
+            <span className="font-medium text-danger">- {formatCurrency(impostos)}</span>
           </div>
 
           {/* Despesas Operacionais */}
@@ -46,20 +46,20 @@ export function DRECard({ faturamentoBruto, impostos, despesasOperacionais }: DR
               <Minus className="h-3 w-3 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Despesas Operacionais</span>
             </div>
-            <span className="font-medium text-red-500">- {formatCurrency(despesasOperacionais)}</span>
+            <span className="font-medium text-danger">- {formatCurrency(despesasOperacionais)}</span>
           </div>
 
           {/* Lucro Líquido */}
           <div className="flex items-center justify-between py-3 bg-muted/30 rounded-lg px-3 -mx-3">
             <div className="flex items-center gap-2">
               {isPositive ? (
-                <TrendingUp className="h-4 w-4 text-emerald-500" />
+                <TrendingUp className="h-4 w-4 text-ok" />
               ) : (
-                <TrendingDown className="h-4 w-4 text-red-500" />
+                <TrendingDown className="h-4 w-4 text-danger" />
               )}
               <span className="font-medium text-foreground">Lucro Líquido</span>
             </div>
-            <span className={`font-bold text-lg ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+            <span className={`font-bold text-lg ${isPositive ? 'text-ok' : 'text-danger'}`}>
               {formatCurrency(lucroLiquido)}
             </span>
           </div>
@@ -71,7 +71,7 @@ export function DRECard({ faturamentoBruto, impostos, despesasOperacionais }: DR
               <span className="text-sm font-medium text-foreground">Margem de Lucro</span>
             </div>
             <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold ${
-              isPositive ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'
+              isPositive ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'
             }`}>
               {margemLucro.toFixed(1)}%
             </div>

@@ -10,13 +10,13 @@ import { PushOptIn } from '@/components/notifications/PushOptIn';
 function iconFor(type: string) {
   switch (type) {
     case 'due_alert':
-      return <BellRing className="w-4 h-4 text-yellow-600" />;
+      return <BellRing className="w-4 h-4 text-warn" />;
     case 'overdue':
       return <AlertTriangle className="w-4 h-4 text-destructive" />;
     case 'task_assigned':
       return <ClipboardList className="w-4 h-4 text-blue-600" />;
     case 'task_completed':
-      return <CheckCircle2 className="w-4 h-4 text-emerald-600" />;
+      return <CheckCircle2 className="w-4 h-4 text-ok" />;
     case 'task_mention':
       return <AtSign className="w-4 h-4 text-primary" />;
     case 'coverage_started':

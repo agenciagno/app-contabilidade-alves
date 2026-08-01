@@ -98,21 +98,21 @@ const getStatusBadge = (status: string) => {
   switch (status) {
     case 'enviado':
       return (
-        <Badge className="bg-emerald-500/10 text-emerald-500 border-0">
+        <Badge className="bg-ok/10 text-ok border-0">
           <CheckCircle2 className="h-3 w-3 mr-1" />
           Enviado
         </Badge>
       );
     case 'pendente':
       return (
-        <Badge className="bg-amber-500/10 text-amber-500 border-0">
+        <Badge className="bg-warn/10 text-warn border-0">
           <Clock4 className="h-3 w-3 mr-1" />
           Agendado
         </Badge>
       );
     case 'falhou':
       return (
-        <Badge className="bg-red-500/10 text-red-500 border-0">
+        <Badge className="bg-danger/10 text-danger border-0">
           <AlertCircle className="h-3 w-3 mr-1" />
           Falhou
         </Badge>
@@ -146,7 +146,7 @@ const CrmDispatches = () => {
       {/* Header */}
       <div className="flex items-center justify-between py-4 flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <h1 className="text-h3-section text-foreground flex items-center gap-2">
             <Send className="h-5 w-5 text-primary" />
             Centro de Disparos
           </h1>
@@ -197,18 +197,18 @@ const CrmDispatches = () => {
                     className={cn(
                       "flex flex-col items-center justify-center p-4 rounded-lg border-2 cursor-pointer transition-all",
                       channel === 'whatsapp' 
-                        ? "border-emerald-500 bg-emerald-500/10" 
-                        : "border-border hover:border-emerald-500/50"
+                        ? "border-ok bg-ok/10" 
+                        : "border-border hover:border-ok/50"
                     )}
                   >
                     <RadioGroupItem value="whatsapp" id="whatsapp" className="sr-only" />
                     <MessageSquare className={cn(
                       "h-6 w-6 mb-2",
-                      channel === 'whatsapp' ? "text-emerald-500" : "text-muted-foreground"
+                      channel === 'whatsapp' ? "text-ok" : "text-muted-foreground"
                     )} />
                     <span className={cn(
                       "text-sm font-medium",
-                      channel === 'whatsapp' ? "text-emerald-500" : "text-muted-foreground"
+                      channel === 'whatsapp' ? "text-ok" : "text-muted-foreground"
                     )}>WhatsApp</span>
                   </Label>
                   
@@ -239,22 +239,22 @@ const CrmDispatches = () => {
           {/* Impact Summary */}
           <Card className={cn(
             "border-2",
-            channel === 'whatsapp' ? "border-emerald-500/30 bg-emerald-500/5" : "border-blue-500/30 bg-blue-500/5"
+            channel === 'whatsapp' ? "border-ok/30 bg-ok/5" : "border-blue-500/30 bg-blue-500/5"
           )}>
             <CardContent className="pt-4">
               <div className="flex items-center gap-3">
                 <div className={cn(
                   "p-3 rounded-full",
-                  channel === 'whatsapp' ? "bg-emerald-500/20" : "bg-blue-500/20"
+                  channel === 'whatsapp' ? "bg-ok/20" : "bg-blue-500/20"
                 )}>
                   <Users className={cn(
                     "h-5 w-5",
-                    channel === 'whatsapp' ? "text-emerald-500" : "text-blue-500"
+                    channel === 'whatsapp' ? "text-ok" : "text-blue-500"
                   )} />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Clientes impactados</p>
-                  <p className="text-2xl font-bold">{contactCount}</p>
+                  <p className="text-h3-section">{contactCount}</p>
                 </div>
               </div>
             </CardContent>
@@ -358,8 +358,8 @@ const CrmDispatches = () => {
               <div className="bg-[#0b141a] rounded-xl p-4 max-w-sm mx-auto">
                 {/* Phone mockup header */}
                 <div className="flex items-center gap-3 pb-3 border-b border-white/10">
-                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                    <MessageSquare className="h-5 w-5 text-emerald-500" />
+                  <div className="w-10 h-10 rounded-full bg-ok/20 flex items-center justify-center">
+                    <MessageSquare className="h-5 w-5 text-ok" />
                   </div>
                   <div>
                     <p className="text-white text-sm font-medium">Sua Empresa</p>
@@ -414,8 +414,8 @@ const CrmDispatches = () => {
                     <div className="flex items-center gap-2">
                       {item.channel === 'whatsapp' ? (
                         <>
-                          <div className="p-1.5 rounded bg-emerald-500/10">
-                            <MessageSquare className="h-4 w-4 text-emerald-500" />
+                          <div className="p-1.5 rounded bg-ok/10">
+                            <MessageSquare className="h-4 w-4 text-ok" />
                           </div>
                           <span className="text-sm">WhatsApp</span>
                         </>

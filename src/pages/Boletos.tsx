@@ -61,7 +61,7 @@ function StatusBadge({ b }: { b: BoletoWithContact }) {
   if (b.status === 'IMPRESSO') {
     return <Badge variant="outline">Impresso</Badge>;
   }
-  return <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20">Pendente</Badge>;
+  return <Badge className="bg-warn/15 text-warn dark:text-warn border-warn/30 hover:bg-warn/20">Pendente</Badge>;
 }
 
 function CanalIcon({ canal }: { canal: BoletoWithContact['canal_entrega'] }) {
@@ -201,8 +201,8 @@ export default function Boletos() {
       {/* Cabeçalho */}
       <div className="flex items-center justify-between py-4 px-6 flex-wrap gap-4">
         <div className="space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Financeiro · Cobrança</p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <p className="text-kicker uppercase text-muted-foreground">Financeiro · Cobrança</p>
+          <h1 className="text-display text-foreground flex items-center gap-2">
             <FileText className="w-7 h-7 text-primary" />
             Controle de Boletos.
           </h1>
@@ -245,7 +245,7 @@ export default function Boletos() {
       <div className="px-6 grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard icon={<FileText className="h-4 w-4" />} label="Boletos gerados" value={String(kpis.total)} />
         <KpiCard icon={<CheckCircle2 className="h-4 w-4 text-success" />} label={kpis.estimado ? 'Total pago (estimado)' : 'Total pago'} value={fmtBRL(kpis.totalPago)} valueClass="text-success" />
-        <KpiCard icon={<Clock className="h-4 w-4 text-amber-500" />} label="Pendentes" value={String(kpis.pendentes)} valueClass="text-amber-600 dark:text-amber-400" />
+        <KpiCard icon={<Clock className="h-4 w-4 text-warn" />} label="Pendentes" value={String(kpis.pendentes)} valueClass="text-warn dark:text-warn" />
         <KpiCard icon={<AlertCircle className="h-4 w-4 text-destructive" />} label="Vencidos" value={String(kpis.vencidos)} valueClass="text-destructive" />
       </div>
 
@@ -571,7 +571,7 @@ function KpiCard({ icon, label, value, valueClass }: {
   return (
     <Card>
       <CardContent className="p-5">
-        <div className="flex items-center gap-2 text-muted-foreground text-[11px] font-medium uppercase tracking-[0.05em]">
+        <div className="flex items-center gap-2 text-muted-foreground text-kicker uppercase">
           {icon}<span>{label}</span>
         </div>
         <p className={cn('text-[1.75rem] font-bold mt-2 tracking-tight leading-none', valueClass)}>{value}</p>
@@ -611,7 +611,7 @@ function EncargosSection({ b }: { b: BoletoWithContact }) {
         </p>
       )}
       {jurosDivergente && (
-        <div className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded p-2 mt-2">
+        <div className="flex items-start gap-1.5 text-xs text-warn dark:text-warn bg-warn/10 border border-warn/30 rounded p-2 mt-2">
           <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
           <span>
             Juros registrado no Sicoob ({fmtPct(r.valorJurosMora)}/dia) diverge do padrão vigente ({JUROS_DIA_ESPERADO}%/dia).

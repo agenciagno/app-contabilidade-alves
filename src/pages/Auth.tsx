@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, User, Lock, Eye, EyeOff, ShieldX, Shield } from 'lucide-react';
 import { PendingApprovalScreen } from '@/components/auth/PendingApprovalScreen';
+import { Logo } from '@/components/brand/Logo';
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 
@@ -123,71 +124,45 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--apple-bg-base)' }}>
+    <div className="flex min-h-screen items-center justify-center bg-bg p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8 flex flex-col items-center">
-          <img
-            src="/Contabilidade_Alves_Branco.svg"
-            alt="Contabilidade Alves"
-            style={{ width: '220px', marginBottom: '32px' }}
-          />
+        <div className="mb-8 flex flex-col items-center">
+          <Logo className="h-12" />
         </div>
 
-        <Card
-          className="shadow-xl"
-          style={{
-            background: 'var(--apple-mat-card)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1px solid var(--apple-border-hair)',
-            borderRadius: 'var(--r-xl)',
-          }}
-        >
+        <Card className="rounded-xl border border-line bg-paper shadow-sc-lg">
           <CardHeader className="pb-4">
-            <h2 className="text-lg font-semibold text-center" style={{ color: 'var(--apple-text-primary)' }}>
-              Entrar no Sistema
-            </h2>
+            <h2 className="text-center text-h4-card text-ink">Entrar no Sistema</h2>
           </CardHeader>
 
           <CardContent>
             {sessionRevoked && (
-              <div
-                className="flex items-center gap-2 p-3 rounded-lg mb-4"
-                style={{ background: 'rgba(255, 149, 0, 0.10)', border: '1px solid rgba(255, 149, 0, 0.2)' }}
-              >
-                <Shield className="w-5 h-5 shrink-0" style={{ color: 'var(--apple-yellow)' }} />
-                <p className="text-sm" style={{ color: 'var(--apple-yellow)' }}>
+              <div className="mb-4 flex items-center gap-2 rounded-md border-l-[3px] border-warn bg-warn-soft p-3">
+                <Shield className="h-5 w-5 shrink-0 text-warn" />
+                <p className="text-body-sm text-ink-2">
                   Sua sessão foi encerrada pelo administrador.
                 </p>
               </div>
             )}
             {statusBlock === 'blocked' && (
-              <div
-                className="flex items-center gap-2 p-3 rounded-lg mb-4"
-                style={{ background: 'hsla(0, 70%, 50%, 0.1)', border: '1px solid hsla(0, 70%, 50%, 0.2)' }}
-              >
-                <ShieldX className="w-5 h-5 shrink-0" style={{ color: 'var(--apple-red)' }} />
-                <p className="text-sm" style={{ color: 'var(--apple-red)' }}>
+              <div className="mb-4 flex items-center gap-2 rounded-md border-l-[3px] border-danger bg-danger-soft p-3">
+                <ShieldX className="h-5 w-5 shrink-0 text-danger" />
+                <p className="text-body-sm text-ink-2">
                   Seu acesso foi bloqueado. Entre em contato com o administrador.
                 </p>
               </div>
             )}
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="emailOrUsername" style={{ color: 'var(--apple-text-secondary)' }}>
+                <Label htmlFor="emailOrUsername" className="text-ui text-muted-ink">
                   Email ou Nome de Usuário
                 </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--apple-text-secondary)' }} />
+                  <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-ink" />
                   <Input
                     id="emailOrUsername"
                     placeholder="email@empresa.com ou usuario"
-                    className="pl-10"
-                    style={{
-                      background: 'var(--apple-bg-base)',
-                      border: '1px solid var(--apple-border-hair)',
-                      color: 'var(--apple-text-primary)',
-                    }}
+                    className="rounded-sm border-line bg-bg pl-10 text-ink"
                     value={loginData.emailOrUsername}
                     onChange={e => setLoginData(prev => ({
                       ...prev,
@@ -196,26 +171,21 @@ export default function Auth() {
                   />
                 </div>
                 {errors.emailOrUsername && (
-                  <p className="text-destructive text-sm">{errors.emailOrUsername}</p>
+                  <p className="text-meta text-danger">{errors.emailOrUsername}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" style={{ color: 'var(--apple-text-secondary)' }}>
+                <Label htmlFor="password" className="text-ui text-muted-ink">
                   Senha
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--apple-text-secondary)' }} />
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-ink" />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
-                    className="pl-10 pr-10"
-                    style={{
-                      background: 'var(--apple-bg-base)',
-                      border: '1px solid var(--apple-border-hair)',
-                      color: 'var(--apple-text-primary)',
-                    }}
+                    className="rounded-sm border-line bg-bg pl-10 pr-10 text-ink"
                     value={loginData.password}
                     onChange={e => setLoginData(prev => ({
                       ...prev,
@@ -225,28 +195,18 @@ export default function Auth() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100 transition-opacity"
-                    style={{ background: 'none', border: 'none', outline: 'none', padding: 0, color: 'var(--apple-text-secondary)' }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 border-none bg-transparent p-0 text-muted-ink opacity-70 outline-none transition-opacity hover:opacity-100"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
                 {errors.password && (
-                  <p className="text-destructive text-sm">{errors.password}</p>
+                  <p className="text-meta text-danger">{errors.password}</p>
                 )}
               </div>
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading}
-                style={{
-                  background: 'var(--apple-blue)',
-                  borderRadius: 'var(--r-pill)',
-                  color: '#fff',
-                }}
-              >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Entrar
               </Button>
 
@@ -255,15 +215,14 @@ export default function Auth() {
                   type="button"
                   onClick={handleForgotPassword}
                   disabled={sendingReset}
-                  className="text-xs underline underline-offset-2 disabled:opacity-60"
-                  style={{ background: 'none', border: 'none', color: 'var(--apple-text-secondary)' }}
+                  className="border-none bg-transparent text-link text-muted-ink underline underline-offset-2 disabled:opacity-60"
                 >
                   {sendingReset ? 'Enviando...' : 'Esqueci minha senha'}
                 </button>
               </div>
             </form>
 
-            <p className="text-xs text-center mt-4" style={{ color: 'var(--apple-text-secondary)' }}>
+            <p className="mt-4 text-center text-meta text-muted-ink">
               Usuários são criados internamente por um administrador.
             </p>
           </CardContent>

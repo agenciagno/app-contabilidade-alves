@@ -98,7 +98,7 @@ export function FiscalPeriodStatusControl({ year, month }: { year: number; month
           <Lock className="h-3 w-3" /> Encerrado
         </Badge>
       ) : (
-        <Badge variant="outline" className="gap-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
+        <Badge variant="outline" className="gap-1 bg-ok/10 text-ok dark:text-ok border-ok/30">
           Aberto
         </Badge>
       )}
@@ -130,15 +130,15 @@ export function FiscalPeriodStatusControl({ year, month }: { year: number; month
             <div className="rounded-md border p-3 text-sm">
               <p className="text-muted-foreground mb-1">Resumo do período</p>
               <p>
-                <span className="font-medium text-emerald-600">{summary?.concluidas ?? 0}</span> concluídas,{' '}
-                <span className="font-medium text-blue-600">{summary?.pendentes ?? 0}</span> pendentes,{' '}
-                <span className="font-medium text-red-600">{summary?.atrasadas ?? 0}</span> atrasadas
+                <span className="font-medium text-ok">{summary?.concluidas ?? 0}</span> concluídas,{' '}
+                <span className="font-medium text-state-todo">{summary?.pendentes ?? 0}</span> pendentes,{' '}
+                <span className="font-medium text-danger">{summary?.atrasadas ?? 0}</span> atrasadas
               </p>
             </div>
 
             {(summary?.atrasadas ?? 0) > 0 && (
-              <Alert className="bg-yellow-500/10 border-yellow-500/40">
-                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <Alert className="bg-state-waiting/10 border-state-waiting/40">
+                <AlertTriangle className="h-4 w-4 text-state-waiting" />
                 <AlertDescription>
                   Atenção: existem {summary?.atrasadas} tarefa(s) atrasada(s) neste período.
                 </AlertDescription>

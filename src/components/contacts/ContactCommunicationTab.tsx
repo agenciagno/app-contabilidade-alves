@@ -152,7 +152,7 @@ export function ContactCommunicationTab({ contactId }: ContactCommunicationTabPr
                     </TableCell>
                     <TableCell>
                       {msg.channel === 'whatsapp' ? (
-                        <div className="flex items-center gap-1 text-emerald-500">
+                        <div className="flex items-center gap-1 text-ok">
                           <MessageSquare className="h-4 w-4" />
                           <span className="text-sm">WhatsApp</span>
                         </div>
@@ -171,10 +171,10 @@ export function ContactCommunicationTab({ contactId }: ContactCommunicationTabPr
                         variant="secondary"
                         className={
                           msg.status === 'enviado'
-                            ? 'bg-emerald-500/10 text-emerald-500'
+                            ? 'bg-ok/10 text-ok'
                             : msg.status === 'pendente'
-                            ? 'bg-yellow-500/10 text-yellow-500'
-                            : 'bg-red-500/10 text-red-500'
+                            ? 'bg-warn/10 text-warn'
+                            : 'bg-danger/10 text-danger'
                         }
                       >
                         {msg.status === 'enviado' ? 'Enviado' : msg.status === 'pendente' ? 'Pendente' : 'Falhou'}

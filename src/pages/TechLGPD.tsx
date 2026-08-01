@@ -72,7 +72,7 @@ export default function TechLGPD() {
           <ShieldCheck className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Conformidade LGPD</h1>
+          <h1 className="text-h3-section text-foreground">Conformidade LGPD</h1>
           <p className="text-sm text-muted-foreground">
             Registros de tratamento e log de acessos a dados pessoais
           </p>

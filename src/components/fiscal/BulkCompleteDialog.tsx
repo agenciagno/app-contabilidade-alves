@@ -376,12 +376,12 @@ export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month 
                             <div key={t.id} className="flex items-center justify-between gap-2 text-sm px-3 py-2">
                               <span className="truncate">{t.contact_name}</span>
                               {file ? (
-                                <span className="flex items-center gap-1.5 text-emerald-700">
+                                <span className="flex items-center gap-1.5 text-ok">
                                   <CheckCircle2 className="h-3.5 w-3.5" />
                                   <span className="truncate max-w-[220px]">{file.name}</span>
                                 </span>
                               ) : (
-                                <span className="flex items-center gap-1.5 text-yellow-700">
+                                <span className="flex items-center gap-1.5 text-state-waiting">
                                   <AlertTriangle className="h-3.5 w-3.5" /> Sem comprovante
                                 </span>
                               )}
@@ -458,7 +458,7 @@ export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month 
                       let detail: React.ReactNode = '—';
                       if (completionType === 'attachment') {
                         const f = taskFileMap[t.id];
-                        detail = f ? f.name : <span className="text-yellow-700">Sem comprovante</span>;
+                        detail = f ? f.name : <span className="text-state-waiting">Sem comprovante</span>;
                       } else if (completionType === 'protocol') {
                         detail = protocol || '—';
                       } else if (completionType === 'transmitted') {
@@ -469,7 +469,7 @@ export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month 
                           <TableCell className="font-medium">{t.contact_name}</TableCell>
                           <TableCell className="text-sm">{detail}</TableCell>
                           <TableCell>
-                            <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30">
+                            <Badge className="bg-ok/15 text-ok border-ok/30">
                               {markCompleted ? 'Concluir' : 'Atualizar'}
                             </Badge>
                           </TableCell>

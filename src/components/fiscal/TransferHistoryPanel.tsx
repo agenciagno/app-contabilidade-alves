@@ -31,7 +31,7 @@ function statusBadge(c: CoverageRow) {
     return (
       <Badge
         variant="outline"
-        className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 animate-pulse"
+        className="bg-ok/15 text-ok dark:text-ok border-ok/30 animate-pulse"
       >
         Ativa
       </Badge>
@@ -41,7 +41,7 @@ function statusBadge(c: CoverageRow) {
     return (
       <Badge
         variant="outline"
-        className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
+        className="bg-warn/15 text-warn dark:text-warn border-warn/30"
       >
         Revertida manualmente
       </Badge>

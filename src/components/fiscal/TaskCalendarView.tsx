@@ -38,10 +38,10 @@ export function TaskCalendarView({ tasks, contactsMap, onTaskClick }: TaskCalend
   }, [tasks]);
 
   const statusColor: Record<string, string> = {
-    a_fazer: 'bg-blue-500',
-    aguardando_cliente: 'bg-yellow-500',
-    em_progresso: 'bg-orange-500',
-    concluido: 'bg-emerald-500',
+    a_fazer: 'bg-state-todo',
+    aguardando_cliente: 'bg-state-waiting',
+    em_progresso: 'bg-state-doing',
+    concluido: 'bg-ok',
   };
 
   return (

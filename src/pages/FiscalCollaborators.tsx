@@ -28,9 +28,9 @@ import { cn } from '@/lib/utils';
 const CAPACITY = 50;
 
 function loadColor(pct: number) {
-  if (pct > 100) return { bar: 'bg-red-500', text: 'text-red-600 dark:text-red-400' };
-  if (pct > 70) return { bar: 'bg-yellow-500', text: 'text-yellow-600 dark:text-yellow-400' };
-  return { bar: 'bg-green-500', text: 'text-green-600 dark:text-green-400' };
+  if (pct > 100) return { bar: 'bg-danger', text: 'text-danger dark:text-danger' };
+  if (pct > 70) return { bar: 'bg-warn', text: 'text-warn dark:text-warn' };
+  return { bar: 'bg-ok', text: 'text-ok dark:text-ok' };
 }
 
 function useWorkloadByProfile(companyId: string | undefined, year: number, month: number) {
@@ -58,9 +58,9 @@ function useWorkloadByProfile(companyId: string | undefined, year: number, month
 
 const STATUS_BADGE: Record<string, string> = {
   a_fazer: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30',
-  em_progresso: 'bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30',
-  aguardando_cliente: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30',
-  concluido: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
+  em_progresso: 'bg-warn/15 text-warn dark:text-warn border-warn/30',
+  aguardando_cliente: 'bg-warn/15 text-warn dark:text-warn border-warn/30',
+  concluido: 'bg-ok/15 text-ok dark:text-ok border-ok/30',
 };
 const STATUS_LABEL: Record<string, string> = {
   a_fazer: 'A Fazer',
@@ -182,7 +182,7 @@ export default function FiscalCollaborators() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between py-4 flex-wrap gap-4">
-        <h1 className="text-2xl font-bold text-foreground">Colaboradores</h1>
+        <h1 className="text-h3-section text-foreground">Colaboradores</h1>
         <Button className="gap-2" onClick={() => setModalOpen(true)}>
           <ArrowRightLeft className="w-4 h-4" />
           Transferência Temporária
@@ -208,10 +208,10 @@ export default function FiscalCollaborators() {
                     className={cn(
                       'text-[10px]',
                       distribution.most.pct > 100
-                        ? 'bg-red-500/10 text-red-600 border-red-500/30'
+                        ? 'bg-danger/10 text-danger border-danger/30'
                         : distribution.most.pct > 80
-                        ? 'bg-yellow-500/10 text-yellow-700 border-yellow-500/30'
-                        : 'bg-green-500/10 text-green-600 border-green-500/30'
+                        ? 'bg-warn/10 text-warn border-warn/30'
+                        : 'bg-ok/10 text-ok border-ok/30'
                     )}
                   >
                     {distribution.most.pct}% da capacidade
@@ -224,7 +224,7 @@ export default function FiscalCollaborators() {
                   <span className="font-medium text-sm truncate">{distribution.least.name}</span>
                   <Badge
                     variant="outline"
-                    className="text-[10px] bg-green-500/10 text-green-600 border-green-500/30"
+                    className="text-[10px] bg-ok/10 text-ok border-ok/30"
                   >
                     {distribution.least.pct}% da capacidade
                   </Badge>
@@ -239,8 +239,8 @@ export default function FiscalCollaborators() {
               </div>
             </div>
             {distribution.spread > 40 && (
-              <Alert className="bg-yellow-500/10 border-yellow-500/40">
-                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <Alert className="bg-warn/10 border-warn/40">
+                <AlertTriangle className="h-4 w-4 text-warn" />
                 <AlertDescription>
                   Distribuição desbalanceada — considerar redistribuição (diferença de {distribution.spread} pontos
                   percentuais entre o mais e o menos carregado).
@@ -281,7 +281,7 @@ export default function FiscalCollaborators() {
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{name}</p>
-                      <Badge variant="outline" className="mt-1 text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                      <Badge variant="outline" className="mt-1 text-[10px] bg-ok/10 text-ok border-ok/30">
                         Ativo
                       </Badge>
                       <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
@@ -301,7 +301,7 @@ export default function FiscalCollaborators() {
                         <Badge
                           key={`abs-${i}`}
                           variant="outline"
-                          className="mt-2 mr-1 text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/30"
+                          className="mt-2 mr-1 text-[10px] bg-warn/10 text-warn border-warn/30"
                         >
                           Ausente — {abs.count} com {abs.coveringName} até {format(parseISO(abs.end_date), 'dd/MM')}
                         </Badge>

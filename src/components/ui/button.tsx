@@ -4,23 +4,29 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * Button — component set "Button" do Figma (3 variantes × 2 tamanhos).
+ * Raio 8px (--r-sm) em todos; texto SC/ui-strong (13 SemiBold).
+ * Os nomes shadcn (outline/secondary/…) são preservados porque o app inteiro
+ * já os consome; os três do DS são: default=primary, outline=secondary, ghost.
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-sm font-semibold ring-offset-background transition-[background,color,border-color] duration-[120ms] ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-sm border text-ui-strong ring-offset-background transition-[background,color,border-color] duration-[120ms] ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-border bg-card hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        default: "border-brand bg-brand text-on-brand hover:bg-brand/90",
+        destructive: "border-danger bg-danger text-white hover:bg-danger/90",
+        outline: "border-line bg-paper text-ink hover:bg-bg-2",
+        secondary: "border-line bg-paper text-ink hover:bg-bg-2",
+        ghost: "border-transparent bg-transparent text-muted-ink hover:bg-bg-2 hover:text-ink",
+        link: "border-transparent text-brand underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-10 px-5 py-2",
-        sm: "h-9 rounded-lg px-3 text-[13px]",
-        lg: "h-11 rounded-[10px] px-8",
-        icon: "h-10 w-10 rounded-lg",
+        default: "h-9 gap-[7px] px-3.5",   // md — 36px
+        sm: "h-8 gap-1.5 px-3 text-ui",
+        lg: "h-11 gap-2 px-[18px]",        // lg — 44px
+        icon: "h-9 w-9 gap-0 rounded-md p-0",
       },
     },
     defaultVariants: {

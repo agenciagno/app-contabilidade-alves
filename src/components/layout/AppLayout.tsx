@@ -6,6 +6,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './AppHeader';
 import { DevEnvironmentBanner } from './DevEnvironmentBanner';
+import { MobileBottomNav } from './MobileBottomNav';
 
 import { ForcePasswordChange } from '@/components/auth/ForcePasswordChange';
 import { Loader2 } from 'lucide-react';
@@ -143,10 +144,12 @@ export function AppLayout({ children }: AppLayoutProps) {
         <SidebarInset className="flex-1 min-w-0 md:h-svh md:overflow-y-auto md:overflow-x-hidden">
           <DevEnvironmentBanner />
           <AppHeader />
-          <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 min-w-0 max-w-full">
+          {/* pb extra no mobile: a bottom nav é fixa e cobriria o fim da página */}
+          <main className="min-w-0 max-w-full flex-1 p-3 pb-24 sm:p-4 sm:pb-24 md:p-6 md:pb-6 lg:p-8 lg:pb-8">
             {children}
           </main>
         </SidebarInset>
+        <MobileBottomNav />
       </div>
     </SidebarProvider>
   );

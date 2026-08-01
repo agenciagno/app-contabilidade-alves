@@ -40,7 +40,7 @@ export function PushOptIn() {
   if (state === 'subscribed') {
     return (
       <div className="px-3 py-2 border-b border-border/50 flex items-center justify-between gap-2">
-        <span className="text-xs text-emerald-600 flex items-center gap-1.5">
+        <span className="text-xs text-ok flex items-center gap-1.5">
           <CheckCircle2 className="w-3.5 h-3.5" />
           Notificações ativadas neste dispositivo
         </span>

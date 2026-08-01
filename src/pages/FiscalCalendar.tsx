@@ -352,7 +352,7 @@ export default function FiscalCalendar() {
             <Button
               onClick={handleConfirm}
               disabled={confirm.isPending || !previewReviewed}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-ok hover:bg-ok"
               title={!previewReviewed ? 'Marque "Revisei a distribuição" para liberar o lançamento' : undefined}
             >
               {confirm.isPending ? (
@@ -365,7 +365,7 @@ export default function FiscalCalendar() {
 
           {phase === 'launched' && (
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 gap-1.5 px-3 py-1.5">
+              <Badge className="bg-ok/15 text-ok dark:text-ok border-ok/30 gap-1.5 px-3 py-1.5">
                 {locked ? <Lock className="h-3.5 w-3.5" /> : <LockOpen className="h-3.5 w-3.5" />}
                 {launchMeta
                   ? `Lançado em ${format(parseISO(launchMeta.launched_at), "dd/MM/yyyy 'às' HH:mm")} por ${launchMeta.launched_by}`
@@ -505,7 +505,7 @@ export default function FiscalCalendar() {
                         {isCustom && (
                           <Badge
                             variant="outline"
-                            className="gap-1 border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] px-1.5 py-0"
+                            className="gap-1 border-warn/40 bg-warn/10 text-warn dark:text-warn text-[10px] px-1.5 py-0"
                           >
                             <Sparkles className="h-3 w-3" /> Personalizada
                           </Badge>
@@ -523,11 +523,11 @@ export default function FiscalCalendar() {
                     <TableCell>{fmt(r.internal_delivery_date)}</TableCell>
                     <TableCell>
                       {isOverridden ? (
-                        <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-500/20 border-yellow-500/30">
+                        <Badge className="bg-warn/15 text-warn dark:text-warn hover:bg-warn/20 border-warn/30">
                           Ajustado
                         </Badge>
                       ) : (
-                        <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 hover:bg-green-500/20 border-green-500/30">
+                        <Badge className="bg-ok/15 text-ok dark:text-ok hover:bg-ok/20 border-ok/30">
                           Automático
                         </Badge>
                       )}
@@ -562,7 +562,7 @@ export default function FiscalCalendar() {
                                 setCustomOpen(true);
                               }}
                               title="Editar obrigação personalizada"
-                              className="text-amber-600 hover:text-amber-700"
+                              className="text-warn hover:text-warn"
                             >
                               <Sparkles className="h-4 w-4" />
                             </Button>

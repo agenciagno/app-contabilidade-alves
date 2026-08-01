@@ -27,13 +27,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
         <p className="font-medium text-sm mb-2">{label}</p>
         <div className="space-y-1 text-sm">
-          <p className={`${data.balance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+          <p className={`${data.balance >= 0 ? 'text-ok' : 'text-danger'}`}>
             Saldo: {formatCurrency(data.balance)}
           </p>
-          <p className="text-emerald-500">
+          <p className="text-ok">
             + Receitas: {formatCurrency(data.receitas)}
           </p>
-          <p className="text-red-500">
+          <p className="text-danger">
             - Despesas: {formatCurrency(data.despesas)}
           </p>
         </div>

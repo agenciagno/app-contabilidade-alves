@@ -836,8 +836,8 @@ export default function Transactions() {
       {/* ── Header ── */}
       <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between py-4 gap-3 min-w-0">
         <div className="space-y-1 shrink-0">
-          <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Financeiro</p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Movimentações.</h1>
+          <p className="text-kicker uppercase text-muted-foreground">Financeiro</p>
+          <h1 className="text-display text-foreground">Movimentações.</h1>
         </div>
         <div className="flex items-center gap-2 flex-wrap w-full xl:w-auto min-w-0">
           <DropdownMenu>
@@ -861,7 +861,7 @@ export default function Transactions() {
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setTransferOpen(true)}>
             <ArrowLeftRight className="w-4 h-4" /> Transferência
           </Button>
-          <Button size="sm" onClick={() => handleNewTransaction('receita')} className="gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white">
+          <Button size="sm" onClick={() => handleNewTransaction('receita')} className="gap-1.5 bg-ok hover:bg-ok text-white">
             <Plus className="w-4 h-4" /> Nova Movimentação
           </Button>
         </div>
@@ -869,23 +869,23 @@ export default function Transactions() {
 
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-3">
-        <Card className="border-l-2 border-l-emerald-500">
+        <Card className="border-l-2 border-l-ok">
           <CardContent className="px-3 py-[10px] min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <TrendingUp className="w-3.5 h-3.5 text-ok shrink-0" />
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">A Receber</p>
             </div>
-            <p className="text-base sm:text-lg font-bold text-emerald-500 truncate">{formatCurrency(kpis.receitasPendentes)}</p>
+            <p className="text-base sm:text-lg font-bold text-ok truncate">{formatCurrency(kpis.receitasPendentes)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Recebido: {formatCurrency(kpis.receitasPagas)}</p>
           </CardContent>
         </Card>
-        <Card className="border-l-2 border-l-red-500">
+        <Card className="border-l-2 border-l-danger">
           <CardContent className="px-3 py-[10px] min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <TrendingDown className="w-3.5 h-3.5 text-red-500 shrink-0" />
+              <TrendingDown className="w-3.5 h-3.5 text-danger shrink-0" />
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">A Pagar</p>
             </div>
-            <p className="text-base sm:text-lg font-bold text-red-500 truncate">{formatCurrency(kpis.despesasPendentes)}</p>
+            <p className="text-base sm:text-lg font-bold text-danger truncate">{formatCurrency(kpis.despesasPendentes)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Pago: {formatCurrency(kpis.despesasPagas)}</p>
           </CardContent>
         </Card>
@@ -895,18 +895,18 @@ export default function Transactions() {
               <Landmark className="w-3.5 h-3.5 text-primary shrink-0" />
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Saldo Disponível</p>
             </div>
-            <p className={`text-base sm:text-lg font-bold truncate ${bankTotals.totalBalance >= 0 ? 'text-primary' : 'text-red-500'}`}>{formatCurrency(bankTotals.totalBalance)}</p>
+            <p className={`text-base sm:text-lg font-bold truncate ${bankTotals.totalBalance >= 0 ? 'text-primary' : 'text-danger'}`}>{formatCurrency(bankTotals.totalBalance)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">Total bancos visíveis</p>
           </CardContent>
         </Card>
-        <Card className="border-l-2 border-l-red-500">
+        <Card className="border-l-2 border-l-danger">
           <CardContent className="px-3 py-[10px] min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+              <AlertTriangle className="w-3.5 h-3.5 text-danger shrink-0" />
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Em Atraso</p>
             </div>
-            <p className="text-sm font-bold text-orange-400">⬇ {formatCurrency(biMetrics.receitasEmAtraso)}</p>
-            <p className="text-sm font-bold text-red-500">⬆ {formatCurrency(biMetrics.contasEmAtraso)}</p>
+            <p className="text-sm font-bold text-warn">⬇ {formatCurrency(biMetrics.receitasEmAtraso)}</p>
+            <p className="text-sm font-bold text-danger">⬆ {formatCurrency(biMetrics.contasEmAtraso)}</p>
           </CardContent>
         </Card>
         <Card className="border-l-2 border-l-blue-500">
@@ -915,26 +915,26 @@ export default function Transactions() {
               <Building2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Capital de Giro</p>
             </div>
-            <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.capitalDeGiroMes >= 0 ? 'text-blue-400' : 'text-red-500'}`}>{formatCurrency(biMetrics.capitalDeGiroMes)}</p>
+            <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.capitalDeGiroMes >= 0 ? 'text-blue-400' : 'text-danger'}`}>{formatCurrency(biMetrics.capitalDeGiroMes)}</p>
           </CardContent>
         </Card>
-        <Card className="border-l-2 border-l-emerald-500">
+        <Card className="border-l-2 border-l-ok">
           <CardContent className="px-3 py-[10px] min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <BarChart3 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <BarChart3 className="w-3.5 h-3.5 text-ok shrink-0" />
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Lucro Previsto</p>
             </div>
-            <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.lucroPrevisto >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{formatCurrency(biMetrics.lucroPrevisto)}</p>
+            <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.lucroPrevisto >= 0 ? 'text-ok' : 'text-danger'}`}>{formatCurrency(biMetrics.lucroPrevisto)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">{format(new Date(), 'MMMM', { locale: ptBR }).replace(/^\w/, c => c.toUpperCase())}</p>
           </CardContent>
         </Card>
-        <Card className="border-l-2 border-l-amber-500">
+        <Card className="border-l-2 border-l-warn">
           <CardContent className="px-3 py-[10px] min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <CalendarCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <CalendarCheck className="w-3.5 h-3.5 text-warn shrink-0" />
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Realizado</p>
             </div>
-            <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.acumuladoReceitas - biMetrics.acumuladoDespesas >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{formatCurrency(biMetrics.acumuladoReceitas - biMetrics.acumuladoDespesas)}</p>
+            <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.acumuladoReceitas - biMetrics.acumuladoDespesas >= 0 ? 'text-ok' : 'text-danger'}`}>{formatCurrency(biMetrics.acumuladoReceitas - biMetrics.acumuladoDespesas)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5">{format(new Date(), 'MMMM', { locale: ptBR }).replace(/^\w/, c => c.toUpperCase())}</p>
           </CardContent>
         </Card>
@@ -999,7 +999,7 @@ export default function Transactions() {
               <TooltipTrigger asChild>
                 <PopoverTrigger asChild>
                   <Button variant={typeFilter !== 'all' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8">
-                    {typeFilter === 'receita' ? <TrendingUp className="w-4 h-4 text-emerald-500" /> : typeFilter === 'despesa' ? <TrendingDown className="w-4 h-4 text-red-500" /> : <TrendingUp className="w-4 h-4" />}
+                    {typeFilter === 'receita' ? <TrendingUp className="w-4 h-4 text-ok" /> : typeFilter === 'despesa' ? <TrendingDown className="w-4 h-4 text-danger" /> : <TrendingUp className="w-4 h-4" />}
                   </Button>
                 </PopoverTrigger>
               </TooltipTrigger>
@@ -1012,10 +1012,10 @@ export default function Transactions() {
                   <span className="italic text-muted-foreground">(Vazio)</span>
                 </button>
                 <button onClick={() => setTypeFilter('receita')} className={`w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 ${typeFilter === 'receita' ? 'bg-primary/10 text-primary font-medium' : ''}`}>
-                  <TrendingUp className="w-3 h-3 text-emerald-500" /> Receita
+                  <TrendingUp className="w-3 h-3 text-ok" /> Receita
                 </button>
                 <button onClick={() => setTypeFilter('despesa')} className={`w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 ${typeFilter === 'despesa' ? 'bg-primary/10 text-primary font-medium' : ''}`}>
-                  <TrendingDown className="w-3 h-3 text-red-500" /> Despesa
+                  <TrendingDown className="w-3 h-3 text-danger" /> Despesa
                 </button>
               </div>
             </PopoverContent>
@@ -1030,7 +1030,7 @@ export default function Transactions() {
           <div className="ml-auto flex items-center gap-2 flex-wrap">
             {selectedIds.size > 0 && (
               <>
-                <Button size="sm" className="h-7 gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs" onClick={handleBulkPay}>
+                <Button size="sm" className="h-7 gap-1.5 bg-ok hover:bg-ok text-white text-xs" onClick={handleBulkPay}>
                   <CheckCircle2 className="w-3.5 h-3.5" /> Pagar {selectedIds.size}
                 </Button>
                 <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={() => setBulkEditOpen(true)}>
@@ -1145,7 +1145,7 @@ export default function Transactions() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <Tooltip><TooltipTrigger asChild><span className="truncate text-sm font-semibold text-foreground">{transaction.contact?.name ?? transaction.description}</span></TooltipTrigger><TooltipContent side="top" className="apple-tooltip"><p>{transaction.contact?.name ?? transaction.description}</p></TooltipContent></Tooltip>
-                            {isOverdue && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/40 whitespace-nowrap shrink-0">Vencido</span>}
+                            {isOverdue && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-danger/20 text-danger border border-danger/40 whitespace-nowrap shrink-0">Vencido</span>}
                             {(() => {
                               const isVisualCash = transaction.is_paid && !!transaction.date && !!transaction.due_date && !!transaction.issue_date && transaction.date === transaction.due_date && transaction.due_date === transaction.issue_date;
                               return isVisualCash && !transaction.is_transfer ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/30 whitespace-nowrap shrink-0">À Vista</span> : null;
@@ -1177,24 +1177,24 @@ export default function Transactions() {
                               <button
                                 onClick={() => togglePaid.mutate({ id: transaction.id, is_paid: !effectivelyPaid })}
                                 className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border transition-all cursor-pointer whitespace-nowrap min-w-[68px] text-center ${
-                                  effectivelyPaid ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-amber-500 text-amber-500 bg-transparent hover:bg-amber-500/10'
+                                  effectivelyPaid ? 'bg-ok border-ok text-white' : 'border-warn text-warn bg-transparent hover:bg-warn/10'
                                 }`}>
                                 {effectivelyPaid ? 'Pago' : 'Pendente'}
                               </button>
                             );
                           })()}
                         </div>
-                        <div className={`text-right font-bold text-[13px] tabular-nums truncate ${transaction.type === 'receita' ? 'text-emerald-500' : 'text-red-500'}`}>
+                        <div className={`text-right font-bold text-[13px] tabular-nums truncate ${transaction.type === 'receita' ? 'text-ok' : 'text-danger'}`}>
                           {transaction.type === 'receita' ? '+' : '-'}{formatCurrency(Number(transaction.amount))}
                         </div>
-                        <div className={`text-right text-[13px] tabular-nums truncate ${isEffectivelyPaid(transaction) && transaction.paid_amount != null ? (transaction.type === 'receita' ? 'text-emerald-500 font-bold' : 'text-red-500 font-bold') : 'text-muted-foreground'}`}>
+                        <div className={`text-right text-[13px] tabular-nums truncate ${isEffectivelyPaid(transaction) && transaction.paid_amount != null ? (transaction.type === 'receita' ? 'text-ok font-bold' : 'text-danger font-bold') : 'text-muted-foreground'}`}>
                           {isEffectivelyPaid(transaction) && transaction.paid_amount != null
                             ? `${transaction.type === 'receita' ? '+' : '-'}${formatCurrency(Number(transaction.paid_amount))}`
                             : '—'}
                         </div>
                         <div className="flex gap-1.5 justify-center">
                           <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted" onClick={() => handleEdit(transaction)}><Pencil className="w-4 h-4 text-muted-foreground" /></Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-emerald-500/10" onClick={() => handleSettle(transaction)}><CircleDollarSign className="w-4 h-4 text-emerald-500" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-ok/10" onClick={() => handleSettle(transaction)}><CircleDollarSign className="w-4 h-4 text-ok" /></Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-destructive/10" onClick={() => setDeleteId(transaction.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                         </div>
                       </div>

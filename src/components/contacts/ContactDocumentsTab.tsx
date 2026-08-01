@@ -87,8 +87,8 @@ const getCategoryIcon = (category: DocumentCategory) => {
 
 const getFileIcon = (fileType: string | null) => {
   const type = fileType?.toLowerCase();
-  if (type === 'pdf') return <FileText className="h-4 w-4 text-red-500" />;
-  if (['xls', 'xlsx', 'csv'].includes(type || '')) return <FileSpreadsheet className="h-4 w-4 text-emerald-500" />;
+  if (type === 'pdf') return <FileText className="h-4 w-4 text-danger" />;
+  if (['xls', 'xlsx', 'csv'].includes(type || '')) return <FileSpreadsheet className="h-4 w-4 text-ok" />;
   if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(type || '')) return <FileImage className="h-4 w-4 text-blue-500" />;
   return <File className="h-4 w-4 text-muted-foreground" />;
 };
@@ -278,7 +278,7 @@ export function ContactDocumentsTab({ contactId }: ContactDocumentsTabProps) {
             className={`
               border-2 border-dashed rounded-lg p-6 text-center transition-all duration-300
               ${uploadDocument.isPending ? 'cursor-not-allowed border-border bg-muted/30' :
-                uploadSuccess ? 'cursor-default border-emerald-500/50 bg-emerald-500/5' :
+                uploadSuccess ? 'cursor-default border-ok/50 bg-ok/5' :
                 isDragging ? 'cursor-pointer border-primary bg-primary/5' : 
                 'cursor-pointer border-border hover:border-primary/50 hover:bg-muted/50'
               }
@@ -291,8 +291,8 @@ export function ContactDocumentsTab({ contactId }: ContactDocumentsTabProps) {
               </>
             ) : uploadSuccess ? (
               <>
-                <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-emerald-500 animate-bounce" />
-                <p className="text-sm font-medium text-emerald-500">Upload concluído!</p>
+                <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-ok animate-bounce" />
+                <p className="text-sm font-medium text-ok">Upload concluído!</p>
               </>
             ) : (
               <>
@@ -421,7 +421,7 @@ export function ContactDocumentsTab({ contactId }: ContactDocumentsTabProps) {
               className={`
                 border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300
                 ${uploadDocument.isPending ? 'cursor-not-allowed border-border bg-muted/30' :
-                  uploadSuccess ? 'cursor-default border-emerald-500/50 bg-emerald-500/5' :
+                  uploadSuccess ? 'cursor-default border-ok/50 bg-ok/5' :
                   'cursor-pointer border-border hover:border-primary/50 hover:bg-muted/50'
                 }
               `}
@@ -433,8 +433,8 @@ export function ContactDocumentsTab({ contactId }: ContactDocumentsTabProps) {
                 </>
               ) : uploadSuccess ? (
                 <>
-                  <CheckCircle2 className="h-10 w-10 mx-auto mb-3 text-emerald-500 animate-bounce" />
-                  <p className="text-sm font-medium text-emerald-500">Upload concluído!</p>
+                  <CheckCircle2 className="h-10 w-10 mx-auto mb-3 text-ok animate-bounce" />
+                  <p className="text-sm font-medium text-ok">Upload concluído!</p>
                 </>
               ) : (
                 <>

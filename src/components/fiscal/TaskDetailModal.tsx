@@ -61,11 +61,11 @@ function getSlaInfo(task: any): SlaInfo {
 }
 
 const slaToneClass: Record<SlaInfo['tone'], string> = {
-  success: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
-  warning: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30',
-  danger: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30',
-  critical: 'bg-red-700/15 text-red-800 dark:text-red-300 border-red-700/40',
-  done: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
+  success: 'bg-ok/10 text-ok dark:text-ok border-ok/30',
+  warning: 'bg-warn/10 text-warn dark:text-warn border-warn/30',
+  danger: 'bg-danger/10 text-danger dark:text-danger border-danger/30',
+  critical: 'bg-danger/15 text-danger dark:text-danger border-danger/40',
+  done: 'bg-ok/10 text-ok dark:text-ok border-ok/30',
 };
 
 // ---- Portal lookup ----
@@ -109,7 +109,7 @@ function buildTimeline(task: any, profiles: { id: string; full_name: string | nu
     events.push({
       at: task.updated_at || task.created_at,
       Icon: Paperclip,
-      iconClass: 'text-amber-700 bg-amber-500/15',
+      iconClass: 'text-warn bg-warn/15',
       text: 'Arquivo anexado',
     });
   }
@@ -117,14 +117,14 @@ function buildTimeline(task: any, profiles: { id: string; full_name: string | nu
     events.push({
       at: task.completed_at || task.updated_at || task.created_at,
       Icon: CheckCircle2,
-      iconClass: 'text-emerald-700 bg-emerald-500/15',
+      iconClass: 'text-ok bg-ok/15',
       text: 'Tarefa concluída',
     });
   } else if (task.updated_at && task.updated_at !== task.created_at) {
     events.push({
       at: task.updated_at,
       Icon: ArrowRight,
-      iconClass: 'text-blue-700 bg-blue-500/15',
+      iconClass: 'text-state-todo bg-state-todo/15',
       text: `Status atual: ${task.status}`,
     });
   }
@@ -208,10 +208,10 @@ const STATUS_OPTIONS = [
 ];
 
 const statusBadgeClass: Record<string, string> = {
-  a_fazer: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30',
-  aguardando_cliente: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30',
-  em_progresso: 'bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30',
-  concluido: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
+  a_fazer: 'bg-state-todo/15 text-state-todo dark:text-state-todo border-state-todo/30',
+  aguardando_cliente: 'bg-state-waiting/15 text-state-waiting dark:text-state-waiting border-state-waiting/30',
+  em_progresso: 'bg-state-doing/15 text-state-doing dark:text-state-doing border-state-doing/30',
+  concluido: 'bg-ok/15 text-ok dark:text-ok border-ok/30',
 };
 
 export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, onUpdate, onDelete, groupTasks, onUploadForTask }: TaskDetailModalProps) {
@@ -502,7 +502,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
             <span>{sla.label}</span>
           </div>
           {wasTransferred && (
-            <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 w-fit">
+            <Badge variant="outline" className="bg-warn/10 text-warn dark:text-warn border-warn/30 w-fit">
               Originalmente atribuída a {originalResponsibleName}
             </Badge>
           )}
@@ -543,7 +543,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <UserCog className="w-3.5 h-3.5 text-amber-600 cursor-help" />
+                        <UserCog className="w-3.5 h-3.5 text-warn cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent>
                         Transferida de {originalResponsibleName}
@@ -666,7 +666,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                         aria-label="Desmarcar conclusão"
                         className="shrink-0"
                       >
-                        <CheckCircle className="w-4 h-4 text-emerald-600 hover:text-emerald-700 transition-colors" />
+                        <CheckCircle className="w-4 h-4 text-ok hover:text-ok transition-colors" />
                       </button>
                     ) : (
                       <button
@@ -707,7 +707,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                   const ct = (task as any).completion_type as string | null;
                   if (ct === 'protocol') {
                     return (
-                      <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 inline-flex items-center gap-1">
+                      <Badge variant="outline" className="text-[10px] bg-state-todo/10 text-state-todo dark:text-state-todo border-state-todo/30 inline-flex items-center gap-1">
                         <Hash className="w-3 h-3" /> Protocolo: {(task as any).protocol_number || '—'}
                       </Badge>
                     );
@@ -715,7 +715,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                   if (ct === 'transmitted') {
                     return (
                       <div className="space-y-1">
-                        <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 inline-flex items-center gap-1">
+                        <Badge variant="outline" className="text-[10px] bg-ok/10 text-ok dark:text-ok border-ok/30 inline-flex items-center gap-1">
                           <CheckCircle className="w-3 h-3" /> Transmitida
                         </Badge>
                         {(task as any).completion_notes && (
@@ -725,13 +725,13 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                     );
                   }
                   return attachmentUrl ? (
-                    <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 inline-flex items-center gap-1">
+                    <Badge variant="outline" className="text-[10px] bg-ok/10 text-ok dark:text-ok border-ok/30 inline-flex items-center gap-1">
                       <Paperclip className="w-3 h-3" /> Documento anexado
                     </Badge>
                   ) : null;
                 })()}
                 {task.status !== 'concluido' && attachmentUrl && (
-                  <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
+                  <Badge variant="outline" className="text-[10px] bg-ok/10 text-ok dark:text-ok border-ok/30">
                     ✅ Documento anexado
                   </Badge>
                 )}
@@ -941,7 +941,7 @@ function ChecklistRow({
             aria-label="Desmarcar conclusão"
             className="shrink-0"
           >
-            <CheckCircle className="w-4 h-4 text-emerald-600 hover:text-emerald-700 transition-colors" />
+            <CheckCircle className="w-4 h-4 text-ok hover:text-ok transition-colors" />
           </button>
         ) : (
           <button
@@ -965,7 +965,7 @@ function ChecklistRow({
         </button>
 
       ) : done ? (
-        <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 shrink-0">
+        <Badge variant="outline" className="text-[10px] bg-ok/10 text-ok dark:text-ok border-ok/30 shrink-0">
           ✅ Anexado
         </Badge>
       ) : (

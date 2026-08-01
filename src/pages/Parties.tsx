@@ -22,7 +22,7 @@ type TipoFilter = 'todos' | PartyTipo;
 
 const tipoBadge = (tipo: string) => {
   const map: Record<string, { label: string; className: string }> = {
-    cliente: { label: 'Cliente', className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
+    cliente: { label: 'Cliente', className: 'bg-ok/15 text-ok dark:text-ok' },
     fornecedor: { label: 'Fornecedor', className: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
     ambos: { label: 'Ambos', className: 'bg-purple-500/15 text-purple-700 dark:text-purple-400' },
   };
@@ -72,8 +72,8 @@ export default function PartiesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Financeiro · Cadastros</p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Clientes & Fornecedores.</h1>
+          <p className="text-kicker uppercase text-muted-foreground">Financeiro · Cadastros</p>
+          <h1 className="text-display text-foreground">Clientes & Fornecedores.</h1>
           <p className="text-[14px] text-muted-foreground">Contrapartes utilizadas em lançamentos financeiros.</p>
         </div>
         <Button onClick={openNew} className="gap-2">

@@ -200,7 +200,7 @@ export default function Contacts() {
   const categoriaBadgeClass: Record<string, string> = {
     cliente: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 hover:bg-blue-500/15',
     fornecedor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 hover:bg-purple-500/15',
-    colaborador: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/15',
+    colaborador: 'bg-ok/10 text-ok dark:text-ok border-ok/20 hover:bg-ok/15',
     outros: 'bg-muted text-muted-foreground border-border hover:bg-muted/80',
   };
   const categoriaLabel: Record<string, string> = {
@@ -247,7 +247,7 @@ export default function Contacts() {
               <CategoryBadges contact={contact} />
             </div>
             <div
-              className={`h-2.5 w-2.5 rounded-full flex-shrink-0 mt-1 ml-2 ${isInadimplente ? 'bg-destructive' : 'bg-emerald-500'}`}
+              className={`h-2.5 w-2.5 rounded-full flex-shrink-0 mt-1 ml-2 ${isInadimplente ? 'bg-destructive' : 'bg-ok'}`}
               title={isInadimplente ? 'Inadimplente' : 'Adimplente'}
             />
           </div>
@@ -367,7 +367,7 @@ export default function Contacts() {
             </TableCell>
             <TableCell>
               <div
-                className={`h-2.5 w-2.5 rounded-full ${isInadimplente ? 'bg-destructive' : 'bg-emerald-500'}`}
+                className={`h-2.5 w-2.5 rounded-full ${isInadimplente ? 'bg-destructive' : 'bg-ok'}`}
                 title={isInadimplente ? 'Inadimplente' : 'Adimplente'}
               />
             </TableCell>
@@ -381,8 +381,8 @@ export default function Contacts() {
     <div className="space-y-6">
       <div className="flex items-start justify-between py-4 flex-wrap gap-4">
         <div className="space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Cadastros</p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Clientes & Fornecedores.</h1>
+          <p className="text-kicker uppercase text-muted-foreground">Cadastros</p>
+          <h1 className="text-display text-foreground">Clientes & Fornecedores.</h1>
         </div>
       </div>
 
@@ -485,7 +485,7 @@ export default function Contacts() {
                   <span className="font-medium text-foreground">{summaryStats.total}</span>
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span className="h-2 w-2 rounded-full bg-ok" />
                   <span>{summaryStats.adimplentes}</span>
                 </span>
                 <span className="flex items-center gap-1.5">

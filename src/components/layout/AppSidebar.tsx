@@ -46,6 +46,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
+import { UserMenu } from './UserMenu';
 import { useCompany } from '@/hooks/useCompany';
 import { usePinnedShortcuts, PinnedShortcut } from '@/hooks/usePinnedShortcuts';
 import { useModuleAccess, type RoleGated } from '@/hooks/useModuleAccess';
@@ -426,10 +427,10 @@ export function AppSidebar() {
         <SidebarMenuButton asChild tooltip={shortcut.title}>
           <NavLink onClick={handleMobileNav}
             to={shortcut.url}
-            className="flex items-center gap-2 pl-8 pr-3 py-1.5 rounded-lg text-[13px] text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-[background,color] duration-[120ms] group"
-            activeClassName="bg-accent text-primary font-medium"
+            className="group flex h-8 items-center gap-[9px] rounded-sm py-1.5 pl-[34px] pr-3 text-ui text-muted-ink transition-[background,color] duration-[120ms] hover:bg-bg-2 hover:text-ink"
+            activeClassName="bg-brand-tint font-semibold text-brand"
           >
-            <IconComponent className="w-[16px] h-[16px] shrink-0 opacity-60" strokeWidth={1.75} />
+            <IconComponent className="h-[15px] w-[15px] shrink-0" strokeWidth={1.75} />
             {showLabels && (
               <>
                 <span className="flex-1 truncate">{shortcut.title}</span>
@@ -453,10 +454,12 @@ export function AppSidebar() {
         <Separator key={`sec-${entry.label}`} className="my-2 mx-3 w-auto bg-sidebar-border" />
       );
     }
+    // Kicker de grupo (decisão 07): a CA tem 17 módulos e precisa escanear por
+    // seção. Sem borda — o próprio kicker separa.
     return (
       <div
         key={`sec-${entry.label}`}
-        className="mt-4 mb-1 px-3 pt-3 border-t border-sidebar-border text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/60"
+        className="px-3 pb-1.5 pt-5 text-kicker uppercase text-muted-ink-2"
       >
         {entry.label}
       </div>
@@ -469,16 +472,17 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip={entry.title}>
+              {/* NavItem do DS: 36px, raio 8, ícone 18, SC/nav */}
               <NavLink onClick={handleMobileNav}
                 to={entry.url}
                 end={entry.url === '/'}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] text-muted-foreground hover:bg-accent hover:text-foreground transition-[background,color] duration-[120ms]"
-                activeClassName="bg-accent text-foreground font-semibold [&_svg]:opacity-100"
+                className="flex h-9 items-center gap-2.5 rounded-sm px-3 text-nav text-muted-ink transition-[background,color] duration-[120ms] hover:bg-bg-2 hover:text-ink"
+                activeClassName="bg-bg-2 font-semibold text-ink"
               >
-                <entry.icon className="w-[18px] h-[18px] shrink-0 opacity-60" strokeWidth={1.75} />
+                <entry.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
                 {showLabels && <span className="flex-1 truncate">{entry.title}</span>}
                 {entry.moduleKey === 'configuracoes' && pendingCount > 0 && (
-                  <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-medium text-destructive-foreground">
+                  <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-danger px-1.5 text-badge font-medium text-white">
                     {pendingCount}
                   </span>
                 )}
@@ -494,13 +498,23 @@ export function AppSidebar() {
     <SidebarGroup key={entry.title}>
       <Collapsible open={openModules[entry.title]} onOpenChange={() => handleToggleModule(entry.title)}>
         <CollapsibleTrigger asChild>
-          <SidebarGroupLabel className="flex items-center justify-between cursor-pointer hover:bg-accent rounded-lg px-3 py-2 transition-[background,color] duration-[120ms] h-auto">
-            <div className="flex items-center gap-2.5 text-muted-foreground">
-              <entry.icon className="w-[18px] h-[18px] opacity-60" strokeWidth={1.75} />
-              {showLabels && <span className="text-[13.5px] font-medium text-foreground">{entry.title}</span>}
+          {/* NavGroup do DS: aberto ganha fundo --bg e texto em tinta cheia */}
+          <SidebarGroupLabel
+            className={cn(
+              'flex h-9 cursor-pointer items-center justify-between rounded-sm py-0 pl-3 pr-2.5 transition-[background,color] duration-[120ms]',
+              openModules[entry.title] ? 'bg-bg text-ink' : 'text-muted-ink hover:bg-bg-2 hover:text-ink',
+            )}
+          >
+            <div className="flex items-center gap-2.5">
+              <entry.icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+              {showLabels && (
+                <span className={cn('text-nav', openModules[entry.title] ? 'font-semibold' : 'font-medium')}>
+                  {entry.title}
+                </span>
+              )}
             </div>
             {showLabels && (
-              <ChevronDown className={cn("w-4 h-4 text-muted-foreground/60 transition-transform duration-[120ms]", openModules[entry.title] && "rotate-180")} />
+              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-[120ms]", openModules[entry.title] && "rotate-180")} />
             )}
           </SidebarGroupLabel>
         </CollapsibleTrigger>
@@ -520,10 +534,10 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild tooltip={item.title}>
                     <NavLink onClick={handleMobileNav}
                       to={item.url}
-                      className="flex items-center gap-2 pl-8 pr-3 py-1.5 rounded-lg text-[13px] text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-[background,color] duration-[120ms] group"
-                      activeClassName="bg-accent text-primary font-medium"
+                      className="group flex h-8 items-center gap-[9px] rounded-sm py-1.5 pl-[34px] pr-3 text-ui text-muted-ink transition-[background,color] duration-[120ms] hover:bg-bg-2 hover:text-ink"
+                      activeClassName="bg-brand-tint font-semibold text-brand"
                     >
-                      <item.icon className="w-[16px] h-[16px] shrink-0 opacity-60" strokeWidth={1.75} />
+                      <item.icon className="h-[15px] w-[15px] shrink-0" strokeWidth={1.75} />
                       {showLabels && (
                         <>
                           <span className="flex-1 truncate">{item.title}</span>
@@ -545,25 +559,28 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
+      {/* Marca: símbolo 28px + nome + CNPJ em mono, como no Shell/Sidebar do Figma */}
       <SidebarHeader className="p-3">
-        <div className="flex items-center gap-3 justify-center">
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary shrink-0 overflow-hidden">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-brand">
             {logoUrl ? (
-              <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
+              <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
             ) : (
-              <Building2 className="w-4 h-4 text-primary-foreground" strokeWidth={1.5} />
+              <Building2 className="h-4 w-4 text-on-brand" strokeWidth={1.5} />
             )}
           </div>
           {showLabels && (
-            <div className="flex flex-col min-w-0">
-              <span className="font-semibold text-sidebar-foreground truncate">{companyName}</span>
-              <span className="text-xs text-sidebar-foreground/60 truncate">{companyCnpj || 'CNPJ não informado'}</span>
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate text-ui-strong text-ink">{companyName}</span>
+              <span className="truncate font-mono text-meta text-muted-ink-2">
+                {companyCnpj || 'CNPJ não informado'}
+              </span>
             </div>
           )}
         </div>
       </SidebarHeader>
 
-      <Separator className="bg-sidebar-border" />
+      <Separator className="bg-line" />
 
       <SidebarContent className="px-2">
         {/* Atalhos Fixados */}
@@ -588,21 +605,13 @@ export function AppSidebar() {
         })}
       </SidebarContent>
 
-      <SidebarFooter className="p-4">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Suporte">
-              <NavLink onClick={handleMobileNav}
-                to="/suporte"
-                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] text-muted-foreground hover:bg-accent hover:text-foreground transition-[background,color] duration-[120ms]"
-                activeClassName="bg-accent text-foreground font-semibold"
-              >
-                <LifeBuoy className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
-                {showLabels && <span className="flex-1">Suporte</span>}
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      {/*
+        Bloco "conta" (decisão 05): o perfil volta para o rodapé da sidebar e sai
+        do topo. Suporte não some — já existe como item do grupo Administração,
+        aqui era duplicata.
+      */}
+      <SidebarFooter className="border-t border-line p-3">
+        {showLabels ? <UserMenu variant="bar" /> : <div className="flex justify-center"><UserMenu /></div>}
       </SidebarFooter>
     </Sidebar>
   );

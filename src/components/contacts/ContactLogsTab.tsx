@@ -58,19 +58,19 @@ const actionLabels: Record<string, string> = {
 };
 
 const actionColors: Record<string, string> = {
-  NOTA_CRIADA: 'bg-emerald-500/10 text-emerald-500',
+  NOTA_CRIADA: 'bg-ok/10 text-ok',
   NOTA_EDITADA: 'bg-blue-500/10 text-blue-500',
-  NOTA_EXCLUIDA: 'bg-red-500/10 text-red-500',
+  NOTA_EXCLUIDA: 'bg-danger/10 text-danger',
   DOCUMENTO_UPLOAD: 'bg-purple-500/10 text-purple-500',
-  DOCUMENTO_EXCLUIDO: 'bg-red-500/10 text-red-500',
+  DOCUMENTO_EXCLUIDO: 'bg-danger/10 text-danger',
   MENSAGEM_ENVIADA: 'bg-cyan-500/10 text-cyan-500',
-  PERFIL_ATUALIZADO: 'bg-amber-500/10 text-amber-500',
-  CADASTRO_ALTERADO: 'bg-orange-500/10 text-orange-500',
-  HONORARIO_GERADO: 'bg-emerald-500/10 text-emerald-500',
-  TRANSACAO_PAGA: 'bg-green-500/10 text-green-500',
+  PERFIL_ATUALIZADO: 'bg-warn/10 text-warn',
+  CADASTRO_ALTERADO: 'bg-warn/10 text-warn',
+  HONORARIO_GERADO: 'bg-ok/10 text-ok',
+  TRANSACAO_PAGA: 'bg-ok/10 text-ok',
   SOCIO_ADICIONADO: 'bg-indigo-500/10 text-indigo-500',
   SOCIO_EDITADO: 'bg-violet-500/10 text-violet-500',
-  SOCIO_REMOVIDO: 'bg-rose-500/10 text-rose-500',
+  SOCIO_REMOVIDO: 'bg-danger/10 text-danger',
 };
 
 export function ContactLogsTab({ contactId }: ContactLogsTabProps) {

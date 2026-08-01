@@ -35,7 +35,7 @@ export function IbsCbsSection({ rows, onNewRtObligation, disabled }: Props) {
         <div className="flex items-center gap-2">
           {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           <h3 className="text-sm font-semibold">Reforma Tributária — IBS/CBS</h3>
-          <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/40">
+          <Badge className="bg-warn/15 text-warn dark:text-warn border-warn/40">
             Em preparação
           </Badge>
           <span className="text-xs text-muted-foreground">

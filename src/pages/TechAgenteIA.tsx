@@ -75,7 +75,7 @@ export default function TechAgenteIA() {
           <Bot className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Agente de Pré-Atendimento</h1>
+          <h1 className="text-h3-section text-foreground">Agente de Pré-Atendimento</h1>
           <p className="text-sm text-muted-foreground">
             Saudação, identificação de setor e transferência automática no WhatsApp (Chatwoot)
           </p>

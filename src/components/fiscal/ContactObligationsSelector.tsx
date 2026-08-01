@@ -79,7 +79,7 @@ export function ContactObligationsSelector({ options, selectedIds, onChange }: P
                       <Check className={cn('mr-2 h-4 w-4', checked ? 'opacity-100' : 'opacity-0')} />
                       <span className="truncate flex-1">{opt.name}</span>
                       {opt.is_custom && (
-                        <Badge variant="outline" className="ml-2 border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] px-1.5 py-0">
+                        <Badge variant="outline" className="ml-2 border-warn/40 bg-warn/10 text-warn dark:text-warn text-[10px] px-1.5 py-0">
                           Personalizada
                         </Badge>
                       )}

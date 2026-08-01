@@ -362,8 +362,8 @@ export default function BackupTab() {
       <Card className="bg-card border-border/50">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10">
-              <Upload className="w-5 h-5 text-amber-500" />
+            <div className="p-2 rounded-lg bg-warn/10">
+              <Upload className="w-5 h-5 text-warn" />
             </div>
             <div>
               <CardTitle>Restaurar Backup</CardTitle>
@@ -372,9 +372,9 @@ export default function BackupTab() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
-            <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-amber-700 dark:text-amber-400">
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-warn/10 border border-warn/30">
+            <AlertTriangle className="w-4 h-4 text-warn mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-warn dark:text-warn">
               A restauração pode sobrescrever dados existentes. Registros com o mesmo ID serão atualizados; registros ausentes serão recriados.
             </p>
           </div>
@@ -485,7 +485,7 @@ export default function BackupTab() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              <AlertTriangle className="w-5 h-5 text-warn" />
               Confirmar Restauração
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -504,7 +504,7 @@ export default function BackupTab() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRestore} className="bg-amber-600 hover:bg-amber-700 text-white">
+            <AlertDialogAction onClick={handleRestore} className="bg-warn hover:bg-warn text-white">
               Sim, Restaurar
             </AlertDialogAction>
           </AlertDialogFooter>

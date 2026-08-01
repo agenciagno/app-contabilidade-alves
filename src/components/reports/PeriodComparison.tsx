@@ -26,24 +26,24 @@ const getVariationIcon = (variation: number, isExpense = false) => {
   if (Math.abs(variation) < 0.1) return <Minus className="h-4 w-4 text-muted-foreground" />;
   if (variation > 0) {
     return isExpense ? (
-      <TrendingUp className="h-4 w-4 text-red-500" />
+      <TrendingUp className="h-4 w-4 text-danger" />
     ) : (
-      <TrendingUp className="h-4 w-4 text-emerald-500" />
+      <TrendingUp className="h-4 w-4 text-ok" />
     );
   }
   return isExpense ? (
-    <TrendingDown className="h-4 w-4 text-emerald-500" />
+    <TrendingDown className="h-4 w-4 text-ok" />
   ) : (
-    <TrendingDown className="h-4 w-4 text-red-500" />
+    <TrendingDown className="h-4 w-4 text-danger" />
   );
 };
 
 const getVariationColor = (variation: number, isExpense = false) => {
   if (Math.abs(variation) < 0.1) return 'text-muted-foreground';
   if (variation > 0) {
-    return isExpense ? 'text-red-500' : 'text-emerald-500';
+    return isExpense ? 'text-danger' : 'text-ok';
   }
-  return isExpense ? 'text-emerald-500' : 'text-red-500';
+  return isExpense ? 'text-ok' : 'text-danger';
 };
 
 const hasData = (period: PeriodData) => 
@@ -85,19 +85,19 @@ export function PeriodComparison({
               <div className="space-y-2">
                 <div>
                   <span className="text-xs text-muted-foreground">Receitas</span>
-                  <p className="text-lg font-semibold text-emerald-500">
+                  <p className="text-lg font-semibold text-ok">
                     {formatCurrency(currentPeriod.receitas)}
                   </p>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">Despesas</span>
-                  <p className="text-lg font-semibold text-red-500">
+                  <p className="text-lg font-semibold text-danger">
                     {formatCurrency(currentPeriod.despesas)}
                   </p>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">Saldo</span>
-                  <p className={`text-lg font-semibold ${currentPeriod.saldo >= 0 ? 'text-primary' : 'text-orange-500'}`}>
+                  <p className={`text-lg font-semibold ${currentPeriod.saldo >= 0 ? 'text-primary' : 'text-warn'}`}>
                     {formatCurrency(currentPeriod.saldo)}
                   </p>
                 </div>
@@ -111,19 +111,19 @@ export function PeriodComparison({
                 <div className="space-y-2">
                   <div>
                     <span className="text-xs text-muted-foreground">Receitas</span>
-                    <p className="text-lg font-semibold text-emerald-500/70">
+                    <p className="text-lg font-semibold text-ok/70">
                       {formatCurrency(previousPeriod.receitas)}
                     </p>
                   </div>
                   <div>
                     <span className="text-xs text-muted-foreground">Despesas</span>
-                    <p className="text-lg font-semibold text-red-500/70">
+                    <p className="text-lg font-semibold text-danger/70">
                       {formatCurrency(previousPeriod.despesas)}
                     </p>
                   </div>
                   <div>
                     <span className="text-xs text-muted-foreground">Saldo</span>
-                    <p className={`text-lg font-semibold ${previousPeriod.saldo >= 0 ? 'text-primary/70' : 'text-orange-500/70'}`}>
+                    <p className={`text-lg font-semibold ${previousPeriod.saldo >= 0 ? 'text-primary/70' : 'text-warn/70'}`}>
                       {formatCurrency(previousPeriod.saldo)}
                     </p>
                   </div>

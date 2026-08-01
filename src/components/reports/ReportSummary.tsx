@@ -32,12 +32,12 @@ export function ReportSummary({
         <Card className="bg-card border-border/50">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-500/10 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-emerald-500" />
+              <div className="p-2 bg-ok/10 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-ok" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Receitas</p>
-                <p className="text-lg font-semibold text-emerald-500">{formatCurrency(totalReceitas)}</p>
+                <p className="text-lg font-semibold text-ok">{formatCurrency(totalReceitas)}</p>
               </div>
             </div>
           </CardContent>
@@ -46,12 +46,12 @@ export function ReportSummary({
         <Card className="bg-card border-border/50">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-500/10 rounded-lg">
-                <TrendingDown className="h-5 w-5 text-red-500" />
+              <div className="p-2 bg-danger/10 rounded-lg">
+                <TrendingDown className="h-5 w-5 text-danger" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Despesas</p>
-                <p className="text-lg font-semibold text-red-500">{formatCurrency(totalDespesas)}</p>
+                <p className="text-lg font-semibold text-danger">{formatCurrency(totalDespesas)}</p>
               </div>
             </div>
           </CardContent>
@@ -60,12 +60,12 @@ export function ReportSummary({
         <Card className="bg-card border-border/50">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${saldo >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
-                <Wallet className={`h-5 w-5 ${saldo >= 0 ? 'text-emerald-500' : 'text-red-500'}`} />
+              <div className={`p-2 rounded-lg ${saldo >= 0 ? 'bg-ok/10' : 'bg-danger/10'}`}>
+                <Wallet className={`h-5 w-5 ${saldo >= 0 ? 'text-ok' : 'text-danger'}`} />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Saldo do Período</p>
-                <p className={`text-lg font-semibold ${saldo >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                <p className={`text-lg font-semibold ${saldo >= 0 ? 'text-ok' : 'text-danger'}`}>
                   {formatCurrency(saldo)}
                 </p>
               </div>

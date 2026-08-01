@@ -164,8 +164,8 @@ export default function ConciliacaoSicoob() {
       {/* Cabeçalho */}
       <div className="flex items-center justify-between py-4 px-6 flex-wrap gap-4">
         <div className="space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Financeiro · Conciliação</p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <p className="text-kicker uppercase text-muted-foreground">Financeiro · Conciliação</p>
+          <h1 className="text-display text-foreground flex items-center gap-2">
             <Landmark className="w-7 h-7 text-primary" />
             Conciliação Sicoob
           </h1>
@@ -173,7 +173,7 @@ export default function ConciliacaoSicoob() {
             Extrato real da conta e comparativo com os dados do sistema — leitura e confirmação manual, sem baixa automática
           </p>
         </div>
-        <Badge variant="outline" className="gap-1.5 border-amber-500/40 text-amber-700 dark:text-amber-400 bg-amber-500/10">
+        <Badge variant="outline" className="gap-1.5 border-warn/40 text-warn dark:text-warn bg-warn/10">
           <FlaskConical className="h-3.5 w-3.5" /> Teste — confirme cada baixa manualmente
         </Badge>
       </div>
@@ -182,7 +182,7 @@ export default function ConciliacaoSicoob() {
       <div className="px-6 flex items-center gap-3 flex-wrap">
         <Card className="flex-1 min-w-[220px]">
           <CardContent className="p-5">
-            <div className="flex items-center gap-2 text-muted-foreground text-[11px] font-medium uppercase tracking-[0.05em]">
+            <div className="flex items-center gap-2 text-muted-foreground text-kicker uppercase">
               <Wallet className="h-4 w-4" /><span>Saldo atual (Sicoob)</span>
             </div>
             {saldoLoading ? (
@@ -196,7 +196,7 @@ export default function ConciliacaoSicoob() {
         </Card>
         <Card className="flex-1 min-w-[220px]">
           <CardContent className="p-5">
-            <div className="flex items-center gap-2 text-muted-foreground text-[11px] font-medium uppercase tracking-[0.05em]">
+            <div className="flex items-center gap-2 text-muted-foreground text-kicker uppercase">
               <span>Saldo bloqueado</span>
             </div>
             <p className="text-[1.75rem] font-bold mt-2 tracking-tight leading-none">
@@ -206,7 +206,7 @@ export default function ConciliacaoSicoob() {
         </Card>
         <Card className="flex-1 min-w-[220px]">
           <CardContent className="p-5">
-            <div className="flex items-center gap-2 text-muted-foreground text-[11px] font-medium uppercase tracking-[0.05em]">
+            <div className="flex items-center gap-2 text-muted-foreground text-kicker uppercase">
               <span>Limite disponível</span>
             </div>
             <p className="text-[1.75rem] font-bold mt-2 tracking-tight leading-none">
@@ -236,7 +236,7 @@ export default function ConciliacaoSicoob() {
             <TabsTrigger value="comparativo" className="gap-1.5">
               Comparativo
               {pendentesRevisao > 0 && (
-                <Badge variant="outline" className="h-5 px-1.5 border-amber-500/40 text-amber-700 dark:text-amber-400">
+                <Badge variant="outline" className="h-5 px-1.5 border-warn/40 text-warn dark:text-warn">
                   {pendentesRevisao}
                 </Badge>
               )}
@@ -411,7 +411,7 @@ export default function ConciliacaoSicoob() {
                                 <Badge className="bg-success/15 text-success border-success/30"><CheckCircle2 className="h-3 w-3 mr-1" />Já confirmado</Badge>
                               )}
                               {row.status === 'NAO_IDENTIFICADO' && row.lanc.tipo === 'CREDITO' && (
-                                <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                                <Badge className="bg-warn/15 text-warn dark:text-warn border-warn/30">
                                   <AlertTriangle className="h-3 w-3 mr-1" />Não identificado
                                 </Badge>
                               )}

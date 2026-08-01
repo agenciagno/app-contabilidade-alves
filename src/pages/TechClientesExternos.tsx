@@ -260,7 +260,7 @@ function ClienteRow({
           {!orfao && semAcesso && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
+                <Badge variant="outline" className="border-warn/50 text-warn dark:text-warn">
                   1º acesso pendente
                 </Badge>
               </TooltipTrigger>
@@ -285,7 +285,7 @@ function ClienteRow({
       <TableCell>
         <Badge
           variant={ativo ? 'default' : 'destructive'}
-          className={ativo ? 'bg-emerald-600 hover:bg-emerald-600' : ''}
+          className={ativo ? 'bg-ok hover:bg-ok' : ''}
         >
           {ativo ? 'Ativo' : 'Suspenso'}
         </Badge>
@@ -311,7 +311,7 @@ function ClienteRow({
 
 function MetricCard({ label, value, tone }: { label: string; value: string; tone?: 'success' | 'danger' }) {
   const colorClass =
-    tone === 'success' ? 'text-emerald-600' : tone === 'danger' ? 'text-destructive' : 'text-foreground';
+    tone === 'success' ? 'text-ok' : tone === 'danger' ? 'text-destructive' : 'text-foreground';
   return (
     <Card>
       <CardContent className="p-4">

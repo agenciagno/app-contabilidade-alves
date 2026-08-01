@@ -41,10 +41,10 @@ export default function TrashTab() {
   return (
     <div className="space-y-4">
       {/* Warning banner */}
-      <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
-        <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+      <div className="flex items-start gap-3 p-3 rounded-lg bg-warn/10 border border-warn/30">
+        <AlertTriangle className="w-5 h-5 text-warn mt-0.5 flex-shrink-0" />
         <div>
-          <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+          <p className="text-sm font-medium text-warn dark:text-warn">
             Itens na lixeira são excluídos permanentemente após 30 dias.
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">

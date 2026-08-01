@@ -91,7 +91,7 @@ export default function ReformaTributariaCalculadora() {
         </div>
         <Badge variant="outline" className="gap-1.5">
           <span
-            className={`h-1.5 w-1.5 rounded-full ${aliquotas.fonte === 'api_oficial' ? 'bg-emerald-500' : 'bg-amber-500'}`}
+            className={`h-1.5 w-1.5 rounded-full ${aliquotas.fonte === 'api_oficial' ? 'bg-ok' : 'bg-warn'}`}
           />
           {aliquotas.fonte === 'api_oficial' ? 'Alíquota da Receita Federal' : 'Teto legal (26,5%)'}
         </Badge>
@@ -180,7 +180,7 @@ export default function ReformaTributariaCalculadora() {
                                 ? 'text-muted-foreground'
                                 : variacao > 0
                                   ? 'text-destructive'
-                                  : 'text-emerald-600'
+                                  : 'text-ok'
                             }`}
                           >
                             {noUnificado

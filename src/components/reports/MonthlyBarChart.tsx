@@ -23,12 +23,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center gap-2 text-sm">
             {entry.name === 'Receitas' ? (
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
+              <TrendingUp className="h-4 w-4 text-ok" />
             ) : (
-              <TrendingDown className="h-4 w-4 text-red-500" />
+              <TrendingDown className="h-4 w-4 text-danger" />
             )}
             <span className="text-muted-foreground">{entry.name}:</span>
-            <span className={entry.name === 'Receitas' ? 'text-emerald-500 font-medium' : 'text-red-500 font-medium'}>
+            <span className={entry.name === 'Receitas' ? 'text-ok font-medium' : 'text-danger font-medium'}>
               {formatCurrency(entry.value)}
             </span>
           </div>
@@ -46,8 +46,8 @@ export function MonthlyBarChart({ data }: MonthlyBarChartProps) {
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <div className="flex gap-1">
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
-              <TrendingDown className="h-4 w-4 text-red-500" />
+              <TrendingUp className="h-4 w-4 text-ok" />
+              <TrendingDown className="h-4 w-4 text-danger" />
             </div>
             Receita vs Despesas
           </CardTitle>
@@ -64,8 +64,8 @@ export function MonthlyBarChart({ data }: MonthlyBarChartProps) {
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <div className="flex gap-1">
-            <TrendingUp className="h-4 w-4 text-emerald-500" />
-            <TrendingDown className="h-4 w-4 text-red-500" />
+            <TrendingUp className="h-4 w-4 text-ok" />
+            <TrendingDown className="h-4 w-4 text-danger" />
           </div>
           Receita vs Despesas
         </CardTitle>

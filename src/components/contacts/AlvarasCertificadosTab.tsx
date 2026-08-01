@@ -32,12 +32,12 @@ function ValidadeBadge({ data }: { data: string }) {
   const dias = differenceInDays(new Date(data + 'T00:00:00'), new Date());
   if (dias < 30) return <Badge variant="destructive">⚠ Vence em {dias} dias</Badge>;
   if (dias <= 60) return (
-    <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
+    <Badge className="bg-warn/15 text-warn dark:text-warn border-warn/30">
       Vence em {dias} dias
     </Badge>
   );
   return (
-    <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
+    <Badge className="bg-ok/15 text-ok dark:text-ok border-ok/30">
       {format(new Date(data + 'T00:00:00'), 'dd/MM/yyyy')}
     </Badge>
   );

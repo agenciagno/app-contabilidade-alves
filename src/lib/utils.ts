@@ -1,5 +1,26 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+/**
+ * A rampa tipográfica do Design System usa nomes próprios (text-body, text-ui-strong,
+ * text-kicker…). O tailwind-merge não os conhece, classifica como cor de texto e os
+ * descarta sempre que houver um text-<cor> na mesma lista — apagando o tamanho e o peso
+ * em silêncio. Registrar os nomes no grupo font-size resolve, e de quebra faz o merge
+ * funcionar de verdade entre dois tamanhos.
+ */
+const TYPE_SCALE = [
+  "display", "metric-xl", "h2-hero", "h3-section", "h4-card",
+  "body", "body-sm", "nav", "ui", "ui-strong", "link",
+  "mono-sm", "meta", "kicker", "badge",
+] as const;
+
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      "font-size": [{ text: [...TYPE_SCALE] }],
+    },
+  },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
