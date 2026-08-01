@@ -113,12 +113,18 @@ export default {
         'brand-tint': 'var(--brand-tint)',
         'brand-soft': 'var(--brand-soft)',
 
+        'on-banner': 'var(--on-banner)',
+
         ok: 'var(--ok)',
         warn: 'var(--warn)',
         danger: 'var(--danger)',
         'ok-soft': 'var(--ok-soft)',
         'warn-soft': 'var(--warn-soft)',
         'danger-soft': 'var(--danger-soft)',
+      },
+      backgroundImage: {
+        // Gradiente do banner de marca, medido no Figma (linear brand-2 -> brand)
+        'brand-banner': 'linear-gradient(115deg, var(--banner-from) 0%, var(--banner-to) 100%)',
       },
       boxShadow: {
         'sc-sm': 'var(--shadow-sm)',

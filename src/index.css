@@ -63,6 +63,13 @@
     --warn-soft: #fdf2ea;
     --danger-soft: #ffece9;
 
+    /* Banner de marca — superfície escura fixa, IGUAL nos dois modos.
+       Não usar --brand/--ink aqui: eles invertem no escuro e o texto sumiria.
+       Por isso estes três ficam só no :root e não são redefinidos em .dark. */
+    --banner-from: #253a50;
+    --banner-to: #101923;
+    --on-banner: #ffffff;
+
     /* Sombras — hairline sólida antes do blur (decisão 03) */
     --shadow-sm: 0 1px 0 #e4e4e7;
     --shadow-md: 0 1px 0 #e4e4e7, 0 8px 24px -10px rgb(0 0 0 / .08);
