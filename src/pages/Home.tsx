@@ -611,7 +611,7 @@ const Home = () => {
                 <Button
                   size="lg"
                   onClick={() => navigate('/reforma-tributaria')}
-                  className="border-white bg-white text-[color:var(--banner-to)] hover:bg-white/90"
+                  className="border-white bg-white text-brand-deep hover:bg-white/90"
                 >
                   <ArrowRight className="h-4 w-4" />
                   Ver o que muda

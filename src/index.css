@@ -47,13 +47,16 @@
     --line: #e4e4e7;
     --line-2: #ededed;
 
-    /* brand/* */
+    /* brand/* — família navy da marca (`_context/marca/`) */
     --brand: #101923;
     --brand-2: #253a50;
-    --brand-deep: #2c3bd6;
-    --brand-ink: #1f2ba0;
-    --brand-tint: #eff3ff;
-    --brand-soft: #e4eaff;
+    /* brand-deep é tinta sobre botão claro dentro do banner escuro — é o único
+       uso dele no protótipo. Como o banner é escuro nos dois modos, este token
+       NÃO é redefinido em .dark: se invertesse, o texto sumiria no botão branco. */
+    --brand-deep: #101923;
+    --brand-ink: #1a2c3e;
+    --brand-tint: #eef1f3;
+    --brand-soft: #d0dbe5;
 
     /* status/* */
     --ok: #1a9f63;
@@ -196,10 +199,11 @@
 
     --brand: #fafafa;
     --brand-2: #fafafa;
-    --brand-deep: #2c3bd6;
-    --brand-ink: #1f2ba0;
-    --brand-tint: #1f243a;
-    --brand-soft: #252c50;
+    /* --brand-deep fica de fora de propósito: é tinta sobre botão claro no
+       banner, que é escuro nos dois modos. Ver comentário no :root. */
+    --brand-ink: #d0dbe5;
+    --brand-tint: #1a2c3e;
+    --brand-soft: #253d54;
 
     --ok: #1a9f63;
     --warn: #d97706;
