@@ -3,18 +3,24 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * Badge — component set "Badge" do Figma: pill, pad 3/8, texto SC/badge
+ * (10.5 Medium). Os 5 tons do DS são success/warning/destructive/info/secondary;
+ * os nomes shadcn seguem valendo porque o app já os consome.
+ * Para o ponto colorido à esquerda use DsBadge de @/components/ds.
+ */
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border-0 px-2.5 py-[3px] text-[11px] font-bold tracking-wide transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center gap-[5px] rounded-pill border-0 px-2 py-[3px] text-badge font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
   {
     variants: {
       variant: {
-        default: "bg-primary/10 text-primary",
-        secondary: "bg-secondary text-secondary-foreground",
-        destructive: "bg-destructive/10 text-destructive",
-        outline: "border border-border text-foreground",
-        success: "bg-[var(--badge-success-bg)] text-[var(--badge-success-text)]",
-        warning: "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-text)]",
-        info: "bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]",
+        default: "bg-brand-soft text-brand",
+        secondary: "bg-bg-2 text-muted-ink",
+        destructive: "bg-danger-soft text-danger",
+        outline: "border border-line text-ink",
+        success: "bg-ok-soft text-ok",
+        warning: "bg-warn-soft text-warn",
+        info: "bg-brand-soft text-brand",
       },
     },
     defaultVariants: {
