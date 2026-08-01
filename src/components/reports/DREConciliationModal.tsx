@@ -864,7 +864,7 @@ export function DREConciliationModal({ open, onOpenChange, startDate, endDate }:
                       <TableCell className="text-right">{formatCurrency(g.previstoDRE)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(g.emAberto)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(g.pagasComPrevista)}</TableCell>
-                      <TableCell className={cn('text-right font-semibold', Math.abs(diff) > 0.001 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
+                      <TableCell className={cn('text-right font-semibold', Math.abs(diff) > 0.001 ? 'text-warn dark:text-warn' : 'text-muted-foreground')}>
                         {formatCurrency(diff)}
                       </TableCell>
                     </TableRow>
@@ -972,9 +972,9 @@ export function DREConciliationModal({ open, onOpenChange, startDate, endDate }:
                                       <TableCell className="text-xs">
                                         <div className="flex flex-wrap items-center gap-1">
                                           {t.is_paid ? (
-                                            <Badge variant="outline" className="text-[10px] border-emerald-500/50 text-emerald-600">Pago</Badge>
+                                            <Badge variant="outline" className="text-[10px] border-ok/50 text-ok">Pago</Badge>
                                           ) : (
-                                            <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-600">Em aberto</Badge>
+                                            <Badge variant="outline" className="text-[10px] border-warn/50 text-warn">Em aberto</Badge>
                                           )}
                                           {suspect && (
                                             <Badge variant="outline" className="text-[10px] border-blue-500/60 text-blue-600 dark:text-blue-400 bg-blue-500/10">

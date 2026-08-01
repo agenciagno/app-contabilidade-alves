@@ -90,7 +90,7 @@ export default function TechClienteExternoDetalhe() {
           <h1 className="text-2xl font-semibold">{cliente.name}</h1>
           <Badge
             variant={ativo ? 'default' : 'destructive'}
-            className={ativo ? 'bg-emerald-600 hover:bg-emerald-600' : ''}
+            className={ativo ? 'bg-ok hover:bg-ok' : ''}
           >
             {ativo ? 'Ativo' : 'Suspenso'}
           </Badge>
@@ -655,11 +655,11 @@ function AbaUsuarios({
                       <TableCell><Badge variant="outline">{u.role ?? '—'}</Badge></TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          <Badge variant={bloqueado ? 'destructive' : 'default'} className={bloqueado ? '' : 'bg-emerald-600 hover:bg-emerald-600'}>
+                          <Badge variant={bloqueado ? 'destructive' : 'default'} className={bloqueado ? '' : 'bg-ok hover:bg-ok'}>
                             {bloqueado ? 'Bloqueado' : 'Liberado'}
                           </Badge>
                           {naoEntrou && (
-                            <Badge variant="outline" className="border-amber-500/50 text-amber-600 dark:text-amber-400">
+                            <Badge variant="outline" className="border-warn/50 text-warn dark:text-warn">
                               1º acesso
                             </Badge>
                           )}
@@ -914,7 +914,7 @@ function AbaModulos({ cliente, onChanged }: { cliente: Cliente; onChanged: () =>
 /* --------------------------------------------------------------------- Faturas */
 
 const ESTADO_BADGE: Record<string, { label: string; className: string }> = {
-  paga: { label: 'Paga', className: 'bg-emerald-600 hover:bg-emerald-600' },
+  paga: { label: 'Paga', className: 'bg-ok hover:bg-ok' },
   aberta: { label: 'Em aberto', className: 'bg-blue-600 hover:bg-blue-600' },
   vencida: { label: 'Vencida', className: 'bg-destructive hover:bg-destructive' },
   cancelada: { label: 'Cancelada', className: 'bg-muted-foreground hover:bg-muted-foreground' },

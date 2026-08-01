@@ -427,14 +427,14 @@ export default function Dashboard() {
                 {isLoading ? (
                   <Skeleton className="h-10 w-32" />
                 ) : (
-                  <p className="text-[2rem] font-bold tracking-tight text-emerald-600 leading-none">{formatCurrency(summary.receitasPagas)}</p>
+                  <p className="text-[2rem] font-bold tracking-tight text-ok leading-none">{formatCurrency(summary.receitasPagas)}</p>
                 )}
                 <p className="text-[13px] text-muted-foreground pt-1">
-                  A Receber: <span className="text-emerald-600 font-medium">{formatCurrency(summary.aReceber)}</span>
+                  A Receber: <span className="text-ok font-medium">{formatCurrency(summary.aReceber)}</span>
                 </p>
               </div>
-              <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
-                <TrendingUp className="w-5 h-5 text-emerald-600" />
+              <div className="w-10 h-10 rounded-full bg-ok/10 flex items-center justify-center shrink-0">
+                <TrendingUp className="w-5 h-5 text-ok" />
               </div>
             </div>
           </CardContent>
@@ -490,10 +490,10 @@ export default function Dashboard() {
         <Card className="shadow-[inset_3px_0_0_0_theme(colors.emerald.500)]">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1.5">
-              <BarChart3 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <BarChart3 className="w-3.5 h-3.5 text-ok shrink-0" />
               <p className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground font-medium">Lucro Previsto — {annualMetrics.year}</p>
             </div>
-            <p className={`text-lg font-bold ${annualMetrics.lucroPrevisto >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+            <p className={`text-lg font-bold ${annualMetrics.lucroPrevisto >= 0 ? 'text-ok' : 'text-destructive'}`}>
               {formatCurrency(annualMetrics.lucroPrevisto)}
             </p>
             <p className="text-[11px] text-muted-foreground mt-1">Receitas − Despesas (ano)</p>
@@ -503,10 +503,10 @@ export default function Dashboard() {
         <Card className="shadow-[inset_3px_0_0_0_theme(colors.amber.500)]">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1.5">
-              <CalendarCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <CalendarCheck className="w-3.5 h-3.5 text-warn shrink-0" />
               <p className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground font-medium">Lucro Realizado — {annualMetrics.year}</p>
             </div>
-            <p className={`text-lg font-bold ${annualMetrics.lucroRealizado >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+            <p className={`text-lg font-bold ${annualMetrics.lucroRealizado >= 0 ? 'text-ok' : 'text-destructive'}`}>
               {formatCurrency(annualMetrics.lucroRealizado)}
             </p>
             <p className="text-[11px] text-muted-foreground mt-1">Realizado no ano corrente</p>
@@ -516,10 +516,10 @@ export default function Dashboard() {
         <Card className="shadow-[inset_3px_0_0_0_theme(colors.emerald.600)]">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1.5">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <TrendingUp className="w-3.5 h-3.5 text-ok shrink-0" />
               <p className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground font-medium">Receitas Acumuladas — {annualMetrics.year}</p>
             </div>
-            <p className="text-lg font-bold text-emerald-600">
+            <p className="text-lg font-bold text-ok">
               {formatCurrency(annualMetrics.receitasAcumuladas)}
             </p>
             <p className="text-[11px] text-muted-foreground mt-1">Receitas já realizadas</p>

@@ -126,7 +126,7 @@ export default function Banks() {
           <div className="mt-4 pt-4 border-t border-border">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Saldo atual</span>
-              <span className={`text-lg font-bold ${closingBalance >= 0 ? 'text-green-500' : 'text-destructive'}`}>
+              <span className={`text-lg font-bold ${closingBalance >= 0 ? 'text-ok' : 'text-destructive'}`}>
                 {formatCurrency(closingBalance)}
               </span>
             </div>

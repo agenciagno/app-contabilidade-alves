@@ -32,12 +32,12 @@ interface Props {
 
 const STATUS_META: Record<RtStatus, { label: string; className: string }> = {
   nao_iniciado: { label: 'Não iniciado', className: 'bg-muted text-muted-foreground border-border' },
-  em_analise: { label: 'Em análise', className: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/40' },
+  em_analise: { label: 'Em análise', className: 'bg-warn/15 text-warn dark:text-warn border-warn/40' },
   adequado: {
     label: 'Adequado',
-    className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/40',
+    className: 'bg-ok/15 text-ok dark:text-ok border-ok/40',
   },
-  acao_necessaria: { label: 'Ação necessária', className: 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40' },
+  acao_necessaria: { label: 'Ação necessária', className: 'bg-danger/15 text-danger dark:text-danger border-danger/40' },
 };
 
 const CHECKLIST_ITEMS: { key: keyof RtItems; label: string }[] = [
@@ -140,7 +140,7 @@ export function RtChecklistDialog({ open, onOpenChange }: Props) {
             </div>
           </div>
           <div className="h-2 rounded-full bg-muted overflow-hidden">
-            <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+            <div className="h-full bg-ok transition-all" style={{ width: `${pct}%` }} />
           </div>
         </div>
 
@@ -218,7 +218,7 @@ export function RtChecklistDialog({ open, onOpenChange }: Props) {
                               />
                               <span className={cn('text-sm', checked && 'text-muted-foreground')}>
                                 {checked ? (
-                                  <CheckCircle2 className="inline h-3.5 w-3.5 mr-1 text-emerald-600" />
+                                  <CheckCircle2 className="inline h-3.5 w-3.5 mr-1 text-ok" />
                                 ) : (
                                   <Circle className="inline h-3.5 w-3.5 mr-1 text-muted-foreground" />
                                 )}

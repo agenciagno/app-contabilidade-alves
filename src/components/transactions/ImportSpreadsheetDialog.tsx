@@ -573,7 +573,7 @@ export function ImportSpreadsheetDialog({ open, onOpenChange, banks, categories,
                           <TableCell className="whitespace-nowrap">{formatDateDisplay(row.issue_date)}</TableCell>
                           <TableCell>{contactName(row.contact_id)}</TableCell>
                           <TableCell>
-                            <Badge className={row.type === 'receita' ? 'bg-emerald-500/15 text-emerald-700 border-emerald-200 hover:bg-emerald-500/20' : 'bg-red-500/15 text-red-700 border-red-200 hover:bg-red-500/20'}>
+                            <Badge className={row.type === 'receita' ? 'bg-ok/15 text-ok border-ok hover:bg-ok/20' : 'bg-danger/15 text-danger border-danger hover:bg-danger/20'}>
                               {row.type === 'receita' ? 'Receita' : 'Despesa'}
                             </Badge>
                           </TableCell>

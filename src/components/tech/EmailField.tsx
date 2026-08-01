@@ -55,7 +55,7 @@ export function EmailField({ id, label, value, onChange, required, placeholder }
         {touched && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2">
             {ok ? (
-              <Check className="h-4 w-4 text-emerald-600" />
+              <Check className="h-4 w-4 text-ok" />
             ) : (
               <AlertCircle className="h-4 w-4 text-destructive" />
             )}

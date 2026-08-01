@@ -83,7 +83,7 @@ export function BudgetTracker() {
                   </div>
                   <div className="h-2 w-full rounded-full bg-muted overflow-hidden flex">
                     <div
-                      className={r.over ? 'bg-destructive' : r.pct >= 0.8 ? 'bg-amber-500' : 'bg-emerald-500'}
+                      className={r.over ? 'bg-destructive' : r.pct >= 0.8 ? 'bg-warn' : 'bg-ok'}
                       style={{ width: `${r.over ? 100 - overWidth : pctClamped}%` }}
                     />
                     {r.over && <div className="bg-destructive/50" style={{ width: `${overWidth}%` }} />}

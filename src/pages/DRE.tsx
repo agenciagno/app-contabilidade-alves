@@ -21,8 +21,8 @@ function formatPerc(value: number) {
 }
 
 function valueColor(value: number) {
-  if (value > 0) return 'text-emerald-500';
-  if (value < 0) return 'text-red-500';
+  if (value > 0) return 'text-ok';
+  if (value < 0) return 'text-danger';
   return 'text-muted-foreground';
 }
 
@@ -64,12 +64,12 @@ function SummaryCard({ title, previsto, realizado, icon: Icon, color }: {
 function SectionRow({ row }: { row: DRESectionRow }) {
   return (
     <>
-      <TableRow className="hover:bg-emerald-500/10 bg-emerald-500/5 font-semibold dre-section-row">
+      <TableRow className="hover:bg-ok/10 bg-ok/5 font-semibold dre-section-row">
         <TableCell className="pl-4">
           <div className="flex items-center gap-2">
             <span style={{ color: 'var(--dre-section-color)' }}>{row.macroName}</span>
             {!row.macroId && (
-              <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded dark:bg-amber-900/30 dark:text-amber-400">
+              <span className="text-[10px] px-1.5 py-0.5 bg-warn-soft text-warn rounded dark:bg-warn/30 dark:text-warn">
                 Não cadastrado
               </span>
             )}
@@ -184,7 +184,7 @@ export default function DRE() {
           previsto={summary.receitaLiquida.previsto}
           realizado={summary.receitaLiquida.realizado}
           icon={TrendingUp}
-          color="bg-emerald-600"
+          color="bg-ok"
         />
         <SummaryCard
           title="Custo c/ Pessoal"
@@ -198,14 +198,14 @@ export default function DRE() {
           previsto={summary.despesasOperacionais.previsto}
           realizado={summary.despesasOperacionais.realizado}
           icon={TrendingDown}
-          color="bg-orange-600"
+          color="bg-warn"
         />
         <SummaryCard
           title="Lucro/Prejuízo"
           previsto={summary.lucroPrejuizoLiquido.previsto}
           realizado={summary.lucroPrejuizoLiquido.realizado}
           icon={DollarSign}
-          color={summary.lucroPrejuizoLiquido.realizado >= 0 ? 'bg-emerald-600' : 'bg-red-600'}
+          color={summary.lucroPrejuizoLiquido.realizado >= 0 ? 'bg-ok' : 'bg-danger'}
         />
         <SummaryCard
           title="Fluxo de Caixa"

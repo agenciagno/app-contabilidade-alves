@@ -167,9 +167,9 @@ export function UnifiedStatementAccordion({ banks }: UnifiedStatementAccordionPr
               <p className="text-xs text-muted-foreground">Saldo Inicial</p>
               <p className="font-semibold text-sm mt-1">{formatCurrency(openingBalance)}</p>
             </div>
-            <div className="bg-green-500/5 rounded-lg p-3 border border-green-500/20">
+            <div className="bg-ok/5 rounded-lg p-3 border border-ok/20">
               <p className="text-xs text-muted-foreground">Total Entradas</p>
-              <p className="font-semibold text-sm text-green-500 mt-1">+{formatCurrency(totalIncome)}</p>
+              <p className="font-semibold text-sm text-ok mt-1">+{formatCurrency(totalIncome)}</p>
             </div>
             <div className="bg-destructive/5 rounded-lg p-3 border border-destructive/20">
               <p className="text-xs text-muted-foreground">Total Saídas</p>
@@ -201,7 +201,7 @@ export function UnifiedStatementAccordion({ banks }: UnifiedStatementAccordionPr
                   <div key={group.dateRaw} className="border border-border/50 rounded-lg overflow-hidden">
                     <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border/30">
                       <span className="text-xs font-semibold text-foreground">{group.dateLabel}</span>
-                      <span className={`text-xs font-bold ${group.dayBalance >= 0 ? 'text-green-500' : 'text-destructive'}`}>
+                      <span className={`text-xs font-bold ${group.dayBalance >= 0 ? 'text-ok' : 'text-destructive'}`}>
                         Saldo {formatCurrency(group.dayBalance)}
                       </span>
                     </div>
@@ -228,7 +228,7 @@ export function UnifiedStatementAccordion({ banks }: UnifiedStatementAccordionPr
                               </div>
                             </div>
                             <div className="text-right flex-shrink-0">
-                              <p className={`text-xs font-semibold ${row.type === 'receita' ? 'text-green-500' : 'text-destructive'}`}>
+                              <p className={`text-xs font-semibold ${row.type === 'receita' ? 'text-ok' : 'text-destructive'}`}>
                                 {row.type === 'receita' ? '+' : '-'}{formatCurrency(row.amount)}
                               </p>
                               <p className="text-[11px] text-muted-foreground">{formatCurrency(row.running_balance)}</p>

@@ -73,7 +73,7 @@ export function ContactContractsCard({ contactId }: ContactContractsCardProps) {
             </div>
             <div className="text-right">
               <p className={`font-semibold ${
-                recurring.type === 'receita' ? 'text-emerald-500' : 'text-red-500'
+                recurring.type === 'receita' ? 'text-ok' : 'text-danger'
               }`}>
                 {recurring.type === 'despesa' && '-'}
                 {formatCurrency(Number(recurring.amount))}

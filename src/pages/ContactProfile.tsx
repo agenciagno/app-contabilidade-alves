@@ -141,7 +141,7 @@ export default function ContactProfile() {
               )}
               <Badge
                 variant={isInadimplente ? 'destructive' : 'secondary'}
-                className={!isInadimplente ? 'bg-emerald-500/10 text-emerald-500' : ''}
+                className={!isInadimplente ? 'bg-ok/10 text-ok' : ''}
               >
                 {isInadimplente ? 'Inadimplente' : 'Adimplente'}
               </Badge>

@@ -241,7 +241,7 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
               )}
 
               {!duplicatedTenant && matchedContact && (
-                <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-400">
+                <div className="flex items-start gap-2 rounded-md border border-warn/30 bg-warn/10 p-2.5 text-xs text-warn dark:text-warn">
                   <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                   <span>
                     Esse documento já está na base contábil da CA como <strong>{matchedContact.name}</strong>.

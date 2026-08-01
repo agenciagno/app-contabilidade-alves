@@ -115,6 +115,12 @@ export default {
 
         'on-banner': 'var(--on-banner)',
 
+        // Estado de tarefa (Fiscal) — 4 etapas de fluxo, não juízo de valor
+        'state-todo': 'var(--state-todo)',
+        'state-doing': 'var(--state-doing)',
+        'state-waiting': 'var(--state-waiting)',
+        'state-done': 'var(--state-done)',
+
         ok: 'var(--ok)',
         warn: 'var(--warn)',
         danger: 'var(--danger)',

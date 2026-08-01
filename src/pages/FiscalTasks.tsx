@@ -581,12 +581,12 @@ export default function FiscalTasks() {
         >
           <Card
             className={cn(
-              'p-3 border-l-4 border-l-orange-500 bg-orange-500/5 hover:bg-orange-500/10 transition-colors h-full',
-              quickFilter === 'today' && 'ring-2 ring-orange-500',
+              'p-3 border-l-4 border-l-orange-500 bg-warn/5 hover:bg-warn/10 transition-colors h-full',
+              quickFilter === 'today' && 'ring-2 ring-warn',
             )}
           >
             <div className="text-xs font-medium text-muted-foreground">Vencem Hoje</div>
-            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">{kpis.dueToday}</div>
+            <div className="text-2xl font-bold text-warn dark:text-warn mt-1">{kpis.dueToday}</div>
           </Card>
         </button>
 
@@ -597,12 +597,12 @@ export default function FiscalTasks() {
         >
           <Card
             className={cn(
-              'p-3 border-l-4 border-l-yellow-500 bg-yellow-500/5 hover:bg-yellow-500/10 transition-colors h-full',
-              quickFilter === 'awaiting' && 'ring-2 ring-yellow-500',
+              'p-3 border-l-4 border-l-yellow-500 bg-warn/5 hover:bg-warn/10 transition-colors h-full',
+              quickFilter === 'awaiting' && 'ring-2 ring-warn',
             )}
           >
             <div className="text-xs font-medium text-muted-foreground">Aguardando Cliente +5 dias</div>
-            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">{kpis.awaiting}</div>
+            <div className="text-2xl font-bold text-warn dark:text-warn mt-1">{kpis.awaiting}</div>
           </Card>
         </button>
 
@@ -613,12 +613,12 @@ export default function FiscalTasks() {
         >
           <Card
             className={cn(
-              'p-3 border-l-4 border-l-green-500 bg-green-500/5 hover:bg-green-500/10 transition-colors h-full',
-              quickFilter === null && 'ring-2 ring-green-500',
+              'p-3 border-l-4 border-l-green-500 bg-ok/5 hover:bg-ok/10 transition-colors h-full',
+              quickFilter === null && 'ring-2 ring-ok',
             )}
           >
             <div className="text-xs font-medium text-muted-foreground">Progresso do Mês</div>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
+            <div className="text-2xl font-bold text-ok dark:text-ok mt-1">
               {kpis.pct}% <span className="text-sm font-normal text-muted-foreground">({kpis.doneMonth}/{kpis.totalMonth})</span>
             </div>
             <Progress value={kpis.pct} className="h-1.5 mt-2" />

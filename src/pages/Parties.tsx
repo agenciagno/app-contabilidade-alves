@@ -22,7 +22,7 @@ type TipoFilter = 'todos' | PartyTipo;
 
 const tipoBadge = (tipo: string) => {
   const map: Record<string, { label: string; className: string }> = {
-    cliente: { label: 'Cliente', className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
+    cliente: { label: 'Cliente', className: 'bg-ok/15 text-ok dark:text-ok' },
     fornecedor: { label: 'Fornecedor', className: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
     ambos: { label: 'Ambos', className: 'bg-purple-500/15 text-purple-700 dark:text-purple-400' },
   };

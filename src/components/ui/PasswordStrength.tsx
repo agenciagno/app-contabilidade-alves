@@ -35,11 +35,11 @@ export function PasswordStrength({ password, className }: PasswordStrengthProps)
       {requirements.map((req) => (
         <div key={req.label} className="flex items-center gap-2">
           {req.met ? (
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-ok flex-shrink-0" />
           ) : (
             <Circle className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
           )}
-          <span className={cn('text-xs', req.met ? 'text-emerald-600' : 'text-muted-foreground')}>
+          <span className={cn('text-xs', req.met ? 'text-ok' : 'text-muted-foreground')}>
             {req.label}
           </span>
         </div>

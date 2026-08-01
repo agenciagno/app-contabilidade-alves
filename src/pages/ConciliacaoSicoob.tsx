@@ -173,7 +173,7 @@ export default function ConciliacaoSicoob() {
             Extrato real da conta e comparativo com os dados do sistema — leitura e confirmação manual, sem baixa automática
           </p>
         </div>
-        <Badge variant="outline" className="gap-1.5 border-amber-500/40 text-amber-700 dark:text-amber-400 bg-amber-500/10">
+        <Badge variant="outline" className="gap-1.5 border-warn/40 text-warn dark:text-warn bg-warn/10">
           <FlaskConical className="h-3.5 w-3.5" /> Teste — confirme cada baixa manualmente
         </Badge>
       </div>
@@ -236,7 +236,7 @@ export default function ConciliacaoSicoob() {
             <TabsTrigger value="comparativo" className="gap-1.5">
               Comparativo
               {pendentesRevisao > 0 && (
-                <Badge variant="outline" className="h-5 px-1.5 border-amber-500/40 text-amber-700 dark:text-amber-400">
+                <Badge variant="outline" className="h-5 px-1.5 border-warn/40 text-warn dark:text-warn">
                   {pendentesRevisao}
                 </Badge>
               )}
@@ -411,7 +411,7 @@ export default function ConciliacaoSicoob() {
                                 <Badge className="bg-success/15 text-success border-success/30"><CheckCircle2 className="h-3 w-3 mr-1" />Já confirmado</Badge>
                               )}
                               {row.status === 'NAO_IDENTIFICADO' && row.lanc.tipo === 'CREDITO' && (
-                                <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30">
+                                <Badge className="bg-warn/15 text-warn dark:text-warn border-warn/30">
                                   <AlertTriangle className="h-3 w-3 mr-1" />Não identificado
                                 </Badge>
                               )}

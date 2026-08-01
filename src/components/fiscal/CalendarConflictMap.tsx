@@ -54,7 +54,7 @@ export function CalendarConflictMap({ rows, year, month }: Props) {
             </span>
           )}
           {criticalCount > 0 && (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400 ml-2">
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-danger dark:text-danger ml-2">
               <AlertTriangle className="h-3.5 w-3.5" />
               {criticalCount} dia(s) crítico(s)
             </span>
@@ -85,8 +85,8 @@ export function CalendarConflictMap({ rows, year, month }: Props) {
                   <div
                     className={cn(
                       'aspect-square rounded-md border text-xs p-1.5 flex flex-col items-start justify-between transition-colors',
-                      conflict && 'bg-amber-100 dark:bg-amber-900/30 border-amber-500/40',
-                      critical && 'bg-red-100 dark:bg-red-900/30 border-red-500/50',
+                      conflict && 'bg-warn-soft dark:bg-warn/30 border-warn/40',
+                      critical && 'bg-danger-soft dark:bg-danger/30 border-danger/50',
                       !conflict && !critical && count === 0 && 'bg-muted/30 border-border/40',
                       !conflict && !critical && count === 1 && 'bg-background border-border/60',
                     )}
@@ -96,8 +96,8 @@ export function CalendarConflictMap({ rows, year, month }: Props) {
                       <span
                         className={cn(
                           'text-[10px] font-semibold self-end',
-                          critical && 'text-red-700 dark:text-red-400',
-                          conflict && 'text-amber-700 dark:text-amber-400',
+                          critical && 'text-danger dark:text-danger',
+                          conflict && 'text-warn dark:text-warn',
                         )}
                       >
                         {count} obrig.
@@ -115,7 +115,7 @@ export function CalendarConflictMap({ rows, year, month }: Props) {
                     <TooltipContent side="top" className="max-w-xs">
                       <p className="font-medium mb-1">
                         {format(day, "dd 'de' MMMM", { locale: ptBR })} — {count} obrigação(ões)
-                        {critical && <span className="text-red-300 ml-2">⚠ Dia crítico</span>}
+                        {critical && <span className="text-danger ml-2">⚠ Dia crítico</span>}
                       </p>
                       <ul className="text-xs space-y-0.5">
                         {items.map((r) => (

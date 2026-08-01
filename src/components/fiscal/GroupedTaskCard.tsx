@@ -40,9 +40,9 @@ function daysLeft(dateStr: string): number {
 function getDueDateColor(dueDate: string) {
   const d = daysLeft(dueDate);
   if (d < 0) return { bg: 'bg-destructive/10', text: 'text-destructive', border: 'border-destructive/30' };
-  if (d <= 2) return { bg: 'bg-orange-500/10', text: 'text-orange-600', border: 'border-orange-500/30' };
-  if (d <= 6) return { bg: 'bg-yellow-500/10', text: 'text-yellow-600', border: 'border-yellow-500/30' };
-  return { bg: 'bg-emerald-500/10', text: 'text-emerald-600', border: 'border-emerald-500/30' };
+  if (d <= 2) return { bg: 'bg-state-doing/10', text: 'text-state-doing', border: 'border-state-doing/30' };
+  if (d <= 6) return { bg: 'bg-state-waiting/10', text: 'text-state-waiting', border: 'border-state-waiting/30' };
+  return { bg: 'bg-ok/10', text: 'text-ok', border: 'border-ok/30' };
 }
 
 export function GroupedTaskCard({
@@ -72,7 +72,7 @@ export function GroupedTaskCard({
   // Na coluna "Aguardando Cliente" o alerta de vencido é amarelo (aviso), não vermelho
   // (vermelho fica reservado para as colunas de trabalho ativo).
   const overdueBorderClass = columnId === 'aguardando_cliente'
-    ? 'border-amber-500 border-2 shadow-[0_0_0_1px_hsl(38_92%_50%/0.15)]'
+    ? 'border-warn border-2 shadow-[0_0_0_1px_hsl(38_92%_50%/0.15)]'
     : 'border-destructive border-2 shadow-[0_0_0_1px_hsl(var(--destructive)/0.15)]';
 
   // Badge date: min due among pending; hide when all done
@@ -123,7 +123,7 @@ export function GroupedTaskCard({
           </div>
           <div className="flex items-center justify-between gap-2">
             {allDone ? (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 border-emerald-500/30 gap-1">
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-ok/10 text-ok border-ok/30 gap-1">
                 <CheckCircle2 className="w-3 h-3" /> Concluído
               </Badge>
             ) : (
@@ -155,7 +155,7 @@ export function GroupedTaskCard({
                 key={task.id}
                 className={cn(
                   'flex items-center gap-2 text-xs rounded px-1.5 py-1 border',
-                  done && 'bg-emerald-500/10 border-emerald-500/30',
+                  done && 'bg-ok/10 border-ok/30',
                   !done && overdue && 'bg-destructive/10 border-destructive/40',
                   !done && !overdue && 'border-transparent',
                 )}
@@ -166,7 +166,7 @@ export function GroupedTaskCard({
                     if (next && !done) setCompletingTask(task);
                     else if (!next && done) onUncompleteTask?.(task);
                   }}
-                  className="h-3.5 w-3.5 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                  className="h-3.5 w-3.5 data-[state=checked]:bg-ok data-[state=checked]:border-ok"
                 />
                 <span className={cn('flex-1 truncate', done && 'line-through text-muted-foreground')}>
                   {task.title}
@@ -180,7 +180,7 @@ export function GroupedTaskCard({
                   {itemDate && format(parseISO(itemDate), 'dd/MM', { locale: ptBR })}
                 </span>
                 {done ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-ok shrink-0" />
                 ) : overdue ? (
                   <>
                     <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0" />

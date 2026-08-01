@@ -22,8 +22,8 @@ const isImage = (fileType: string | null) => {
 
 const getFileIcon = (fileType: string | null) => {
   const type = fileType?.toLowerCase();
-  if (type === 'pdf') return <FileText className="h-16 w-16 text-red-500" />;
-  if (['xls', 'xlsx', 'csv'].includes(type || '')) return <FileSpreadsheet className="h-16 w-16 text-emerald-500" />;
+  if (type === 'pdf') return <FileText className="h-16 w-16 text-danger" />;
+  if (['xls', 'xlsx', 'csv'].includes(type || '')) return <FileSpreadsheet className="h-16 w-16 text-ok" />;
   return <File className="h-16 w-16 text-muted-foreground" />;
 };
 

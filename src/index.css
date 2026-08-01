@@ -63,6 +63,16 @@
     --warn-soft: #fdf2ea;
     --danger-soft: #ffece9;
 
+    /* Estado de tarefa do Fiscal — extensão do DS, não vem do Figma.
+       O DS tem 4 tons de status (ok/warn/danger) que dizem "está bom / atenção /
+       ruim". Estado de tarefa é outra coisa: são 4 etapas de um fluxo, todas
+       neutras em juízo, e precisam de matizes distintos para o Kanban funcionar.
+       Ancorados nos valores que já estavam em uso para não deslocar o visual. */
+    --state-todo: #2563eb;    /* 5.17:1 sobre branco */
+    --state-doing: #c2410c;   /* 5.18:1 — o laranja anterior dava 3.56, abaixo de AA */
+    --state-waiting: #a16207; /* 4.92:1 — o amarelo anterior dava 2.94 */
+    --state-done: #059669;
+
     /* Banner de marca — superfície escura fixa, IGUAL nos dois modos.
        Não usar --brand/--ink aqui: eles invertem no escuro e o texto sumiria.
        Por isso estes três ficam só no :root e não são redefinidos em .dark. */
@@ -197,6 +207,12 @@
     --ok-soft: #1f3126;
     --warn-soft: #3c2a1d;
     --danger-soft: #3e201d;
+
+    /* Estado de tarefa — mais claros no escuro, senão somem no fundo #0a0a0a */
+    --state-todo: #60a5fa;
+    --state-doing: #fb923c;
+    --state-waiting: #facc15;
+    --state-done: #34d17f;
 
     --shadow-sm: 0 1px 0 #262626;
     --shadow-md: 0 1px 0 #262626, 0 8px 24px -10px rgb(0 0 0 / .3);

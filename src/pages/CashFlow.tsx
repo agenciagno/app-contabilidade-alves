@@ -209,11 +209,11 @@ export default function CashFlow() {
           loading={isLoading}
         />
         <KpiCard
-          icon={<TrendingUp className="w-4 h-4 text-emerald-600" />}
+          icon={<TrendingUp className="w-4 h-4 text-ok" />}
           title="Entradas previstas"
           value={entradasTotal}
           loading={isLoading}
-          valueClass="text-emerald-600"
+          valueClass="text-ok"
         />
         <KpiCard
           icon={<TrendingDown className="w-4 h-4 text-destructive" />}
@@ -300,7 +300,7 @@ export default function CashFlow() {
                 {buckets.map((b) => (
                   <TableRow key={b.key}>
                     <TableCell className="font-medium">{b.label}</TableCell>
-                    <TableCell className="text-right text-emerald-600">
+                    <TableCell className="text-right text-ok">
                       {b.entradas ? brl(b.entradas) : '—'}
                     </TableCell>
                     <TableCell className="text-right text-destructive">
@@ -309,7 +309,7 @@ export default function CashFlow() {
                     <TableCell
                       className={cn(
                         'text-right font-medium',
-                        b.resultado < 0 ? 'text-destructive' : b.resultado > 0 ? 'text-emerald-600' : '',
+                        b.resultado < 0 ? 'text-destructive' : b.resultado > 0 ? 'text-ok' : '',
                       )}
                     >
                       {brl(b.resultado)}

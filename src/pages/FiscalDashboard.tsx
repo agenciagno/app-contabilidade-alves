@@ -115,12 +115,12 @@ function KpiCard({
 
 function StatusBadge({ status, isLate }: { status: string; isLate: boolean }) {
   if (isLate) {
-    return <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30 hover:bg-red-500/20">Atrasado</Badge>;
+    return <Badge className="bg-danger/15 text-danger dark:text-danger border-danger/30 hover:bg-danger/20">Atrasado</Badge>;
   }
-  if (status === 'em_progresso') return <Badge className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30 hover:bg-orange-500/20">Em andamento</Badge>;
-  if (status === 'aguardando_cliente') return <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/20">Aguardando</Badge>;
+  if (status === 'em_progresso') return <Badge className="bg-warn/15 text-warn dark:text-warn border-warn/30 hover:bg-warn/20">Em andamento</Badge>;
+  if (status === 'aguardando_cliente') return <Badge className="bg-warn/15 text-warn dark:text-warn border-warn/30 hover:bg-warn/20">Aguardando</Badge>;
   if (status === 'a_fazer') return <Badge className="bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/20">A Fazer</Badge>;
-  if (status === 'concluido') return <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20">Concluído</Badge>;
+  if (status === 'concluido') return <Badge className="bg-ok/15 text-ok dark:text-ok border-ok/30 hover:bg-ok/20">Concluído</Badge>;
   return <Badge variant="secondary">{status}</Badge>;
 }
 
@@ -197,9 +197,9 @@ function RiskRadarCard({
     color: string;
     bg: string;
   }> = [
-    { key: 'critico', icon: '🔴', label: 'Crítico', list: critico, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10 hover:bg-red-500/15 border-red-500/30' },
-    { key: 'atencao', icon: '🟡', label: 'Atenção', list: atencao, color: 'text-yellow-700 dark:text-yellow-400', bg: 'bg-yellow-500/10 hover:bg-yellow-500/15 border-yellow-500/30' },
-    { key: 'regular', icon: '🟢', label: 'Regular', list: regular, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-500/10 hover:bg-green-500/15 border-green-500/30' },
+    { key: 'critico', icon: '🔴', label: 'Crítico', list: critico, color: 'text-danger dark:text-danger', bg: 'bg-danger/10 hover:bg-danger/15 border-danger/30' },
+    { key: 'atencao', icon: '🟡', label: 'Atenção', list: atencao, color: 'text-warn dark:text-warn', bg: 'bg-warn/10 hover:bg-warn/15 border-warn/30' },
+    { key: 'regular', icon: '🟢', label: 'Regular', list: regular, color: 'text-ok dark:text-ok', bg: 'bg-ok/10 hover:bg-ok/15 border-ok/30' },
   ];
 
   const active = bands.find((b) => b.key === openBand);
@@ -208,7 +208,7 @@ function RiskRadarCard({
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
-          <ShieldAlert className="h-5 w-5 text-orange-500" />
+          <ShieldAlert className="h-5 w-5 text-warn" />
           Radar de Risco
         </CardTitle>
       </CardHeader>
@@ -271,7 +271,7 @@ function RiskRadarCard({
                           </div>
                           {active.key !== 'regular' ? (
                             <div className="flex items-center gap-2 shrink-0">
-                              <Badge variant="secondary" className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">
+                              <Badge variant="secondary" className="bg-danger/15 text-danger dark:text-danger border-danger/30">
                                 {c.atrasadas} atrasada{c.atrasadas > 1 ? 's' : ''}
                               </Badge>
                               <Badge variant="outline" className="text-xs">
@@ -433,8 +433,8 @@ export default function FiscalDashboard() {
 
       {/* Sem responsável banner */}
       {semResponsavel > 0 && (
-        <Alert className="bg-yellow-500/10 border-yellow-500/40">
-          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+        <Alert className="bg-warn/10 border-warn/40">
+          <AlertTriangle className="h-4 w-4 text-warn" />
           <AlertDescription className="flex items-center justify-between gap-3 w-full">
             <span className="font-medium">
               {semResponsavel} {semResponsavel === 1 ? 'tarefa' : 'tarefas'} sem responsável atribuído
@@ -454,9 +454,9 @@ export default function FiscalDashboard() {
       {/* KPIs row 1 — 4 cards compactos */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard label="Pendentes" value={kpis.pendentes} icon={Clock} borderClass="border-l-blue-500" iconClass="text-blue-500" />
-        <KpiCard label="Em andamento" value={kpis.emAndamento} icon={ListChecks} borderClass="border-l-orange-500" iconClass="text-orange-500" />
-        <KpiCard label="Atrasadas" value={kpis.atrasadas} icon={AlertTriangle} borderClass="border-l-red-500" iconClass="text-red-500" />
-        <KpiCard label="Concluídas" value={kpis.concluidas} icon={CheckCircle2} borderClass="border-l-green-500" iconClass="text-green-500" />
+        <KpiCard label="Em andamento" value={kpis.emAndamento} icon={ListChecks} borderClass="border-l-orange-500" iconClass="text-warn" />
+        <KpiCard label="Atrasadas" value={kpis.atrasadas} icon={AlertTriangle} borderClass="border-l-red-500" iconClass="text-danger" />
+        <KpiCard label="Concluídas" value={kpis.concluidas} icon={CheckCircle2} borderClass="border-l-green-500" iconClass="text-ok" />
       </div>
 
       {/* Próximos Vencimentos */}
@@ -512,7 +512,7 @@ export default function FiscalDashboard() {
             <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : upcomingTasks.length === 0 ? (
             <div className="flex items-center gap-3 py-6 text-muted-foreground">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              <CheckCircle2 className="h-5 w-5 text-ok" />
               <span>Nenhuma obrigação vencendo no período selecionado</span>
             </div>
           ) : (
@@ -675,9 +675,9 @@ function ClientPendenciesSection({
   );
 
   const trafficLight = (atrasadas: number) => {
-    if (atrasadas >= 3) return 'bg-red-500';
-    if (atrasadas >= 1) return 'bg-yellow-500';
-    return 'bg-green-500';
+    if (atrasadas >= 3) return 'bg-danger';
+    if (atrasadas >= 1) return 'bg-warn';
+    return 'bg-ok';
   };
 
   return (
@@ -733,7 +733,7 @@ function ClientPendenciesSection({
                   <TableCell className="text-right tabular-nums">{r.aguardando}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {r.atrasadas > 0 ? (
-                      <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30">{r.atrasadas}</Badge>
+                      <Badge className="bg-danger/15 text-danger dark:text-danger border-danger/30">{r.atrasadas}</Badge>
                     ) : (
                       <span className="text-muted-foreground">0</span>
                     )}
@@ -742,9 +742,9 @@ function ClientPendenciesSection({
                   <TableCell className="text-right tabular-nums">
                     <span className={cn(
                       'font-medium',
-                      r.compliance >= 90 ? 'text-green-600 dark:text-green-400'
-                        : r.compliance >= 70 ? 'text-yellow-600 dark:text-yellow-400'
-                        : 'text-red-600 dark:text-red-400',
+                      r.compliance >= 90 ? 'text-ok dark:text-ok'
+                        : r.compliance >= 70 ? 'text-warn dark:text-warn'
+                        : 'text-danger dark:text-danger',
                     )}>
                       {r.compliance}%
                     </span>

@@ -40,7 +40,7 @@ export function DiagnosticoResultado({
       {/* Resumo executivo — a resposta em uma olhada */}
       <Card
         className={
-          noUnificado ? 'border-primary/40' : subiu ? 'border-destructive/40' : 'border-emerald-500/40'
+          noUnificado ? 'border-primary/40' : subiu ? 'border-destructive/40' : 'border-ok/40'
         }
       >
         <CardContent className="pt-6">
@@ -50,7 +50,7 @@ export function DiagnosticoResultado({
                 {noUnificado || semMudanca ? null : subiu ? (
                   <TrendingUp className="h-5 w-5 text-destructive" />
                 ) : (
-                  <TrendingDown className="h-5 w-5 text-emerald-600" />
+                  <TrendingDown className="h-5 w-5 text-ok" />
                 )}
                 <span className="text-sm font-medium text-muted-foreground">
                   {nomeEmpresa}
@@ -76,7 +76,7 @@ export function DiagnosticoResultado({
                 </p>
               ) : (
                 !semMudanca && (
-                  <p className={`text-3xl font-bold ${subiu ? 'text-destructive' : 'text-emerald-600'}`}>
+                  <p className={`text-3xl font-bold ${subiu ? 'text-destructive' : 'text-ok'}`}>
                     {subiu ? '+' : '−'}{brl(mes(Math.abs(d.variacaoValor)))}
                     <span className="ml-2 text-base font-medium text-muted-foreground">
                       por mês ({subiu ? '+' : '−'}{Math.abs(d.variacaoPercentual * 100).toFixed(1).replace('.', ',')}%) ·{' '}
@@ -167,10 +167,10 @@ export function DiagnosticoResultado({
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="py-1.5 text-xs text-emerald-600">
+                  <TableCell className="py-1.5 text-xs text-ok">
                     Crédito das compras
                   </TableCell>
-                  <TableCell className="py-1.5 text-right text-xs tabular-nums text-emerald-600">
+                  <TableCell className="py-1.5 text-right text-xs tabular-nums text-ok">
                     − {brl(mes(d.posReforma.credito))}/mês
                   </TableCell>
                 </TableRow>
@@ -250,7 +250,7 @@ export function DiagnosticoResultado({
           </Table>
 
           {d.economiaMigracao > 0 && d.melhorRegime && (
-            <p className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">
+            <p className="rounded-md bg-ok/10 p-3 text-sm text-ok dark:text-ok">
               Migrar para {d.melhorRegime.label} economizaria cerca de{' '}
               <strong>{brl(mes(d.economiaMigracao))} por mês</strong> ({brl(d.economiaMigracao)} no
               ano). Vale confirmar com uma análise
@@ -346,10 +346,10 @@ export function DiagnosticoResultado({
       </Card>
 
       {/* Alertas e disclaimer */}
-      <Card className="border-amber-500/40">
+      <Card className="border-warn/40">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertTriangle className="h-4 w-4 text-warn" />
             O que observar
           </CardTitle>
         </CardHeader>

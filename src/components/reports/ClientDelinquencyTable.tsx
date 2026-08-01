@@ -21,9 +21,9 @@ const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 const getSeverityBadge = (days: number) => {
-  if (days > 60) return { label: 'Crítico', className: 'bg-red-500/10 text-red-500 border-red-500/20' };
-  if (days > 30) return { label: 'Alto', className: 'bg-orange-500/10 text-orange-500 border-orange-500/20' };
-  if (days > 15) return { label: 'Médio', className: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' };
+  if (days > 60) return { label: 'Crítico', className: 'bg-danger/10 text-danger border-danger/20' };
+  if (days > 30) return { label: 'Alto', className: 'bg-warn/10 text-warn border-warn/20' };
+  if (days > 15) return { label: 'Médio', className: 'bg-warn/10 text-warn border-warn/20' };
   return { label: 'Baixo', className: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
 };
 
@@ -48,11 +48,11 @@ export function ClientDelinquencyTable({ clients }: ClientDelinquencyTableProps)
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-orange-500" />
+            <AlertTriangle className="h-4 w-4 text-warn" />
             Inadimplência por Cliente
           </CardTitle>
           {clients.length > 0 && (
-            <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/20">
+            <Badge variant="outline" className="bg-danger/10 text-danger border-danger/20">
               Total: {formatCurrency(totalOpenAmount)}
             </Badge>
           )}
@@ -90,7 +90,7 @@ export function ClientDelinquencyTable({ clients }: ClientDelinquencyTableProps)
                           <span className="font-medium">{client.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-red-500">
+                      <TableCell className="text-right font-semibold text-danger">
                         {formatCurrency(client.openAmount)}
                       </TableCell>
                       <TableCell className="text-center">
@@ -106,7 +106,7 @@ export function ClientDelinquencyTable({ clients }: ClientDelinquencyTableProps)
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10"
+                          className="h-8 w-8 text-ok hover:text-ok hover:bg-ok/10"
                           onClick={() => handleWhatsApp(client)}
                           title="Enviar WhatsApp"
                         >

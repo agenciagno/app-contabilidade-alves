@@ -88,12 +88,12 @@ export function ContactFinancialTab({ contactId, contactName }: ContactFinancial
         <Card className="bg-card border-border/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 rounded-lg bg-emerald-500/10">
-                <TrendingUp className="h-5 w-5 text-emerald-500" />
+              <div className="p-2 rounded-lg bg-ok/10">
+                <TrendingUp className="h-5 w-5 text-ok" />
               </div>
               <span className="text-sm text-muted-foreground">Total Pago</span>
             </div>
-            <p className="text-2xl font-bold text-emerald-500">
+            <p className="text-2xl font-bold text-ok">
               {formatCurrency(summary.totalPago)}
             </p>
           </CardContent>
@@ -102,12 +102,12 @@ export function ContactFinancialTab({ contactId, contactName }: ContactFinancial
         <Card className="bg-card border-border/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 rounded-lg bg-yellow-500/10">
-                <Clock className="h-5 w-5 text-yellow-500" />
+              <div className="p-2 rounded-lg bg-warn/10">
+                <Clock className="h-5 w-5 text-warn" />
               </div>
               <span className="text-sm text-muted-foreground">Total Pendente</span>
             </div>
-            <p className="text-2xl font-bold text-yellow-500">
+            <p className="text-2xl font-bold text-warn">
               {formatCurrency(summary.totalPendente)}
             </p>
           </CardContent>
@@ -116,12 +116,12 @@ export function ContactFinancialTab({ contactId, contactName }: ContactFinancial
         <Card className="bg-card border-border/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 rounded-lg bg-red-500/10">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
+              <div className="p-2 rounded-lg bg-danger/10">
+                <AlertTriangle className="h-5 w-5 text-danger" />
               </div>
               <span className="text-sm text-muted-foreground">Total Vencido</span>
             </div>
-            <p className="text-2xl font-bold text-red-500">
+            <p className="text-2xl font-bold text-danger">
               {formatCurrency(summary.totalVencido)}
             </p>
           </CardContent>
@@ -174,7 +174,7 @@ export function ContactFinancialTab({ contactId, contactName }: ContactFinancial
                       </TableCell>
                       <TableCell className="font-medium">{transaction.description}</TableCell>
                       <TableCell className={`text-right font-medium ${
-                        transaction.type === 'receita' ? 'text-emerald-500' : 'text-red-500'
+                        transaction.type === 'receita' ? 'text-ok' : 'text-danger'
                       }`}>
                         {transaction.type === 'despesa' && '-'}
                         {formatCurrency(Number(transaction.amount))}
@@ -187,13 +187,13 @@ export function ContactFinancialTab({ contactId, contactName }: ContactFinancial
                       </TableCell>
                       <TableCell>
                         {transaction.is_paid ? (
-                          <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500">
+                          <Badge variant="secondary" className="bg-ok/10 text-ok">
                             Pago
                           </Badge>
                         ) : isOverdue ? (
                           <Badge variant="destructive">Vencido</Badge>
                         ) : (
-                          <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-500">
+                          <Badge variant="secondary" className="bg-warn/10 text-warn">
                             Pendente
                           </Badge>
                         )}

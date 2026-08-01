@@ -65,7 +65,7 @@ const REGIME_BADGE: Record<
     label: 'SN',
     full: 'Simples Nacional',
     className:
-      'bg-emerald-500/15 text-emerald-700 border-emerald-500/30 dark:text-emerald-400',
+      'bg-ok/15 text-ok border-ok/30 dark:text-ok',
   },
   lucro_presumido: {
     label: 'LP',
@@ -83,7 +83,7 @@ const REGIME_BADGE: Record<
     label: 'MEI',
     full: 'MEI',
     className:
-      'bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-400',
+      'bg-warn/15 text-warn border-warn/30 dark:text-warn',
   },
 };
 

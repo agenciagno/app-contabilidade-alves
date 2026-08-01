@@ -21,10 +21,10 @@ const STATUS_OPTIONS = [
 ];
 
 const statusBadgeClass: Record<string, string> = {
-  a_fazer: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30',
-  aguardando_cliente: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30',
-  em_progresso: 'bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30',
-  concluido: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
+  a_fazer: 'bg-state-todo/15 text-state-todo dark:text-state-todo border-state-todo/30',
+  aguardando_cliente: 'bg-state-waiting/15 text-state-waiting dark:text-state-waiting border-state-waiting/30',
+  em_progresso: 'bg-state-doing/15 text-state-doing dark:text-state-doing border-state-doing/30',
+  concluido: 'bg-ok/15 text-ok dark:text-ok border-ok/30',
 };
 
 type Mode = 'mine' | 'overview';
@@ -220,7 +220,7 @@ function buildUrgencySections(
           badgeFor={(t) => {
             const days = Math.abs(differenceInCalendarDays(parseISO(t.due_date), today));
             return (
-              <Badge variant="outline" className="text-[10px] bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30 inline-flex items-center gap-1">
+              <Badge variant="outline" className="text-[10px] bg-danger/15 text-danger dark:text-danger border-danger/30 inline-flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" /> {days} dia{days === 1 ? '' : 's'} de atraso
               </Badge>
             );
@@ -234,7 +234,7 @@ function buildUrgencySections(
           onTaskClick={onTaskClick}
           onUploadAttachment={onUploadAttachment}
           badgeFor={() => (
-            <Badge variant="outline" className="text-[10px] bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30 inline-flex items-center gap-1">
+            <Badge variant="outline" className="text-[10px] bg-state-doing/15 text-state-doing dark:text-state-doing border-state-doing/30 inline-flex items-center gap-1">
               <Clock className="w-3 h-3" /> Hoje
             </Badge>
           )}
@@ -247,7 +247,7 @@ function buildUrgencySections(
           onTaskClick={onTaskClick}
           onUploadAttachment={onUploadAttachment}
           badgeFor={(t) => (
-            <Badge variant="outline" className="text-[10px] bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
+            <Badge variant="outline" className="text-[10px] bg-state-waiting/15 text-state-waiting dark:text-state-waiting border-state-waiting/30">
               {format(parseISO(t.due_date), 'dd/MM', { locale: ptBR })}
             </Badge>
           )}
@@ -347,7 +347,7 @@ export function MyDayView({
           if (pending.length === 0) {
             return (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <CheckCircle className="w-12 h-12 text-emerald-500 mb-3" />
+                <CheckCircle className="w-12 h-12 text-ok mb-3" />
                 <p className="text-base font-medium text-foreground">Tudo em dia!</p>
                 <p className="text-sm text-muted-foreground">Nenhuma tarefa pendente.</p>
               </div>

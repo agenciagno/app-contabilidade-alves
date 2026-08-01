@@ -27,10 +27,10 @@ import { fiscalTaskContactLabel } from '@/lib/fiscal-filters';
 import { cn } from '@/lib/utils';
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
-  a_fazer: { label: 'A Fazer', className: 'bg-blue-500/10 text-blue-600 border-blue-500/30' },
-  aguardando_cliente: { label: 'Aguardando', className: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30' },
-  em_progresso: { label: 'Em Progresso', className: 'bg-orange-500/10 text-orange-600 border-orange-500/30' },
-  concluido: { label: 'Concluído', className: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' },
+  a_fazer: { label: 'A Fazer', className: 'bg-state-todo/10 text-state-todo border-state-todo/30' },
+  aguardando_cliente: { label: 'Aguardando', className: 'bg-state-waiting/10 text-state-waiting border-state-waiting/30' },
+  em_progresso: { label: 'Em Progresso', className: 'bg-state-doing/10 text-state-doing border-state-doing/30' },
+  concluido: { label: 'Concluído', className: 'bg-ok/10 text-ok border-ok/30' },
 };
 
 function getDueDateColor(dueDate: string) {
@@ -38,9 +38,9 @@ function getDueDateColor(dueDate: string) {
   today.setHours(0, 0, 0, 0);
   const daysLeft = differenceInDays(parseISO(dueDate), today);
   if (daysLeft < 0) return 'text-destructive';
-  if (daysLeft <= 2) return 'text-orange-600';
-  if (daysLeft <= 6) return 'text-yellow-600';
-  return 'text-emerald-600';
+  if (daysLeft <= 2) return 'text-state-doing';
+  if (daysLeft <= 6) return 'text-state-waiting';
+  return 'text-ok';
 }
 
 interface ProfileOption { id: string; name: string }

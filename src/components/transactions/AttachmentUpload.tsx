@@ -18,7 +18,7 @@ interface AttachmentUploadProps {
 function getFileIcon(type: string | null) {
   if (!type) return <File className="w-4 h-4" />;
   if (type.startsWith('image/')) return <Image className="w-4 h-4" />;
-  if (type.includes('pdf')) return <FileText className="w-4 h-4 text-red-500" />;
+  if (type.includes('pdf')) return <FileText className="w-4 h-4 text-danger" />;
   return <FileText className="w-4 h-4" />;
 }
 

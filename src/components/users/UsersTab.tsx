@@ -207,13 +207,13 @@ export default function UsersTab({ companyId, currentUserId }: UsersTabProps) {
                   <TableCell>
                     {(user.status ?? 'active') === 'pending' ? (
                       <div className="flex items-center gap-1.5">
-                        <Badge className="bg-yellow-500/15 text-yellow-600 hover:bg-yellow-500/20 border-yellow-500/20">
+                        <Badge className="bg-warn/15 text-warn hover:bg-warn/20 border-warn/20">
                           Aguardando aprovação
                         </Badge>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-500/10"
+                          className="h-7 w-7 text-ok hover:text-ok hover:bg-ok/10"
                           title="Aprovar"
                           disabled={updateStatus.isPending}
                           onClick={() => updateStatus.mutate({ userId: user.user_id, status: 'active' })}

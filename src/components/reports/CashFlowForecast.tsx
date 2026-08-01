@@ -115,25 +115,25 @@ export function CashFlowForecast() {
             <p className={`text-xl font-bold ${finalBalance >= 0 ? 'text-foreground' : 'text-destructive'}`}>
               {formatCurrency(finalBalance)}
             </p>
-            <p className={`text-xs flex items-center gap-1 ${balanceChange >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+            <p className={`text-xs flex items-center gap-1 ${balanceChange >= 0 ? 'text-ok' : 'text-danger'}`}>
               {balanceChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
               {balanceChange >= 0 ? '+' : ''}{balanceChangePercent}%
             </p>
           </div>
-          <div className="bg-emerald-500/10 rounded-lg p-4">
-            <p className="text-sm text-emerald-600">A Receber</p>
-            <p className="text-xl font-bold text-emerald-500">{formatCurrency(totalReceitas)}</p>
+          <div className="bg-ok/10 rounded-lg p-4">
+            <p className="text-sm text-ok">A Receber</p>
+            <p className="text-xl font-bold text-ok">{formatCurrency(totalReceitas)}</p>
           </div>
-          <div className="bg-red-500/10 rounded-lg p-4">
-            <p className="text-sm text-red-600">A Pagar</p>
-            <p className="text-xl font-bold text-red-500">{formatCurrency(totalDespesas)}</p>
+          <div className="bg-danger/10 rounded-lg p-4">
+            <p className="text-sm text-danger">A Pagar</p>
+            <p className="text-xl font-bold text-danger">{formatCurrency(totalDespesas)}</p>
           </div>
         </div>
 
         {/* Chart — Realizado (passado, linha cheia) × Projetado (futuro, tracejado) */}
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-primary" /> Realizado</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block w-4 border-t-2 border-dashed border-amber-500" /> Projetado</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-4 border-t-2 border-dashed border-warn" /> Projetado</span>
         </div>
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
@@ -186,11 +186,11 @@ export function CashFlowForecast() {
               <div 
                 key={week.week} 
                 className={`rounded-lg p-3 text-center ${
-                  week.saldo >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10'
+                  week.saldo >= 0 ? 'bg-ok/10' : 'bg-danger/10'
                 }`}
               >
                 <p className="text-xs text-muted-foreground">{week.label}</p>
-                <p className={`text-sm font-bold ${week.saldo >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                <p className={`text-sm font-bold ${week.saldo >= 0 ? 'text-ok' : 'text-danger'}`}>
                   {week.saldo >= 0 ? '+' : ''}{formatCurrency(week.saldo)}
                 </p>
               </div>
@@ -238,9 +238,9 @@ export function CashFlowForecast() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {t.type === 'receita' ? (
-                            <TrendingUp className="h-4 w-4 text-emerald-500" />
+                            <TrendingUp className="h-4 w-4 text-ok" />
                           ) : (
-                            <TrendingDown className="h-4 w-4 text-red-500" />
+                            <TrendingDown className="h-4 w-4 text-danger" />
                           )}
                           <span className="text-sm">{t.description}</span>
                           {t.isRecurring && (
@@ -260,7 +260,7 @@ export function CashFlowForecast() {
                         )}
                       </TableCell>
                       <TableCell className={`text-right font-medium ${
-                        t.type === 'receita' ? 'text-emerald-500' : 'text-red-500'
+                        t.type === 'receita' ? 'text-ok' : 'text-danger'
                       }`}>
                         {t.type === 'receita' ? '+' : '-'}{formatCurrency(t.amount)}
                       </TableCell>
