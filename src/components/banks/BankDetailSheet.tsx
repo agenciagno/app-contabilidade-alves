@@ -113,7 +113,7 @@ export function BankDetailSheet({ bank, open, onOpenChange }: BankDetailSheetPro
                     .join(' • ')}
                 </p>
               )}
-              <p className={`text-2xl font-bold mt-2 ${closingBalance >= 0 ? 'text-ok' : 'text-destructive'}`}>
+              <p className={`text-h3-section mt-2 ${closingBalance >= 0 ? 'text-ok' : 'text-destructive'}`}>
                 {formatCurrency(closingBalance)}
               </p>
             </div>

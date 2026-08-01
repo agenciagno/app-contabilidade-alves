@@ -72,8 +72,8 @@ export default function PartiesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Financeiro · Cadastros</p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Clientes & Fornecedores.</h1>
+          <p className="text-kicker uppercase text-muted-foreground">Financeiro · Cadastros</p>
+          <h1 className="text-display text-foreground">Clientes & Fornecedores.</h1>
           <p className="text-[14px] text-muted-foreground">Contrapartes utilizadas em lançamentos financeiros.</p>
         </div>
         <Button onClick={openNew} className="gap-2">

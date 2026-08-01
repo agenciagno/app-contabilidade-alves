@@ -71,7 +71,7 @@ export function NewClients2026Tab({ contacts }: NewClients2026TabProps) {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Total de Novos Clientes</p>
-              <p className="text-2xl font-bold text-foreground">{totalClients}</p>
+              <p className="text-h3-section text-foreground">{totalClients}</p>
             </div>
           </CardContent>
         </Card>
@@ -82,7 +82,7 @@ export function NewClients2026Tab({ contacts }: NewClients2026TabProps) {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Receita de Novos Honorários</p>
-              <p className="text-2xl font-bold text-foreground">{formatCurrency(totalRevenue)}</p>
+              <p className="text-h3-section text-foreground">{formatCurrency(totalRevenue)}</p>
             </div>
           </CardContent>
         </Card>

@@ -175,8 +175,8 @@ export default function CashFlow() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Financeiro · Projeção</p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Fluxo de Caixa.</h1>
+          <p className="text-kicker uppercase text-muted-foreground">Financeiro · Projeção</p>
+          <h1 className="text-display text-foreground">Fluxo de Caixa.</h1>
           <p className="text-[14px] text-muted-foreground">
             Projeção do saldo com base nos bancos e nas contas a pagar/receber em aberto.
           </p>

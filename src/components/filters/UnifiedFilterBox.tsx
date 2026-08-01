@@ -193,7 +193,7 @@ export function UnifiedFilterBox({
             <div className="p-3 space-y-3">
               {/* Quick shortcuts */}
               <div className="space-y-1">
-                <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground px-2">Atalhos Rápidos</p>
+                <p className="text-kicker uppercase text-muted-foreground px-2">Atalhos Rápidos</p>
                 <div className="grid grid-cols-2 gap-1">
                   {periodOptions.filter(o => o.value !== 'custom' && o.value !== 'all').map((option) => (
                     <Button

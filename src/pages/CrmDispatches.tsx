@@ -146,7 +146,7 @@ const CrmDispatches = () => {
       {/* Header */}
       <div className="flex items-center justify-between py-4 flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <h1 className="text-h3-section text-foreground flex items-center gap-2">
             <Send className="h-5 w-5 text-primary" />
             Centro de Disparos
           </h1>
@@ -254,7 +254,7 @@ const CrmDispatches = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Clientes impactados</p>
-                  <p className="text-2xl font-bold">{contactCount}</p>
+                  <p className="text-h3-section">{contactCount}</p>
                 </div>
               </div>
             </CardContent>

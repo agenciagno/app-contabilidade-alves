@@ -93,7 +93,7 @@ export function ContactFinancialTab({ contactId, contactName }: ContactFinancial
               </div>
               <span className="text-sm text-muted-foreground">Total Pago</span>
             </div>
-            <p className="text-2xl font-bold text-ok">
+            <p className="text-h3-section text-ok">
               {formatCurrency(summary.totalPago)}
             </p>
           </CardContent>
@@ -107,7 +107,7 @@ export function ContactFinancialTab({ contactId, contactName }: ContactFinancial
               </div>
               <span className="text-sm text-muted-foreground">Total Pendente</span>
             </div>
-            <p className="text-2xl font-bold text-warn">
+            <p className="text-h3-section text-warn">
               {formatCurrency(summary.totalPendente)}
             </p>
           </CardContent>
@@ -121,7 +121,7 @@ export function ContactFinancialTab({ contactId, contactName }: ContactFinancial
               </div>
               <span className="text-sm text-muted-foreground">Total Vencido</span>
             </div>
-            <p className="text-2xl font-bold text-danger">
+            <p className="text-h3-section text-danger">
               {formatCurrency(summary.totalVencido)}
             </p>
           </CardContent>

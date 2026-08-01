@@ -165,8 +165,8 @@ export default function Banks() {
       {/* Top bar */}
       <div className="flex items-center justify-between py-4 flex-wrap gap-4">
         <div className="space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Financeiro</p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Conta Corrente.</h1>
+          <p className="text-kicker uppercase text-muted-foreground">Financeiro</p>
+          <h1 className="text-display text-foreground">Conta Corrente.</h1>
           <p className="text-[14px] text-muted-foreground">Organize suas contas corrente</p>
         </div>
         <div className="flex gap-2">

@@ -182,7 +182,7 @@ export default function FiscalCollaborators() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between py-4 flex-wrap gap-4">
-        <h1 className="text-2xl font-bold text-foreground">Colaboradores</h1>
+        <h1 className="text-h3-section text-foreground">Colaboradores</h1>
         <Button className="gap-2" onClick={() => setModalOpen(true)}>
           <ArrowRightLeft className="w-4 h-4" />
           Transferência Temporária

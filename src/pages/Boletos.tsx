@@ -201,8 +201,8 @@ export default function Boletos() {
       {/* Cabeçalho */}
       <div className="flex items-center justify-between py-4 px-6 flex-wrap gap-4">
         <div className="space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.05em] text-muted-foreground">Financeiro · Cobrança</p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <p className="text-kicker uppercase text-muted-foreground">Financeiro · Cobrança</p>
+          <h1 className="text-display text-foreground flex items-center gap-2">
             <FileText className="w-7 h-7 text-primary" />
             Controle de Boletos.
           </h1>
@@ -571,7 +571,7 @@ function KpiCard({ icon, label, value, valueClass }: {
   return (
     <Card>
       <CardContent className="p-5">
-        <div className="flex items-center gap-2 text-muted-foreground text-[11px] font-medium uppercase tracking-[0.05em]">
+        <div className="flex items-center gap-2 text-muted-foreground text-kicker uppercase">
           {icon}<span>{label}</span>
         </div>
         <p className={cn('text-[1.75rem] font-bold mt-2 tracking-tight leading-none', valueClass)}>{value}</p>

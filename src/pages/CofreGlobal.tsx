@@ -173,7 +173,7 @@ export default function CofreGlobal() {
           <LockKeyhole className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Acessos</h1>
+          <h1 className="text-h3-section text-foreground">Acessos</h1>
           <p className="text-sm text-muted-foreground">
             Credenciais de todos os clientes ativos
           </p>

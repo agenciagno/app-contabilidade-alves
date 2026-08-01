@@ -249,7 +249,7 @@ export function BoletoGenerationDialog({
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="flex items-center gap-2 text-2xl font-bold">{icon}{value}</div>
+      <div className="flex items-center gap-2 text-h3-section">{icon}{value}</div>
       <span className="text-xs text-muted-foreground uppercase tracking-wide">{label}</span>
     </div>
   );
