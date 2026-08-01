@@ -190,12 +190,14 @@ export const menuEntries: MenuEntry[] = [
     ],
   },
   {
-    kind: 'simple',
+    kind: 'collapsible',
     title: 'Reforma Tributária',
-    url: '/reforma-tributaria',
     icon: Scale,
-    iconName: 'scale',
     moduleKey: 'reforma_tributaria',
+    items: [
+      { title: 'Painel RT', url: '/reforma-tributaria', icon: Scale, iconName: 'scale', subKey: 'reforma_tributaria_painel' },
+      { title: 'Calculadora RT', url: '/reforma-tributaria/calculadora', icon: Calculator, iconName: 'calculator', subKey: 'reforma_tributaria_calculadora' },
+    ],
   },
   {
     kind: 'collapsible',

@@ -24,7 +24,14 @@ export const MODULE_TREE: ModuleNode[] = [
     label: 'Tech',
     children: [{ key: 'tech_disparos', label: 'Disparos' }],
   },
-  { key: 'reforma_tributaria', label: 'Reforma Tributária' },
+  {
+    key: 'reforma_tributaria',
+    label: 'Reforma Tributária',
+    children: [
+      { key: 'reforma_tributaria_painel', label: 'Painel RT' },
+      { key: 'reforma_tributaria_calculadora', label: 'Calculadora RT' },
+    ],
+  },
   {
     key: 'gestao360',
     label: 'Gestão 360°',

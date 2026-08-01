@@ -3322,6 +3322,92 @@ export type Database = {
         }
         Relationships: []
       }
+      rt_simulations: {
+        Row: {
+          aliquota_cbs: number
+          aliquota_fonte: string
+          aliquota_ibs: number
+          aliquota_icms: number | null
+          aliquota_iss: number | null
+          anexo_simples: string | null
+          cnae_codigo: string | null
+          cnae_descricao: string | null
+          company_id: string
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          faturamento_12m: number
+          folha_12m: number | null
+          id: string
+          municipio: string | null
+          nome_referencia: string | null
+          pct_b2b: number | null
+          regime_atual: string
+          resultado: Json
+          setor: string
+          uf: string | null
+          updated_at: string
+        }
+        Insert: {
+          aliquota_cbs: number
+          aliquota_fonte: string
+          aliquota_ibs: number
+          aliquota_icms?: number | null
+          aliquota_iss?: number | null
+          anexo_simples?: string | null
+          cnae_codigo?: string | null
+          cnae_descricao?: string | null
+          company_id: string
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          faturamento_12m: number
+          folha_12m?: number | null
+          id?: string
+          municipio?: string | null
+          nome_referencia?: string | null
+          pct_b2b?: number | null
+          regime_atual: string
+          resultado: Json
+          setor: string
+          uf?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aliquota_cbs?: number
+          aliquota_fonte?: string
+          aliquota_ibs?: number
+          aliquota_icms?: number | null
+          aliquota_iss?: number | null
+          anexo_simples?: string | null
+          cnae_codigo?: string | null
+          cnae_descricao?: string | null
+          company_id?: string
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          faturamento_12m?: number
+          folha_12m?: number | null
+          id?: string
+          municipio?: string | null
+          nome_referencia?: string | null
+          pct_b2b?: number | null
+          regime_atual?: string
+          resultado?: Json
+          setor?: string
+          uf?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rt_simulations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_sessions: {
         Row: {
           ended_at: string | null
