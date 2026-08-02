@@ -46,6 +46,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PageHeader, MetricaFaixa } from '@/components/ds';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -331,12 +332,10 @@ export default function Dashboard() {
     <div className="space-y-7">
       {/* Header */}
       <div className="flex items-center justify-between py-4 flex-wrap gap-4">
-        <div>
-          <p className="text-kicker uppercase text-muted-foreground">Painel Financeiro</p>
-          <h1 className="text-display text-foreground">Dashboard.</h1>
-          <p className="text-[14px] text-muted-foreground">
-            {periodLabel}
-          </p>
+        <div className="min-w-0">
+          <p className="text-kicker uppercase text-muted-ink-2">~/financeiro · {annualMetrics.year}</p>
+          <h1 className="mt-1 text-display text-ink">Dashboard.</h1>
+          <p className="mt-1 text-body text-muted-ink">Visão geral do escritório · {periodLabel}</p>
           <div className="mt-2">
             <FinancialHealthBadge />
           </div>
@@ -417,73 +416,48 @@ export default function Dashboard() {
         </CollapsibleContent>
       </Collapsible>
 
-      {/* KPI Cards - 3 columns matching Transactions page style */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Receitas Recebidas</p>
-                {isLoading ? (
-                  <Skeleton className="h-10 w-32" />
-                ) : (
-                  <p className="text-[2rem] font-bold tracking-tight text-ok leading-none">{formatCurrency(summary.receitasPagas)}</p>
-                )}
-                <p className="text-[13px] text-muted-foreground pt-1">
-                  A Receber: <span className="text-ok font-medium">{formatCurrency(summary.aReceber)}</span>
-                </p>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-ok/10 flex items-center justify-center shrink-0">
-                <TrendingUp className="w-5 h-5 text-ok" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Contas Pagas</p>
-                {isLoading ? (
-                  <Skeleton className="h-10 w-32" />
-                ) : (
-                  <p className="text-[2rem] font-bold tracking-tight text-destructive leading-none">{formatCurrency(summary.despesasPagas)}</p>
-                )}
-                <p className="text-[13px] text-muted-foreground pt-1">
-                  A Pagar: <span className="text-destructive font-medium">{formatCurrency(summary.aPagar)}</span>
-                </p>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
-                <TrendingDown className="w-5 h-5 text-destructive" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Saldo Bancário</p>
-                {isLoading ? (
-                  <Skeleton className="h-10 w-32" />
-                ) : (
-                  <p className={`text-[2rem] font-bold tracking-tight leading-none ${summary.saldoBancario >= 0 ? 'text-foreground' : 'text-destructive'}`}>
-                    {formatCurrency(summary.saldoBancario)}
-                  </p>
-                )}
-                <p className="text-[13px] text-muted-foreground pt-1">
-                  Total bancos visíveis
-                </p>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <Landmark className="w-5 h-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/*
+        Faixa de indicadores da R4: os quatro números dividem UM card, separados
+        por hairline, com barra de proporção embaixo. Antes eram 3 cards soltos
+        e "Lucro realizado" só aparecia lá embaixo, na faixa anual.
+      */}
+      <MetricaFaixa
+        items={[
+          {
+            label: 'Receitas recebidas',
+            icon: <TrendingUp />,
+            valor: formatCurrency(summary.receitasPagas),
+            hint: `a receber: ${formatCurrency(summary.aReceber)}`,
+            progresso: summary.receitasPagas + summary.aReceber > 0
+              ? (summary.receitasPagas / (summary.receitasPagas + summary.aReceber)) * 100
+              : 0,
+            tom: 'ok',
+          },
+          {
+            label: 'Contas pagas',
+            icon: <TrendingDown />,
+            valor: formatCurrency(summary.despesasPagas),
+            hint: `a pagar: ${formatCurrency(summary.aPagar)}`,
+            progresso: summary.despesasPagas + summary.aPagar > 0
+              ? (summary.despesasPagas / (summary.despesasPagas + summary.aPagar)) * 100
+              : 0,
+            tom: 'danger',
+          },
+          {
+            label: 'Saldo bancário',
+            icon: <Landmark />,
+            valor: formatCurrency(summary.saldoBancario),
+            hint: 'total dos bancos visíveis',
+          },
+          {
+            label: 'Lucro realizado',
+            icon: <BarChart3 />,
+            valor: formatCurrency(annualMetrics.lucroRealizado),
+            hint: `previsto: ${formatCurrency(annualMetrics.lucroPrevisto)}`,
+            tom: annualMetrics.lucroRealizado >= 0 ? 'ok' : 'danger',
+          },
+        ]}
+      />
 
       {/* Annual Ticker Cards - 4 columns */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">

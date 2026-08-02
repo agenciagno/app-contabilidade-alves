@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, User, DollarSign, FileText, ClipboardList, Download, History, KeyRound } from 'lucide-react';
+import { ArrowLeft, User, DollarSign, FileText, ClipboardList, Download, History, KeyRound, Building2 } from 'lucide-react';
 import { useContacts } from '@/hooks/useContacts';
 import { useContactTransactions, useContactFinancialStatus } from '@/hooks/useContactTransactions';
 import { useContactDocuments, DOCUMENT_CATEGORIES } from '@/hooks/useContactDocuments';
@@ -19,6 +19,7 @@ import { ContactCadastroTab } from '@/components/contacts/cadastro/ContactCadast
 import { ContactLogsWithComunicacaoTab } from '@/components/contacts/ContactLogsWithComunicacaoTab';
 import { getDocumentType } from '@/lib/utils';
 import { getContactDisplayName } from '@/lib/contact-display';
+import { DsBadge } from '@/components/ds';
 
 const taxRegimeLabels: Record<string, string> = {
   mei: 'MEI',
@@ -114,50 +115,48 @@ export default function ContactProfile() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        <Button variant="ghost" onClick={() => navigate('/contatos')} className="w-fit">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Voltar
-        </Button>
+      {/* Breadcrumb do protótipo: "Empresas / Nome" no lugar do botão Voltar solto */}
+      <nav className="flex items-center gap-2 text-link">
+        <button
+          onClick={() => navigate('/contatos')}
+          className="flex items-center gap-1.5 text-muted-ink transition-colors hover:text-ink"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Empresas
+        </button>
+        <span className="text-meta text-muted-ink-2">/</span>
+        <span className="truncate text-ink">{getContactDisplayName(contact)}</span>
+      </nav>
 
-        <div className="flex items-center gap-4 flex-1">
-          <div className="p-3 bg-primary/10 rounded-xl">
-            <User className="h-6 w-6 text-primary" />
-          </div>
-
-          <div className="flex-1">
-            <h1 className="text-h3-section text-foreground">{getContactDisplayName(contact)}</h1>
-            {contact.document && (
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {getDocumentType(contact.document) ?? 'CNPJ'}: {contact.document}
-              </p>
-            )}
-            <div className="flex flex-wrap gap-2 mt-2">
-              {contact.tax_regime && (
-                <Badge variant="outline">
-                  {taxRegimeLabels[contact.tax_regime]}
-                </Badge>
-              )}
-              <Badge
-                variant={isInadimplente ? 'destructive' : 'secondary'}
-                className={!isInadimplente ? 'bg-ok/10 text-ok' : ''}
-              >
-                {isInadimplente ? 'Inadimplente' : 'Adimplente'}
-              </Badge>
-            </div>
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleGenerateReport}
-            className="hidden sm:flex"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Gerar Relatório
-          </Button>
+      {/* Cabeçalho do objeto: IconBox 56 + nome em display + meta em linha */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div
+          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-md ${
+            isInadimplente ? 'bg-danger-soft text-danger' : 'bg-ok-soft text-ok'
+          }`}
+        >
+          <Building2 className="h-5 w-5" strokeWidth={1.75} />
         </div>
+
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-display text-ink">{getContactDisplayName(contact)}</h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
+            {contact.document && (
+              <span className="font-mono text-mono-sm text-muted-ink">{contact.document}</span>
+            )}
+            {contact.tax_regime && (
+              <span className="text-meta text-muted-ink-2">{taxRegimeLabels[contact.tax_regime]}</span>
+            )}
+            <DsBadge tone={isInadimplente ? 'danger' : 'ok'}>
+              {isInadimplente ? 'inadimplente' : 'adimplente'}
+            </DsBadge>
+          </div>
+        </div>
+
+        <Button variant="outline" onClick={handleGenerateReport} className="hidden sm:flex">
+          <Download className="h-4 w-4" />
+          Gerar relatório
+        </Button>
       </div>
 
       {/* Mobile Report Button */}

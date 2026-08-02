@@ -39,6 +39,17 @@ import {
   startOfMonth, endOfMonth, isWithinInterval, parseISO, format
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { PageHeader, StatCardRow } from '@/components/ds';
+
+/** Métrica secundária em linha — sem card, para não competir com os indicadores. */
+function ResumoInline({ label, valor, negativo }: { label: string; valor: string; negativo?: boolean }) {
+  return (
+    <span className="flex min-w-0 flex-col gap-0.5">
+      <span className="text-kicker uppercase text-muted-ink-2">{label}</span>
+      <span className={`text-ui-strong ${negativo ? 'text-danger' : 'text-ink'}`}>{valor}</span>
+    </span>
+  );
+}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -833,111 +844,75 @@ export default function Transactions() {
 
   return (
     <div className="space-y-4 min-w-0 max-w-full">
-      {/* ── Header ── */}
-      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between py-4 gap-3 min-w-0">
-        <div className="space-y-1 shrink-0">
-          <p className="text-kicker uppercase text-muted-foreground">Financeiro</p>
-          <h1 className="text-display text-foreground">Movimentações.</h1>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap w-full xl:w-auto min-w-0">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5">
-                <Download className="w-4 h-4" /> Exportar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportToCSV(exportTransactions())} className="gap-2">
-                <FileSpreadsheet className="w-4 h-4" /> CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { exportToPDF(exportTransactions(), totals); }} className="gap-2">
-                <FileText className="w-4 h-4" /> PDF
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setImportOpen(true)}>
-            <Upload className="w-4 h-4" /> Importar
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setTransferOpen(true)}>
-            <ArrowLeftRight className="w-4 h-4" /> Transferência
-          </Button>
-          <Button size="sm" onClick={() => handleNewTransaction('receita')} className="gap-1.5 bg-ok hover:bg-ok text-white">
-            <Plus className="w-4 h-4" /> Nova Movimentação
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        kicker="~/financeiro · lançamentos"
+        title="Lançamentos."
+        subtitle={`${filteredTransactions.length.toLocaleString('pt-BR')} transações · ${formatCurrency(biMetrics.receitasEmAtraso + biMetrics.contasEmAtraso)} em atraso.`}
+        actions={
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline"><Download className="w-4 h-4" /> Exportar</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportToCSV(exportTransactions())} className="gap-2">
+                  <FileSpreadsheet className="w-4 h-4" /> CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { exportToPDF(exportTransactions(), totals); }} className="gap-2">
+                  <FileText className="w-4 h-4" /> PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <Upload className="w-4 h-4" /> Importar
+            </Button>
+            <Button variant="outline" onClick={() => setTransferOpen(true)}>
+              <ArrowLeftRight className="w-4 h-4" /> Transferência
+            </Button>
+            <Button onClick={() => handleNewTransaction('receita')}>
+              <Plus className="w-4 h-4" /> Nova movimentação
+            </Button>
+          </>
+        }
+      />
 
-      {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-3">
-        <Card className="border-l-2 border-l-ok">
-          <CardContent className="px-3 py-[10px] min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <TrendingUp className="w-3.5 h-3.5 text-ok shrink-0" />
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">A Receber</p>
-            </div>
-            <p className="text-base sm:text-lg font-bold text-ok truncate">{formatCurrency(kpis.receitasPendentes)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Recebido: {formatCurrency(kpis.receitasPagas)}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-2 border-l-danger">
-          <CardContent className="px-3 py-[10px] min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <TrendingDown className="w-3.5 h-3.5 text-danger shrink-0" />
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">A Pagar</p>
-            </div>
-            <p className="text-base sm:text-lg font-bold text-danger truncate">{formatCurrency(kpis.despesasPendentes)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Pago: {formatCurrency(kpis.despesasPagas)}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-2 border-l-primary">
-          <CardContent className="px-3 py-[10px] min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <Landmark className="w-3.5 h-3.5 text-primary shrink-0" />
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Saldo Disponível</p>
-            </div>
-            <p className={`text-base sm:text-lg font-bold truncate ${bankTotals.totalBalance >= 0 ? 'text-primary' : 'text-danger'}`}>{formatCurrency(bankTotals.totalBalance)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Total bancos visíveis</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-2 border-l-danger">
-          <CardContent className="px-3 py-[10px] min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-danger shrink-0" />
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Em Atraso</p>
-            </div>
-            <p className="text-sm font-bold text-warn">⬇ {formatCurrency(biMetrics.receitasEmAtraso)}</p>
-            <p className="text-sm font-bold text-danger">⬆ {formatCurrency(biMetrics.contasEmAtraso)}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-2 border-l-blue-500">
-          <CardContent className="px-3 py-[10px] min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <Building2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Capital de Giro</p>
-            </div>
-            <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.capitalDeGiroMes >= 0 ? 'text-blue-400' : 'text-danger'}`}>{formatCurrency(biMetrics.capitalDeGiroMes)}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-2 border-l-ok">
-          <CardContent className="px-3 py-[10px] min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <BarChart3 className="w-3.5 h-3.5 text-ok shrink-0" />
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Lucro Previsto</p>
-            </div>
-            <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.lucroPrevisto >= 0 ? 'text-ok' : 'text-danger'}`}>{formatCurrency(biMetrics.lucroPrevisto)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{format(new Date(), 'MMMM', { locale: ptBR }).replace(/^\w/, c => c.toUpperCase())}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-l-2 border-l-warn">
-          <CardContent className="px-3 py-[10px] min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <CalendarCheck className="w-3.5 h-3.5 text-warn shrink-0" />
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">Realizado</p>
-            </div>
-            <p className={`text-base sm:text-lg font-bold truncate ${biMetrics.acumuladoReceitas - biMetrics.acumuladoDespesas >= 0 ? 'text-ok' : 'text-danger'}`}>{formatCurrency(biMetrics.acumuladoReceitas - biMetrics.acumuladoDespesas)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{format(new Date(), 'MMMM', { locale: ptBR }).replace(/^\w/, c => c.toUpperCase())}</p>
-          </CardContent>
-        </Card>
+      {/*
+        Indicadores numerados (decisão 06). O protótipo mostra 4 na Lançamentos —
+        os operacionais. Os 3 analíticos que existiam aqui (capital de giro, lucro
+        previsto, realizado) não sumiram: viraram a linha compacta logo abaixo,
+        porque o Figma não tem slot para eles nesta tela mas jogá-los fora
+        tiraria número que o Financeiro usa.
+      */}
+      <StatCardRow
+        items={[
+          {
+            label: 'Em atraso',
+            value: formatCurrency(biMetrics.receitasEmAtraso + biMetrics.contasEmAtraso),
+            hint: `${formatCurrency(biMetrics.receitasEmAtraso)} a receber · ${formatCurrency(biMetrics.contasEmAtraso)} a pagar`,
+            emphasis: biMetrics.receitasEmAtraso + biMetrics.contasEmAtraso > 0 ? 'warm' : 'none',
+          },
+          {
+            label: 'A receber',
+            value: formatCurrency(kpis.receitasPendentes),
+            hint: `recebido: ${formatCurrency(kpis.receitasPagas)}`,
+          },
+          {
+            label: 'A pagar',
+            value: formatCurrency(kpis.despesasPendentes),
+            hint: `pago: ${formatCurrency(kpis.despesasPagas)}`,
+          },
+          {
+            label: 'Saldo',
+            value: formatCurrency(bankTotals.totalBalance),
+            hint: 'total dos bancos visíveis',
+          },
+        ]}
+      />
+
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-lg border border-line bg-paper px-5 py-3.5">
+        <ResumoInline label="Capital de giro" valor={formatCurrency(biMetrics.capitalDeGiroMes)} negativo={biMetrics.capitalDeGiroMes < 0} />
+        <ResumoInline label="Lucro previsto" valor={formatCurrency(biMetrics.lucroPrevisto)} negativo={biMetrics.lucroPrevisto < 0} />
+        <ResumoInline label="Realizado" valor={formatCurrency(biMetrics.acumuladoReceitas - biMetrics.acumuladoDespesas)} negativo={biMetrics.acumuladoReceitas - biMetrics.acumuladoDespesas < 0} />
       </div>
 
       {/* ── Toolbar ── */}

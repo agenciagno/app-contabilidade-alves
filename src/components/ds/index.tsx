@@ -322,6 +322,82 @@ export function StatCardRow({ items, className }: { items: StatItem[]; className
   );
 }
 
+/* ───────────────────── Abas (shadcn Tabs) ────────────────────
+   O protótipo usa dois níveis de aba, com desenhos diferentes:
+   nível 1 = underline 2px sem fundo; nível 2 = segmented dentro de um trilho.
+   Como o app inteiro usa <Tabs> do shadcn, exporto as classes em vez de
+   componentes novos — assim a migração é trocar className, sem refazer estado. */
+
+export const tabsListClass =
+  'h-auto w-full justify-start gap-1 rounded-none border-b border-line bg-transparent p-0';
+
+export const tabsTriggerClass =
+  'h-11 gap-[7px] rounded-none border-b-2 border-transparent px-3.5 text-nav text-muted-ink ' +
+  'data-[state=active]:border-ink data-[state=active]:bg-transparent data-[state=active]:font-semibold ' +
+  'data-[state=active]:text-ink data-[state=active]:shadow-none';
+
+export const segmentedListClass =
+  'h-auto w-auto justify-start gap-1 rounded-md border border-line bg-bg-2 p-1';
+
+export const segmentedTriggerClass =
+  'h-[34px] rounded-sm px-3 text-nav text-muted-ink ' +
+  'data-[state=active]:bg-paper data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-sc-sm';
+
+/* ────────────────── Faixa de métricas (R4) ───────────────────
+   Diferente da StatCardRow: aqui os indicadores dividem UM card, separados
+   por hairline, e cada um tem uma barra de progresso embaixo. */
+
+export interface MetricaFaixaItem {
+  label: string;
+  icon?: React.ReactNode;
+  valor: React.ReactNode;
+  hint?: React.ReactNode;
+  /** 0–100. Ausente esconde a barra. */
+  progresso?: number;
+  tom?: 'ok' | 'warn' | 'danger' | 'brand';
+}
+
+const barraTom = {
+  ok: 'bg-ok',
+  warn: 'bg-warn',
+  danger: 'bg-danger',
+  brand: 'bg-brand',
+} as const;
+
+export function MetricaFaixa({ items, className }: { items: MetricaFaixaItem[]; className?: string }) {
+  return (
+    <div className={cn('grid grid-cols-1 overflow-hidden rounded-lg border border-line bg-paper sm:grid-cols-2 xl:grid-cols-4', className)}>
+      {items.map((m, i) => (
+        <div
+          key={m.label}
+          className={cn(
+            'flex flex-col gap-2.5 p-5',
+            i > 0 && 'border-t border-line-2 sm:border-t-0 xl:border-l',
+            i === 1 && 'sm:border-l sm:border-line-2',
+            i >= 2 && 'sm:border-t sm:border-line-2 xl:border-t-0',
+            i === 3 && 'sm:border-l sm:border-line-2',
+          )}
+        >
+          <div className="flex items-center gap-2 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:text-muted-ink-2">
+            {m.icon}
+            <span className="text-kicker uppercase text-muted-ink-2">{m.label}</span>
+          </div>
+          <p className="text-metric-xl text-ink">{m.valor}</p>
+          {m.hint && <p className="text-meta text-muted-ink">{m.hint}</p>}
+          {m.progresso !== undefined && (
+            <div className="h-1 w-full overflow-hidden rounded-pill bg-bg-3">
+              <div
+                className={cn('h-full rounded-pill', barraTom[m.tom ?? 'brand'])}
+                style={{ width: `${Math.max(0, Math.min(100, m.progresso))}%` }}
+              />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ─────────────────────────── Alert ───────────────────────────
    Faixa contextual · borda esquerda 3px · raio 10 */
 

@@ -52,6 +52,7 @@ import {
   FiscalTaskRow,
 } from '@/hooks/useFiscalDashboard';
 import { GenerateDeadlineAlertsButton } from '@/components/fiscal/GenerateDeadlineAlertsButton';
+import { StatCardRow } from '@/components/ds';
 
 
 const MONTHS = [
@@ -386,9 +387,14 @@ export default function FiscalDashboard() {
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-kicker uppercase text-muted-foreground">Fiscal</p>
-            <h1 className="text-display text-foreground">Dashboard Fiscal.</h1>
+          <div className="min-w-0 space-y-1">
+            <p className="text-kicker uppercase text-muted-ink-2">
+              ~/tarefas · {MONTHS[month - 1]?.toLowerCase()} {year}
+            </p>
+            <h1 className="text-display text-ink">Dashboard fiscal.</h1>
+            <p className="text-body text-muted-ink">
+              {tasks.length.toLocaleString('pt-BR')} obrigações no mês · {kpis.atrasadas} atrasadas · {semResponsavel} sem responsável.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 no-print">
             <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
@@ -451,13 +457,26 @@ export default function FiscalDashboard() {
         </Alert>
       )}
 
-      {/* KPIs row 1 — 4 cards compactos */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard label="Pendentes" value={kpis.pendentes} icon={Clock} borderClass="border-l-blue-500" iconClass="text-blue-500" />
-        <KpiCard label="Em andamento" value={kpis.emAndamento} icon={ListChecks} borderClass="border-l-warn" iconClass="text-warn" />
-        <KpiCard label="Atrasadas" value={kpis.atrasadas} icon={AlertTriangle} borderClass="border-l-danger" iconClass="text-danger" />
-        <KpiCard label="Concluídas" value={kpis.concluidas} icon={CheckCircle2} borderClass="border-l-ok" iconClass="text-ok" />
-      </div>
+      {/* Indicadores numerados (decisão 06): atraso primeiro, e só ele destacado */}
+      <StatCardRow
+        items={[
+          {
+            label: 'Atrasadas',
+            value: kpis.atrasadas,
+            hint: 'acumulado de meses anteriores',
+            emphasis: kpis.atrasadas > 0 ? 'warm' : 'none',
+          },
+          { label: 'Pendentes', value: kpis.pendentes, hint: 'dentro do prazo' },
+          { label: 'Em andamento', value: kpis.emAndamento, hint: 'com responsável ativo' },
+          {
+            label: 'Concluídas',
+            value: kpis.concluidas,
+            hint: tasks.length > 0
+              ? `${Math.round((kpis.concluidas / tasks.length) * 100)}% do mês entregue`
+              : 'nada lançado no mês',
+          },
+        ]}
+      />
 
       {/* Próximos Vencimentos */}
       <Card>
