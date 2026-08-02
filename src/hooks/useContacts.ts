@@ -7,6 +7,15 @@ import { useActiveCompany } from '@/contexts/CompanyContext';
 
 export type TaxRegime = 'mei' | 'simples_nacional' | 'lucro_presumido' | 'lucro_real' | 'nao_aplica';
 
+/** Rótulo legível do regime. Estava só dentro do log de auditoria; a tela precisa do mesmo. */
+export const TAX_REGIME_LABELS: Record<string, string> = {
+  mei: 'MEI',
+  simples_nacional: 'Simples Nacional',
+  lucro_presumido: 'Lucro Presumido',
+  lucro_real: 'Lucro Real',
+  nao_aplica: 'Pessoa Física',
+};
+
 export interface Contact {
   id: string;
   company_id: string;
@@ -209,13 +218,7 @@ export function useContacts() {
           medicina_trabalho: 'Medicina do Trabalho',
         };
 
-        const taxRegimeLabels: Record<string, string> = {
-          mei: 'MEI',
-          simples_nacional: 'Simples Nacional',
-          lucro_presumido: 'Lucro Presumido',
-          lucro_real: 'Lucro Real',
-          nao_aplica: 'Pessoa Física',
-        };
+        const taxRegimeLabels = TAX_REGIME_LABELS;
 
         // Map tax regime values to labels for better readability
         const mappedOldData = {

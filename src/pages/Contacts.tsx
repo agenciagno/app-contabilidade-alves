@@ -11,8 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, User, Mail, Phone, Copy, Users, X, FileText, LayoutGrid, List, Pencil, Trash2 } from 'lucide-react';
-import { useContacts, Contact, ContactInsert } from '@/hooks/useContacts';
+import { Plus, Search, User, Mail, Phone, Copy, Users, X, FileText, LayoutGrid, List, Pencil, Trash2, Building2, CalendarDays, FolderOpen } from 'lucide-react';
+import { useContacts, Contact, ContactInsert, TAX_REGIME_LABELS } from '@/hooks/useContacts';
 import { useTransactions } from '@/hooks/useTransactions';
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
 import { ContactBulkEditDialog } from '@/components/contacts/ContactBulkEditDialog';
@@ -22,9 +22,22 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { maskPhone } from '@/lib/utils';
 import { getContactDisplayName } from '@/lib/contact-display';
 import { useAllFiscalProfiles } from '@/hooks/useCollaboratorCoverage';
+import { EmpresaCard } from '@/components/contacts/EmpresaCard';
+import { PageHeader } from '@/components/ds';
 
 
 type ViewMode = 'card' | 'list';
+
+/** Contador da linha de resumo: ponto + número + o que ele conta. */
+function Contador({ tom, valor, label }: { tom: string; valor: number; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className={`h-[7px] w-[7px] shrink-0 rounded-pill ${tom}`} />
+      <span className="text-ui-strong text-ink">{valor}</span>
+      <span className="text-meta text-muted-ink">{label}</span>
+    </span>
+  );
+}
 
 const ARCHIVED_STATUSES = ['Encerrado', 'Ex-cliente'];
 const isArchivedContact = (c: Contact) => ARCHIVED_STATUSES.includes(((c as any).status_cliente || '').toString());
@@ -61,8 +74,10 @@ export default function Contacts() {
   const getFinancialStatus = (contactId: string) => {
     const today = new Date().toISOString().split('T')[0];
     const contactTransactions = transactions.filter(t => t.contact_id === contactId);
-    const hasOverdue = contactTransactions.some(t => !t.is_paid && t.due_date && t.due_date < today);
-    return { isInadimplente: hasOverdue };
+    // O card mostra "3 títulos vencidos", não só devendo/em dia — mesma regra de
+    // antes (não pago e vencido), só que contada em vez de reduzida a booleano.
+    const vencidos = contactTransactions.filter(t => !t.is_paid && t.due_date && t.due_date < today).length;
+    return { isInadimplente: vencidos > 0, titulosVencidos: vencidos };
   };
 
   const summaryStats = useMemo(() => {
@@ -225,84 +240,24 @@ export default function Contacts() {
   };
 
   const ContactCard = ({ contact }: { contact: Contact }) => {
-    const { isInadimplente } = getFinancialStatus(contact.id);
+    const { titulosVencidos } = getFinancialStatus(contact.id);
+    const responsavel = fiscalProfiles.find(p => p.id === contact.responsible_id)?.full_name;
     return (
-      <Card
-        className={`bg-card cursor-pointer transition-colors hover:border-primary/40 ${!contact.is_active ? 'opacity-60' : ''}`}
-        onClick={() => goToProfile(contact)}
-      >
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2 bg-primary/10 rounded-xl flex-shrink-0">
-                <User className="h-5 w-5 text-primary" />
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); copyToClipboard(getContactDisplayName(contact), 'Nome'); }}
-                className="group flex items-center gap-2 hover:text-primary transition-colors text-left min-w-0"
-              >
-                <h3 className="font-semibold text-foreground truncate">{getContactDisplayName(contact)}</h3>
-                <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground flex-shrink-0" />
-              </button>
-              <CategoryBadges contact={contact} />
-            </div>
-            <div
-              className={`h-2.5 w-2.5 rounded-full flex-shrink-0 mt-1 ml-2 ${isInadimplente ? 'bg-destructive' : 'bg-ok'}`}
-              title={isInadimplente ? 'Inadimplente' : 'Adimplente'}
-            />
-          </div>
-
-          <div className="space-y-2 text-sm text-muted-foreground">
-            {/* Document — always rendered */}
-            <div className="flex items-center gap-2 h-5">
-              <FileText className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/60" />
-              {contact.document ? (
-                <button
-                  onClick={(e) => { e.stopPropagation(); copyToClipboard(contact.document!, 'CPF/CNPJ'); }}
-                  className="group flex items-center gap-2 w-full hover:text-primary transition-colors text-left"
-                >
-                  <span className="truncate flex-1 font-mono text-xs">{contact.document}</span>
-                  <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                </button>
-              ) : (
-                <span className="text-muted-foreground/30 text-xs">—</span>
-              )}
-            </div>
-
-            {/* Phone — always rendered */}
-            <div className="flex items-center gap-2 h-5">
-              <Phone className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/60" />
-              {contact.phone ? (
-                <button
-                  onClick={(e) => { e.stopPropagation(); copyToClipboard(contact.phone!, 'Telefone'); }}
-                  className="group flex items-center gap-2 w-full hover:text-primary transition-colors text-left"
-                >
-                  <span className="flex-1 text-xs">{maskPhone(contact.phone)}</span>
-                  <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                </button>
-              ) : (
-                <span className="text-muted-foreground/30 text-xs">—</span>
-              )}
-            </div>
-
-            {/* Email — always rendered */}
-            <div className="flex items-center gap-2 h-5">
-              <Mail className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/60" />
-              {contact.email ? (
-                <button
-                  onClick={(e) => { e.stopPropagation(); copyToClipboard(contact.email!, 'E-mail'); }}
-                  className="group flex items-center gap-2 w-full hover:text-primary transition-colors text-left"
-                >
-                  <span className="truncate flex-1 text-xs">{contact.email}</span>
-                  <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                </button>
-              ) : (
-                <span className="text-muted-foreground/30 text-xs">—</span>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <EmpresaCard
+        nome={getContactDisplayName(contact)}
+        razaoSocial={contact.razao_social}
+        documento={contact.document}
+        regime={contact.tax_regime ? TAX_REGIME_LABELS[contact.tax_regime] ?? contact.tax_regime : null}
+        porte={contact.porte}
+        responsavel={responsavel}
+        titulosVencidos={titulosVencidos}
+        inativo={!contact.is_active}
+        onAbrir={() => goToProfile(contact)}
+        onNomeClick={(e) => {
+          e.stopPropagation();
+          copyToClipboard(getContactDisplayName(contact), 'Nome');
+        }}
+      />
     );
   };
 
@@ -379,18 +334,40 @@ export default function Contacts() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between py-4 flex-wrap gap-4">
-        <div className="space-y-1">
-          <p className="text-kicker uppercase text-muted-foreground">Cadastros</p>
-          <h1 className="text-display text-foreground">Clientes & Fornecedores.</h1>
-        </div>
-      </div>
+      {/*
+        Título "Empresas." vem do Figma e resolve uma divergência que existia:
+        o menu já dizia "Empresas" enquanto a tela dizia "Clientes & Fornecedores".
+      */}
+      <PageHeader
+        kicker="~/cadastros"
+        title="Empresas."
+        subtitle={`${summaryStats.total} contatos · ${summaryStats.adimplentes} adimplentes · ${summaryStats.inadimplentes} com título vencido.`}
+      />
 
       <Tabs defaultValue="clientes" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="clientes">Contatos</TabsTrigger>
-          <TabsTrigger value="entrada-2026">Entrada de Clientes 2026</TabsTrigger>
-          <TabsTrigger value="arquivados">Arquivados ({archivedContacts.length})</TabsTrigger>
+        {/* Abas com underline e ícone, como no protótipo — não pills */}
+        <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b border-line bg-transparent p-0">
+          <TabsTrigger
+            value="clientes"
+            className="h-11 gap-[7px] rounded-none border-b-2 border-transparent px-3.5 text-nav text-muted-ink data-[state=active]:border-ink data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-none"
+          >
+            <Building2 className="h-4 w-4" strokeWidth={1.75} />
+            Contatos
+          </TabsTrigger>
+          <TabsTrigger
+            value="entrada-2026"
+            className="h-11 gap-[7px] rounded-none border-b-2 border-transparent px-3.5 text-nav text-muted-ink data-[state=active]:border-ink data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-none"
+          >
+            <CalendarDays className="h-4 w-4" strokeWidth={1.75} />
+            Entrada de clientes 2026
+          </TabsTrigger>
+          <TabsTrigger
+            value="arquivados"
+            className="h-11 gap-[7px] rounded-none border-b-2 border-transparent px-3.5 text-nav text-muted-ink data-[state=active]:border-ink data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-none"
+          >
+            <FolderOpen className="h-4 w-4" strokeWidth={1.75} />
+            Arquivados ({archivedContacts.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="clientes">
@@ -478,32 +455,22 @@ export default function Contacts() {
                   Limpar
                 </Button>
               )}
-              <div className="h-5 w-px bg-border/50 hidden sm:block" />
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5" />
-                  <span className="font-medium text-foreground">{summaryStats.total}</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-ok" />
-                  <span>{summaryStats.adimplentes}</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-destructive" />
-                  <span>{summaryStats.inadimplentes}</span>
-                </span>
-              </div>
+            </div>
+
+            {/* Linha de contadores do protótipo: rótulo + número + o que ele conta */}
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="text-kicker uppercase text-muted-ink-2">Ativos</span>
+              <Contador tom="bg-muted-ink-2" valor={summaryStats.total} label="total" />
+              <Contador tom="bg-ok" valor={summaryStats.adimplentes} label="adimplentes" />
+              <Contador tom="bg-danger" valor={summaryStats.inadimplentes} label="inadimplentes" />
             </div>
 
             {/* Card View */}
             {viewMode === 'card' && (
               <>
                 {activeContacts.length > 0 && (
-                  <div className="space-y-3">
-                    <h2 className="text-sm font-medium text-muted-foreground">Ativos ({activeContacts.length})</h2>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {activeContacts.map(contact => <ContactCard key={contact.id} contact={contact} />)}
-                    </div>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {activeContacts.map(contact => <ContactCard key={contact.id} contact={contact} />)}
                   </div>
                 )}
                 {inactiveContacts.length > 0 && (
