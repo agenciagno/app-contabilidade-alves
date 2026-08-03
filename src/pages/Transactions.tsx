@@ -847,7 +847,7 @@ export default function Transactions() {
       <PageHeader
         kicker="~/financeiro · lançamentos"
         title="Lançamentos."
-        subtitle={`${filteredTransactions.length.toLocaleString('pt-BR')} transações · ${formatCurrency(biMetrics.receitasEmAtraso + biMetrics.contasEmAtraso)} em atraso.`}
+        subtitle={`${totalCount.toLocaleString('pt-BR')} transações · ${formatCurrency(biMetrics.receitasEmAtraso + biMetrics.contasEmAtraso)} em atraso.`}
         actions={
           <>
             <DropdownMenu>
