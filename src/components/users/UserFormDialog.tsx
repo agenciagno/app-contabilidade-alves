@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { PasswordStrength, isPasswordStrong } from '@/components/ui/PasswordStrength';
 
 import { ALL_MODULE_KEYS, MODULE_TREE } from '@/constants/modules';
+import { DEPARTMENT_OPTIONS } from '@/constants/departments';
 
 
 const ROLE_OPTIONS = [
@@ -35,6 +36,7 @@ export interface EditUserData {
   role: string;
   statusActive: boolean;
   allowedModules: string[];
+  department?: string | null;
 }
 
 interface UserFormDialogProps {
@@ -71,6 +73,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('colaborador');
+  const [department, setDepartment] = useState('');
   const [statusActive, setStatusActive] = useState(true);
   const [allowedModules, setAllowedModules] = useState<string[]>(ALL_MODULE_KEYS);
   const [password, setPassword] = useState('');
@@ -89,6 +92,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
       setFullName(editUser.fullName);
       setEmail(editUser.email);
       setRole(editUser.role);
+      setDepartment(editUser.department || '');
       setStatusActive(editUser.statusActive);
       setAllowedModules(editUser.allowedModules);
       setNewPassword('');
@@ -113,6 +117,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
     setNewPassword('');
     setShowNewPassword(false);
     setRole('colaborador');
+    setDepartment('');
     setStatusActive(true);
     setAllowedModules(isExternalCompany ? [] : ALL_MODULE_KEYS);
     setErrors({});
@@ -178,7 +183,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
 
         const { data: updateData, error: updateError } = await supabase.functions.invoke(
           'admin-update-user',
-          { body: { userId: editUser!.userId, fullName, role, statusActive, allowedModules: resolvedModules } }
+          { body: { userId: editUser!.userId, fullName, role, statusActive, allowedModules: resolvedModules, department: department || null } }
         );
         if (updateError) throw new Error(updateError.message || 'Erro ao atualizar usuário');
         if (updateData?.error) throw new Error(updateData.error);
@@ -219,6 +224,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
             force_password_change: false,
             allowedModules: resolvedModules,
             allowed_modules: resolvedModules,
+            department: department || null,
           },
         });
         if (fnError) throw new Error(fnError.message || 'Erro ao criar usuário');
@@ -303,6 +309,22 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
               </SelectTrigger>
               <SelectContent>
                 {ROLE_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Setor */}
+          <div className="space-y-2">
+            <Label>Setor</Label>
+            <Select value={department || 'none'} onValueChange={v => setDepartment(v === 'none' ? '' : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o setor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Não definido</SelectItem>
+                {DEPARTMENT_OPTIONS.map(opt => (
                   <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                 ))}
               </SelectContent>

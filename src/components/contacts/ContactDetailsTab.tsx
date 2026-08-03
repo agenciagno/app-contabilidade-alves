@@ -8,6 +8,7 @@ import { Contact } from '@/hooks/useContacts';
 import { supabase } from '@/integrations/supabase/client';
 import { ContactEditSheet } from './ContactEditSheet';
 import { ContactBillingCard } from './ContactBillingCard';
+import { RESPONSIBLE_FIELDS } from '@/constants/responsibleFields';
 
 type Section = 'contato' | 'endereco' | 'fiscal' | 'observacoes' | 'empresariais' | 'datas-esfera' | 'departamento-pessoal';
 
@@ -86,9 +87,10 @@ export function ContactDetailsTab({ contact }: ContactDetailsTabProps) {
     },
   });
 
-  const responsibleName = contact.responsible_id
-    ? profiles?.find((p) => p.id === contact.responsible_id)?.full_name
-    : null;
+  const responsibleName = (fieldKey: string) => {
+    const id = (contact as any)[fieldKey];
+    return id ? profiles?.find((p) => p.id === id)?.full_name : null;
+  };
 
   return (
     <div className="grid md:grid-cols-2 gap-6">
@@ -201,7 +203,9 @@ export function ContactDetailsTab({ contact }: ContactDetailsTabProps) {
           <Field label="Nº Alvará">{fmt(contact.numero_alvara)}</Field>
           <Field label="Validade Alvará">{fmtDate(contact.validade_alvara)}</Field>
           <Field label="Status">{contact.is_active ? 'Ativo' : 'Inativo'}</Field>
-          <Field label="Colaborador Responsável">{responsibleName || '—'}</Field>
+          {RESPONSIBLE_FIELDS.map((rf) => (
+            <Field key={rf.key} label={rf.label}>{responsibleName(rf.key) || '—'}</Field>
+          ))}
           <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/50">
             <Field label="Registro de Entradas">{fmtBool(contact.registro_entradas)}</Field>
             <Field label="Registro de Saídas">{fmtBool(contact.registro_saidas)}</Field>

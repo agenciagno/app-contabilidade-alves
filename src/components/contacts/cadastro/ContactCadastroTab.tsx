@@ -36,6 +36,7 @@ import { maskPhone, maskCPFCNPJ, getDocumentType } from '@/lib/utils';
 import { toast } from 'sonner';
 import { TAX_REGIMES } from '@/constants/taxRegimes';
 import { PORTE_OPTIONS } from '@/constants/porte';
+import { RESPONSIBLE_FIELDS } from '@/constants/responsibleFields';
 
 interface Props {
   contactId: string;
@@ -488,7 +489,8 @@ export function ContactCadastroTab({ contactId }: Props) {
           form={form}
           set={set}
           onSave={() => saveSection([
-            'responsible_id', 'categorias', 'status_cliente',
+            'responsible_id', 'dp_responsible_id', 'financeiro_responsible_id', 'contabil_responsible_id', 'comercial_responsible_id',
+            'categorias', 'status_cliente',
             'data_inicio_contrato', 'data_saida_cliente',
             'data_abertura_junta', 'data_encerramento_junta',
             'data_abertura_rf', 'data_encerramento_rf',
@@ -646,15 +648,17 @@ function OperacionalSection({
               </Select>
             </Field>
           )}
-          <Field label="Colaborador Responsável">
-            <Select value={form.responsible_id || 'none'} onValueChange={v => set('responsible_id', v === 'none' ? null : v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Não atribuído</SelectItem>
-                {profiles?.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name || 'Sem nome'}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </Field>
+          {RESPONSIBLE_FIELDS.map(rf => (
+            <Field key={rf.key} label={rf.label}>
+              <Select value={form[rf.key] || 'none'} onValueChange={v => set(rf.key, v === 'none' ? null : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Não atribuído</SelectItem>
+                  {profiles?.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name || 'Sem nome'}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+          ))}
           <Field label="Categorias (controle de acesso)">
             <div className="flex flex-wrap gap-2">
               {categoriasDisponiveis.map(cat => {

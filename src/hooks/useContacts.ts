@@ -44,6 +44,10 @@ export interface Contact {
   enviar_cobranca_auto: boolean;
   origin: string;
   responsible_id: string | null;
+  dp_responsible_id: string | null;
+  financeiro_responsible_id: string | null;
+  contabil_responsible_id: string | null;
+  comercial_responsible_id: string | null;
   created_at: string;
   updated_at: string;
   // Dados empresariais
@@ -110,7 +114,7 @@ type ContactOptionalKeys =
   | 'grupo_cipa' | 'registro_entradas' | 'registro_saidas' | 'registro_icms' | 'inventario'
   | 'siare_senha_encrypted';
 
-export type ContactInsert = Omit<Contact, 'id' | 'company_id' | 'created_at' | 'updated_at' | 'origin' | 'whatsapp' | 'responsible_id' | 'canal_entrega' | 'numero_cliente_sicoob' | 'enviar_cobranca_auto' | ContactOptionalKeys> & { origin?: string; whatsapp?: string | null; responsible_id?: string | null; canal_entrega?: string | null; numero_cliente_sicoob?: number | null; enviar_cobranca_auto?: boolean } & Partial<Pick<Contact, ContactOptionalKeys>>;
+export type ContactInsert = Omit<Contact, 'id' | 'company_id' | 'created_at' | 'updated_at' | 'origin' | 'whatsapp' | 'responsible_id' | 'dp_responsible_id' | 'financeiro_responsible_id' | 'contabil_responsible_id' | 'comercial_responsible_id' | 'canal_entrega' | 'numero_cliente_sicoob' | 'enviar_cobranca_auto' | ContactOptionalKeys> & { origin?: string; whatsapp?: string | null; responsible_id?: string | null; dp_responsible_id?: string | null; financeiro_responsible_id?: string | null; contabil_responsible_id?: string | null; comercial_responsible_id?: string | null; canal_entrega?: string | null; numero_cliente_sicoob?: number | null; enviar_cobranca_auto?: boolean } & Partial<Pick<Contact, ContactOptionalKeys>>;
 export type ContactUpdate = Partial<ContactInsert>;
 
 export function useContacts() {

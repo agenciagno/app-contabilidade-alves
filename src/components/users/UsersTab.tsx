@@ -41,6 +41,7 @@ interface Profile {
   status: string | null;
   is_super_admin: boolean;
   allowed_modules: string[];
+  department: string | null;
   created_at: string;
 }
 
@@ -61,7 +62,7 @@ export default function UsersTab({ companyId, currentUserId }: UsersTabProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, user_id, full_name, email, role, status_active, status, is_super_admin, allowed_modules, created_at')
+        .select('id, user_id, full_name, email, role, status_active, status, is_super_admin, allowed_modules, department, created_at')
         .eq('company_id', companyId)
         .order('created_at', { ascending: false });
 
@@ -121,6 +122,7 @@ export default function UsersTab({ companyId, currentUserId }: UsersTabProps) {
       role: user.role || 'colaborador',
       statusActive: user.status_active ?? true,
       allowedModules: user.allowed_modules ?? [],
+      department: user.department ?? null,
     });
     setIsDialogOpen(true);
   };
@@ -177,6 +179,7 @@ export default function UsersTab({ companyId, currentUserId }: UsersTabProps) {
                 <TableHead>Nome</TableHead>
                 <TableHead>E-mail</TableHead>
                 <TableHead>Nível de Acesso</TableHead>
+                <TableHead>Setor</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Módulos</TableHead>
                 <TableHead className="w-[100px]">Ações</TableHead>
@@ -203,6 +206,9 @@ export default function UsersTab({ companyId, currentUserId }: UsersTabProps) {
                     ) : (
                       <Badge variant="outline">{ROLE_LABELS[user.role] || user.role}</Badge>
                     )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {user.department || '—'}
                   </TableCell>
                   <TableCell>
                     {(user.status ?? 'active') === 'pending' ? (

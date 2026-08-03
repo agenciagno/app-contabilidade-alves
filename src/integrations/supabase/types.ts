@@ -2991,6 +2991,7 @@ export type Database = {
           company_id: string
           cpf: string | null
           created_at: string
+          department: string | null
           email: string
           first_name: string | null
           force_password_change: boolean
@@ -3014,6 +3015,7 @@ export type Database = {
           company_id: string
           cpf?: string | null
           created_at?: string
+          department?: string | null
           email: string
           first_name?: string | null
           force_password_change?: boolean
@@ -3037,6 +3039,7 @@ export type Database = {
           company_id?: string
           cpf?: string | null
           created_at?: string
+          department?: string | null
           email?: string
           first_name?: string | null
           force_password_change?: boolean

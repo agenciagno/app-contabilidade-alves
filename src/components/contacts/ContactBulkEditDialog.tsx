@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useCompany } from '@/hooks/useCompany';
+import { RESPONSIBLE_FIELDS } from '@/constants/responsibleFields';
 
 interface ContactBulkEditDialogProps {
   open: boolean;
@@ -49,8 +50,8 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
   const [statusCliente, setStatusCliente] = useState('');
   const [editRegime, setEditRegime] = useState(false);
   const [taxRegime, setTaxRegime] = useState('');
-  const [editResponsible, setEditResponsible] = useState(false);
-  const [responsibleId, setResponsibleId] = useState('');
+  const [editResponsibleFields, setEditResponsibleFields] = useState<Record<string, boolean>>({});
+  const [responsibleIdValues, setResponsibleIdValues] = useState<Record<string, string>>({});
 
   const [editObrigacoes, setEditObrigacoes] = useState(false);
   const [obrigacoesIds, setObrigacoesIds] = useState<string[]>([]);
@@ -76,7 +77,7 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
       setEditPorte(false); setPorte('');
       setEditStatusCliente(false); setStatusCliente('');
       setEditRegime(false); setTaxRegime('');
-      setEditResponsible(false); setResponsibleId('');
+      setEditResponsibleFields({}); setResponsibleIdValues({});
       setEditObrigacoes(false); setObrigacoesIds([]);
       setEditCategorias(false); setCategoriasIds([]);
       setEditBoletoActive(false); setBoletoActive(false);
@@ -141,7 +142,11 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
       if (editPorte && porte) updates.porte = porte;
       if (editStatusCliente && statusCliente) updates.status_cliente = statusCliente;
       if (editRegime && taxRegime) updates.tax_regime = taxRegime;
-      if (editResponsible && responsibleId) updates.responsible_id = responsibleId;
+      RESPONSIBLE_FIELDS.forEach(rf => {
+        if (editResponsibleFields[rf.key] && responsibleIdValues[rf.key]) {
+          updates[rf.key] = responsibleIdValues[rf.key];
+        }
+      });
       if (editCategorias) updates.categorias = categoriasIds;
       if (editBoletoActive) updates.boleto_active = boletoActive;
       if (editBoletoDueDay && boletoDueDay) updates.boleto_due_day = parseInt(boletoDueDay, 10);
@@ -263,22 +268,30 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
                 )}
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Switch checked={editResponsible} onCheckedChange={setEditResponsible} />
-                  <Label>Colaborador Responsável</Label>
+              {RESPONSIBLE_FIELDS.map(rf => (
+                <div key={rf.key} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={!!editResponsibleFields[rf.key]}
+                      onCheckedChange={(v) => setEditResponsibleFields(prev => ({ ...prev, [rf.key]: v }))}
+                    />
+                    <Label>{rf.label}</Label>
+                  </div>
+                  {editResponsibleFields[rf.key] && (
+                    <Select
+                      value={responsibleIdValues[rf.key] || ''}
+                      onValueChange={(v) => setResponsibleIdValues(prev => ({ ...prev, [rf.key]: v }))}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        {profiles.map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.full_name || 'Sem nome'}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
-                {editResponsible && (
-                  <Select value={responsibleId} onValueChange={setResponsibleId}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      {profiles.map(p => (
-                        <SelectItem key={p.id} value={p.id}>{p.full_name || 'Sem nome'}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
+              ))}
             </section>
 
             <Separator />

@@ -15,7 +15,7 @@ const SUPER_PERFIL_COLUMNS = [
   'address', 'address_number', 'complemento', 'neighborhood', 'city', 'state', 'cep',
   'tax_regime', 'ie', 'im', 'regime_apuracao', 'numero_alvara', 'validade_alvara',
   'registro_entradas', 'registro_saidas', 'registro_icms', 'inventario',
-  'responsible_id', 'categorias',
+  'responsible_id', 'dp_responsible_id', 'financeiro_responsible_id', 'contabil_responsible_id', 'comercial_responsible_id', 'categorias',
   'data_inicio_contrato', 'data_saida_cliente',
   'data_abertura_junta', 'data_encerramento_junta',
   'data_abertura_rf', 'data_encerramento_rf',

@@ -78,6 +78,10 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
   const [taxRegime, setTaxRegime] = useState<TaxRegime | ''>(contact.tax_regime || '');
   const [isActive, setIsActive] = useState(contact.is_active);
   const [responsibleId, setResponsibleId] = useState<string>(contact.responsible_id || 'none');
+  const [dpResponsibleId, setDpResponsibleId] = useState<string>(contact.dp_responsible_id || 'none');
+  const [financeiroResponsibleId, setFinanceiroResponsibleId] = useState<string>(contact.financeiro_responsible_id || 'none');
+  const [contabilResponsibleId, setContabilResponsibleId] = useState<string>(contact.contabil_responsible_id || 'none');
+  const [comercialResponsibleId, setComercialResponsibleId] = useState<string>(contact.comercial_responsible_id || 'none');
   const [selectedObligations, setSelectedObligations] = useState<Set<string>>(new Set());
   const [obligationsInitialized, setObligationsInitialized] = useState(false);
 
@@ -194,6 +198,10 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
     setTaxRegime(contact.tax_regime || '');
     setIsActive(contact.is_active);
     setResponsibleId(contact.responsible_id || 'none');
+    setDpResponsibleId(contact.dp_responsible_id || 'none');
+    setFinanceiroResponsibleId(contact.financeiro_responsible_id || 'none');
+    setContabilResponsibleId(contact.contabil_responsible_id || 'none');
+    setComercialResponsibleId(contact.comercial_responsible_id || 'none');
     setNotes(contact.notes || '');
     setBoletoValue(contact.boleto_value != null ? String(contact.boleto_value) : '');
     setBoletoDueDay(contact.boleto_due_day != null ? String(contact.boleto_due_day) : 'none');
@@ -345,7 +353,15 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
     } else if (section === 'endereco') {
       updates = { cep: cep || null, address: address || null, address_number: addressNumber || null, neighborhood: neighborhood || null, city: city || null, state: state || null };
     } else if (section === 'fiscal') {
-      updates = { tax_regime: (taxRegime as TaxRegime) || null, is_active: isActive, responsible_id: responsibleId === 'none' ? null : responsibleId };
+      updates = {
+        tax_regime: (taxRegime as TaxRegime) || null,
+        is_active: isActive,
+        responsible_id: responsibleId === 'none' ? null : responsibleId,
+        dp_responsible_id: dpResponsibleId === 'none' ? null : dpResponsibleId,
+        financeiro_responsible_id: financeiroResponsibleId === 'none' ? null : financeiroResponsibleId,
+        contabil_responsible_id: contabilResponsibleId === 'none' ? null : contabilResponsibleId,
+        comercial_responsible_id: comercialResponsibleId === 'none' ? null : comercialResponsibleId,
+      };
     } else if (section === 'observacoes') {
       updates = { notes: notes || null };
     } else if (section === 'cobranca') {
@@ -532,8 +548,64 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
                 <Switch checked={isActive} onCheckedChange={setIsActive} />
               </div>
               <div className="space-y-1.5">
-                <Label>Colaborador Responsável</Label>
+                <Label>Responsável — Fiscal</Label>
                 <Select value={responsibleId} onValueChange={setResponsibleId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Não atribuído</SelectItem>
+                    {profiles?.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.full_name || 'Sem nome'}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Responsável — Departamento Pessoal</Label>
+                <Select value={dpResponsibleId} onValueChange={setDpResponsibleId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Não atribuído</SelectItem>
+                    {profiles?.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.full_name || 'Sem nome'}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Responsável — Financeiro</Label>
+                <Select value={financeiroResponsibleId} onValueChange={setFinanceiroResponsibleId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Não atribuído</SelectItem>
+                    {profiles?.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.full_name || 'Sem nome'}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Responsável — Contábil</Label>
+                <Select value={contabilResponsibleId} onValueChange={setContabilResponsibleId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Não atribuído</SelectItem>
+                    {profiles?.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.full_name || 'Sem nome'}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Responsável — Comercial</Label>
+                <Select value={comercialResponsibleId} onValueChange={setComercialResponsibleId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o responsável" />
                   </SelectTrigger>

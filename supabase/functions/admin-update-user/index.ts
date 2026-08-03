@@ -13,6 +13,7 @@ const BodySchema = z.object({
   role: z.string().min(1),
   statusActive: z.boolean(),
   allowedModules: z.array(z.string()),
+  department: z.string().nullable().optional(),
 });
 
 Deno.serve(async (req) => {
@@ -54,7 +55,7 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
-    const { userId, fullName, role, statusActive, allowedModules } = parsed.data;
+    const { userId, fullName, role, statusActive, allowedModules, department } = parsed.data;
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
@@ -97,15 +98,20 @@ Deno.serve(async (req) => {
       }
     }
 
+    const updatePayload: Record<string, unknown> = {
+      full_name: fullName,
+      role,
+      status_active: statusActive,
+      is_super_admin: role === 'super_admin',
+      allowed_modules: allowedModules,
+    };
+    if (department !== undefined) {
+      updatePayload.department = department;
+    }
+
     const { error: updErr } = await admin
       .from('profiles')
-      .update({
-        full_name: fullName,
-        role,
-        status_active: statusActive,
-        is_super_admin: role === 'super_admin',
-        allowed_modules: allowedModules,
-      })
+      .update(updatePayload)
       .eq('user_id', userId);
 
     if (updErr) {
