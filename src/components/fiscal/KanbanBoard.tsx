@@ -16,7 +16,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowDownAZ, ArrowDownZA, Clock } from 'lucide-react';
+import { ArrowDownAZ, ArrowDownZA } from 'lucide-react';
 import { differenceInDays, parseISO } from 'date-fns';
 import { FiscalTask } from '@/hooks/useFiscalTasks';
 import { TaskCard } from './TaskCard';
@@ -26,9 +26,9 @@ import { useActiveCoverageByContact } from '@/hooks/useTemporaryTransfers';
 import { fiscalTaskContactLabel, isFiscalTaskDone } from '@/lib/fiscal-filters';
 
 const COLUMNS = [
-  { id: 'a_fazer', label: 'A Fazer', color: 'bg-state-todo' },
-  { id: 'em_progresso', label: 'Em Progresso', color: 'bg-state-doing' },
-  { id: 'aguardando_cliente', label: 'Aguardando Cliente', color: 'bg-state-waiting' },
+  { id: 'a_fazer', label: 'A fazer', color: 'bg-state-todo' },
+  { id: 'em_progresso', label: 'Em progresso', color: 'bg-state-doing' },
+  { id: 'aguardando_cliente', label: 'Aguardando cliente', color: 'bg-state-waiting' },
   { id: 'concluido', label: 'Concluído', color: 'bg-ok' },
 ] as const;
 
@@ -88,22 +88,13 @@ function DroppableColumn({
   children: React.ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
-  const isWaiting = id === 'aguardando_cliente';
 
   return (
     <div className="flex-1 min-w-[260px] flex-shrink-0 flex flex-col">
-      <div
-        className={`flex items-center gap-2 mb-3 px-2 py-1.5 rounded-md ${
-          isWaiting ? 'bg-warn-soft dark:bg-warn/20' : ''
-        }`}
-      >
-        {isWaiting ? (
-          <Clock className="w-3.5 h-3.5 text-warn dark:text-warn" />
-        ) : (
-          <div className={`w-2.5 h-2.5 rounded-full ${color}`} />
-        )}
+      <div className="flex items-center gap-2 mb-3 px-2 py-1.5">
+        <div className={`w-2 h-2 rounded-full ${color}`} />
         <span className="text-sm font-semibold text-foreground">{label}</span>
-        <span className="text-xs text-muted-foreground bg-muted rounded-full px-2 py-0.5">{count}</span>
+        <span className="text-xs text-muted-foreground">{count}</span>
         <button
           type="button"
           onClick={onToggleSort}

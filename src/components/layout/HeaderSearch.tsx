@@ -51,7 +51,7 @@ export function HeaderSearch() {
       if (!passesRoleGate(entry)) return;
 
       if (entry.kind === 'simple') {
-        if (!isModuleVisible(entry.moduleKey)) return;
+        if (entry.moduleKey && !isModuleVisible(entry.moduleKey)) return;
         out.push({ title: entry.title, url: entry.url, icon: entry.icon, group: currentSection });
         return;
       }

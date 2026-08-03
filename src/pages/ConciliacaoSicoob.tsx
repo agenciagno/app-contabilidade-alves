@@ -2,24 +2,26 @@ import { useMemo, useState } from 'react';
 import { format, addMonths, startOfMonth, parseISO, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  Landmark, Wallet, Search, AlertTriangle, CheckCircle2, HelpCircle, FlaskConical, Loader2, X,
+  RefreshCw, CalendarDays, SlidersHorizontal, ArrowUpDown, CheckCircle2, Loader2, X, FlaskConical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { PageHeader, StatCardRow, DsAlert, DsBadge, SearchField, tabsListClass, tabsTriggerClass } from '@/components/ds';
+import { SearchableSelect } from '@/components/fiscal/SearchableSelect';
 import { useSicoobConciliacao, type SicoobLancamento, type BoletoParaMatch } from '@/hooks/useSicoobConciliacao';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +32,8 @@ const fmtDate = (s: string | null | undefined) => {
   if (!s) return '—';
   try { return format(parseISO(s.slice(0, 10)), 'dd/MM/yyyy'); } catch { return '—'; }
 };
+
+const tipoLabel = (tipo: string) => (tipo === 'CREDITO' ? 'Crédito' : tipo === 'DEBITO' ? 'Débito' : tipo);
 
 function getMonthOptions(): { value: string; mes: number; ano: number }[] {
   const now = startOfMonth(new Date());
@@ -77,6 +81,16 @@ function classificar(c: Candidatos): CompStatus {
   return 'NAO_IDENTIFICADO';
 }
 
+// Mapa de status real (4 estados) -> vocabulário visual do Figma (conciliado/sem par/divergente).
+// BATE (achou 1 candidato, aguardando confirmação humana) não tem par 1:1 no Figma — mantido como
+// estado próprio (tone "info") porque colapsá-lo em "conciliado" mentiria sobre o que já foi baixado.
+function statusBadge(status: CompStatus, tipo: string): { tone: 'ok' | 'warn' | 'danger' | 'info' | 'neutral'; label: string } {
+  if (status === 'JA_CONFIRMADO') return { tone: 'ok', label: 'Conciliado' };
+  if (status === 'BATE') return { tone: 'info', label: 'Bate com boleto' };
+  if (status === 'AMBIGUO') return { tone: 'danger', label: 'Divergente' };
+  return tipo === 'CREDITO' ? { tone: 'warn', label: 'Sem par' } : { tone: 'neutral', label: 'Fora do escopo' };
+}
+
 export default function ConciliacaoSicoob() {
   const monthOptions = useMemo(() => getMonthOptions(), []);
   const [periodo, setPeriodo] = useState(() => monthOptions[monthOptions.length - 1].value);
@@ -84,20 +98,17 @@ export default function ConciliacaoSicoob() {
 
   const {
     saldo, saldoLoading, saldoError,
-    extrato, extratoLoading, extratoError,
+    extrato, extratoLoading, extratoError, refetchExtrato,
     boletos, boletosLoading,
     confirmarBaixa,
   } = useSicoobConciliacao(selected.mes, selected.ano);
 
-  // Filtros — Extrato completo
+  // Filtros — compartilhados pelas 4 abas (Figma mostra uma única barra de busca/filtros
+  // abaixo das abas, válida para qualquer uma delas).
   const [search, setSearch] = useState('');
-  const [tipoFilter, setTipoFilter] = useState('ALL');
+  const [tipoFilter, setTipoFilter] = useState('all');
   const [valorMin, setValorMin] = useState('');
   const [valorMax, setValorMax] = useState('');
-
-  // Filtros — Comparativo
-  const [compStatus, setCompStatus] = useState<'ALL' | CompStatus>('ALL');
-  const [compSearch, setCompSearch] = useState('');
 
   const [confirmTarget, setConfirmTarget] = useState<{ lanc: SicoobLancamento; candidatos: BoletoParaMatch[] } | null>(null);
   const [escolhido, setEscolhido] = useState<string>('');
@@ -107,23 +118,8 @@ export default function ConciliacaoSicoob() {
     return Array.from(set);
   }, [extrato]);
 
-  const filteredExtrato = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const min = valorMin.trim() ? Number(valorMin.replace(',', '.')) : null;
-    const max = valorMax.trim() ? Number(valorMax.replace(',', '.')) : null;
-    return (extrato?.transacoes ?? []).filter((t) => {
-      if (tipoFilter !== 'ALL' && t.tipo !== tipoFilter) return false;
-      if (term) {
-        const haystack = `${t.descricao ?? ''} ${t.descInfComplementar ?? ''} ${t.numeroDocumento ?? ''} ${t.cpfCnpj ?? ''}`.toLowerCase();
-        if (!haystack.includes(term)) return false;
-      }
-      const valorAbs = Math.abs(Number(t.valor));
-      if (min != null && !Number.isNaN(min) && !(valorAbs >= min)) return false;
-      if (max != null && !Number.isNaN(max) && !(valorAbs <= max)) return false;
-      return true;
-    });
-  }, [extrato, search, tipoFilter, valorMin, valorMax]);
-
+  // Comparativo — todo lançamento do extrato (crédito ou débito) cruzado com os boletos abertos.
+  // Fonte única para as 4 abas: cada uma só filtra por `status`, sem recalcular nada.
   const comparativo = useMemo(() => {
     return (extrato?.transacoes ?? []).map((lanc) => {
       const candidatos = findCandidatos(lanc, boletos);
@@ -131,20 +127,35 @@ export default function ConciliacaoSicoob() {
     });
   }, [extrato, boletos]);
 
-  const filteredComparativo = useMemo(() => {
-    const term = compSearch.trim().toLowerCase();
-    return comparativo.filter((row) => {
-      if (compStatus !== 'ALL' && row.status !== compStatus) return false;
+  const filteredRows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const min = valorMin.trim() ? Number(valorMin.replace(',', '.')) : null;
+    const max = valorMax.trim() ? Number(valorMax.replace(',', '.')) : null;
+    return comparativo.filter(({ lanc, candidatos, status }) => {
+      if (tipoFilter !== 'all' && lanc.tipo !== tipoFilter) return false;
+      const valorAbs = Math.abs(Number(lanc.valor));
+      if (min != null && !Number.isNaN(min) && !(valorAbs >= min)) return false;
+      if (max != null && !Number.isNaN(max) && !(valorAbs <= max)) return false;
       if (term) {
-        const nomes = [...row.candidatos.pendentes, ...row.candidatos.pagos].map((b) => b.contact_name).join(' ');
-        const haystack = `${row.lanc.descricao ?? ''} ${nomes} ${row.lanc.numeroDocumento ?? ''}`.toLowerCase();
+        const nomes = status === 'JA_CONFIRMADO'
+          ? candidatos.pagos.map((b) => b.contact_name).join(' ')
+          : candidatos.pendentes.map((b) => b.contact_name).join(' ');
+        const haystack = `${lanc.descricao ?? ''} ${lanc.descInfComplementar ?? ''} ${lanc.numeroDocumento ?? ''} ${lanc.cpfCnpj ?? ''} ${nomes}`.toLowerCase();
         if (!haystack.includes(term)) return false;
       }
       return true;
     });
-  }, [comparativo, compStatus, compSearch]);
+  }, [comparativo, search, tipoFilter, valorMin, valorMax]);
 
   const pendentesRevisao = comparativo.filter((r) => r.status === 'AMBIGUO' || r.status === 'NAO_IDENTIFICADO').length;
+  const conciliadosCount = comparativo.filter((r) => r.status === 'JA_CONFIRMADO').length;
+
+  const totais = useMemo(() => {
+    const txs = extrato?.transacoes ?? [];
+    const entradas = txs.filter((t) => t.tipo === 'CREDITO').reduce((s, t) => s + Math.abs(Number(t.valor)), 0);
+    const saidas = txs.filter((t) => t.tipo === 'DEBITO').reduce((s, t) => s + Math.abs(Number(t.valor)), 0);
+    return { entradas, saidas };
+  }, [extrato]);
 
   const openConfirm = (lanc: SicoobLancamento, candidatos: BoletoParaMatch[]) => {
     setEscolhido(candidatos.length === 1 ? candidatos[0].id : '');
@@ -159,287 +170,225 @@ export default function ConciliacaoSicoob() {
     );
   };
 
+  const hasActiveFilters = search || tipoFilter !== 'all' || valorMin || valorMax;
+  const clearFilters = () => { setSearch(''); setTipoFilter('all'); setValorMin(''); setValorMax(''); };
+
+  const renderTabela = (rows: typeof filteredRows) => {
+    const total = extrato?.transacoes.length ?? 0;
+    return (
+      <div className="space-y-3">
+        <div className="rounded-lg border border-line bg-paper">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Descrição</TableHead>
+                <TableHead>Documento</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead>Lançamento (Sicoob)</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-[150px]" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {extratoLoading || boletosLoading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 8 }).map((__, j) => (
+                      <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : extratoError ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-32 text-center text-danger">{extratoError.message}</TableCell>
+                </TableRow>
+              ) : rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-ink">Nenhum movimento encontrado</TableCell>
+                </TableRow>
+              ) : (
+                rows.map(({ lanc, candidatos, status }) => {
+                  const nomes = status === 'JA_CONFIRMADO'
+                    ? candidatos.pagos.map((b) => b.contact_name).join(', ')
+                    : candidatos.pendentes.map((b) => b.contact_name).join(', ');
+                  const badge = statusBadge(status, lanc.tipo);
+                  return (
+                    <TableRow key={lanc.transactionId}>
+                      <TableCell className="whitespace-nowrap">{fmtDate(lanc.data)}</TableCell>
+                      <TableCell className="max-w-[260px]">
+                        <p className="truncate text-ink">{lanc.descricao}</p>
+                        {lanc.descInfComplementar && (
+                          <p className="truncate text-meta text-muted-ink">{lanc.descInfComplementar.replace(/\|@/g, ' ')}</p>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-ink">{lanc.numeroDocumento || '—'}</TableCell>
+                      <TableCell>{tipoLabel(lanc.tipo)}</TableCell>
+                      <TableCell className={cn('text-right font-medium', lanc.tipo === 'DEBITO' ? 'text-danger' : 'text-ok')}>
+                        {lanc.tipo === 'DEBITO' ? '- ' : ''}{fmtBRL(lanc.valor)}
+                      </TableCell>
+                      <TableCell className="max-w-[180px] truncate text-ui">{nomes || '—'}</TableCell>
+                      <TableCell><DsBadge tone={badge.tone}>{badge.label}</DsBadge></TableCell>
+                      <TableCell>
+                        {(status === 'BATE' || status === 'AMBIGUO') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5"
+                            onClick={() => openConfirm(lanc, candidatos.pendentes)}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Confirmar baixa
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <p className="text-meta text-muted-ink">
+          {rows.length} de {total} movimentos · competência {String(selected.mes).padStart(2, '0')}/{selected.ano}
+        </p>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full">
-      {/* Cabeçalho */}
-      <div className="flex items-center justify-between py-4 px-6 flex-wrap gap-4">
-        <div className="space-y-1">
-          <p className="text-kicker uppercase text-muted-foreground">Financeiro · Conciliação</p>
-          <h1 className="text-display text-foreground flex items-center gap-2">
-            <Landmark className="w-7 h-7 text-primary" />
-            Conciliação Sicoob
-          </h1>
-          <p className="text-[14px] text-muted-foreground">
-            Extrato real da conta e comparativo com os dados do sistema — leitura e confirmação manual, sem baixa automática
-          </p>
+      <div className="space-y-5 px-6 py-4">
+        <PageHeader
+          kicker="~/financeiro · conciliação"
+          title="Conciliação Sicoob."
+          subtitle="Extrato bancário confrontado com os lançamentos do sistema."
+          actions={
+            <Button variant="outline" className="gap-1.5" onClick={() => refetchExtrato()} disabled={extratoLoading}>
+              <RefreshCw className="h-3.5 w-3.5" /> Sincronizar
+            </Button>
+          }
+        />
+
+        <DsAlert
+          tone="warn"
+          icon={<FlaskConical />}
+          title="Teste — confirme cada baixa manualmente"
+          description="Leitura e confirmação manual, sem baixa automática."
+        />
+
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-meta text-muted-ink">
+          <span>Saldo Sicoob <span className="font-medium text-ink">{saldoLoading ? '…' : saldoError ? '—' : fmtBRL(saldo?.saldo)}</span></span>
+          <span>Bloqueado <span className="font-medium text-ink">{saldoLoading ? '…' : fmtBRL(saldo?.saldoBloqueado)}</span></span>
+          <span>Limite disponível <span className="font-medium text-ink">{saldoLoading ? '…' : fmtBRL(saldo?.saldoLimite)}</span></span>
         </div>
-        <Badge variant="outline" className="gap-1.5 border-warn/40 text-warn dark:text-warn bg-warn/10">
-          <FlaskConical className="h-3.5 w-3.5" /> Teste — confirme cada baixa manualmente
-        </Badge>
+
+        <StatCardRow
+          items={[
+            { label: 'Não conciliados', value: pendentesRevisao, hint: 'exigem revisão manual', emphasis: pendentesRevisao > 0 ? 'warm' : 'none' },
+            { label: 'Conciliados', value: conciliadosCount, hint: 'no período' },
+            { label: 'Entradas', value: fmtBRL(totais.entradas), hint: 'no extrato' },
+            { label: 'Saídas', value: fmtBRL(totais.saidas), hint: 'no extrato' },
+          ]}
+        />
       </div>
 
-      {/* Saldo + período */}
-      <div className="px-6 flex items-center gap-3 flex-wrap">
-        <Card className="flex-1 min-w-[220px]">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-2 text-muted-foreground text-kicker uppercase">
-              <Wallet className="h-4 w-4" /><span>Saldo atual (Sicoob)</span>
-            </div>
-            {saldoLoading ? (
-              <Skeleton className="h-8 w-32 mt-2" />
-            ) : saldoError ? (
-              <p className="text-sm text-destructive mt-2">{saldoError.message}</p>
-            ) : (
-              <p className="text-[1.75rem] font-bold mt-2 tracking-tight leading-none">{fmtBRL(saldo?.saldo)}</p>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="flex-1 min-w-[220px]">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-2 text-muted-foreground text-kicker uppercase">
-              <span>Saldo bloqueado</span>
-            </div>
-            <p className="text-[1.75rem] font-bold mt-2 tracking-tight leading-none">
-              {saldoLoading ? <Skeleton className="h-8 w-24" /> : fmtBRL(saldo?.saldoBloqueado)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="flex-1 min-w-[220px]">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-2 text-muted-foreground text-kicker uppercase">
-              <span>Limite disponível</span>
-            </div>
-            <p className="text-[1.75rem] font-bold mt-2 tracking-tight leading-none">
-              {saldoLoading ? <Skeleton className="h-8 w-24" /> : fmtBRL(saldo?.saldoLimite)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Select value={periodo} onValueChange={setPeriodo}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Mês do extrato" />
-          </SelectTrigger>
-          <SelectContent>
-            {monthOptions.map((m) => (
-              <SelectItem key={m.value} value={m.value}>
-                {format(parseISO(m.value), "MMMM 'de' yyyy", { locale: ptBR })}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex-1 overflow-auto px-6 py-4">
+      <div className="flex-1 overflow-auto px-6 pb-6">
         <Tabs defaultValue="extrato">
-          <TabsList>
-            <TabsTrigger value="extrato">Extrato completo</TabsTrigger>
-            <TabsTrigger value="comparativo" className="gap-1.5">
-              Comparativo
-              {pendentesRevisao > 0 && (
-                <Badge variant="outline" className="h-5 px-1.5 border-warn/40 text-warn dark:text-warn">
-                  {pendentesRevisao}
-                </Badge>
-              )}
-            </TabsTrigger>
+          <TabsList className={tabsListClass}>
+            <TabsTrigger className={tabsTriggerClass} value="extrato">Extrato completo</TabsTrigger>
+            <TabsTrigger className={tabsTriggerClass} value="nao_conciliados">Não conciliados</TabsTrigger>
+            <TabsTrigger className={tabsTriggerClass} value="conciliados">Conciliados</TabsTrigger>
+            <TabsTrigger className={tabsTriggerClass} value="divergencias">Divergências</TabsTrigger>
           </TabsList>
 
-          {/* ---------------- Extrato completo ---------------- */}
-          <TabsContent value="extrato" className="space-y-4 mt-4">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar por descrição, documento ou CPF/CNPJ…"
-                  className="pl-9 w-[300px]"
-                />
-              </div>
-              <Select value={tipoFilter} onValueChange={setTipoFilter}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Tipo de lançamento" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todos os tipos</SelectItem>
-                  {tipos.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <div className="flex items-center gap-1.5">
-                <Input type="number" inputMode="decimal" step="0.01" value={valorMin}
-                  onChange={(e) => setValorMin(e.target.value)} placeholder="Valor mín." className="w-[110px]" />
-                <span className="text-muted-foreground text-sm">–</span>
-                <Input type="number" inputMode="decimal" step="0.01" value={valorMax}
-                  onChange={(e) => setValorMax(e.target.value)} placeholder="Valor máx." className="w-[110px]" />
-              </div>
-              {(search || tipoFilter !== 'ALL' || valorMin || valorMax) && (
-                <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground"
-                  onClick={() => { setSearch(''); setTipoFilter('ALL'); setValorMin(''); setValorMax(''); }}>
-                  <X className="h-3.5 w-3.5" /> Limpar filtros
-                </Button>
-              )}
-            </div>
+          <div className="flex flex-wrap items-center gap-2 py-4">
+            <SearchField
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por descrição, documento ou CPF/CNPJ…"
+              wrapperClassName="flex-1 min-w-[240px]"
+            />
 
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Descrição</TableHead>
-                      <TableHead>Documento</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {extratoLoading ? (
-                      Array.from({ length: 6 }).map((_, i) => (
-                        <TableRow key={i}>
-                          {Array.from({ length: 5 }).map((__, j) => (
-                            <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    ) : extratoError ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="h-32 text-center text-destructive">{extratoError.message}</TableCell>
-                      </TableRow>
-                    ) : filteredExtrato.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">Nenhum lançamento no período</TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredExtrato.map((t) => (
-                        <TableRow key={t.transactionId}>
-                          <TableCell>{fmtDate(t.data)}</TableCell>
-                          <TableCell className="max-w-[360px] truncate" title={t.descInfComplementar || undefined}>
-                            {t.descricao}{t.descInfComplementar ? ` — ${t.descInfComplementar.replace(/\|@/g, ' ')}` : ''}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">{t.numeroDocumento || '—'}</TableCell>
-                          <TableCell>{t.tipo}</TableCell>
-                          <TableCell className={cn('text-right font-medium', t.tipo === 'DEBITO' ? 'text-destructive' : 'text-success')}>
-                            {t.tipo === 'DEBITO' ? '- ' : ''}{fmtBRL(t.valor)}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <Select value={periodo} onValueChange={setPeriodo}>
+              <SelectTrigger className="h-9 w-auto gap-2 rounded-sm border-line bg-paper px-3 text-ui text-ink [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:opacity-100 [&>svg]:text-muted-ink-2">
+                <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-ink" strokeWidth={1.75} />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {format(parseISO(m.value), "MMMM 'de' yyyy", { locale: ptBR })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <SearchableSelect
+              icon={ArrowUpDown}
+              value={tipoFilter}
+              onChange={setTipoFilter}
+              options={tipos.map((t) => ({ value: t, label: tipoLabel(t) }))}
+              placeholder="Tipo"
+              allLabel="Todos os tipos"
+              width="w-[110px]"
+            />
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-9 shrink-0 items-center gap-1.5 rounded-sm border border-line bg-paper px-3 text-ui text-muted-ink transition-colors hover:bg-bg-2"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  Mais filtros
+                  {(valorMin || valorMax) && <span className="h-1.5 w-1.5 rounded-full bg-brand" />}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-64 space-y-2 p-3">
+                <Label className="text-xs">Faixa de valor</Label>
+                <div className="flex items-center gap-1.5">
+                  <Input type="number" inputMode="decimal" step="0.01" value={valorMin}
+                    onChange={(e) => setValorMin(e.target.value)} placeholder="Mín." className="h-9" />
+                  <span className="text-muted-ink text-sm">–</span>
+                  <Input type="number" inputMode="decimal" step="0.01" value={valorMax}
+                    onChange={(e) => setValorMax(e.target.value)} placeholder="Máx." className="h-9" />
+                </div>
+                {(valorMin || valorMax) && (
+                  <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs"
+                    onClick={() => { setValorMin(''); setValorMax(''); }}>
+                    <X className="h-3.5 w-3.5" /> Limpar
+                  </Button>
+                )}
+              </PopoverContent>
+            </Popover>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" className="gap-1.5 text-muted-ink" onClick={clearFilters}>
+                <X className="h-3.5 w-3.5" /> Limpar filtros
+              </Button>
+            )}
+          </div>
+
+          <TabsContent value="extrato" className="mt-0">
+            {renderTabela(filteredRows)}
           </TabsContent>
 
-          {/* ---------------- Comparativo ---------------- */}
-          <TabsContent value="comparativo" className="space-y-4 mt-4">
-            <p className="text-xs text-muted-foreground max-w-2xl">
+          <TabsContent value="nao_conciliados" className="mt-0">
+            {renderTabela(filteredRows.filter((r) => r.status !== 'JA_CONFIRMADO'))}
+          </TabsContent>
+
+          <TabsContent value="conciliados" className="mt-0">
+            {renderTabela(filteredRows.filter((r) => r.status === 'JA_CONFIRMADO'))}
+          </TabsContent>
+
+          <TabsContent value="divergencias" className="mt-0 space-y-3">
+            <p className="max-w-2xl text-xs text-muted-foreground">
               O Sicoob não manda identificador do boleto nos lançamentos de recebimento — o cruzamento é por
               valor + data próxima do vencimento (±{JANELA_DIAS} dias). Quando mais de um boleto bate, escolha
               manualmente antes de confirmar. Nenhuma baixa acontece sem essa confirmação.
             </p>
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={compSearch}
-                  onChange={(e) => setCompSearch(e.target.value)}
-                  placeholder="Buscar por cliente, descrição ou documento…"
-                  className="pl-9 w-[300px]"
-                />
-              </div>
-              <Select value={compStatus} onValueChange={(v: any) => setCompStatus(v)}>
-                <SelectTrigger className="w-[240px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todos</SelectItem>
-                  <SelectItem value="BATE">Bate com um boleto</SelectItem>
-                  <SelectItem value="AMBIGUO">Múltiplos candidatos</SelectItem>
-                  <SelectItem value="JA_CONFIRMADO">Já confirmado</SelectItem>
-                  <SelectItem value="NAO_IDENTIFICADO">Não identificado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Lançamento (Sicoob)</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Cliente / candidato(s)</TableHead>
-                      <TableHead className="w-[160px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {extratoLoading || boletosLoading ? (
-                      Array.from({ length: 6 }).map((_, i) => (
-                        <TableRow key={i}>
-                          {Array.from({ length: 6 }).map((__, j) => (
-                            <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    ) : filteredComparativo.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">Nenhum lançamento no período</TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredComparativo.map((row) => {
-                        const nomes = row.status === 'JA_CONFIRMADO'
-                          ? row.candidatos.pagos.map((b) => b.contact_name).join(', ')
-                          : row.candidatos.pendentes.map((b) => b.contact_name).join(', ');
-                        return (
-                          <TableRow key={row.lanc.transactionId}>
-                            <TableCell>{fmtDate(row.lanc.data)}</TableCell>
-                            <TableCell className="max-w-[260px] truncate">{row.lanc.descricao}</TableCell>
-                            <TableCell className={cn('text-right font-medium', row.lanc.tipo === 'DEBITO' ? 'text-destructive' : 'text-success')}>
-                              {fmtBRL(row.lanc.valor)}
-                            </TableCell>
-                            <TableCell>
-                              {row.status === 'BATE' && (
-                                <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 dark:text-blue-400">Bate com boleto</Badge>
-                              )}
-                              {row.status === 'AMBIGUO' && (
-                                <Badge className="bg-purple-500/15 text-purple-600 border-purple-500/30 dark:text-purple-400">
-                                  <HelpCircle className="h-3 w-3 mr-1" />{row.candidatos.pendentes.length} candidatos
-                                </Badge>
-                              )}
-                              {row.status === 'JA_CONFIRMADO' && (
-                                <Badge className="bg-success/15 text-success border-success/30"><CheckCircle2 className="h-3 w-3 mr-1" />Já confirmado</Badge>
-                              )}
-                              {row.status === 'NAO_IDENTIFICADO' && row.lanc.tipo === 'CREDITO' && (
-                                <Badge className="bg-warn/15 text-warn dark:text-warn border-warn/30">
-                                  <AlertTriangle className="h-3 w-3 mr-1" />Não identificado
-                                </Badge>
-                              )}
-                              {row.lanc.tipo === 'DEBITO' && row.status === 'NAO_IDENTIFICADO' && (
-                                <Badge variant="outline">Débito (fora de boleto)</Badge>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-sm">{nomes || '—'}</TableCell>
-                            <TableCell>
-                              {(row.status === 'BATE' || row.status === 'AMBIGUO') && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="gap-1.5"
-                                  onClick={() => openConfirm(row.lanc, row.candidatos.pendentes)}
-                                >
-                                  <CheckCircle2 className="h-3.5 w-3.5" /> Confirmar baixa
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            {renderTabela(filteredRows.filter((r) => r.status === 'AMBIGUO'))}
           </TabsContent>
         </Tabs>
       </div>

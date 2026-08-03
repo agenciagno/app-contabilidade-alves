@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2, Upload, User, KeyRound, Mail } from 'lucide-react';
+import { Loader2, Upload, User, KeyRound, Mail, Monitor, LogOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -15,6 +15,26 @@ import { useCompany } from '@/hooks/useCompany';
 import CompanyDataCard from '@/components/settings/CompanyDataCard';
 import { maskCpf, maskPhone, unmaskPhone } from '@/lib/utils';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { PageHeader, DsBadge, tabsListClass, tabsTriggerClass } from '@/components/ds';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+function parseDeviceInfo(ua: string | null): string {
+  if (!ua) return 'Dispositivo desconhecido';
+  let browser = 'Navegador';
+  if (ua.includes('Firefox')) browser = 'Firefox';
+  else if (ua.includes('Edg/')) browser = 'Edge';
+  else if (ua.includes('Chrome')) browser = 'Chrome';
+  else if (ua.includes('Safari')) browser = 'Safari';
+  let os = '';
+  if (ua.includes('Windows')) os = 'Windows';
+  else if (ua.includes('Mac OS')) os = 'macOS';
+  else if (ua.includes('Linux')) os = 'Linux';
+  else if (ua.includes('Android')) os = 'Android';
+  else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+  return os ? `${os} · ${browser}` : browser;
+}
 
 /**
  * Minha Conta — substitui o antigo ProfileModal do rodapé do sidebar.
@@ -150,13 +170,72 @@ export default function MinhaConta() {
 
   const initials = (fullName || user?.email || 'U').substring(0, 2).toUpperCase();
 
-  return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-h3-section text-foreground">Minha Conta</h1>
-        <p className="text-muted-foreground">Seus dados de acesso ao sistema</p>
-      </div>
+  const currentSessionUuid = useMemo(
+    () => (typeof window !== 'undefined' ? localStorage.getItem('session_uuid') : null),
+    [],
+  );
+  const queryClientSessions = useQueryClient();
+  const { data: mySessions = [], isLoading: sessionsLoading } = useQuery({
+    queryKey: ['my-active-sessions', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('active_sessions')
+        .select('id, session_uuid, metadata, started_at, last_seen_at')
+        .eq('user_id', user!.id)
+        .order('last_seen_at', { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!user?.id,
+  });
+  const [endingId, setEndingId] = useState<string | null>(null);
+  const handleEndSession = async (id: string) => {
+    setEndingId(id);
+    const { error } = await supabase.from('active_sessions').delete().eq('id', id);
+    setEndingId(null);
+    if (error) {
+      toast.error('Erro ao encerrar sessão');
+      return;
+    }
+    queryClientSessions.invalidateQueries({ queryKey: ['my-active-sessions'] });
+    toast.success('Sessão encerrada');
+  };
+  const handleEndAllOthers = async () => {
+    if (!user?.id) return;
+    const others = mySessions.filter((s) => s.session_uuid !== currentSessionUuid);
+    if (others.length === 0) return;
+    const { error } = await supabase.from('active_sessions').delete().in('id', others.map((s) => s.id));
+    if (error) {
+      toast.error('Erro ao encerrar sessões');
+      return;
+    }
+    queryClientSessions.invalidateQueries({ queryKey: ['my-active-sessions'] });
+    toast.success('Demais sessões encerradas');
+  };
 
+  return (
+    <div className="max-w-3xl space-y-6">
+      <PageHeader
+        kicker="~/conta"
+        title="Minha conta."
+        subtitle="Dados de acesso, preferências e sessões ativas."
+        actions={
+          mySessions.length > 1 ? (
+            <Button variant="outline" onClick={handleEndAllOthers}>
+              <LogOut className="h-4 w-4" /> Sair de todos
+            </Button>
+          ) : undefined
+        }
+      />
+
+      <Tabs defaultValue="perfil">
+        <TabsList className={tabsListClass}>
+          <TabsTrigger value="perfil" className={tabsTriggerClass}>Perfil</TabsTrigger>
+          <TabsTrigger value="seguranca" className={tabsTriggerClass}>Segurança</TabsTrigger>
+          <TabsTrigger value="sessoes" className={tabsTriggerClass}>Sessões</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="perfil" className="mt-6">
       <Card className="bg-card border-border/50">
         <CardHeader>
           <div className="flex items-center gap-3">
@@ -276,34 +355,95 @@ export default function MinhaConta() {
       </Card>
 
       {mostrarDadosDaEmpresa && <CompanyDataCard />}
+        </TabsContent>
 
-      <Card className="bg-card border-border/50">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <KeyRound className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <CardTitle>Segurança</CardTitle>
-              <CardDescription>Sua senha é definida sempre por e-mail</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Enviamos um link para <span className="text-foreground">{user?.email}</span>. Você define a
-            nova senha por lá — o sistema nunca pede sua senha atual nem a guarda em tela.
-          </p>
-          <Button variant="outline" onClick={handleSendPasswordReset} disabled={sendingReset}>
-            {sendingReset ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Mail className="w-4 h-4 mr-2" />
-            )}
-            Enviar link de redefinição de senha
-          </Button>
-        </CardContent>
-      </Card>
+        <TabsContent value="seguranca" className="mt-6">
+          <Card className="bg-card border-border/50">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <KeyRound className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>Senha</CardTitle>
+                  <CardDescription>Sua senha é definida sempre por e-mail — o sistema nunca a guarda em tela.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Enviamos um link para <span className="text-foreground">{user?.email}</span>. Você define a
+                nova senha por lá.
+              </p>
+              <Button variant="outline" onClick={handleSendPasswordReset} disabled={sendingReset}>
+                {sendingReset ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4 mr-2" />
+                )}
+                Enviar link de redefinição de senha
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sessoes" className="mt-6">
+          <Card className="bg-card border-border/50">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Monitor className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>Sessões ativas</CardTitle>
+                  <CardDescription>Dispositivos conectados à sua conta agora.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {sessionsLoading ? (
+                <div className="flex justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : mySessions.length === 0 ? (
+                <p className="py-4 text-sm text-muted-foreground">Nenhuma sessão registrada.</p>
+              ) : (
+                mySessions.map((s) => {
+                  const isSelf = s.session_uuid === currentSessionUuid;
+                  return (
+                    <div key={s.id} className="flex items-center justify-between gap-3 rounded-md border border-line bg-bg px-4 py-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Monitor className="h-4 w-4 shrink-0 text-muted-ink" />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-ui-strong text-ink">
+                              {parseDeviceInfo((s.metadata as any)?.device_info ?? null)}
+                            </span>
+                            {isSelf && <DsBadge tone="ok">agora</DsBadge>}
+                          </div>
+                          <span className="text-meta text-muted-ink">
+                            última atividade {s.last_seen_at ? format(new Date(s.last_seen_at), "dd/MM 'às' HH:mm", { locale: ptBR }) : '—'}
+                          </span>
+                        </div>
+                      </div>
+                      {!isSelf && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEndSession(s.id)}
+                          disabled={endingId === s.id}
+                        >
+                          Encerrar
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import UsersTab from '@/components/users/UsersTab';
+import { PageHeader } from '@/components/ds';
 
 /**
  * Equipe — mesma tela que vivia na aba "Minha Equipe" de Configurações,
@@ -27,10 +28,11 @@ export default function Equipe() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-h3-section text-foreground">Equipe</h1>
-        <p className="text-muted-foreground">Usuários, permissões e sessões ativas</p>
-      </div>
+      <PageHeader
+        kicker="~/cadastros · equipe"
+        title="Equipe."
+        subtitle="Usuários do sistema e permissões por módulo."
+      />
 
       {isLoading || !companyId || !user ? (
         <div className="flex justify-center py-10">

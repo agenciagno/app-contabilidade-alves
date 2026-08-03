@@ -2,14 +2,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowRightLeft, UserCheck, ChevronDown, AlertTriangle, Gauge } from 'lucide-react';
+import { ArrowRightLeft, UserCheck, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
 import {
@@ -22,6 +19,7 @@ import { useTransferHistory } from '@/hooks/useTemporaryTransfers';
 import { TransferTemporaryModal } from '@/components/fiscal/TransferTemporaryModal';
 import { TransferHistoryPanel } from '@/components/fiscal/TransferHistoryPanel';
 import { supabase } from '@/integrations/supabase/client';
+import { PageHeader, StatCardRow, IconBox, DsBadge, type BadgeTone } from '@/components/ds';
 
 import { cn } from '@/lib/utils';
 
@@ -33,27 +31,95 @@ function loadColor(pct: number) {
   return { bar: 'bg-ok', text: 'text-ok dark:text-ok' };
 }
 
-function useWorkloadByProfile(companyId: string | undefined, year: number, month: number) {
-  return useQuery<Record<string, number>>({
-    queryKey: ['workload-by-profile', companyId, year, month],
+interface TaskStats { total: number; overdue: number; done: number }
+
+/** Tarefas/Atrasadas/Entregues na competência, por responsável + um balde para
+ * as sem responsável — uma varredura só, agregada no client (mesmo padrão já
+ * usado nesta página para carga mensal). */
+function useCompetenceTaskStats(companyId: string | undefined, year: number, month: number) {
+  return useQuery<{ byProfile: Record<string, TaskStats>; unassigned: TaskStats }>({
+    queryKey: ['competence-task-stats', companyId, year, month],
     enabled: !!companyId,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from('fiscal_tasks')
-        .select('responsible_id')
+        .select('responsible_id, status, due_date')
         .eq('company_id', companyId)
         .eq('competence_year', year)
-        .eq('competence_month', month)
-        .neq('status', 'concluido');
+        .eq('competence_month', month);
       if (error) throw error;
-      const map: Record<string, number> = {};
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      const byProfile: Record<string, TaskStats> = {};
+      const unassigned: TaskStats = { total: 0, overdue: 0, done: 0 };
       (data ?? []).forEach((r: any) => {
-        if (!r.responsible_id) return;
-        map[r.responsible_id] = (map[r.responsible_id] ?? 0) + 1;
+        const bucket = r.responsible_id ? (byProfile[r.responsible_id] ??= { total: 0, overdue: 0, done: 0 }) : unassigned;
+        bucket.total += 1;
+        if (r.status === 'concluido') bucket.done += 1;
+        else if (r.due_date && r.due_date < todayStr) bucket.overdue += 1;
       });
-      return map;
+      return { byProfile, unassigned };
     },
   });
+}
+
+function ColaboradorCard({
+  nome, desde, subtitle, badge, stats, load, loadPct, onClick,
+}: {
+  nome: string; desde?: string | null; subtitle?: string; badge: { tone: BadgeTone; label: string };
+  stats: TaskStats; load: number; loadPct: number; onClick?: () => void;
+}) {
+  const loadStyle = loadColor(loadPct);
+  return (
+    <div
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      className={cn(
+        'flex flex-col overflow-hidden rounded-lg border border-line bg-paper text-left transition-colors',
+        onClick && 'cursor-pointer hover:border-ink/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+      )}
+    >
+      <div className="flex gap-3 px-[18px] pb-4 pt-[18px]">
+        <IconBox tone="neutral" icon={<Users strokeWidth={1.75} />} />
+        <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-h4-card text-ink">{nome}</p>
+            <DsBadge tone={badge.tone} className="shrink-0">{badge.label}</DsBadge>
+          </div>
+          <p className="truncate text-meta text-muted-ink-2">
+            {subtitle ?? (desde ? `equipe fiscal · desde ${desde}` : 'equipe fiscal')}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 border-t border-line-2">
+        <MetricaCard label="Tarefas" valor={stats.total} />
+        <MetricaCard label="Atrasadas" valor={stats.overdue} className="border-l border-line-2" />
+        <MetricaCard label="Entregues" valor={stats.done} className="border-l border-line-2" />
+      </div>
+
+      {/* Carga do mês vs capacidade — não tem slot no Figma, mas é o dado que
+          decide o badge de sobrecarga; mantido em faixa compacta abaixo. */}
+      <div className="border-t border-line-2 px-[18px] py-2.5">
+        <div className="mb-1 flex items-center justify-between text-meta">
+          <span className="text-muted-ink-2">Carga do mês</span>
+          <span className={cn('font-medium tabular-nums', loadStyle.text)}>{load}/{CAPACITY}</span>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-pill bg-bg-2">
+          <div className={cn('h-full transition-all', loadStyle.bar)} style={{ width: `${Math.min(loadPct, 100)}%` }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetricaCard({ label, valor, className }: { label: string; valor: number; className?: string }) {
+  return (
+    <div className={cn('flex min-w-0 flex-col gap-[3px] py-3 pl-3.5 pr-2.5', className)}>
+      <span className="truncate text-kicker uppercase text-muted-ink-2">{label}</span>
+      <span className="truncate text-h4-card text-ink">{valor}</span>
+    </div>
+  );
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -132,11 +198,9 @@ export default function FiscalCollaborators() {
   const { data: history = [] } = useTransferHistory();
 
   const now = new Date();
-  const { data: workloadMap = {} } = useWorkloadByProfile(
-    companyId,
-    now.getFullYear(),
-    now.getMonth() + 1
-  );
+  const { data: taskStats } = useCompetenceTaskStats(companyId, now.getFullYear(), now.getMonth() + 1);
+  const byProfile = taskStats?.byProfile ?? {};
+  const unassigned = taskStats?.unassigned ?? { total: 0, overdue: 0, done: 0 };
 
   const [modalOpen, setModalOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -161,180 +225,114 @@ export default function FiscalCollaborators() {
     return { coveringFor, absentTo };
   }, [history]);
 
-  // Workload distribution summary
-  const distribution = useMemo(() => {
-    const items = collaborators.map((c) => {
-      const load = workloadMap[c.id] ?? 0;
-      const pct = Math.round((load / CAPACITY) * 100);
-      return { id: c.id, name: c.full_name || c.email || '—', load, pct };
+  // Carga (pendentes/CAPACITY) por colaborador — decide o badge sobrecarga/no ritmo
+  // e a faixa de capacidade do card; StatCard 03 usa a média de `stats.total`.
+  const loads = useMemo(() => {
+    return collaborators.map((c) => {
+      const pending = (byProfile[c.id]?.total ?? 0) - (byProfile[c.id]?.done ?? 0);
+      const pct = Math.round((pending / CAPACITY) * 100);
+      return { id: c.id, load: pending, pct };
     });
-    if (items.length === 0) {
-      return { items, most: null, least: null, avg: 0, spread: 0 };
-    }
-    const sorted = [...items].sort((a, b) => b.pct - a.pct);
-    const most = sorted[0];
-    const least = sorted[sorted.length - 1];
-    const avg = Math.round(items.reduce((s, i) => s + i.pct, 0) / items.length);
-    return { items, most, least, avg, spread: most.pct - least.pct };
-  }, [collaborators, workloadMap]);
-
+  }, [collaborators, byProfile]);
+  const loadById = useMemo(() => Object.fromEntries(loads.map((l) => [l.id, l])), [loads]);
+  const sobrecarregados = loads.filter((l) => l.pct > 100).length;
+  const mediaPorPessoa = collaborators.length
+    ? Math.round(collaborators.reduce((s, c) => s + (byProfile[c.id]?.total ?? 0), 0) / collaborators.length)
+    : 0;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between py-4 flex-wrap gap-4">
-        <h1 className="text-h3-section text-foreground">Colaboradores</h1>
-        <Button className="gap-2" onClick={() => setModalOpen(true)}>
-          <ArrowRightLeft className="w-4 h-4" />
-          Transferência Temporária
-        </Button>
-      </div>
+      <PageHeader
+        kicker="~/tarefas · equipe"
+        title="Colaboradores."
+        subtitle="Carga de trabalho da equipe fiscal na competência."
+        actions={
+          <Button onClick={() => setModalOpen(true)}>
+            <ArrowRightLeft className="h-4 w-4" />
+            Distribuir tarefas
+          </Button>
+        }
+      />
 
-      {distribution.most && distribution.least && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Gauge className="w-5 h-5 text-primary" />
-              Distribuição de Carga
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Mais sobrecarregado</p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-sm truncate">{distribution.most.name}</span>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      'text-[10px]',
-                      distribution.most.pct > 100
-                        ? 'bg-danger/10 text-danger border-danger/30'
-                        : distribution.most.pct > 80
-                        ? 'bg-warn/10 text-warn border-warn/30'
-                        : 'bg-ok/10 text-ok border-ok/30'
-                    )}
-                  >
-                    {distribution.most.pct}% da capacidade
-                  </Badge>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Mais disponível</p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-sm truncate">{distribution.least.name}</span>
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] bg-ok/10 text-ok border-ok/30"
-                  >
-                    {distribution.least.pct}% da capacidade
-                  </Badge>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Média da equipe</p>
-                <div className="flex items-center gap-2">
-                  <Progress value={Math.min(distribution.avg, 100)} className="h-2 flex-1" />
-                  <span className="text-sm font-medium tabular-nums">{distribution.avg}%</span>
-                </div>
-              </div>
-            </div>
-            {distribution.spread > 40 && (
-              <Alert className="bg-warn/10 border-warn/40">
-                <AlertTriangle className="h-4 w-4 text-warn" />
-                <AlertDescription>
-                  Distribuição desbalanceada — considerar redistribuição (diferença de {distribution.spread} pontos
-                  percentuais entre o mais e o menos carregado).
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <StatCardRow
+        items={[
+          { label: 'Colaboradores', value: collaborators.length, hint: 'na equipe fiscal' },
+          { label: 'Sobrecarregados', value: sobrecarregados, hint: 'acima da capacidade mensal', emphasis: sobrecarregados > 0 ? 'warm' : 'none' },
+          { label: 'Média por pessoa', value: mediaPorPessoa, hint: 'tarefas na competência' },
+          { label: 'Sem responsável', value: unassigned.total, hint: 'a distribuir' },
+        ]}
+      />
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Colaboradores Ativos</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {collaborators.map((c) => {
-            const name = c.full_name || c.email;
-            const initials = (name || '?').substring(0, 2).toUpperCase();
+            const name = c.full_name || c.email || '—';
             const clientsCount = clientCountMap[c.id] ?? 0;
             const isExpanded = expandedId === c.id;
             const covering = coveringFor[c.id] ?? [];
             const absent = absentTo[c.id] ?? [];
-            const load = workloadMap[c.id] ?? 0;
-            const loadPct = Math.round((load / CAPACITY) * 100);
-            const loadStyle = loadColor(loadPct);
+            const stats = byProfile[c.id] ?? { total: 0, overdue: 0, done: 0 };
+            const { load, pct: loadPct } = loadById[c.id] ?? { load: 0, pct: 0 };
+            const desde = c.created_at ? format(parseISO(c.created_at), 'yyyy') : null;
+            const badge: { tone: BadgeTone; label: string } =
+              loadPct > 100 ? { tone: 'warn', label: 'sobrecarga' } : { tone: 'ok', label: 'no ritmo' };
             return (
-              <Card
-                key={c.id}
-                className={cn(
-                  'bg-card border-border/50 overflow-hidden cursor-pointer transition-all hover:border-primary/30',
-                  isExpanded && 'sm:col-span-2 lg:col-span-3 xl:col-span-4 border-primary/40'
-                )}
-                onClick={() => setExpandedId(isExpanded ? null : c.id)}
-              >
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-start gap-3">
-                    <Avatar className="w-10 h-10">
-                      {c.avatar_url && <AvatarImage src={c.avatar_url} />}
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs">{initials}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{name}</p>
-                      <Badge variant="outline" className="mt-1 text-[10px] bg-ok/10 text-ok border-ok/30">
-                        Ativo
+              <div key={c.id} className={cn(isExpanded && 'sm:col-span-2 xl:col-span-3')}>
+                <ColaboradorCard
+                  nome={name}
+                  desde={desde}
+                  badge={badge}
+                  stats={stats}
+                  load={load}
+                  loadPct={loadPct}
+                  onClick={() => setExpandedId(isExpanded ? null : c.id)}
+                />
+                {(covering.length > 0 || absent.length > 0) && (
+                  <div className="flex flex-wrap gap-1.5 px-1 pt-2">
+                    {covering.map((cov, i) => (
+                      <Badge key={`cov-${i}`} variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30">
+                        Cobrindo {cov.count} de {cov.absentName} até {format(parseISO(cov.end_date), 'dd/MM')}
                       </Badge>
-                      <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                        <UserCheck className="w-3 h-3" />
-                        {clientsCount} cliente{clientsCount === 1 ? '' : 's'} vinculado{clientsCount === 1 ? '' : 's'}
-                      </p>
-                      {covering.map((cov, i) => (
-                        <Badge
-                          key={`cov-${i}`}
-                          variant="outline"
-                          className="mt-2 mr-1 text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30"
-                        >
-                          Cobrindo {cov.count} de {cov.absentName} até {format(parseISO(cov.end_date), 'dd/MM')}
-                        </Badge>
-                      ))}
-                      {absent.map((abs, i) => (
-                        <Badge
-                          key={`abs-${i}`}
-                          variant="outline"
-                          className="mt-2 mr-1 text-[10px] bg-warn/10 text-warn border-warn/30"
-                        >
-                          Ausente — {abs.count} com {abs.coveringName} até {format(parseISO(abs.end_date), 'dd/MM')}
-                        </Badge>
-                      ))}
-                    </div>
-                    <ChevronDown className={cn('w-4 h-4 text-muted-foreground transition-transform', isExpanded && 'rotate-180')} />
+                    ))}
+                    {absent.map((abs, i) => (
+                      <Badge key={`abs-${i}`} variant="outline" className="text-[10px] bg-warn/10 text-warn border-warn/30">
+                        Ausente — {abs.count} com {abs.coveringName} até {format(parseISO(abs.end_date), 'dd/MM')}
+                      </Badge>
+                    ))}
                   </div>
-                  <div>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">Carga do mês</span>
-                      <span className={cn('font-medium tabular-nums', loadStyle.text)}>
-                        {load}/{CAPACITY} tarefas ({loadPct}%)
-                      </span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                      <div
-                        className={cn('h-full transition-all', loadStyle.bar)}
-                        style={{ width: `${Math.min(loadPct, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-                {isExpanded && (
-                  <CollaboratorDetailPanel
-                    profileId={c.id}
-                    onSeeAll={() => navigate(`/fiscal/tarefas?responsible=${c.id}`)}
-                  />
                 )}
-              </Card>
+                {isExpanded && (
+                  <div className="mt-2 flex items-center gap-1.5 px-1 text-meta text-muted-ink-2">
+                    <UserCheck className="h-3 w-3" />
+                    {clientsCount} cliente{clientsCount === 1 ? '' : 's'} vinculado{clientsCount === 1 ? '' : 's'}
+                  </div>
+                )}
+                {isExpanded && (
+                  <div className="mt-2 overflow-hidden rounded-lg border border-line">
+                    <CollaboratorDetailPanel
+                      profileId={c.id}
+                      onSeeAll={() => navigate(`/fiscal/tarefas?responsible=${c.id}`)}
+                    />
+                  </div>
+                )}
+              </div>
             );
           })}
+
+          {/* Não atribuídas — espelha o último card do Figma; sem clique (não há
+              filtro "sem responsável" pronto em /fiscal/tarefas). */}
+          <ColaboradorCard
+            nome="Não atribuídas"
+            desde={null}
+            subtitle="aguardando distribuição"
+            badge={{ tone: unassigned.total > 0 ? 'danger' : 'neutral', label: unassigned.total > 0 ? `${unassigned.total} tarefas` : 'em dia' }}
+            stats={unassigned}
+            load={0}
+            loadPct={0}
+          />
+
           {collaborators.length === 0 && (
-            <div className="col-span-full text-muted-foreground text-sm">Nenhum colaborador com clientes atribuídos.</div>
+            <div className="col-span-full text-sm text-muted-ink">Nenhum colaborador com clientes atribuídos.</div>
           )}
         </div>
       </section>

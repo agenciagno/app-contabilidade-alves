@@ -1,11 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Plus, Search, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
@@ -17,23 +14,34 @@ import {
 } from '@/components/ui/table';
 import { useParties, type Party, type PartyInput, type PartyTipo } from '@/hooks/useParties';
 import { PartyFormDialog } from '@/components/parties/PartyFormDialog';
+import { PageHeader, DsBadge, IconBox } from '@/components/ds';
 
 type TipoFilter = 'todos' | PartyTipo;
+type AtivoFilter = 'todos' | 'ativo' | 'inativo';
 
-const tipoBadge = (tipo: string) => {
-  const map: Record<string, { label: string; className: string }> = {
-    cliente: { label: 'Cliente', className: 'bg-ok/15 text-ok dark:text-ok' },
-    fornecedor: { label: 'Fornecedor', className: 'bg-blue-500/15 text-blue-700 dark:text-blue-400' },
-    ambos: { label: 'Ambos', className: 'bg-purple-500/15 text-purple-700 dark:text-purple-400' },
-  };
-  const c = map[tipo] ?? { label: tipo, className: '' };
-  return <Badge variant="secondary" className={c.className}>{c.label}</Badge>;
+const tipoLabel: Record<PartyTipo, string> = {
+  cliente: 'Cliente',
+  fornecedor: 'Fornecedor',
+  ambos: 'Ambos',
+};
+
+const monthYear = (iso: string) => {
+  const d = new Date(iso);
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+};
+
+const partySubtitle = (p: Party) => {
+  if (!p.is_active) return `inativo desde ${monthYear(p.updated_at)}`;
+  if (p.observacoes?.trim()) return p.observacoes.trim();
+  const label = p.tipo === 'ambos' ? 'cliente e fornecedor' : tipoLabel[p.tipo].toLowerCase();
+  return `${label} desde ${monthYear(p.created_at)}`;
 };
 
 export default function PartiesPage() {
   const { data: parties, isLoading, create, update, toggleActive } = useParties();
   const [search, setSearch] = useState('');
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('todos');
+  const [ativoFilter, setAtivoFilter] = useState<AtivoFilter>('todos');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Party | null>(null);
 
@@ -42,6 +50,8 @@ export default function PartiesPage() {
     const q = search.trim().toLowerCase();
     return list.filter((p) => {
       if (tipoFilter !== 'todos' && p.tipo !== tipoFilter) return false;
+      if (ativoFilter === 'ativo' && !p.is_active) return false;
+      if (ativoFilter === 'inativo' && p.is_active) return false;
       if (!q) return true;
       return (
         p.nome.toLowerCase().includes(q) ||
@@ -49,7 +59,7 @@ export default function PartiesPage() {
         (p.documento ?? '').toLowerCase().includes(q)
       );
     });
-  }, [parties, search, tipoFilter]);
+  }, [parties, search, tipoFilter, ativoFilter]);
 
   const openNew = () => {
     setEditing(null);
@@ -70,69 +80,74 @@ export default function PartiesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <p className="text-kicker uppercase text-muted-foreground">Financeiro · Cadastros</p>
-          <h1 className="text-display text-foreground">Clientes & Fornecedores.</h1>
-          <p className="text-[14px] text-muted-foreground">Contrapartes utilizadas em lançamentos financeiros.</p>
+      <PageHeader
+        kicker="~/financeiro · cadastros"
+        title="Clientes & fornecedores."
+        subtitle={`Contrapartes usadas nos lançamentos · ${parties?.length ?? 0} cadastradas.`}
+        actions={
+          <Button onClick={openNew} className="gap-2">
+            <Plus className="h-4 w-4" /> Nova contraparte
+          </Button>
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[240px] flex-1 max-w-2xl">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-ink-2" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nome ou documento..."
+            className="h-10 border-line bg-paper pl-9 text-ui"
+          />
         </div>
-        <Button onClick={openNew} className="gap-2">
-          <Plus className="w-4 h-4" /> Novo
-        </Button>
+
+        <Select value={tipoFilter} onValueChange={(v) => setTipoFilter(v as TipoFilter)}>
+          <SelectTrigger className="h-9 w-[130px] border-line bg-paper text-ui">
+            <SelectValue placeholder="Tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os tipos</SelectItem>
+            <SelectItem value="cliente">Cliente</SelectItem>
+            <SelectItem value="fornecedor">Fornecedor</SelectItem>
+            <SelectItem value="ambos">Ambos</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={ativoFilter} onValueChange={(v) => setAtivoFilter(v as AtivoFilter)}>
+          <SelectTrigger className="h-9 w-[120px] border-line bg-paper text-ui">
+            <SelectValue placeholder="Ativo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            <SelectItem value="ativo">Ativos</SelectItem>
+            <SelectItem value="inativo">Inativos</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Filtros</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="relative sm:col-span-2">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome ou documento…"
-                className="pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <Select value={tipoFilter} onValueChange={(v) => setTipoFilter(v as TipoFilter)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os tipos</SelectItem>
-                <SelectItem value="cliente">Cliente</SelectItem>
-                <SelectItem value="fornecedor">Fornecedor</SelectItem>
-                <SelectItem value="ambos">Ambos</SelectItem>
-              </SelectContent>
-            </Select>
+      <div className="rounded-lg border border-line bg-paper">
+        {isLoading ? (
+          <div className="p-6 space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-6 space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 p-12 text-center">
+            <IconBox tone="neutral" icon={<Users strokeWidth={1.75} />} />
+            <div>
+              <p className="text-ui-strong text-ink">Nenhum registro encontrado</p>
+              <p className="text-meta text-muted-ink">
+                {parties?.length ? 'Ajuste os filtros ou crie um novo.' : 'Cadastre seu primeiro cliente ou fornecedor.'}
+              </p>
             </div>
-          ) : filtered.length === 0 ? (
-            <div className="p-12 flex flex-col items-center justify-center text-center gap-3">
-              <div className="p-3 rounded-full bg-muted">
-                <Users className="w-6 h-6 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="font-medium">Nenhum registro encontrado</p>
-                <p className="text-sm text-muted-foreground">
-                  {parties?.length ? 'Ajuste os filtros ou crie um novo.' : 'Cadastre seu primeiro cliente ou fornecedor.'}
-                </p>
-              </div>
-              <Button onClick={openNew} variant="outline" className="gap-2">
-                <Plus className="w-4 h-4" /> Novo
-              </Button>
-            </div>
-          ) : (
+            <Button onClick={openNew} variant="outline" className="gap-2">
+              <Plus className="h-4 w-4" /> Nova contraparte
+            </Button>
+          </div>
+        ) : (
+          <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -146,19 +161,25 @@ export default function PartiesPage() {
               </TableHeader>
               <TableBody>
                 {filtered.map((p) => (
-                  <TableRow key={p.id} className={p.is_active ? '' : 'opacity-60'}>
-                    <TableCell className="font-medium">{p.display_name || p.nome}</TableCell>
-                    <TableCell>{tipoBadge(p.tipo)}</TableCell>
-                    <TableCell className="font-mono text-xs">{p.documento || '—'}</TableCell>
-                    <TableCell className="text-sm">
-                      <div>{p.email || '—'}</div>
-                      <div className="text-muted-foreground">{p.telefone || ''}</div>
-                    </TableCell>
+                  <TableRow key={p.id}>
                     <TableCell>
-                      <Switch
-                        checked={p.is_active}
-                        onCheckedChange={(v) => toggleActive.mutate({ id: p.id, is_active: v })}
-                      />
+                      <p className="font-medium text-ink">{p.display_name || p.nome}</p>
+                      <p className="text-meta text-muted-ink">{partySubtitle(p)}</p>
+                    </TableCell>
+                    <TableCell className="text-ink">{tipoLabel[p.tipo]}</TableCell>
+                    <TableCell className="font-mono text-mono-sm text-muted-ink">{p.documento || '—'}</TableCell>
+                    <TableCell className="text-ink">{p.email || p.telefone || '—'}</TableCell>
+                    <TableCell>
+                      <button
+                        type="button"
+                        onClick={() => toggleActive.mutate({ id: p.id, is_active: !p.is_active })}
+                        title={p.is_active ? 'Clique para desativar' : 'Clique para ativar'}
+                        className="cursor-pointer"
+                      >
+                        <DsBadge tone={p.is_active ? 'ok' : 'neutral'}>
+                          {p.is_active ? 'ativo' : 'inativo'}
+                        </DsBadge>
+                      </button>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>
@@ -169,9 +190,12 @@ export default function PartiesPage() {
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+            <div className="border-t border-line px-5 py-3 text-meta text-muted-ink">
+              {filtered.length} de {parties?.length ?? 0} contrapartes
+            </div>
+          </>
+        )}
+      </div>
 
       <PartyFormDialog
         open={dialogOpen}

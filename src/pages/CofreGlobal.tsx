@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertTriangle, Copy, Eye, Loader2, LockKeyhole, Search } from 'lucide-react';
+import { AlertTriangle, Copy, Eye, Loader2, Search } from 'lucide-react';
+import { PageHeader, StatCardRow } from '@/components/ds';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -130,6 +131,13 @@ export default function CofreGlobal() {
 
   const colunasVisiveis = PORTAL_ORDER.filter((p) => portaisSelecionados.includes(p));
 
+  const stats = useMemo(() => ({
+    credenciais: (data ?? []).length,
+    aVencer: (data ?? []).filter((r) => r.alerta_vencimento).length,
+    portais: PORTAL_ORDER.length,
+    clientes: clientes.length,
+  }), [data, clientes]);
+
   const handleRevelar = async (row: CofreGlobalRow) => {
     const key = row.acesso_id + ':rev';
     setLoadingAction(key);
@@ -166,29 +174,31 @@ export default function CofreGlobal() {
   if (!podeAcessar) return null;
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-3 bg-primary/10 rounded-xl">
-          <LockKeyhole className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-h3-section text-foreground">Acessos</h1>
-          <p className="text-sm text-muted-foreground">
-            Credenciais de todos os clientes ativos
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        kicker="~/cadastros · cofre"
+        title="Acessos."
+        subtitle="Credenciais de portais por cliente — cofre criptografado."
+      />
+
+      <StatCardRow
+        items={[
+          { label: 'Credenciais', value: stats.credenciais, hint: 'no cofre' },
+          { label: 'Certificados a vencer', value: stats.aVencer, hint: 'com alerta ativo', emphasis: stats.aVencer > 0 ? 'warm' : 'none' },
+          { label: 'Portais', value: stats.portais, hint: 'tipos monitorados' },
+          { label: 'Clientes', value: stats.clientes, hint: 'com acesso cadastrado' },
+        ]}
+      />
 
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-ink-2" />
           <Input
             placeholder="Buscar cliente..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="h-10 border-line bg-paper pl-9 text-ui"
           />
         </div>
 

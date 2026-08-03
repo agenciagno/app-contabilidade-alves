@@ -6,7 +6,9 @@ export default function ClientCategories() {
   return (
     <CategoriesView
       scope="cliente"
-      pageTitle="Categorias"
+      kicker="~/financeiro · categorias"
+      pageTitle="Categorias."
+      subtitle="Categorias de receita e despesa do módulo vendido a clientes."
       addButtonLabel="Nova Categoria"
       revenueTabLabel="Categorias de Receita"
       expenseTabLabel="Categorias de Despesa"

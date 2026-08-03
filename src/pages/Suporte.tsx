@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/hooks/useCompany';
+import { PageHeader } from '@/components/ds';
 
 /**
  * Canais oficiais de suporte.
@@ -29,11 +30,12 @@ export default function Suporte() {
   );
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-h3-section text-foreground">Suporte</h1>
-        <p className="text-muted-foreground">Fale com a gente quando precisar</p>
-      </div>
+    <div className="max-w-2xl space-y-6">
+      <PageHeader
+        kicker="~/suporte"
+        title="Como podemos ajudar?"
+        subtitle="Fale com a gente quando precisar."
+      />
 
       <Card className="bg-card border-border/50">
         <CardHeader>

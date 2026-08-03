@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, ChevronDown, X } from 'lucide-react';
+import { Check, ChevronDown, X, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Command,
@@ -24,6 +24,8 @@ interface Props {
   placeholder: string;
   allLabel?: string;
   width?: string; // tailwind width class
+  /** Ícone à esquerda do rótulo — pill do Figma (filtros/f/*) sempre leva um. */
+  icon?: LucideIcon;
 }
 
 export function SearchableSelect({
@@ -33,6 +35,7 @@ export function SearchableSelect({
   placeholder,
   allLabel = 'Todos',
   width = 'w-[200px]',
+  icon: Icon,
 }: Props) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
@@ -42,20 +45,20 @@ export function SearchableSelect({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
+        <button
+          type="button"
           role="combobox"
           aria-expanded={open}
           className={cn(
-            'h-9 justify-between gap-2 bg-background/50 border-border/50 font-normal',
+            'flex h-9 shrink-0 items-center gap-2 rounded-sm border border-line bg-paper px-3 text-ui transition-colors hover:bg-bg-2',
             width,
-            !isActive && 'text-muted-foreground',
+            isActive ? 'text-ink' : 'text-muted-ink',
           )}
         >
-          <span className="truncate">{label}</span>
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
-        </Button>
+          {Icon && <Icon className="h-3.5 w-3.5 shrink-0 text-muted-ink" strokeWidth={1.75} />}
+          <span className="flex-1 truncate text-left">{label}</span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-ink-2" strokeWidth={1.75} />
+        </button>
       </PopoverTrigger>
       <PopoverContent className="w-[260px] p-0" align="start">
         <Command>

@@ -9,6 +9,7 @@ export interface Collaborator {
   email: string;
   avatar_url: string | null;
   status_active: boolean;
+  created_at?: string;
 }
 
 export interface CoverageRow {
@@ -82,7 +83,7 @@ export function useCollaborators() {
       if (ids.length === 0) return [];
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, user_id, full_name, email, avatar_url, status_active')
+        .select('id, user_id, full_name, email, avatar_url, status_active, created_at')
         .eq('company_id', companyId)
         .eq('status_active', true)
         .in('id', ids)

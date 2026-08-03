@@ -152,7 +152,8 @@ interface SimpleModule extends RoleGated {
   url: string;
   icon: LucideIcon;
   iconName: string;
-  moduleKey: string;
+  /** Ausente = sem gate de módulo (rota já é aberta a qualquer usuário logado, ex. Suporte). */
+  moduleKey?: string;
 }
 
 interface CollapsibleModule extends RoleGated {
@@ -310,7 +311,6 @@ export const menuEntries: MenuEntry[] = [
     title: 'Financeiro',
     icon: Wallet,
     moduleKey: 'financeiro',
-    defaultOpen: true,
     items: [
       { title: 'Dashboard', url: '/painel-financeiro', icon: LayoutDashboard, iconName: 'layout-dashboard', subKey: 'financeiro_dashboard' },
       { title: 'Lançamentos', url: '/movimentacoes', icon: ArrowLeftRight, iconName: 'arrow-left-right', subKey: 'financeiro_lancamentos' },
@@ -353,6 +353,13 @@ export const menuEntries: MenuEntry[] = [
     // dele vivem em Minha Conta.
     internalOnly: true,
   },
+  {
+    kind: 'simple',
+    title: 'Suporte',
+    url: '/suporte',
+    icon: LifeBuoy,
+    iconName: 'life-buoy',
+  },
 ];
 
 export function AppSidebar() {
@@ -382,7 +389,7 @@ export function AppSidebar() {
   const isEntryVisible = (entry: MenuEntry): boolean => {
     if (entry.kind === 'section') return false; // resolvido na montagem da lista
     if (!passesRoleGate(entry)) return false;
-    if (entry.kind === 'simple') return isModuleVisible(entry.moduleKey);
+    if (entry.kind === 'simple') return entry.moduleKey ? isModuleVisible(entry.moduleKey) : true;
     // Grupo sem moduleKey (Cadastros) depende só dos itens.
     if (entry.moduleKey && !isModuleVisible(entry.moduleKey)) return false;
     return visibleItems(entry).length > 0;

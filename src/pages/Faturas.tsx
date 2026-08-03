@@ -4,18 +4,17 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { PageHeader, StatCardRow, DsBadge, type BadgeTone } from '@/components/ds';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { invoiceState, type TenantInvoiceRow } from '@/hooks/useTenants';
-import { brl, dateBR, competenciaBR, BILLING_CYCLE_LABEL } from '@/lib/tenant-format';
+import { brl, dateBR, competenciaBR } from '@/lib/tenant-format';
 
-const ESTADO: Record<string, { label: string; className: string }> = {
-  paga: { label: 'Paga', className: 'bg-ok hover:bg-ok' },
-  aberta: { label: 'Em aberto', className: 'bg-blue-600 hover:bg-blue-600' },
-  vencida: { label: 'Vencida', className: 'bg-destructive hover:bg-destructive' },
-  cancelada: { label: 'Cancelada', className: 'bg-muted-foreground hover:bg-muted-foreground' },
+const ESTADO: Record<string, { label: string; tone: BadgeTone }> = {
+  paga: { label: 'paga', tone: 'ok' },
+  aberta: { label: 'em aberto', tone: 'info' },
+  vencida: { label: 'vencida', tone: 'danger' },
+  cancelada: { label: 'cancelada', tone: 'neutral' },
 };
 
 /**
@@ -43,13 +42,24 @@ export default function Faturas() {
     enabled: !!companyId,
   });
 
-  const emAberto = useMemo(
-    () => (invoices ?? []).filter((i) => {
-      const estado = invoiceState(i);
-      return estado === 'aberta' || estado === 'vencida';
-    }),
-    [invoices],
-  );
+  const total = (invoices ?? []).length;
+
+  const stats = useMemo(() => {
+    const limite30 = new Date();
+    limite30.setDate(limite30.getDate() - 30);
+    const limite30ISO = limite30.toISOString().slice(0, 10);
+
+    let abertoSum = 0, abertoCount = 0;
+    let vencidoSum = 0, vencidoCount = 0;
+    let pagas30 = 0;
+    for (const inv of invoices ?? []) {
+      const estado = invoiceState(inv);
+      if (estado === 'aberta') { abertoSum += Number(inv.valor); abertoCount++; }
+      if (estado === 'vencida') { vencidoSum += Number(inv.valor); vencidoCount++; }
+      if (estado === 'paga' && inv.pago_em && inv.pago_em.slice(0, 10) >= limite30ISO) pagas30++;
+    }
+    return { abertoSum, abertoCount, vencidoSum, vencidoCount, pagas30 };
+  }, [invoices]);
 
   if (isLoading || loadingCompany) return null;
 
@@ -57,46 +67,53 @@ export default function Faturas() {
   const canSee = !isInternalCompany && (isAdmin || isSuperAdmin);
   if (!canSee) return <Navigate to="/" replace />;
 
-  const plano = (company as any)?.plan_name as string | null;
-  const preco = (company as any)?.plan_price as number | null;
-  const ciclo = (company as any)?.billing_cycle as string | null;
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Faturas</h1>
-        <p className="text-sm text-muted-foreground">
-          Histórico de pagamento da assinatura do sistema.
-        </p>
-      </div>
+      <PageHeader
+        kicker="~/faturas"
+        title="Faturas."
+        subtitle={`Cobranças do escritório · ${total} no histórico.`}
+      />
 
-      {plano && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{plano}</CardTitle>
-            <CardDescription>
-              {preco ? brl(Number(preco)) : 'Valor a combinar'}
-              {ciclo ? ` · ${BILLING_CYCLE_LABEL[ciclo] ?? ciclo}` : ''}
-              {emAberto.length > 0 && ` · ${emAberto.length} fatura(s) em aberto`}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
+      <StatCardRow
+        items={[
+          {
+            label: 'Em aberto',
+            value: brl(stats.abertoSum),
+            hint: stats.abertoCount === 0
+              ? 'sem próximas cobranças'
+              : `${stats.abertoCount} fatura${stats.abertoCount === 1 ? '' : 's'} a vencer`,
+            emphasis: stats.abertoSum > 0 ? 'warm' : 'none',
+          },
+          {
+            label: 'Saldo atrasado',
+            value: brl(stats.vencidoSum),
+            hint: `${stats.vencidoCount} fatura${stats.vencidoCount === 1 ? '' : 's'} vencida${stats.vencidoCount === 1 ? '' : 's'}`,
+          },
+          {
+            label: 'Pagas · 30 dias',
+            value: stats.pagas30,
+            hint: `${stats.pagas30} fatura${stats.pagas30 === 1 ? '' : 's'} quitada${stats.pagas30 === 1 ? '' : 's'}`,
+          },
+          {
+            label: 'Total histórico',
+            value: total,
+            hint: 'faturas registradas',
+          },
+        ]}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Histórico</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loadingInvoices ? (
-            <div className="space-y-2">
-              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
-            </div>
-          ) : (invoices ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">
-              Nenhuma fatura emitida ainda.
-            </p>
-          ) : (
+      <div className="overflow-hidden rounded-lg border border-line bg-paper">
+        {loadingInvoices ? (
+          <div className="space-y-2 p-[22px]">
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+          </div>
+        ) : total === 0 ? (
+          <p className="py-12 text-center text-body text-muted-ink">
+            Nenhuma fatura emitida ainda.
+          </p>
+        ) : (
+          <>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -115,10 +132,10 @@ export default function Faturas() {
                     return (
                       <TableRow key={inv.id}>
                         <TableCell className="tabular-nums">{competenciaBR(inv.competencia)}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{inv.descricao ?? '—'}</TableCell>
+                        <TableCell className="text-ink">{inv.descricao ?? '—'}</TableCell>
                         <TableCell className="text-right tabular-nums">{brl(Number(inv.valor))}</TableCell>
                         <TableCell className="tabular-nums">{dateBR(inv.vencimento)}</TableCell>
-                        <TableCell><Badge className={badge.className}>{badge.label}</Badge></TableCell>
+                        <TableCell><DsBadge tone={badge.tone}>{badge.label}</DsBadge></TableCell>
                         <TableCell className="tabular-nums">{dateBR(inv.pago_em)}</TableCell>
                       </TableRow>
                     );
@@ -126,9 +143,12 @@ export default function Faturas() {
                 </TableBody>
               </Table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div className="border-t border-line px-[22px] py-3 text-meta text-muted-ink">
+              {total} de {total} fatura{total === 1 ? '' : 's'}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

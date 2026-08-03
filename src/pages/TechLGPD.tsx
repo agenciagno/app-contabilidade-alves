@@ -22,7 +22,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Pencil, ShieldCheck, ListChecks } from 'lucide-react';
+import { Pencil, ShieldCheck, ListChecks, Search } from 'lucide-react';
+import { PageHeader, StatCardRow, tabsListClass, tabsTriggerClass } from '@/components/ds';
 
 const BASES_LEGAIS: { value: string; label: string }[] = [
   { value: 'contrato', label: 'Execução de contrato' },
@@ -67,27 +68,21 @@ export default function TechLGPD() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="p-3 bg-primary/10 rounded-xl">
-          <ShieldCheck className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-h3-section text-foreground">Conformidade LGPD</h1>
-          <p className="text-sm text-muted-foreground">
-            Registros de tratamento e log de acessos a dados pessoais
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        kicker="~/tech · conformidade"
+        title="Conformidade LGPD."
+        subtitle="Registro de consentimentos e base legal por titular."
+      />
 
       <Tabs defaultValue="tratamentos" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-lg">
-          <TabsTrigger value="tratamentos" className="gap-2">
-            <ListChecks className="h-4 w-4" />
-            Registros de Tratamento
+        <TabsList className={tabsListClass}>
+          <TabsTrigger value="tratamentos" className={tabsTriggerClass}>
+            <ListChecks className="h-[15px] w-[15px]" strokeWidth={1.75} />
+            Registros de tratamento
           </TabsTrigger>
-          <TabsTrigger value="logs" className="gap-2">
-            <ShieldCheck className="h-4 w-4" />
-            Log de Acessos
+          <TabsTrigger value="logs" className={tabsTriggerClass}>
+            <ShieldCheck className="h-[15px] w-[15px]" strokeWidth={1.75} />
+            Log de acessos
           </TabsTrigger>
         </TabsList>
 
@@ -167,42 +162,75 @@ function TratamentosTab({ canEdit }: { canEdit: boolean }) {
     if (error) toast.error('Erro ao carregar registros de tratamento');
   }, [error]);
 
+  // Termo vigente = versão mais frequente entre os registros (proxy real, já que
+  // não existe uma tabela de "termo ativo" separada — cada registro grava a
+  // própria versão aceita no momento).
+  const { vigente, vigenteDesde, pendentes, titularesUnicos } = useMemo(() => {
+    const all = rows ?? [];
+    const counts = new Map<string, number>();
+    all.forEach((r) => {
+      if (r.versao_termo) counts.set(r.versao_termo, (counts.get(r.versao_termo) ?? 0) + 1);
+    });
+    let top: string | null = null;
+    let topCount = 0;
+    counts.forEach((c, v) => { if (c > topCount) { topCount = c; top = v; } });
+    const comVigente = top ? all.filter((r) => r.versao_termo === top && r.consentimento_em) : [];
+    const desde = comVigente.length
+      ? comVigente.reduce((min, r) => (r.consentimento_em! < min ? r.consentimento_em! : min), comVigente[0].consentimento_em!)
+      : null;
+    return {
+      vigente: top,
+      vigenteDesde: desde,
+      pendentes: top ? all.filter((r) => r.versao_termo !== top).length : 0,
+      titularesUnicos: new Set(all.map((r) => r.titular_id)).size,
+    };
+  }, [rows]);
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Registros de Tratamento</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-col sm:flex-row gap-2">
+    <div className="space-y-6">
+      <StatCardRow
+        items={[
+          { label: 'Consentimentos', value: (rows ?? []).length, hint: 'titulares registrados' },
+          { label: 'Termo vigente', value: vigente ?? '—', hint: vigenteDesde ? `desde ${format(new Date(vigenteDesde), 'dd/MM/yyyy', { locale: ptBR })}` : 'sem termo majoritário' },
+          { label: 'Pendentes de aceite', value: pendentes, hint: 'termo desatualizado', emphasis: pendentes > 0 ? 'warm' : 'none' },
+          { label: 'Titulares únicos', value: titularesUnicos, hint: 'com registro de tratamento' },
+        ]}
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[240px] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-ink-2" />
           <Input
-            placeholder="Buscar por nome, finalidade ou ID..."
+            placeholder="Buscar titular..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="sm:max-w-sm"
+            className="h-10 border-line bg-paper pl-9 text-ui"
           />
-          <Select value={baseFilter} onValueChange={setBaseFilter}>
-            <SelectTrigger className="sm:w-64">
-              <SelectValue placeholder="Base legal" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as bases legais</SelectItem>
-              {BASES_LEGAIS.map((b) => (
-                <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
+        <Select value={baseFilter} onValueChange={setBaseFilter}>
+          <SelectTrigger className="h-9 w-[170px] border-line bg-paper text-ui">
+            <SelectValue placeholder="Base legal" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as bases legais</SelectItem>
+            {BASES_LEGAIS.map((b) => (
+              <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
+      <div className="overflow-hidden rounded-lg border border-line bg-paper">
         {isLoading ? (
-          <div className="space-y-2">
+          <div className="space-y-2 p-4">
             {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center text-muted-foreground">
+          <div className="py-16 text-center text-muted-ink">
             Nenhum registro de tratamento encontrado.
           </div>
         ) : (
-          <div className="rounded-md border overflow-x-auto">
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -210,27 +238,25 @@ function TratamentosTab({ canEdit }: { canEdit: boolean }) {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Finalidade</TableHead>
                   <TableHead>Base legal</TableHead>
-                  <TableHead>Versão do termo</TableHead>
+                  <TableHead>Versão</TableHead>
                   <TableHead>Consentimento em</TableHead>
-                  <TableHead>Registrado em</TableHead>
                   {canEdit && <TableHead className="text-right">Ações</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map((r) => {
                   const nome = r.titular_tipo === 'contato' ? (nameMap?.[r.titular_id] ?? '—') : '—';
+                  const tipoLabel = r.titular_tipo === 'contato' ? 'Cliente' : 'Colaborador';
+                  const outdated = vigente && r.versao_termo && r.versao_termo !== vigente;
                   return (
                     <TableRow key={r.id}>
-                      <TableCell className="font-medium">{nome}</TableCell>
-                      <TableCell><Badge variant="outline">{r.titular_tipo}</Badge></TableCell>
-                      <TableCell className="max-w-xs truncate" title={r.finalidade}>{r.finalidade}</TableCell>
-                      <TableCell><Badge variant="secondary">{baseLegalLabel(r.base_legal)}</Badge></TableCell>
-                      <TableCell>{r.versao_termo ?? '—'}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium text-ink">{nome}</TableCell>
+                      <TableCell className="text-muted-ink">{tipoLabel}</TableCell>
+                      <TableCell className="max-w-xs truncate text-muted-ink" title={r.finalidade}>{r.finalidade}</TableCell>
+                      <TableCell className="text-muted-ink">{baseLegalLabel(r.base_legal)}</TableCell>
+                      <TableCell className={outdated ? 'text-warn' : 'text-muted-ink'}>{r.versao_termo ?? '—'}</TableCell>
+                      <TableCell className="text-muted-ink">
                         {r.consentimento_em ? format(new Date(r.consentimento_em), 'dd/MM/yyyy', { locale: ptBR }) : '—'}
-                      </TableCell>
-                      <TableCell>
-                        {format(new Date(r.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
                       </TableCell>
                       {canEdit && (
                         <TableCell className="text-right">
@@ -246,7 +272,10 @@ function TratamentosTab({ canEdit }: { canEdit: boolean }) {
             </Table>
           </div>
         )}
-      </CardContent>
+        <div className="border-t border-line px-4 py-2.5 text-meta text-muted-ink-2">
+          {filtered.length} de {(rows ?? []).length} registros
+        </div>
+      </div>
 
       {editing && (
         <EditTratamentoDialog
@@ -258,7 +287,7 @@ function TratamentosTab({ canEdit }: { canEdit: boolean }) {
           }}
         />
       )}
-    </Card>
+    </div>
   );
 }
 

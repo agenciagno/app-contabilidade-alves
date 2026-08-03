@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { CalendarDays, X, TrendingUp, TrendingDown, DollarSign, Wallet, Building2, FileText, GitCompare, Info } from 'lucide-react';
+import { CalendarDays, X, FileText, GitCompare, Info } from 'lucide-react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useDREData, DRESectionRow, DRECalculatedRow, DRERowResult } from '@/hooks/useDREData';
 import { DREReportModal } from '@/components/reports/DREReportModal';
 import { DREConciliationModal } from '@/components/reports/DREConciliationModal';
+import { PageHeader, StatCardRow } from '@/components/ds';
 import { cn } from '@/lib/utils';
 
 function formatCurrency(value: number) {
@@ -24,41 +25,6 @@ function valueColor(value: number) {
   if (value > 0) return 'text-ok';
   if (value < 0) return 'text-danger';
   return 'text-muted-foreground';
-}
-
-function SummaryCard({ title, previsto, realizado, icon: Icon, color }: {
-  title: string;
-  previsto: number;
-  realizado: number;
-  icon: any;
-  color: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="flex items-center gap-3 mb-3">
-          <div className={cn('p-2 rounded-lg', color)}>
-            <Icon className="h-4 w-4 text-white" />
-          </div>
-          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em]">{title}</span>
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Previsto</span>
-            <span className="font-semibold tabular-nums">{formatCurrency(previsto)}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Realizado</span>
-            <span className={cn('font-semibold tabular-nums', valueColor(realizado))}>{formatCurrency(realizado)}</span>
-          </div>
-          <div className="flex justify-between text-sm border-t border-border pt-1.5 mt-1">
-            <span className="text-muted-foreground">RXP</span>
-            <span className={cn('font-semibold tabular-nums', valueColor(realizado - previsto))}>{formatCurrency(realizado - previsto)}</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
 }
 
 function SectionRow({ row }: { row: DRESectionRow }) {
@@ -146,75 +112,50 @@ export default function DRE() {
     ? format(parsedStart, "MMMM'-'yy", { locale: ptBR })
     : '';
 
+  const margemPct = summary.receitaLiquida.realizado
+    ? (summary.lucroPrejuizoLiquido.realizado / summary.receitaLiquida.realizado) * 100
+    : 0;
+  const pctDoPrevisto = summary.receitaLiquida.previsto
+    ? (summary.receitaLiquida.realizado / summary.receitaLiquida.previsto) * 100
+    : 0;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between py-4 flex-wrap gap-4">
-        <div className="space-y-1">
-          <p className="text-kicker uppercase text-muted-foreground">Financeiro · Relatórios</p>
-          <h1 className="text-display text-foreground">DRE.</h1>
-          <p className="text-[14px] text-muted-foreground">
-            Demonstração do Resultado do Exercício • <span className="font-medium capitalize">{monthLabel}</span>
-          </p>
-        </div>
+      <PageHeader
+        kicker="~/financeiro · demonstrativo"
+        title="DRE."
+        subtitle={<>Demonstrativo de resultado · <span className="capitalize">{monthLabel}</span>.</>}
+        actions={
+          <>
+            <div className="flex items-center gap-1.5">
+              <CalendarDays className="h-4 w-4 text-muted-ink" />
+              <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-9 w-[150px] border-line bg-paper text-ui" />
+              <span className="text-meta text-muted-ink">até</span>
+              <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-9 w-[150px] border-line bg-paper text-ui" />
+              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handleClear} title="Limpar filtro">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <Button variant="outline" onClick={() => setConciliationOpen(true)}>
+              <GitCompare className="h-4 w-4" />
+              Conciliação
+            </Button>
+            <Button onClick={() => setReportOpen(true)}>
+              <FileText className="h-4 w-4" />
+              Gerar relatório
+            </Button>
+          </>
+        }
+      />
 
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-muted-foreground" />
-          <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-9 w-[150px] text-sm" />
-          <span className="text-muted-foreground text-sm">até</span>
-          <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-9 w-[150px] text-sm" />
-          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handleClear} title="Limpar filtro">
-            <X className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => setConciliationOpen(true)}>
-            <GitCompare className="h-4 w-4" />
-            Conciliação
-          </Button>
-          <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => setReportOpen(true)}>
-            <FileText className="h-4 w-4" />
-            Gerar Relatório
-          </Button>
-        </div>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <SummaryCard
-          title="Receita Líquida"
-          previsto={summary.receitaLiquida.previsto}
-          realizado={summary.receitaLiquida.realizado}
-          icon={TrendingUp}
-          color="bg-ok"
-        />
-        <SummaryCard
-          title="Custo c/ Pessoal"
-          previsto={summary.custoPessoal.previsto}
-          realizado={summary.custoPessoal.realizado}
-          icon={Building2}
-          color="bg-blue-600"
-        />
-        <SummaryCard
-          title="Desp. Operacionais"
-          previsto={summary.despesasOperacionais.previsto}
-          realizado={summary.despesasOperacionais.realizado}
-          icon={TrendingDown}
-          color="bg-warn"
-        />
-        <SummaryCard
-          title="Lucro/Prejuízo"
-          previsto={summary.lucroPrejuizoLiquido.previsto}
-          realizado={summary.lucroPrejuizoLiquido.realizado}
-          icon={DollarSign}
-          color={summary.lucroPrejuizoLiquido.realizado >= 0 ? 'bg-ok' : 'bg-danger'}
-        />
-        <SummaryCard
-          title="Fluxo de Caixa"
-          previsto={summary.fluxoCaixa}
-          realizado={summary.fluxoCaixa}
-          icon={Wallet}
-          color="bg-violet-600"
-        />
-      </div>
+      <StatCardRow
+        items={[
+          { label: 'Receita bruta', value: formatCurrency(summary.receitaLiquida.previsto), hint: 'previsto no mês' },
+          { label: 'Receita realizada', value: formatCurrency(summary.receitaLiquida.realizado), hint: `${pctDoPrevisto.toFixed(0)}% do previsto` },
+          { label: 'Despesas', value: formatCurrency(summary.despesasOperacionais.realizado + summary.custoPessoal.realizado), hint: 'custo operacional' },
+          { label: 'Resultado', value: formatCurrency(summary.lucroPrejuizoLiquido.realizado), hint: `margem de ${margemPct.toFixed(0)}%`, emphasis: 'warm' },
+        ]}
+      />
 
       {/* DRE Table */}
       <Card className="bg-card border-border/50">
