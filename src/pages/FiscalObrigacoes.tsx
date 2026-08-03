@@ -278,31 +278,31 @@ export default function FiscalObrigacoes() {
     },
   });
 
-  const regimeCountsQuery = useQuery({
-    queryKey: ['contacts-regime-count', companyId],
+  // Conta clientes por obrigação a partir do vínculo real (client_obligations), não por
+  // regime — applies_to só diz quais regimes PODEM ter a obrigação, não quem de fato tem
+  // ela marcada no Super Perfil. Contar por regime infla o número (ex: uma obrigação
+  // recorrente que aplica a todos os regimes apareceria vinculada a quase todo mundo).
+  const obligationCompanyCountsQuery = useQuery({
+    queryKey: ['client-obligations-count', companyId],
     enabled: !!companyId,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('contacts')
-        .select('tax_regime')
-        .eq('company_id', companyId!)
-        .eq('is_active', true)
-        .not('tax_regime', 'is', null);
+        .from('client_obligations')
+        .select('obligation_id')
+        .eq('company_id', companyId!);
       if (error) throw error;
       const counts: Record<string, number> = {};
-      (data ?? []).forEach((c) => {
-        const r = ((c as { tax_regime: string | null }).tax_regime ?? '')
-          .toLowerCase()
-          .trim();
-        if (r && r !== 'nenhum') counts[r] = (counts[r] ?? 0) + 1;
+      (data ?? []).forEach((row) => {
+        const id = (row as { obligation_id: string }).obligation_id;
+        counts[id] = (counts[id] ?? 0) + 1;
       });
       return counts;
     },
   });
 
-  const regimeCounts = regimeCountsQuery.data ?? {};
-  const getCompanyCount = (appliesTo: string[]) =>
-    appliesTo.reduce((sum, r) => sum + (regimeCounts[r] ?? 0), 0);
+  const obligationCompanyCounts = obligationCompanyCountsQuery.data ?? {};
+  const getCompanyCount = (obligationId: string) =>
+    obligationCompanyCounts[obligationId] ?? 0;
 
   const filtered = useMemo(() => {
     const all = obligationsQuery.data ?? [];
@@ -478,13 +478,11 @@ export default function FiscalObrigacoes() {
                 </TableRow>
               ) : (
                 filtered.map((ob) => {
-                  const count = getCompanyCount(ob.applies_to ?? []);
-                  const tooltipText = (ob.applies_to ?? [])
-                    .map(
-                      (r) =>
-                        `${REGIME_BADGE[r]?.label ?? r}: ${regimeCounts[r] ?? 0}`,
-                    )
-                    .join(' · ');
+                  const count = getCompanyCount(ob.id);
+                  const tooltipText =
+                    count > 0
+                      ? `${count} empresa${count === 1 ? '' : 's'} com esta obrigação vinculada`
+                      : 'Nenhuma empresa vinculada ainda';
                   return (
                     <TableRow
                       key={ob.id}

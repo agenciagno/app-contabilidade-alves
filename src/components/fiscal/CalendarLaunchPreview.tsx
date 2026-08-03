@@ -21,7 +21,6 @@ interface Props {
 interface EligibleContact {
   id: string;
   name: string;
-  tax_regime: string | null;
   responsible_id: string | null;
 }
 
@@ -29,20 +28,38 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
   const { company } = useCompany();
   const companyId = company?.id;
 
+  // Mesmo critério de elegibilidade do RPC generate_monthly_fiscal_tasks:
+  // is_active, responsible_id definido e categorizado como 'cliente'.
   const { data: contacts = [], isLoading: contactsLoading } = useQuery<EligibleContact[]>({
     queryKey: ['fiscal-eligible-contacts', companyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('contacts')
-        .select('id, name, tax_regime, responsible_id')
+        .select('id, name, responsible_id')
         .eq('company_id', companyId!)
         .eq('is_active', true)
-        .not('tax_regime', 'is', null);
+        .not('responsible_id', 'is', null)
+        .contains('categorias', ['cliente']);
       if (error) throw error;
-      return ((data ?? []) as EligibleContact[]).filter((c) => {
-        const v = (c.tax_regime ?? '').toString().trim().toLowerCase();
-        return v !== '' && v !== 'nenhum';
-      });
+      return (data ?? []) as EligibleContact[];
+    },
+    enabled: !!companyId,
+  });
+
+  // Vínculo real por cliente (client_obligations) — a mesma fonte que o RPC usa.
+  // Não usar fiscal_obligations_catalog.applies_to (regime) pra contar clientes: uma
+  // obrigação pode aplicar a um regime mas só estar marcada em alguns clientes dele.
+  const { data: clientObligations = [], isLoading: clientObligationsLoading } = useQuery<
+    { obligation_id: string; contact_id: string }[]
+  >({
+    queryKey: ['client-obligations-all', companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('client_obligations')
+        .select('obligation_id, contact_id')
+        .eq('company_id', companyId!);
+      if (error) throw error;
+      return data ?? [];
     },
     enabled: !!companyId,
   });
@@ -67,10 +84,16 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
   };
 
   const breakdown = useMemo(() => {
-    // For each row, count clients matching applies_to regimes
+    // Para cada obrigação, contar só os clientes com vínculo real em client_obligations
+    // (o mesmo dado que o RPC generate_monthly_fiscal_tasks usa pra gerar as tarefas).
+    const contactsById = new Map(contacts.map((c) => [c.id, c]));
     const perObligation = rows.map((r) => {
-      const applies = r.fiscal_obligations_catalog?.applies_to ?? [];
-      const clients = contacts.filter((c) => applies.includes((c.tax_regime ?? '').toString()));
+      const linkedContactIds = clientObligations
+        .filter((co) => co.obligation_id === r.obligation_id)
+        .map((co) => co.contact_id);
+      const clients = linkedContactIds
+        .map((id) => contactsById.get(id))
+        .filter((c): c is EligibleContact => !!c);
       return {
         id: r.id,
         name: r.fiscal_obligations_catalog?.name ?? '—',
@@ -109,10 +132,10 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
       totalTasks,
       clientCount: clientsTouched.size,
     };
-  }, [rows, contacts, profiles]);
+  }, [rows, contacts, clientObligations, profiles]);
 
   const overloaded = breakdown.perCollaborator.filter((c) => c.pct > 40);
-  const loading = contactsLoading;
+  const loading = contactsLoading || clientObligationsLoading;
 
   // Reset reviewed flag when rows change
   useEffect(() => {

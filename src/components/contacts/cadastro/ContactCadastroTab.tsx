@@ -27,7 +27,7 @@ import { useContactPartners } from '@/hooks/useContactPartners';
 import { useContacts } from '@/hooks/useContacts';
 import { useContactDependencies } from '@/hooks/useContactDependencies';
 import { useUserRole } from '@/hooks/useUserRole';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ContactBillingCard } from '../ContactBillingCard';
 import { ContactObligationsSelector } from '@/components/fiscal/ContactObligationsSelector';
@@ -113,6 +113,40 @@ export function ContactCadastroTab({ contactId }: Props) {
     const payload: Record<string, any> = {};
     keys.forEach(k => { payload[k] = form[k] ?? null; });
     updateSuperPerfil.mutate(payload);
+  };
+
+  const {
+    catalog: obligationsCatalog,
+    selected: selectedObligations,
+    setSelected: setSelectedObligations,
+    sync: syncObligations,
+  } = useContactObligations(contactId, !isPessoaFisica);
+
+  const [savingFiscal, setSavingFiscal] = useState(false);
+  const saveFiscalSection = async () => {
+    setSavingFiscal(true);
+    try {
+      await updateSuperPerfil.mutateAsync({
+        tax_regime: form.tax_regime ?? null,
+        status_cliente: form.status_cliente ?? null,
+        im: form.im ?? null,
+        ie: form.ie ?? null,
+        registro_entradas: form.registro_entradas ?? null,
+        registro_saidas: form.registro_saidas ?? null,
+        registro_icms: form.registro_icms ?? null,
+        inventario: form.inventario ?? null,
+      });
+    } catch {
+      setSavingFiscal(false);
+      return; // updateSuperPerfil já mostra o toast de erro
+    }
+    try {
+      await syncObligations();
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao salvar obrigações fiscais');
+    } finally {
+      setSavingFiscal(false);
+    }
   };
 
   const handleCnpjLookup = async () => {
@@ -396,14 +430,20 @@ export function ContactCadastroTab({ contactId }: Props) {
             </CardContent>
           </Card>
 
-          <ObligationsSection contactId={contactId} />
+          <Card>
+            <CardHeader><CardTitle className="text-base">Obrigações Fiscais</CardTitle></CardHeader>
+            <CardContent>
+              <ContactObligationsSelector
+                options={obligationsCatalog}
+                selectedIds={selectedObligations}
+                onChange={setSelectedObligations}
+              />
+            </CardContent>
+          </Card>
 
           <div className="flex justify-end">
-            <Button onClick={() => saveSection([
-              'tax_regime', 'status_cliente', 'im', 'ie',
-              'registro_entradas', 'registro_saidas', 'registro_icms', 'inventario',
-            ])} disabled={updateSuperPerfil.isPending}>
-              {updateSuperPerfil.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            <Button onClick={saveFiscalSection} disabled={savingFiscal}>
+              {savingFiscal ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
               Salvar
             </Button>
           </div>
@@ -442,13 +482,19 @@ export function ContactCadastroTab({ contactId }: Props) {
 }
 
 // ============ Obrigações Fiscais ============
-function ObligationsSection({ contactId }: { contactId: string }) {
+// Estado + sync ficam num hook (não num componente com botão próprio) para que o
+// salvamento aconteça junto com o resto da aba Fiscal, num único botão "Salvar" —
+// dois botões "Salvar" adjacentes e mal identificados levavam a edições perdidas
+// (usuário clicava no botão errado e as obrigações nunca eram persistidas).
+function useContactObligations(contactId: string, enabled: boolean) {
   const { company } = useCompany();
+  const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [initialized, setInitialized] = useState(false);
 
   const { data: catalog = [] } = useQuery({
     queryKey: ['fiscal-obligations-catalog'],
+    enabled,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from('fiscal_obligations_catalog')
@@ -461,6 +507,7 @@ function ObligationsSection({ contactId }: { contactId: string }) {
 
   const { data: contactObligations = [] } = useQuery({
     queryKey: ['client-obligations', contactId],
+    enabled,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from('client_obligations')
@@ -472,58 +519,37 @@ function ObligationsSection({ contactId }: { contactId: string }) {
   });
 
   useEffect(() => {
-    if (!initialized && contactObligations.length >= 0) {
+    if (!initialized && enabled) {
       setSelected(new Set(contactObligations.map(o => o.obligation_id)));
       setInitialized(true);
     }
-  }, [contactObligations, initialized]);
+  }, [contactObligations, initialized, enabled]);
 
-  const handleSave = async () => {
+  const sync = async () => {
     if (!company?.id) return;
-    try {
-      const original = new Set(contactObligations.map(o => o.obligation_id));
-      const toDelete: string[] = [];
-      const toInsert: string[] = [];
-      original.forEach(id => { if (!selected.has(id)) toDelete.push(id); });
-      selected.forEach(id => { if (!original.has(id)) toInsert.push(id); });
+    const original = new Set(contactObligations.map(o => o.obligation_id));
+    const toDelete: string[] = [];
+    const toInsert: string[] = [];
+    original.forEach(id => { if (!selected.has(id)) toDelete.push(id); });
+    selected.forEach(id => { if (!original.has(id)) toInsert.push(id); });
 
-      if (toDelete.length) {
-        const { error } = await (supabase as any)
-          .from('client_obligations').delete()
-          .eq('contact_id', contactId).in('obligation_id', toDelete);
-        if (error) throw error;
-      }
-      if (toInsert.length) {
-        const { error } = await (supabase as any)
-          .from('client_obligations').insert(
-            toInsert.map(obligation_id => ({ contact_id: contactId, obligation_id, company_id: company.id }))
-          );
-        if (error) throw error;
-      }
-      toast.success('Obrigações fiscais atualizadas');
-    } catch (e: any) {
-      toast.error(e?.message || 'Erro ao salvar obrigações');
+    if (toDelete.length) {
+      const { error } = await (supabase as any)
+        .from('client_obligations').delete()
+        .eq('contact_id', contactId).in('obligation_id', toDelete);
+      if (error) throw error;
     }
+    if (toInsert.length) {
+      const { error } = await (supabase as any)
+        .from('client_obligations').insert(
+          toInsert.map(obligation_id => ({ contact_id: contactId, obligation_id, company_id: company.id }))
+        );
+      if (error) throw error;
+    }
+    await queryClient.invalidateQueries({ queryKey: ['client-obligations', contactId] });
   };
 
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">Obrigações Fiscais</CardTitle>
-        <Button size="sm" variant="outline" onClick={handleSave}>
-          <Save className="h-4 w-4 mr-2" />
-          Salvar obrigações
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <ContactObligationsSelector
-          options={catalog}
-          selectedIds={selected}
-          onChange={setSelected}
-        />
-      </CardContent>
-    </Card>
-  );
+  return { catalog, selected, setSelected, sync };
 }
 
 // ============ Operacional ============
