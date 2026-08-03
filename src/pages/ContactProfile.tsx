@@ -10,7 +10,7 @@ import { ArrowLeft, User, DollarSign, FileText, ClipboardList, Download, History
 import { useContacts } from '@/hooks/useContacts';
 import { useContactTransactions, useContactFinancialStatus } from '@/hooks/useContactTransactions';
 import { useContactDocuments, DOCUMENT_CATEGORIES } from '@/hooks/useContactDocuments';
-import { useUserRole } from '@/hooks/useUserRole';
+import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { ContactFinancialTab } from '@/components/contacts/ContactFinancialTab';
 import { ContactDocumentsTab } from '@/components/contacts/ContactDocumentsTab';
 import { generateContactReport } from '@/components/contacts/ContactReportPDF';
@@ -35,10 +35,17 @@ export default function ContactProfile() {
   const { contacts, isLoading: isLoadingContacts } = useContacts();
   const { data: transactions } = useContactTransactions(id);
   const { documents, getDocumentCounts } = useContactDocuments(id);
-  const { isAdmin, isSuperAdmin, allowedModules } = useUserRole();
-  const canViewAcessos = isSuperAdmin || allowedModules.includes('acessos');
-  const canViewFinanceiro = isSuperAdmin || isAdmin || allowedModules.includes('financeiro');
-  const canViewLogs = isSuperAdmin || isAdmin;
+  const { isModuleVisible, isSubItemVisible } = useModuleAccess();
+  const canViewSub = (subKey: string) =>
+    isModuleVisible('perfil_cliente') && isSubItemVisible('perfil_cliente', subKey);
+  const canViewIdentificacaoGroup = canViewSub('perfil_cliente_identificacao')
+    || canViewSub('perfil_cliente_fiscal')
+    || canViewSub('perfil_cliente_operacional')
+    || canViewSub('perfil_cliente_socios');
+  const canViewAcessos = canViewSub('perfil_cliente_acessos');
+  const canViewDocumentos = canViewSub('perfil_cliente_documentos');
+  const canViewFinanceiro = canViewSub('perfil_cliente_financeiro');
+  const canViewLogs = canViewSub('perfil_cliente_logs');
   const contact = contacts.find(c => c.id === id);
   const { isInadimplente } = useContactFinancialStatus(id, transactions);
 
@@ -104,14 +111,22 @@ export default function ContactProfile() {
     );
   }
 
-  const visibleTabCount = 2 + (canViewAcessos ? 1 : 0) + (canViewFinanceiro ? 1 : 0) + (canViewLogs ? 1 : 0);
+  const visibleTabCount = (canViewIdentificacaoGroup ? 1 : 0) + (canViewAcessos ? 1 : 0)
+    + (canViewDocumentos ? 1 : 0) + (canViewFinanceiro ? 1 : 0) + (canViewLogs ? 1 : 0);
   const GRID_COLS_CLASS: Record<number, string> = {
+    1: 'grid-cols-1',
     2: 'grid-cols-2 md:grid-cols-2',
     3: 'grid-cols-2 md:grid-cols-3',
     4: 'grid-cols-2 md:grid-cols-4',
     5: 'grid-cols-2 md:grid-cols-5',
   };
-  const tabsColsClass = GRID_COLS_CLASS[visibleTabCount];
+  const tabsColsClass = GRID_COLS_CLASS[visibleTabCount] ?? 'grid-cols-1';
+  const defaultProfileTab = canViewIdentificacaoGroup ? 'cadastro'
+    : canViewAcessos ? 'acessos'
+    : canViewDocumentos ? 'documentos'
+    : canViewFinanceiro ? 'financeiro'
+    : canViewLogs ? 'logs'
+    : 'cadastro';
 
   return (
     <div className="space-y-6">
@@ -171,22 +186,31 @@ export default function ContactProfile() {
       </Button>
 
       {/* Tabs */}
-      <Tabs defaultValue="cadastro" className="w-full">
+      {visibleTabCount === 0 ? (
+        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+          Sem permissão para ver o perfil deste cliente.
+        </div>
+      ) : (
+      <Tabs defaultValue={defaultProfileTab} className="w-full">
         <TabsList className={`w-full grid ${tabsColsClass} gap-1 h-auto`}>
-          <TabsTrigger value="cadastro" className="flex items-center gap-1.5">
-            <ClipboardList className="h-4 w-4" />
-            <span className="hidden sm:inline">Cadastro</span>
-          </TabsTrigger>
+          {canViewIdentificacaoGroup && (
+            <TabsTrigger value="cadastro" className="flex items-center gap-1.5">
+              <ClipboardList className="h-4 w-4" />
+              <span className="hidden sm:inline">Cadastro</span>
+            </TabsTrigger>
+          )}
           {canViewAcessos && (
             <TabsTrigger value="acessos" className="flex items-center gap-1.5">
               <KeyRound className="h-4 w-4" />
               <span className="hidden sm:inline">Acessos</span>
             </TabsTrigger>
           )}
-          <TabsTrigger value="documentos" className="flex items-center gap-1.5">
-            <FileText className="h-4 w-4" />
-            <span className="hidden sm:inline">Documentos</span>
-          </TabsTrigger>
+          {canViewDocumentos && (
+            <TabsTrigger value="documentos" className="flex items-center gap-1.5">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Documentos</span>
+            </TabsTrigger>
+          )}
           {canViewFinanceiro && (
             <TabsTrigger value="financeiro" className="flex items-center gap-1.5">
               <DollarSign className="h-4 w-4" />
@@ -201,9 +225,11 @@ export default function ContactProfile() {
           )}
         </TabsList>
 
-        <TabsContent value="cadastro" className="mt-6">
-          <ContactCadastroTab contactId={contact.id} />
-        </TabsContent>
+        {canViewIdentificacaoGroup && (
+          <TabsContent value="cadastro" className="mt-6">
+            <ContactCadastroTab contactId={contact.id} />
+          </TabsContent>
+        )}
 
         {canViewAcessos && (
           <TabsContent value="acessos" className="mt-6">
@@ -211,9 +237,11 @@ export default function ContactProfile() {
           </TabsContent>
         )}
 
-        <TabsContent value="documentos" className="mt-6">
-          <ContactDocumentsTab contactId={contact.id} />
-        </TabsContent>
+        {canViewDocumentos && (
+          <TabsContent value="documentos" className="mt-6">
+            <ContactDocumentsTab contactId={contact.id} />
+          </TabsContent>
+        )}
 
         {canViewFinanceiro && (
           <TabsContent value="financeiro" className="mt-6">
@@ -227,6 +255,7 @@ export default function ContactProfile() {
           </TabsContent>
         )}
       </Tabs>
+      )}
     </div>
   );
 }

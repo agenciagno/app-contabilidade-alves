@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +50,24 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   const [isLoading, setIsLoading] = useState(false);
   const { addNotification } = useNotifications();
 
+  // Cliente Externo (is_internal = false) nasce com o controle de módulos zerado —
+  // Gabriel popula manualmente depois. Empresa interna (CA) mantém admin/super_admin
+  // com tudo por padrão.
+  const { data: companyIsInternal } = useQuery({
+    queryKey: ['user-form-company-internal', companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('is_internal')
+        .eq('id', companyId)
+        .single();
+      if (error) throw error;
+      return (data as any)?.is_internal ?? true;
+    },
+    enabled: !!companyId,
+  });
+  const isExternalCompany = companyIsInternal === false;
+
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('colaborador');
@@ -60,6 +79,10 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [sendingResetEmail, setSendingResetEmail] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Interna: só colaborador escolhe módulo (admin/super_admin ganham tudo).
+  // Externa: todo mundo escolhe módulo, mesmo admin — nasce zerado.
+  const showModulePicker = role === 'colaborador' || isExternalCompany;
 
   useEffect(() => {
     if (open && editUser) {
@@ -91,7 +114,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
     setShowNewPassword(false);
     setRole('colaborador');
     setStatusActive(true);
-    setAllowedModules(ALL_MODULE_KEYS);
+    setAllowedModules(isExternalCompany ? [] : ALL_MODULE_KEYS);
     setErrors({});
   };
 
@@ -130,7 +153,8 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
       return;
     }
 
-    if (role === 'colaborador' && allowedModules.length === 0) {
+    // Cliente Externo nasce zerado de propósito — Gabriel popula manualmente depois.
+    if (!isExternalCompany && role === 'colaborador' && allowedModules.length === 0) {
       toast.error('Selecione pelo menos um módulo de acesso');
       return;
     }
@@ -150,7 +174,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
     try {
 
       if (isEditMode) {
-        const resolvedModules = role === 'colaborador' ? allowedModules : ALL_MODULE_KEYS;
+        const resolvedModules = showModulePicker ? allowedModules : ALL_MODULE_KEYS;
 
         const { data: updateData, error: updateError } = await supabase.functions.invoke(
           'admin-update-user',
@@ -179,7 +203,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
         handleClose();
       } else {
         // CREATE MODE
-        const resolvedModules = role === 'colaborador' ? allowedModules : ALL_MODULE_KEYS;
+        const resolvedModules = showModulePicker ? allowedModules : ALL_MODULE_KEYS;
         const { data, error: fnError } = await supabase.functions.invoke('create-user-v2', {
           body: {
             email,
@@ -285,9 +309,14 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
             </Select>
           </div>
 
-          {/* Módulos — only for Colaborador */}
-          {role === 'colaborador' && (
+          {/* Módulos — Colaborador sempre escolhe; empresa externa, todo mundo escolhe */}
+          {showModulePicker && (
             <div className="space-y-3">
+              {isExternalCompany && (
+                <p className="text-xs text-muted-foreground">
+                  Cliente Externo nasce com tudo desmarcado — libere módulo por módulo.
+                </p>
+              )}
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-primary" />
                 <Label className="font-semibold">Módulos de Acesso</Label>

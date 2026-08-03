@@ -10,8 +10,6 @@ import {
 export interface RoleGated {
   requireAdmin?: boolean;
   requireSuperAdmin?: boolean;
-  /** Esconde de colaborador (mesma regra de Configurações). */
-  hideFromColaborador?: boolean;
   /**
    * Esconde de cliente externo (empresa com `is_internal = false`).
    * É regra de produto — o que o cliente que assina não enxerga —, e não permissão
@@ -28,7 +26,7 @@ export interface RoleGated {
  * sem isso a busca mostraria rota que o usuário não pode abrir.
  */
 export function useModuleAccess() {
-  const { isSuperAdmin, isAdmin, isColaborador, allowedModules } = useUserRole();
+  const { isSuperAdmin, isAdmin, allowedModules } = useUserRole();
   const { company } = useCompany();
 
   const planModules: string[] = (company as any)?.plan_modules ?? DEFAULT_PLAN_MODULES;
@@ -71,7 +69,6 @@ export function useModuleAccess() {
   const passesRoleGate = (item: RoleGated) => {
     if (item.requireSuperAdmin && !isSuperAdmin) return false;
     if (item.requireAdmin && !isAdmin && !isSuperAdmin) return false;
-    if (item.hideFromColaborador && isColaborador && !isSuperAdmin) return false;
     if (item.internalOnly && isExternalCompany && !isSuperAdmin) return false;
     return true;
   };

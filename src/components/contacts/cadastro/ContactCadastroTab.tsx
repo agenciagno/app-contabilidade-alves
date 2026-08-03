@@ -26,7 +26,7 @@ import { useSuperPerfil } from '@/hooks/useSuperPerfil';
 import { useContactPartners } from '@/hooks/useContactPartners';
 import { useContacts } from '@/hooks/useContacts';
 import { useContactDependencies } from '@/hooks/useContactDependencies';
-import { useUserRole } from '@/hooks/useUserRole';
+import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ContactBillingCard } from '../ContactBillingCard';
@@ -108,6 +108,27 @@ export function ContactCadastroTab({ contactId }: Props) {
 
   const documentType = getDocumentType(form.document);
   const isPessoaFisica = documentType === 'CPF';
+
+  // Autorização por sub-aba do Super Perfil — mesma regra pra Colaborador e Cliente Externo.
+  const { isModuleVisible, isSubItemVisible } = useModuleAccess();
+  const canViewSub = (subKey: string) =>
+    isModuleVisible('perfil_cliente') && isSubItemVisible('perfil_cliente', subKey);
+  const canViewIdentificacao = canViewSub('perfil_cliente_identificacao');
+  const canViewFiscalTab = !isPessoaFisica && canViewSub('perfil_cliente_fiscal');
+  const canViewOperacional = canViewSub('perfil_cliente_operacional');
+  const canViewSocios = !isPessoaFisica && canViewSub('perfil_cliente_socios');
+  const visibleCadastroTabs = [canViewIdentificacao, canViewFiscalTab, canViewOperacional, canViewSocios].filter(Boolean).length;
+  const CADASTRO_GRID_COLS: Record<number, string> = {
+    1: 'grid-cols-1',
+    2: 'grid-cols-2',
+    3: 'grid-cols-2 md:grid-cols-3',
+    4: 'grid-cols-2 md:grid-cols-4',
+  };
+  const defaultCadastroTab = canViewIdentificacao ? 'identificacao'
+    : canViewFiscalTab ? 'fiscal'
+    : canViewOperacional ? 'operacional'
+    : canViewSocios ? 'socios'
+    : 'identificacao';
 
   const saveSection = (keys: string[]) => {
     const payload: Record<string, any> = {};
@@ -199,16 +220,25 @@ export function ContactCadastroTab({ contactId }: Props) {
 
   if (isLoading) return <Skeleton className="h-[400px] w-full" />;
 
+  if (visibleCadastroTabs === 0) {
+    return (
+      <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+        Sem permissão para ver o cadastro deste cliente.
+      </div>
+    );
+  }
+
   return (
-    <Tabs defaultValue="identificacao" className="w-full">
-      <TabsList className={`w-full grid gap-1 ${isPessoaFisica ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-4'}`}>
-        <TabsTrigger value="identificacao">Identificação</TabsTrigger>
-        {!isPessoaFisica && <TabsTrigger value="fiscal">Fiscal</TabsTrigger>}
-        <TabsTrigger value="operacional">Operacional</TabsTrigger>
-        {!isPessoaFisica && <TabsTrigger value="socios">Sócios</TabsTrigger>}
+    <Tabs defaultValue={defaultCadastroTab} className="w-full">
+      <TabsList className={`w-full grid gap-1 ${CADASTRO_GRID_COLS[visibleCadastroTabs]}`}>
+        {canViewIdentificacao && <TabsTrigger value="identificacao">Identificação</TabsTrigger>}
+        {canViewFiscalTab && <TabsTrigger value="fiscal">Fiscal</TabsTrigger>}
+        {canViewOperacional && <TabsTrigger value="operacional">Operacional</TabsTrigger>}
+        {canViewSocios && <TabsTrigger value="socios">Sócios</TabsTrigger>}
       </TabsList>
 
       {/* IDENTIFICAÇÃO & CONTATOS */}
+      {canViewIdentificacao && (
       <TabsContent value="identificacao" className="mt-6 space-y-4">
         <Card>
           <CardHeader><CardTitle className="text-base">Identificação & Contatos</CardTitle></CardHeader>
@@ -357,9 +387,10 @@ export function ContactCadastroTab({ contactId }: Props) {
           </Button>
         </div>
       </TabsContent>
+      )}
 
       {/* FISCAL (só PJ — para PF, Status do Cliente vive na aba Operacional) */}
-      {!isPessoaFisica && (
+      {canViewFiscalTab && (
         <TabsContent value="fiscal" className="mt-6 space-y-4">
           <Card>
             <CardHeader><CardTitle className="text-base">Regime e Inscrições</CardTitle></CardHeader>
@@ -451,6 +482,7 @@ export function ContactCadastroTab({ contactId }: Props) {
       )}
 
       {/* OPERACIONAL */}
+      {canViewOperacional && (
       <TabsContent value="operacional" className="mt-6 space-y-4">
         <OperacionalSection
           form={form}
@@ -470,9 +502,10 @@ export function ContactCadastroTab({ contactId }: Props) {
           isPessoaFisica={isPessoaFisica}
         />
       </TabsContent>
+      )}
 
       {/* SÓCIOS */}
-      {!isPessoaFisica && (
+      {canViewSocios && (
         <TabsContent value="socios" className="mt-6">
           <SociosSection contactId={contactId} />
         </TabsContent>
@@ -568,9 +601,11 @@ function OperacionalSection({
   const navigate = useNavigate();
   const { data: dependencies, isLoading: loadingDependencies } = useContactDependencies(contactId);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const { isSuperAdmin, isAdmin, allowedModules } = useUserRole();
-  const canViewCobranca = isSuperAdmin || isAdmin || allowedModules.includes('financeiro');
-  const canDeleteContact = isSuperAdmin || isAdmin;
+  const { isModuleVisible, isSubItemVisible } = useModuleAccess();
+  const canViewSub = (subKey: string) =>
+    isModuleVisible('perfil_cliente') && isSubItemVisible('perfil_cliente', subKey);
+  const canViewCobranca = canViewSub('perfil_cliente_financeiro');
+  const canDeleteContact = canViewSub('perfil_cliente_operacional_excluir');
 
   const handleDelete = () => {
     deleteContact.mutate(contactId, { onSuccess: () => navigate('/contatos') });

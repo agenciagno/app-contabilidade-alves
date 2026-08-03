@@ -8,6 +8,10 @@
  * Chaves de permissão são gravadas em `companies.plan_modules` (o que o plano
  * contratou) e `profiles.allowed_modules` (o que o usuário pode ver). Nunca renomear
  * uma chave já gravada — adicionar em LEGACY_MODULE_ALIASES em vez disso.
+ *
+ * Vale igual para Colaborador (equipe interna CA) e Cliente Externo — mesma árvore,
+ * mesmo gate. Cliente Externo nasce com `allowed_modules` vazio (ver UserFormDialog);
+ * Colaborador admin/super_admin ganha tudo por padrão.
  */
 
 export interface ModuleNode {
@@ -19,11 +23,6 @@ export interface ModuleNode {
 /** Árvore de permissões exibida no cadastro de usuário. */
 export const MODULE_TREE: ModuleNode[] = [
   { key: 'home', label: 'Início' },
-  {
-    key: 'tech',
-    label: 'Tech',
-    children: [{ key: 'tech_disparos', label: 'Disparos' }],
-  },
   {
     key: 'reforma_tributaria',
     label: 'Reforma Tributária',
@@ -49,7 +48,8 @@ export const MODULE_TREE: ModuleNode[] = [
       { key: 'fiscal_dashboard', label: 'Dashboard' },
       { key: 'fiscal_tarefas', label: 'Tarefas' },
       { key: 'fiscal_colaboradores', label: 'Colaboradores' },
-      { key: 'fiscal_calendario', label: 'Obrigações e Declarações / Calendário Fiscal' },
+      { key: 'fiscal_obrigacoes_declaracoes', label: 'Obrigações e Declarações' },
+      { key: 'fiscal_calendario', label: 'Calendário Fiscal' },
       { key: 'fiscal_obrigacoes', label: 'Obrigações Fiscais' },
       { key: 'fiscal_agenda', label: 'Agenda' },
     ],
@@ -73,23 +73,52 @@ export const MODULE_TREE: ModuleNode[] = [
       { key: 'financeiro_fluxo_caixa', label: 'Fluxo de Caixa' },
       { key: 'financeiro_boletos', label: 'Boletos' },
       { key: 'financeiro_conta_corrente', label: 'Conta Corrente' },
-      { key: 'financeiro_conciliacao_sicoob', label: 'Conciliação Sicoob' },
+      { key: 'financeiro_conciliacao_sicoob', label: 'Sicoob' },
       { key: 'financeiro_eventos_contabeis', label: 'Eventos Contábeis' },
       { key: 'financeiro_dre', label: 'DRE' },
       { key: 'financeiro_clientes_fornecedores', label: 'Clientes & Fornecedores' },
-      { key: 'financeiro_metas_orcamentos', label: 'Metas & Orçamentos' },
       { key: 'financeiro_categorias', label: 'Categorias' },
+      { key: 'financeiro_metas_orcamentos', label: 'Metas & Orçamentos' },
     ],
   },
-  // Cadastros é grupo visual no menu; as chaves seguem no topo para não invalidar
-  // as permissões já gravadas de `contatos` e `acessos`.
-  { key: 'contatos', label: 'Cadastros · Empresas' },
-  { key: 'cadastros_procuracoes', label: 'Cadastros · Procurações' },
-  { key: 'cadastros_certificados', label: 'Cadastros · Certificados' },
-  { key: 'cadastros_alvaras', label: 'Cadastros · Alvarás' },
-  { key: 'acessos', label: 'Cadastros · Acessos' },
-  { key: 'equipe', label: 'Cadastros · Equipe' },
-  { key: 'configuracoes', label: 'Configurações' },
+  {
+    key: 'cadastro',
+    label: 'Cadastro',
+    children: [
+      { key: 'contatos', label: 'Empresas' },
+      { key: 'cadastros_procuracoes', label: 'Procurações' },
+      { key: 'cadastros_certificados', label: 'Certificados' },
+      { key: 'cadastros_alvaras', label: 'Alvarás' },
+      { key: 'acessos', label: 'Acessos' },
+      { key: 'equipe', label: 'Equipe' },
+    ],
+  },
+  {
+    key: 'perfil_cliente',
+    label: 'Perfil do Cliente',
+    children: [
+      { key: 'perfil_cliente_identificacao', label: 'Identificação' },
+      { key: 'perfil_cliente_fiscal', label: 'Fiscal' },
+      { key: 'perfil_cliente_operacional', label: 'Operacional' },
+      { key: 'perfil_cliente_operacional_excluir', label: 'Operacional · Excluir cliente' },
+      { key: 'perfil_cliente_socios', label: 'Sócios' },
+      { key: 'perfil_cliente_acessos', label: 'Acessos' },
+      { key: 'perfil_cliente_documentos', label: 'Documentos' },
+      { key: 'perfil_cliente_financeiro', label: 'Financeiro' },
+      { key: 'perfil_cliente_logs', label: 'Logs' },
+    ],
+  },
+  {
+    key: 'configuracoes',
+    label: 'Configurações',
+    children: [
+      { key: 'configuracoes_empresa', label: 'Dados da Empresa' },
+      { key: 'configuracoes_logs', label: 'Logs Globais' },
+      { key: 'configuracoes_lixeira', label: 'Lixeira' },
+      { key: 'configuracoes_backup', label: 'Backup' },
+    ],
+  },
+  { key: 'suporte', label: 'Suporte' },
 ];
 
 /** Toda chave válida (pais + filhos). */
@@ -122,6 +151,7 @@ export const LEGACY_MODULE_ALIASES: Record<string, string[]> = {
 };
 export const LEGACY_SUBMODULE_ALIASES: Record<string, string[]> = {
   tech_disparos: ['clientes_disparos'],
+  contatos: ['clientes'],
 };
 
 /** Fallback de plano quando a empresa não tem `plan_modules` preenchido. */
@@ -129,9 +159,10 @@ export const DEFAULT_PLAN_MODULES: string[] = [
   'home',
   'fiscal',
   'financeiro',
-  'contatos',
-  'acessos',
+  'cadastro',
+  'perfil_cliente',
   'configuracoes',
+  'suporte',
 ];
 
 /** Para onde mandar quem cai numa rota sem permissão. */
@@ -140,20 +171,22 @@ export const MODULE_ROUTE_MAP: Record<string, string> = {
   tech: '/disparos',
   financeiro: '/painel-financeiro',
   fiscal: '/fiscal/tarefas',
+  cadastro: '/contatos',
   contatos: '/contatos',
   acessos: '/acessos',
   equipe: '/cadastros/equipe',
   configuracoes: '/configuracoes',
+  suporte: '/suporte',
 };
 
 export const MODULE_PRIORITY = [
   'home',
   'financeiro',
   'fiscal',
-  'contatos',
+  'cadastro',
   'tech',
-  'acessos',
   'configuracoes',
+  'suporte',
 ];
 
 /**

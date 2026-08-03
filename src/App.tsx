@@ -82,8 +82,8 @@ const App = () => (
               <Route path="/financeiro/fluxo-caixa" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_fluxo_caixa"><CashFlow /></ModuleGuard></AppLayout>} />
               <Route path="/financeiro/metas-orcamentos" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_metas_orcamentos"><MetasOrcamentos /></ModuleGuard></AppLayout>} />
 
-              <Route path="/contatos" element={<AppLayout><ModuleGuard moduleName="contatos"><Contacts /></ModuleGuard></AppLayout>} />
-              <Route path="/crm/cliente/:id" element={<AppLayout><ModuleGuard moduleName="contatos"><ContactProfile /></ModuleGuard></AppLayout>} />
+              <Route path="/contatos" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="contatos"><Contacts /></ModuleGuard></AppLayout>} />
+              <Route path="/crm/cliente/:id" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="contatos"><ContactProfile /></ModuleGuard></AppLayout>} />
 
               <Route path="/bancos" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_conta_corrente"><Banks /></ModuleGuard></AppLayout>} />
               <Route path="/categorias" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_eventos_contabeis"><Categories /></ModuleGuard></AppLayout>} />
@@ -92,7 +92,7 @@ const App = () => (
               
               <Route path="/configuracoes" element={<AppLayout><ModuleGuard moduleName="configuracoes" internalOnly><SettingsPage /></ModuleGuard></AppLayout>} />
               <Route path="/disparos" element={<AppLayout><ModuleGuard moduleName="tech" subModule="tech_disparos"><CrmDispatches /></ModuleGuard></AppLayout>} />
-              <Route path="/relatorio-clientes" element={<AppLayout><ModuleGuard moduleName="contatos"><ClientReport /></ModuleGuard></AppLayout>} />
+              <Route path="/relatorio-clientes" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="contatos"><ClientReport /></ModuleGuard></AppLayout>} />
 
               <Route path="/boletos" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_boletos"><Boletos /></ModuleGuard></AppLayout>} />
               <Route path="/financeiro/conciliacao-sicoob" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_conciliacao_sicoob"><ConciliacaoSicoob /></ModuleGuard></AppLayout>} />
@@ -100,9 +100,9 @@ const App = () => (
               <Route path="/fiscal/calendario" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_calendario" requireAdmin><FiscalCalendar /></ModuleGuard></AppLayout>} />
               <Route path="/fiscal/dashboard" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_dashboard" requireAdmin><FiscalDashboard /></ModuleGuard></AppLayout>} />
               <Route path="/fiscal/colaboradores" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_colaboradores" requireAdmin><FiscalCollaborators /></ModuleGuard></AppLayout>} />
-              <Route path="/fiscal/obrigacoes" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_calendario" requireAdmin><FiscalObrigacoes /></ModuleGuard></AppLayout>} />
-              
-              <Route path="/acessos" element={<AppLayout><ModuleGuard moduleName="acessos"><CofreGlobal /></ModuleGuard></AppLayout>} />
+              <Route path="/fiscal/obrigacoes" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_obrigacoes_declaracoes" requireAdmin><FiscalObrigacoes /></ModuleGuard></AppLayout>} />
+
+              <Route path="/acessos" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="acessos"><CofreGlobal /></ModuleGuard></AppLayout>} />
               <Route path="/tech/clientes-externos" element={<AppLayout><TechClientesExternos /></AppLayout>} />
               <Route path="/tech/clientes-externos/:id" element={<AppLayout><TechClienteExternoDetalhe /></AppLayout>} />
               {/* Rotas antigas: atalho fixado e link salvo continuam funcionando. */}
@@ -114,7 +114,7 @@ const App = () => (
 
               {/* Conta do usuário */}
               <Route path="/minha-conta" element={<AppLayout><MinhaConta /></AppLayout>} />
-              <Route path="/suporte" element={<AppLayout><Suporte /></AppLayout>} />
+              <Route path="/suporte" element={<AppLayout><ModuleGuard moduleName="suporte"><Suporte /></ModuleGuard></AppLayout>} />
               <Route path="/faturas" element={<AppLayout><Faturas /></AppLayout>} />
 
               {/* Reforma Tributária */}
@@ -144,11 +144,11 @@ const App = () => (
               <Route path="/simulador-tributario" element={<AppLayout><ModuleGuard moduleName="simulador_tributario"><EmBreve moduleKey="simulador_tributario" /></ModuleGuard></AppLayout>} />
               <Route path="/diagnostico-ca" element={<AppLayout><ModuleGuard moduleName="diagnostico_ca"><EmBreve moduleKey="diagnostico_ca" /></ModuleGuard></AppLayout>} />
 
-              {/* Cadastros */}
-              <Route path="/cadastros/procuracoes" element={<AppLayout><ModuleGuard moduleName="cadastros_procuracoes"><EmBreve moduleKey="cadastros_procuracoes" /></ModuleGuard></AppLayout>} />
-              <Route path="/cadastros/certificados" element={<AppLayout><ModuleGuard moduleName="cadastros_certificados"><EmBreve moduleKey="cadastros_certificados" /></ModuleGuard></AppLayout>} />
-              <Route path="/cadastros/alvaras" element={<AppLayout><ModuleGuard moduleName="cadastros_alvaras"><EmBreve moduleKey="cadastros_alvaras" /></ModuleGuard></AppLayout>} />
-              <Route path="/cadastros/equipe" element={<AppLayout><ModuleGuard moduleName="equipe"><Equipe /></ModuleGuard></AppLayout>} />
+              {/* Cadastro */}
+              <Route path="/cadastros/procuracoes" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="cadastros_procuracoes"><EmBreve moduleKey="cadastros_procuracoes" /></ModuleGuard></AppLayout>} />
+              <Route path="/cadastros/certificados" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="cadastros_certificados"><EmBreve moduleKey="cadastros_certificados" /></ModuleGuard></AppLayout>} />
+              <Route path="/cadastros/alvaras" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="cadastros_alvaras"><EmBreve moduleKey="cadastros_alvaras" /></ModuleGuard></AppLayout>} />
+              <Route path="/cadastros/equipe" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="equipe"><Equipe /></ModuleGuard></AppLayout>} />
 
               <Route path="*" element={<NotFound />} />
               </Routes>

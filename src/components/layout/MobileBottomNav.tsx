@@ -13,15 +13,20 @@ const DESTINOS = [
   { title: 'Início', url: '/', icon: Home, moduleKey: 'home' },
   { title: 'Tarefas', url: '/fiscal/tarefas', icon: ListChecks, moduleKey: 'fiscal' },
   { title: 'Financeiro', url: '/painel-financeiro', icon: Wallet, moduleKey: 'financeiro' },
-  { title: 'Empresas', url: '/contatos', icon: Building2, moduleKey: 'contatos' },
+  // Empresas é filha de "cadastro" — precisa checar o par pai/filho, não a chave solta.
+  { title: 'Empresas', url: '/contatos', icon: Building2, parentKey: 'cadastro', subKey: 'contatos' },
 ] as const;
 
 export function MobileBottomNav() {
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
-  const { isModuleVisible } = useModuleAccess();
+  const { isModuleVisible, isSubItemVisible } = useModuleAccess();
 
-  const visiveis = DESTINOS.filter((d) => isModuleVisible(d.moduleKey));
+  const visiveis = DESTINOS.filter((d) =>
+    'subKey' in d
+      ? isModuleVisible(d.parentKey) && isSubItemVisible(d.parentKey, d.subKey)
+      : isModuleVisible(d.moduleKey)
+  );
 
   return (
     <nav

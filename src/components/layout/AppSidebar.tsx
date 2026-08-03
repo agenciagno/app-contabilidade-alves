@@ -222,7 +222,7 @@ export const menuEntries: MenuEntry[] = [
       { title: 'Dashboard', url: '/fiscal/dashboard', icon: LayoutDashboard, iconName: 'layout-dashboard', subKey: 'fiscal_dashboard', requireAdmin: true },
       { title: 'Tarefas', url: '/fiscal/tarefas', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_tarefas' },
       { title: 'Colaboradores', url: '/fiscal/colaboradores', icon: UsersRound, iconName: 'users-round', subKey: 'fiscal_colaboradores', requireAdmin: true },
-      { title: 'Obrigações e Declarações', url: '/fiscal/obrigacoes', icon: BookOpen, iconName: 'book-open', subKey: 'fiscal_calendario', requireAdmin: true },
+      { title: 'Obrigações e Declarações', url: '/fiscal/obrigacoes', icon: BookOpen, iconName: 'book-open', subKey: 'fiscal_obrigacoes_declaracoes', requireAdmin: true },
       { title: 'Calendário Fiscal', url: '/fiscal/calendario', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_calendario', requireAdmin: true },
       { title: 'Obrigações Fiscais', url: '/fiscal/obrigacoes-fiscais', icon: FileCheck, iconName: 'file-check', subKey: 'fiscal_obrigacoes', requireAdmin: true },
       { title: 'Agenda', url: '/fiscal/agenda', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_agenda', requireAdmin: true },
@@ -327,18 +327,17 @@ export const menuEntries: MenuEntry[] = [
     ],
   },
   {
-    // Grupo visual: cada item carrega a própria chave de módulo, porque `contatos`
-    // e `acessos` já existem como permissão de topo desde antes do agrupamento.
     kind: 'collapsible',
-    title: 'Cadastros',
+    title: 'Cadastro',
     icon: FolderOpen,
+    moduleKey: 'cadastro',
     items: [
-      { title: 'Empresas', url: '/contatos', icon: Building2, iconName: 'building-2', moduleKey: 'contatos' },
-      { title: 'Procurações', url: '/cadastros/procuracoes', icon: FileSignature, iconName: 'file-signature', moduleKey: 'cadastros_procuracoes' },
-      { title: 'Certificados', url: '/cadastros/certificados', icon: BadgeCheck, iconName: 'badge-check', moduleKey: 'cadastros_certificados' },
-      { title: 'Alvarás', url: '/cadastros/alvaras', icon: FileText, iconName: 'file-text', moduleKey: 'cadastros_alvaras' },
-      { title: 'Acessos', url: '/acessos', icon: LockKeyhole, iconName: 'lock-keyhole', moduleKey: 'acessos' },
-      { title: 'Equipe', url: '/cadastros/equipe', icon: UsersRound, iconName: 'users-round', moduleKey: 'equipe', hideFromColaborador: true },
+      { title: 'Empresas', url: '/contatos', icon: Building2, iconName: 'building-2', subKey: 'contatos' },
+      { title: 'Procurações', url: '/cadastros/procuracoes', icon: FileSignature, iconName: 'file-signature', subKey: 'cadastros_procuracoes' },
+      { title: 'Certificados', url: '/cadastros/certificados', icon: BadgeCheck, iconName: 'badge-check', subKey: 'cadastros_certificados' },
+      { title: 'Alvarás', url: '/cadastros/alvaras', icon: FileText, iconName: 'file-text', subKey: 'cadastros_alvaras' },
+      { title: 'Acessos', url: '/acessos', icon: LockKeyhole, iconName: 'lock-keyhole', subKey: 'acessos' },
+      { title: 'Equipe', url: '/cadastros/equipe', icon: UsersRound, iconName: 'users-round', subKey: 'equipe' },
     ],
   },
   {
@@ -348,7 +347,6 @@ export const menuEntries: MenuEntry[] = [
     icon: Settings,
     iconName: 'settings',
     moduleKey: 'configuracoes',
-    hideFromColaborador: true,
     // Cliente externo não tem Configurações por enquanto — os dados da empresa
     // dele vivem em Minha Conta.
     internalOnly: true,
@@ -359,6 +357,7 @@ export const menuEntries: MenuEntry[] = [
     url: '/suporte',
     icon: LifeBuoy,
     iconName: 'life-buoy',
+    moduleKey: 'suporte',
   },
 ];
 
