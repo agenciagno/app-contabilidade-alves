@@ -6,6 +6,8 @@ import TrashTab from '@/components/settings/TrashTab';
 import BackupTab from '@/components/settings/BackupTab';
 import CompanyDataCard from '@/components/settings/CompanyDataCard';
 import { useUserRole } from '@/hooks/useUserRole';
+import { PageHeader, tabsListClass, tabsTriggerClass } from '@/components/ds';
+import { cn } from '@/lib/utils';
 
 /**
  * Configurações — só equipe interna da CA. Cliente externo não tem esta tela;
@@ -35,16 +37,17 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-h3-section text-foreground">Configurações</h1>
-        <p className="text-muted-foreground">Dados da empresa e manutenção do sistema</p>
-      </div>
+      <PageHeader
+        kicker="~/configurações"
+        title="Configurações."
+        subtitle="Dados da empresa e manutenção do sistema."
+      />
 
       <Tabs defaultValue={tabs.some(t => t.value === defaultTab) ? defaultTab : tabs[0]?.value} className="w-full">
-        <TabsList className="mb-6">
+        <TabsList className={cn(tabsListClass, 'mb-6')}>
           {tabs.map(tab => (
-            <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5">
-              <tab.icon className="w-4 h-4" />
+            <TabsTrigger key={tab.value} value={tab.value} className={tabsTriggerClass}>
+              <tab.icon className="h-[15px] w-[15px]" strokeWidth={1.75} />
               {tab.label}
             </TabsTrigger>
           ))}

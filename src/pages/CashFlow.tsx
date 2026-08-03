@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { TrendingUp, TrendingDown, Wallet, LineChart as LineChartIcon } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   addDays,
   addWeeks,
@@ -25,7 +26,9 @@ import {
 } from 'recharts';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader, StatCardRow } from '@/components/ds';
 import {
   Select,
   SelectContent,
@@ -170,66 +173,58 @@ export default function CashFlow() {
 
   const chartData = buckets.map((b) => ({ label: b.label, saldo: Number(b.saldo.toFixed(2)) }));
   const projetadoNegativo = saldoFinal < 0;
+  const menorSaldo = buckets.reduce((min, b) => (b.saldo < min.saldo ? b : min), buckets[0] ?? { saldo: saldoFinal, label: '' });
+  const queryClient = useQueryClient();
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-kicker uppercase text-muted-foreground">Financeiro · Projeção</p>
-          <h1 className="text-display text-foreground">Fluxo de Caixa.</h1>
-          <p className="text-[14px] text-muted-foreground">
-            Projeção do saldo com base nos bancos e nas contas a pagar/receber em aberto.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Select value={granularidade} onValueChange={(v) => setGranularidade(v as Granularidade)}>
-            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="semana">Semanal</SelectItem>
-              <SelectItem value="mes">Mensal</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={horizonteKey} onValueChange={(v) => setHorizonteKey(v as HorizonteKey)}>
-            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {(Object.keys(HORIZONS) as HorizonteKey[]).map((k) => (
-                <SelectItem key={k} value={k}>{HORIZONS[k].label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      <PageHeader
+        kicker="~/financeiro · projeção"
+        title="Fluxo de caixa."
+        subtitle="Projeção semanal a partir do saldo em contas."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['transactions'] });
+                queryClient.invalidateQueries({ queryKey: ['banks'] });
+              }}
+            >
+              <RefreshCw className="h-4 w-4" /> Atualizar
+            </Button>
+            <Select value={granularidade} onValueChange={(v) => setGranularidade(v as Granularidade)}>
+              <SelectTrigger className="h-9 w-[130px] border-line bg-paper text-ui"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="semana">Semanal</SelectItem>
+                <SelectItem value="mes">Mensal</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={horizonteKey} onValueChange={(v) => setHorizonteKey(v as HorizonteKey)}>
+              <SelectTrigger className="h-9 w-[170px] border-line bg-paper text-ui"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(HORIZONS) as HorizonteKey[]).map((k) => (
+                  <SelectItem key={k} value={k}>{HORIZONS[k].label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        }
+      />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
-          icon={<Wallet className="w-4 h-4" />}
-          title="Saldo atual"
-          value={saldoInicial}
-          loading={isLoading}
-        />
-        <KpiCard
-          icon={<TrendingUp className="w-4 h-4 text-ok" />}
-          title="Entradas previstas"
-          value={entradasTotal}
-          loading={isLoading}
-          valueClass="text-ok"
-        />
-        <KpiCard
-          icon={<TrendingDown className="w-4 h-4 text-destructive" />}
-          title="Saídas previstas"
-          value={saidasTotal}
-          loading={isLoading}
-          valueClass="text-destructive"
-        />
-        <KpiCard
-          icon={<LineChartIcon className="w-4 h-4" />}
-          title="Saldo projetado (fim)"
-          value={saldoFinal}
-          loading={isLoading}
-          valueClass={projetadoNegativo ? 'text-destructive' : 'text-foreground'}
-        />
-      </div>
+      <StatCardRow
+        items={[
+          { label: 'Saldo atual', value: brl(saldoInicial), hint: 'bancos visíveis' },
+          { label: 'Entradas previstas', value: brl(entradasTotal), hint: HORIZONS[horizonteKey].label.toLowerCase() },
+          { label: 'Saídas previstas', value: brl(saidasTotal), hint: HORIZONS[horizonteKey].label.toLowerCase() },
+          {
+            label: projetadoNegativo ? 'Menor saldo projetado' : 'Saldo projetado (fim)',
+            value: brl(projetadoNegativo ? menorSaldo.saldo : saldoFinal),
+            hint: projetadoNegativo ? `semana de ${menorSaldo.label}` : HORIZONS[horizonteKey].label.toLowerCase(),
+            emphasis: projetadoNegativo ? 'warm' : 'none',
+          },
+        ]}
+      />
 
       {/* Chart */}
       <Card>
@@ -330,33 +325,6 @@ export default function CashFlow() {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-interface KpiCardProps {
-  icon: React.ReactNode;
-  title: string;
-  value: number;
-  loading?: boolean;
-  valueClass?: string;
-}
-
-function KpiCard({ icon, title, value, loading, valueClass }: KpiCardProps) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.05em] flex items-center gap-2">
-          {icon} {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <Skeleton className="h-8 w-32" />
-        ) : (
-          <div className={cn('text-[1.75rem] font-bold tracking-tight tabular-nums leading-none', valueClass)}>{brl(value)}</div>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 

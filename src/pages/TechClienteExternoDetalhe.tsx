@@ -29,6 +29,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { MODULE_TREE } from '@/constants/modules';
+import { DsBadge, tabsListClass, tabsTriggerClass } from '@/components/ds';
 import { EmailField, isValidEmail, normalizeEmail } from '@/components/tech/EmailField';
 import {
   useTenants, useTenantUsers, useTenantInvoices, useInvalidateTenants,
@@ -82,33 +83,40 @@ export default function TechClienteExternoDetalhe() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <Button variant="ghost" size="sm" className="-ml-2 mb-2" onClick={() => navigate('/tech/clientes-externos')}>
-          <ArrowLeft className="w-4 h-4 mr-2" /> Clientes Externos
-        </Button>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">{cliente.name}</h1>
-          <Badge
-            variant={ativo ? 'default' : 'destructive'}
-            className={ativo ? 'bg-ok hover:bg-ok' : ''}
-          >
-            {ativo ? 'Ativo' : 'Suspenso'}
-          </Badge>
-          {cliente.is_internal && <Badge variant="outline">Matriz (CA)</Badge>}
+      <nav className="flex items-center gap-2 text-link">
+        <button
+          onClick={() => navigate('/tech/clientes-externos')}
+          className="flex items-center gap-1.5 text-muted-ink transition-colors hover:text-ink"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Clientes externos
+        </button>
+        <span className="text-meta text-muted-ink-2">/</span>
+        <span className="truncate text-ink">{cliente.name}</span>
+      </nav>
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-md ${ativo ? 'bg-ok-soft text-ok' : 'bg-danger-soft text-danger'}`}>
+          <ShieldCheck className="h-5 w-5" strokeWidth={1.75} />
         </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          {formatDoc(cliente.cnpj)} · cadastrado{' '}
-          {formatDistanceToNow(new Date(cliente.created_at), { addSuffix: true, locale: ptBR })}
-        </p>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-display text-ink">{cliente.name}</h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
+            <span className="font-mono text-mono-sm text-muted-ink">{formatDoc(cliente.cnpj)}</span>
+            {cliente.plan_name && <span className="text-meta text-muted-ink-2">Plano {cliente.plan_name}</span>}
+            <DsBadge tone={ativo ? 'ok' : 'danger'}>{ativo ? 'ativo' : 'suspenso'}</DsBadge>
+            {cliente.is_internal && <DsBadge tone="info">matriz (CA)</DsBadge>}
+          </div>
+        </div>
       </div>
 
       <Tabs defaultValue="geral">
-        <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="geral">Visão geral</TabsTrigger>
-          <TabsTrigger value="usuarios">Usuários ({usuarios.length})</TabsTrigger>
-          <TabsTrigger value="modulos">Módulos</TabsTrigger>
-          <TabsTrigger value="faturas">Faturas ({invoices?.length ?? 0})</TabsTrigger>
-          <TabsTrigger value="historico">Histórico</TabsTrigger>
+        <TabsList className={tabsListClass}>
+          <TabsTrigger value="geral" className={tabsTriggerClass}>Visão geral</TabsTrigger>
+          <TabsTrigger value="usuarios" className={tabsTriggerClass}>Usuários ({usuarios.length})</TabsTrigger>
+          <TabsTrigger value="modulos" className={tabsTriggerClass}>Módulos</TabsTrigger>
+          <TabsTrigger value="faturas" className={tabsTriggerClass}>Faturamento ({invoices?.length ?? 0})</TabsTrigger>
+          <TabsTrigger value="historico" className={tabsTriggerClass}>Histórico</TabsTrigger>
         </TabsList>
 
         <TabsContent value="geral" className="mt-4">

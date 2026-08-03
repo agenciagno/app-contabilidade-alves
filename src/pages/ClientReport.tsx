@@ -1,17 +1,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users } from 'lucide-react';
+import { PageHeader } from '@/components/ds';
 
 const ClientReport = () => {
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between py-4 flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Relatório de Clientes</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Análises e métricas sobre sua base de clientes
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        kicker="~/relatórios"
+        title="Relatório de clientes."
+        subtitle="Exportação consolidada da carteira com filtros salvos."
+      />
 
       <Card className="border-dashed">
         <CardHeader className="text-center">

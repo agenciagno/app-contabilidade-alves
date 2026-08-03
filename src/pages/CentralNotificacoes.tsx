@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { BellRing, Send, Loader2 } from 'lucide-react';
+import { Send, Loader2 } from 'lucide-react';
+import { PageHeader } from '@/components/ds';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -120,16 +121,12 @@ export default function CentralNotificacoes() {
   };
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold flex items-center gap-2">
-          <BellRing className="w-5 h-5 text-primary" />
-          Central de Notificações
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Envie uma notificação push para quem instalou o app e ativou notificações.
-        </p>
-      </div>
+    <div className="max-w-2xl space-y-6">
+      <PageHeader
+        kicker="~/tech · notificações"
+        title="Central de notificações."
+        subtitle="Envie uma notificação push para quem instalou o app e ativou notificações."
+      />
 
       <Card>
         <CardHeader>

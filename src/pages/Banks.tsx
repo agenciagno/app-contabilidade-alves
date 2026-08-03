@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2, Building2, CircleDollarSign, FileBarChart2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Building2, FileBarChart2 } from 'lucide-react';
+import { format } from 'date-fns';
 import { useBanks, Bank } from '@/hooks/useBanks';
 import { useBankTransactions } from '@/hooks/useBankTransactions';
 import { BankFormDialog } from '@/components/banks/BankFormDialog';
@@ -11,7 +11,8 @@ import { BankReportModal } from '@/components/banks/BankReportModal';
 import { BankBalanceDiagnosticPanel } from '@/components/banks/BankBalanceDiagnosticPanel';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
+import { PageHeader, StatCard, DsBadge } from '@/components/ds';
+import { cn } from '@/lib/utils';
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -89,51 +90,57 @@ export default function Banks() {
       banksList
     );
 
+    const infoParts = [bank.agency && `Ag. ${bank.agency}`, bank.account_number && `CC ${bank.account_number}`].filter(Boolean) as string[];
+    const infoLine = infoParts.length > 0 ? infoParts.join(' · ') : 'controle manual';
+
     return (
-      <Card
-        className="bg-card hover:border-primary/40 hover:shadow-md transition-all cursor-pointer group"
-        onClick={() => handleBankCardClick(bank)}>
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => handleBankCardClick(bank)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleBankCardClick(bank);
+          }
+        }}
+        className="group flex cursor-pointer flex-col overflow-hidden rounded-lg border border-line bg-paper text-left transition-colors hover:border-ink/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <div className="flex flex-col gap-3 p-[18px]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: bank.color + '20' }}>
-                <Building2 className="w-6 h-6" style={{ color: bank.color }} />
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md [&_svg]:h-5 [&_svg]:w-5"
+                style={{ backgroundColor: bank.color + '20', color: bank.color }}>
+                <Building2 strokeWidth={1.75} />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">{bank.name}</h3>
-                  {bank.is_invisible && <Badge variant="destructive" className="text-xs">Invisível</Badge>}
-                  {!bank.is_active && <Badge variant="secondary" className="text-xs">Inativa</Badge>}
-                </div>
-                {(bank.bank_code || bank.agency || bank.account_number) &&
-                  <p className="text-sm text-muted-foreground">
-                    {[bank.bank_code, bank.agency, bank.account_number].filter(Boolean).join(' • ')}
-                  </p>
-                }
+              <div className="min-w-0">
+                <p className="truncate text-h4-card text-ink">{bank.name}</p>
+                <p className="truncate text-meta text-muted-ink-2">{infoLine}</p>
               </div>
             </div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Button variant="ghost" size="icon" onClick={(e) => handleEdit(bank, e)}>
-                <Pencil className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={(e) => handleDeleteClick(bank.id, e)}>
-                <Trash2 className="w-4 h-4 text-destructive" />
-              </Button>
+            <div className="relative flex h-[22px] shrink-0 items-center">
+              <DsBadge tone={bank.is_invisible ? 'neutral' : 'ok'} className="transition-opacity group-hover:opacity-0">
+                {bank.is_invisible ? 'oculta' : 'visível'}
+              </DsBadge>
+              <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleEdit(bank, e)}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleDeleteClick(bank.id, e)}>
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                </Button>
+              </div>
             </div>
           </div>
-          <div className="mt-4 pt-4 border-t border-border">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Saldo atual</span>
-              <span className={`text-lg font-bold ${closingBalance >= 0 ? 'text-ok' : 'text-destructive'}`}>
-                {formatCurrency(closingBalance)}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Clique para ver o extrato</p>
-          </div>
-        </CardContent>
-      </Card>
+          <p className={cn('text-metric-xl', closingBalance >= 0 ? 'text-ink' : 'text-danger')}>
+            {formatCurrency(closingBalance)}
+          </p>
+        </div>
+        <div className="border-t border-line-2 px-[18px] py-[11px]">
+          <p className="truncate text-meta text-muted-ink-2">atualizado em {format(new Date(bank.updated_at), 'dd/MM')}</p>
+        </div>
+      </div>
     );
   };
 
@@ -151,10 +158,14 @@ export default function Banks() {
             <Skeleton className="h-10 w-32" />
           </div>
         </div>
-        <Skeleton className="h-24" />
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Skeleton className="h-[116px]" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Skeleton className="h-[163px]" />
+          <Skeleton className="h-[163px]" />
+          <Skeleton className="h-[163px]" />
+          <Skeleton className="h-[163px]" />
         </div>
       </div>);
 
@@ -162,47 +173,34 @@ export default function Banks() {
 
   return (
     <div className="space-y-6">
-      {/* Top bar */}
-      <div className="flex items-center justify-between py-4 flex-wrap gap-4">
-        <div className="space-y-1">
-          <p className="text-kicker uppercase text-muted-foreground">Financeiro</p>
-          <h1 className="text-display text-foreground">Conta Corrente.</h1>
-          <p className="text-[14px] text-muted-foreground">Organize suas contas corrente</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={() => setReportOpen(true)}>
-            <FileBarChart2 className="w-4 h-4" />
-            Gerar Relatório
-          </Button>
-          <Button className="gap-2" onClick={() => {setEditingBank(null);setDialogOpen(true);}}>
-            <Plus className="w-4 h-4" />
-            Novo Banco
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        kicker="~/financeiro · contas"
+        title="Conta corrente."
+        subtitle="Saldos por banco e visibilidade no fluxo de caixa."
+        actions={
+          <>
+            <Button variant="outline" className="gap-2" onClick={() => setReportOpen(true)}>
+              <FileBarChart2 className="w-4 h-4" />
+              Gerar Relatório
+            </Button>
+            <Button className="gap-2" onClick={() => {setEditingBank(null);setDialogOpen(true);}}>
+              <Plus className="w-4 h-4" />
+              Nova conta
+            </Button>
+          </>
+        }
+      />
 
-      {/* Total Balance Card */}
-      <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
-        <CardContent className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center">
-              <CircleDollarSign className="w-7 h-7 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Saldo total em contas ativas</p>
-              <p className={`text-3xl font-bold ${totalBalance >= 0 ? 'text-foreground' : 'text-destructive'}`}>
-                {formatCurrency(totalBalance)}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Total Balance */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Saldo total em contas ativas" value={formatCurrency(totalBalance)} />
+      </div>
 
       {/* Active Banks */}
       {activeBanks.length > 0 &&
       <div>
-          <h2 className="text-lg font-semibold text-foreground mb-4">Contas Ativas ({activeBanks.length})</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <h2 className="mb-4 text-ui-strong text-ink">Contas Ativas ({activeBanks.length})</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {activeBanks.map((bank) => <BankCard key={bank.id} bank={bank} />)}
           </div>
         </div>
@@ -211,21 +209,19 @@ export default function Banks() {
       {/* Inactive Banks */}
       {inactiveBanks.length > 0 &&
       <div>
-          <h2 className="text-lg font-semibold text-muted-foreground mb-4">Contas Inativas ({inactiveBanks.length})</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <h2 className="mb-4 text-ui-strong text-muted-ink">Contas Inativas ({inactiveBanks.length})</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {inactiveBanks.map((bank) => <BankCard key={bank.id} bank={bank} />)}
           </div>
         </div>
       }
 
       {banks.length === 0 &&
-      <Card className="bg-card">
-          <CardContent className="text-muted-foreground text-center py-16">
-            <Building2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>Nenhuma conta cadastrada</p>
-            <p className="text-sm mt-1">Clique em "Novo Banco" para adicionar sua primeira conta</p>
-          </CardContent>
-      </Card>
+      <div className="rounded-lg border border-line bg-paper py-16 text-center text-muted-ink">
+          <Building2 className="mx-auto mb-4 h-12 w-12 opacity-50" />
+          <p>Nenhuma conta cadastrada</p>
+          <p className="mt-1 text-meta">Clique em "Nova conta" para adicionar sua primeira conta</p>
+      </div>
       }
 
       <BankBalanceDiagnosticPanel />

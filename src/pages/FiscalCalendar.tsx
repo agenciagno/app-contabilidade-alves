@@ -71,6 +71,7 @@ import { FiscalPeriodStatusControl } from '@/components/fiscal/FiscalPeriodStatu
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { DsAlert } from '@/components/ds';
 
 
 const MONTHS = [
@@ -302,40 +303,44 @@ export default function FiscalCalendar() {
   const COL_COUNT = 7;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Calendário Fiscal</h1>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-kicker uppercase text-muted-ink-2">~/tarefas · competência</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h1 className="text-display text-ink">Calendário fiscal.</h1>
+            <Select value={String(month)} onValueChange={handleMonthChange}>
+              <SelectTrigger className="h-9 w-[110px] border-line bg-paper text-ui"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((m, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={String(year)} onValueChange={handleYearChange}>
+              <SelectTrigger className="h-9 w-[90px] border-line bg-paper text-ui"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {YEARS.map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="mt-1 text-body text-muted-ink">Revise a distribuição antes de lançar as tarefas no Kanban.</p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={String(month)} onValueChange={handleMonthChange}>
-            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((m, i) => (
-                <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={String(year)} onValueChange={handleYearChange}>
-            <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {YEARS.map((y) => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Button variant="outline" onClick={() => setRtChecklistOpen(true)}>
+            <ClipboardCheck className="h-4 w-4" /> Checklist RT
+          </Button>
 
           <FiscalPeriodStatusControl year={year} month={month} />
-
 
           <Button
             variant="outline"
             onClick={() => { setCustomInitial(null); setCustomOpen(true); }}
             disabled={editingDisabled}
           >
-            <Plus className="h-4 w-4" /> Nova Obrigação
-          </Button>
-
-          <Button variant="outline" onClick={() => setRtChecklistOpen(true)}>
-            <ClipboardCheck className="h-4 w-4" /> Checklist RT
+            <Plus className="h-4 w-4" /> Nova obrigação
           </Button>
 
           {phase === 'idle' && (
@@ -397,12 +402,12 @@ export default function FiscalCalendar() {
 
 
       {phase === 'calculated' && (
-        <div className="flex items-start gap-3 rounded-lg border border-blue-500/30 bg-blue-500/10 p-4 text-sm">
-          <Info className="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
-          <p className="text-foreground">
-            Calendário calculado. Revise o preview de distribuição abaixo e clique em <strong>Lançar Tarefas</strong> para criar as tarefas no Kanban.
-          </p>
-        </div>
+        <DsAlert
+          tone="info"
+          icon={<Info />}
+          title="Calendário calculado"
+          description="Revise o preview de distribuição abaixo e clique em Lançar tarefas para criar as tarefas no Kanban."
+        />
       )}
 
       {phase === 'calculated' && sorted.length > 0 && (

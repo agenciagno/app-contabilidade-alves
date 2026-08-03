@@ -37,6 +37,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { PageHeader, tabsListClass, tabsTriggerClass } from '@/components/ds';
 
 // Chatwoot roda numa única conta para a CA (chat.contabilidadealves.com.br, account id 1).
 const CHATWOOT_ACCOUNT_ID = 1;
@@ -70,25 +71,19 @@ export default function TechAgenteIA() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="p-3 bg-primary/10 rounded-xl">
-          <Bot className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-h3-section text-foreground">Agente de Pré-Atendimento</h1>
-          <p className="text-sm text-muted-foreground">
-            Saudação, identificação de setor e transferência automática no WhatsApp (Chatwoot)
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        kicker="~/tech · automação"
+        title="Agente de pré-atendimento."
+        subtitle="Saudação, identificação de setor e transferência automática no WhatsApp (Chatwoot)."
+      />
 
       <Tabs defaultValue="status">
-        <TabsList>
-          <TabsTrigger value="status">Status</TabsTrigger>
-          <TabsTrigger value="config">Configuração</TabsTrigger>
-          <TabsTrigger value="roteamento">Roteamento</TabsTrigger>
-          <TabsTrigger value="excecoes">Exceções</TabsTrigger>
-          <TabsTrigger value="log">Log</TabsTrigger>
+        <TabsList className={tabsListClass}>
+          <TabsTrigger value="status" className={tabsTriggerClass}>Status</TabsTrigger>
+          <TabsTrigger value="config" className={tabsTriggerClass}>Configuração</TabsTrigger>
+          <TabsTrigger value="roteamento" className={tabsTriggerClass}>Roteamento</TabsTrigger>
+          <TabsTrigger value="excecoes" className={tabsTriggerClass}>Exceções</TabsTrigger>
+          <TabsTrigger value="log" className={tabsTriggerClass}>Log</TabsTrigger>
         </TabsList>
         <TabsContent value="status" className="mt-4">
           <AbaStatus />

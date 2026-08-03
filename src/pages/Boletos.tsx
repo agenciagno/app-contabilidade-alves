@@ -3,13 +3,11 @@ import { Link } from 'react-router-dom';
 import { format, addMonths, subMonths, startOfMonth, parseISO, isBefore, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  FileText, CheckCircle2, Clock, AlertCircle, Zap, Mail, MessageCircle, Printer,
+  AlertCircle, Zap, Mail, MessageCircle, Printer,
   FileX, MoreHorizontal, Eye, Send, CheckSquare, Download, RefreshCw, Loader2,
-  Search, CalendarIcon, X, Copy,
+  Search, CalendarIcon, X, Copy, SlidersHorizontal,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import {
@@ -26,6 +24,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PageHeader, StatCardRow, DsBadge } from '@/components/ds';
 import { useBoletoControls, type BoletoWithContact } from '@/hooks/useBoletoControls';
 import { BoletoGenerationDialog } from '@/components/financeiro/BoletoGenerationDialog';
 import { IndividualBoletoDialog } from '@/components/financeiro/IndividualBoletoDialog';
@@ -49,33 +48,25 @@ function isOverdue(b: BoletoWithContact) {
 }
 
 function StatusBadge({ b }: { b: BoletoWithContact }) {
-  if (isOverdue(b)) {
-    return <Badge className="bg-destructive/15 text-destructive border-destructive/30 hover:bg-destructive/20">Vencido</Badge>;
-  }
-  if (b.status === 'PAGO') {
-    return <Badge className="bg-success/15 text-success border-success/30 hover:bg-success/20">Pago</Badge>;
-  }
-  if (b.status === 'FILA_IMPRESSAO') {
-    return <Badge className="bg-blue-500/15 text-blue-600 border-blue-500/30 dark:text-blue-400 hover:bg-blue-500/20">Fila de Impressão</Badge>;
-  }
-  if (b.status === 'IMPRESSO') {
-    return <Badge variant="outline">Impresso</Badge>;
-  }
-  return <Badge className="bg-warn/15 text-warn dark:text-warn border-warn/30 hover:bg-warn/20">Pendente</Badge>;
+  if (isOverdue(b)) return <DsBadge tone="danger">vencido</DsBadge>;
+  if (b.status === 'PAGO') return <DsBadge tone="ok">pago</DsBadge>;
+  if (b.status === 'FILA_IMPRESSAO') return <DsBadge tone="info">gerado</DsBadge>;
+  if (b.status === 'IMPRESSO') return <DsBadge tone="neutral">impresso</DsBadge>;
+  return <DsBadge tone="warn">a vencer</DsBadge>;
 }
 
 function CanalIcon({ canal }: { canal: BoletoWithContact['canal_entrega'] }) {
-  if (!canal) return <span className="text-muted-foreground">—</span>;
-  const cls = 'h-4 w-4';
-  if (canal === 'whatsapp') return <span className="inline-flex items-center gap-1.5 text-sm"><MessageCircle className={cls} /> WhatsApp</span>;
-  if (canal === 'email') return <span className="inline-flex items-center gap-1.5 text-sm"><Mail className={cls} /> E-mail</span>;
-  if (canal === 'impresso') return <span className="inline-flex items-center gap-1.5 text-sm"><Printer className={cls} /> Impresso</span>;
+  if (!canal) return <span className="text-muted-ink-2">—</span>;
+  const cls = 'h-3.5 w-3.5 text-muted-ink';
+  if (canal === 'whatsapp') return <span className="inline-flex items-center gap-1.5 text-ui text-ink"><MessageCircle className={cls} /> WhatsApp</span>;
+  if (canal === 'email') return <span className="inline-flex items-center gap-1.5 text-ui text-ink"><Mail className={cls} /> E-mail</span>;
+  if (canal === 'impresso') return <span className="inline-flex items-center gap-1.5 text-ui text-ink"><Printer className={cls} /> Impresso</span>;
   if (canal === 'whatsapp_email') return (
-    <span className="inline-flex items-center gap-1.5 text-sm">
+    <span className="inline-flex items-center gap-1.5 text-ui text-ink">
       <MessageCircle className={cls} /><Mail className={cls} /> WA + E-mail
     </span>
   );
-  return <span className="text-sm">{canal}</span>;
+  return <span className="text-ui text-ink">{canal}</span>;
 }
 
 function getMonthOptions(): string[] {
@@ -151,7 +142,7 @@ export default function Boletos() {
     const estimado = pago.some((b: BoletoWithContact) => b.valor_pago == null);
     const pendentes = boletoList.filter((b: BoletoWithContact) => b.status === 'PENDENTE').length;
     const vencidos = boletoList.filter((b: BoletoWithContact) => isOverdue(b)).length;
-    return { total, totalPago, estimado, pendentes, vencidos };
+    return { total, totalPago, estimado, pendentes, vencidos, liquidados: pago.length };
   }, [boletoList]);
 
   // Filtro
@@ -197,72 +188,75 @@ export default function Boletos() {
   const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Cabeçalho */}
-      <div className="flex items-center justify-between py-4 px-6 flex-wrap gap-4">
-        <div className="space-y-1">
-          <p className="text-kicker uppercase text-muted-foreground">Financeiro · Cobrança</p>
-          <h1 className="text-display text-foreground flex items-center gap-2">
-            <FileText className="w-7 h-7 text-primary" />
-            Controle de Boletos.
-          </h1>
-          <p className="text-[14px] text-muted-foreground">
-            Painel da automação de cobrança
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={handleSync}
-            disabled={syncing}
-          >
-            {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            {syncing
-              ? `Sincronizando… ${syncProgress.done}/${syncProgress.total || '…'}`
-              : 'Sincronizar com Sicoob'}
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => setGenerateOpen(true)}
-          >
-            <Zap className="w-4 h-4" />
-            Gerar boletos do mês
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => setSingleOpen(true)}
-          >
-            <Zap className="w-4 h-4" />
-            Boleto avulso
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        kicker="~/financeiro · cobrança"
+        title="Controle de boletos."
+        subtitle={`Painel da automação de cobrança · ${kpis.total} boleto${kpis.total === 1 ? '' : 's'} no mês.`}
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={handleSync}
+              disabled={syncing}
+              className="inline-flex items-center gap-1.5 text-ui text-muted-ink transition-colors hover:text-ink disabled:opacity-60"
+            >
+              {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              {syncing
+                ? `Sincronizando… ${syncProgress.done}/${syncProgress.total || '…'}`
+                : 'atualizar'}
+            </button>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => setSingleOpen(true)}
+            >
+              <Zap className="h-4 w-4" />
+              Boleto avulso
+            </Button>
+            <Button
+              className="gap-2"
+              onClick={() => setGenerateOpen(true)}
+            >
+              <Zap className="h-4 w-4" />
+              Gerar lote
+            </Button>
+          </>
+        }
+      />
 
-      {/* KPIs */}
-      <div className="px-6 grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard icon={<FileText className="h-4 w-4" />} label="Boletos gerados" value={String(kpis.total)} />
-        <KpiCard icon={<CheckCircle2 className="h-4 w-4 text-success" />} label={kpis.estimado ? 'Total pago (estimado)' : 'Total pago'} value={fmtBRL(kpis.totalPago)} valueClass="text-success" />
-        <KpiCard icon={<Clock className="h-4 w-4 text-warn" />} label="Pendentes" value={String(kpis.pendentes)} valueClass="text-warn dark:text-warn" />
-        <KpiCard icon={<AlertCircle className="h-4 w-4 text-destructive" />} label="Vencidos" value={String(kpis.vencidos)} valueClass="text-destructive" />
-      </div>
+      <StatCardRow
+        items={[
+          { label: 'Boletos gerados', value: kpis.total, hint: 'no mês' },
+          {
+            label: 'Pendentes',
+            value: kpis.pendentes,
+            hint: 'aguardando pagamento',
+            emphasis: kpis.pendentes > 0 ? 'warm' : 'none',
+          },
+          { label: 'Vencidos', value: kpis.vencidos, hint: 'em atraso' },
+          {
+            label: 'Liquidados',
+            value: kpis.liquidados,
+            hint: kpis.estimado ? `${fmtBRL(kpis.totalPago)} (estimado)` : fmtBRL(kpis.totalPago),
+          },
+        ]}
+      />
 
       {/* Filtros */}
-      <div className="flex items-center gap-3 px-6 py-4 flex-wrap">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[240px] flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-ink-2" />
           <Input
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Buscar por cliente, CPF/CNPJ ou nosso número…"
-            className="pl-9 w-[280px]"
+            placeholder="Buscar por cliente ou nosso número…"
+            className="h-10 border-line bg-paper pl-9 text-ui"
           />
         </div>
 
         <Select value={vencimentoMonth} onValueChange={(v) => { setVencimentoMonth(v); setPage(1); }}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="h-9 w-[180px] border-line bg-paper text-ui">
             <SelectValue placeholder="Mês de vencimento" />
           </SelectTrigger>
           <SelectContent>
@@ -275,7 +269,7 @@ export default function Boletos() {
         </Select>
 
         <Select value={statusFilter} onValueChange={(v: any) => { setStatusFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="h-9 w-[170px] border-line bg-paper text-ui">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -288,7 +282,7 @@ export default function Boletos() {
         </Select>
 
         <Select value={canalFilter} onValueChange={(v: any) => { setCanalFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="h-9 w-[170px] border-line bg-paper text-ui">
             <SelectValue placeholder="Canal" />
           </SelectTrigger>
           <SelectContent>
@@ -300,79 +294,86 @@ export default function Boletos() {
           </SelectContent>
         </Select>
 
-        <div className="flex items-center gap-1.5">
-          <Input
-            type="number" inputMode="decimal" step="0.01"
-            value={valorMin}
-            onChange={(e) => { setValorMin(e.target.value); setPage(1); }}
-            placeholder="Valor mín."
-            className="w-[110px]"
-          />
-          <span className="text-muted-foreground text-sm">–</span>
-          <Input
-            type="number" inputMode="decimal" step="0.01"
-            value={valorMax}
-            onChange={(e) => { setValorMax(e.target.value); setPage(1); }}
-            placeholder="Valor máx."
-            className="w-[110px]"
-          />
-        </div>
-
+        {/* Mais filtros — faixa de valor + data de pagamento, sem slot no Figma mas
+            continuam funcionais (nada de real foi descartado, ver FiscalTasks.tsx). */}
         <Popover>
           <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn('gap-2 w-[220px] justify-start font-normal', !pagamentoStart && !pagamentoEnd && 'text-muted-foreground')}
+            <button
+              type="button"
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-sm border border-line bg-paper px-3 text-ui text-muted-ink transition-colors hover:bg-bg-2"
             >
-              <CalendarIcon className="h-4 w-4" />
-              {pagamentoStart || pagamentoEnd
-                ? `${pagamentoStart ? format(pagamentoStart, 'dd/MM/yy') : '…'} – ${pagamentoEnd ? format(pagamentoEnd, 'dd/MM/yy') : '…'}`
-                : 'Data de pagamento'}
-            </Button>
+              <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Mais filtros
+              {(valorMin || valorMax || pagamentoStart || pagamentoEnd) && (
+                <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+              )}
+            </button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-3" align="start">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground px-1">De</p>
-                <CalendarPicker
-                  mode="single"
-                  selected={pagamentoStart ?? undefined}
-                  onSelect={(d) => { setPagamentoStart(d ?? null); setPage(1); }}
-                  initialFocus
+          <PopoverContent className="w-80 space-y-3 p-3" align="start">
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-ink px-1">Faixa de valor</p>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number" inputMode="decimal" step="0.01"
+                  value={valorMin}
+                  onChange={(e) => { setValorMin(e.target.value); setPage(1); }}
+                  placeholder="Valor mín."
+                  className="h-9 border-line bg-paper text-ui"
                 />
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground px-1">Até</p>
-                <CalendarPicker
-                  mode="single"
-                  selected={pagamentoEnd ?? undefined}
-                  onSelect={(d) => { setPagamentoEnd(d ?? null); setPage(1); }}
+                <span className="text-muted-ink text-sm">–</span>
+                <Input
+                  type="number" inputMode="decimal" step="0.01"
+                  value={valorMax}
+                  onChange={(e) => { setValorMax(e.target.value); setPage(1); }}
+                  placeholder="Valor máx."
+                  className="h-9 border-line bg-paper text-ui"
                 />
               </div>
             </div>
-            {(pagamentoStart || pagamentoEnd) && (
-              <Button
-                variant="ghost" size="sm" className="w-full mt-2 gap-1.5"
-                onClick={() => { setPagamentoStart(null); setPagamentoEnd(null); setPage(1); }}
-              >
-                <X className="h-3.5 w-3.5" /> Limpar período
-              </Button>
-            )}
+
+            <div className="space-y-1.5 border-t border-line pt-3">
+              <p className="text-xs text-muted-ink px-1">Data de pagamento</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-ink-2 px-1">De</p>
+                  <CalendarPicker
+                    mode="single"
+                    selected={pagamentoStart ?? undefined}
+                    onSelect={(d) => { setPagamentoStart(d ?? null); setPage(1); }}
+                    initialFocus
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-ink-2 px-1">Até</p>
+                  <CalendarPicker
+                    mode="single"
+                    selected={pagamentoEnd ?? undefined}
+                    onSelect={(d) => { setPagamentoEnd(d ?? null); setPage(1); }}
+                  />
+                </div>
+              </div>
+              {(pagamentoStart || pagamentoEnd) && (
+                <Button
+                  variant="ghost" size="sm" className="w-full gap-1.5"
+                  onClick={() => { setPagamentoStart(null); setPagamentoEnd(null); setPage(1); }}
+                >
+                  <X className="h-3.5 w-3.5" /> Limpar período
+                </Button>
+              )}
+            </div>
           </PopoverContent>
         </Popover>
 
         {hasExtraFilters && (
-          <Button variant="ghost" size="sm" onClick={clearExtraFilters} className="gap-1.5 text-muted-foreground">
+          <Button variant="ghost" size="sm" onClick={clearExtraFilters} className="gap-1.5 text-muted-ink">
             <X className="h-3.5 w-3.5" /> Limpar filtros
           </Button>
         )}
       </div>
 
       {/* Tabela */}
-      <div className="flex-1 overflow-auto px-6 pb-6">
-        <Card>
-          <CardContent className="p-0">
-            <Table>
+      <div className="overflow-hidden rounded-lg border border-line bg-paper">
+        <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Cliente</TableHead>
@@ -380,8 +381,8 @@ export default function Boletos() {
                   <TableHead>Vencimento</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Canal</TableHead>
-                  <TableHead>Data Pgto.</TableHead>
-                  <TableHead>Valor Pago</TableHead>
+                  <TableHead>Data pgto.</TableHead>
+                  <TableHead>Valor pago</TableHead>
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -411,12 +412,17 @@ export default function Boletos() {
                     return (
                       <TableRow key={b.id}>
                         <TableCell className="font-medium">
-                          <Link to={`/crm/cliente/${b.contact_id}`} className="hover:underline text-primary">
-                            {b.contact_name}
-                          </Link>
+                          <div className="flex flex-col">
+                            <Link to={`/crm/cliente/${b.contact_id}`} className="text-ink hover:underline">
+                              {b.contact_name}
+                            </Link>
+                            {b.contact_document && (
+                              <span className="text-xs text-muted-ink-2">{b.contact_document}</span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>{fmtBRL(b.valor)}</TableCell>
-                        <TableCell className={cn(overdue && 'text-destructive font-medium')}>{fmtDate(b.data_vencimento)}</TableCell>
+                        <TableCell className={cn(overdue && 'text-danger font-medium')}>{fmtDate(b.data_vencimento)}</TableCell>
                         <TableCell><StatusBadge b={b} /></TableCell>
                         <TableCell><CanalIcon canal={b.canal_entrega} /></TableCell>
                         <TableCell>{fmtDate(b.data_pagamento)}</TableCell>
@@ -462,24 +468,22 @@ export default function Boletos() {
                 )}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
+      </div>
 
-        {/* Paginação */}
-        {filtered.length > PAGE_SIZE && (
-          <div className="flex items-center justify-between mt-4 text-sm">
-            <span className="text-muted-foreground">
-              Mostrando {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} de {filtered.length}
-            </span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}>
-                Anterior
-              </Button>
-              <span className="px-3 py-1.5">{safePage} / {totalPages}</span>
-              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}>
-                Próxima
-              </Button>
-            </div>
+      {/* Paginação */}
+      <div className="flex items-center justify-between text-meta text-muted-ink">
+        <span>
+          {pageRows.length} de {filtered.length} boleto{filtered.length === 1 ? '' : 's'} · ordenado por vencimento
+        </span>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}>
+              Anterior
+            </Button>
+            <span className="px-3 py-1.5">{safePage} / {totalPages}</span>
+            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}>
+              Próxima
+            </Button>
           </div>
         )}
       </div>
@@ -562,21 +566,6 @@ export default function Boletos() {
         generateSingleBoleto={generateSingleBoleto}
       />
     </div>
-  );
-}
-
-function KpiCard({ icon, label, value, valueClass }: {
-  icon: React.ReactNode; label: string; value: string; valueClass?: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="flex items-center gap-2 text-muted-foreground text-kicker uppercase">
-          {icon}<span>{label}</span>
-        </div>
-        <p className={cn('text-[1.75rem] font-bold mt-2 tracking-tight leading-none', valueClass)}>{value}</p>
-      </CardContent>
-    </Card>
   );
 }
 

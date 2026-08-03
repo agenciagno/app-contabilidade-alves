@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Pencil, Trash2, Tag, TrendingUp, TrendingDown, CornerDownRight } from 'lucide-react';
 import { useCategories, Category, CategoryScope } from '@/hooks/useCategories';
@@ -7,10 +6,14 @@ import { CategoryFormDialog } from '@/components/categories/CategoryFormDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { PageHeader, tabsListClass, tabsTriggerClass } from '@/components/ds';
+import { cn } from '@/lib/utils';
 
 interface CategoriesViewProps {
   scope: CategoryScope;
+  kicker: string;
   pageTitle: string;
+  subtitle: string;
   addButtonLabel: string;
   revenueTabLabel: string;
   expenseTabLabel: string;
@@ -30,7 +33,9 @@ interface CategoriesViewProps {
 
 export function CategoriesView({
   scope,
+  kicker,
   pageTitle,
+  subtitle,
   addButtonLabel,
   revenueTabLabel,
   expenseTabLabel,
@@ -73,19 +78,19 @@ export function CategoriesView({
   const CategoryCard = ({ category, isSub }: { category: Category; isSub?: boolean }) => {
     const parentName = getParentName(category.parent_id);
     return (
-      <div className={`flex items-center justify-between p-4 bg-muted/50 rounded-lg border border-border/50 hover:border-border transition-colors ${isSub ? 'ml-8' : ''}`}>
+      <div className={`flex items-center justify-between rounded-md border border-line bg-bg p-4 transition-colors hover:border-ink/20 ${isSub ? 'ml-8' : ''}`}>
         <div className="flex items-center gap-3">
           {isSub ? (
-            <CornerDownRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            <CornerDownRight className="h-4 w-4 shrink-0 text-muted-ink" />
           ) : (
-            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Tag className="w-4 h-4 text-primary" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-tint">
+              <Tag className="h-4 w-4 text-brand" />
             </div>
           )}
           <div className="flex flex-col">
-            <span className="font-medium text-foreground">{category.name}</span>
+            <span className="text-ui-strong text-ink">{category.name}</span>
             {parentName && (
-              <span className="text-xs text-muted-foreground">{subOfLabel} {parentName}</span>
+              <span className="text-meta text-muted-ink">{subOfLabel} {parentName}</span>
             )}
           </div>
         </div>
@@ -147,38 +152,40 @@ export function CategoriesView({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between py-4 flex-wrap gap-4">
-        <h1 className="text-h3-section text-foreground">{pageTitle}</h1>
-        <Button className="gap-2" onClick={handleNewCategory}>
-          <Plus className="w-4 h-4" />
-          {addButtonLabel}
-        </Button>
-      </div>
+      <PageHeader
+        kicker={kicker}
+        title={pageTitle}
+        subtitle={subtitle}
+        actions={
+          <Button onClick={handleNewCategory}>
+            <Plus className="h-4 w-4" />
+            {addButtonLabel}
+          </Button>
+        }
+      />
 
-      <Card className="bg-card border-border/50">
-        <CardContent className="p-6">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'receita' | 'despesa')}>
-            <TabsList className="w-full h-10 mb-4">
-              <TabsTrigger value="receita" className="flex-1 gap-2">
-                <TrendingUp className="w-4 h-4" />
-                {revenueTabLabel}
-                <span className="text-xs text-muted-foreground">({receitaCategories.length})</span>
-              </TabsTrigger>
-              <TabsTrigger value="despesa" className="flex-1 gap-2">
-                <TrendingDown className="w-4 h-4" />
-                {expenseTabLabel}
-                <span className="text-xs text-muted-foreground">({despesaCategories.length})</span>
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="receita">
-              {renderHierarchicalList(receitaCategories)}
-            </TabsContent>
-            <TabsContent value="despesa">
-              {renderHierarchicalList(despesaCategories)}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+      <div className="rounded-lg border border-line bg-paper p-5">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'receita' | 'despesa')}>
+          <TabsList className={cn(tabsListClass, 'mb-4')}>
+            <TabsTrigger value="receita" className={tabsTriggerClass}>
+              <TrendingUp className="h-[15px] w-[15px]" strokeWidth={1.75} />
+              {revenueTabLabel}
+              <span className="text-muted-ink">({receitaCategories.length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="despesa" className={tabsTriggerClass}>
+              <TrendingDown className="h-[15px] w-[15px]" strokeWidth={1.75} />
+              {expenseTabLabel}
+              <span className="text-muted-ink">({despesaCategories.length})</span>
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="receita">
+            {renderHierarchicalList(receitaCategories)}
+          </TabsContent>
+          <TabsContent value="despesa">
+            {renderHierarchicalList(despesaCategories)}
+          </TabsContent>
+        </Tabs>
+      </div>
 
       <CategoryFormDialog
         open={dialogOpen}

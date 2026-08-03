@@ -4,7 +4,9 @@ export default function Categories() {
   return (
     <CategoriesView
       scope="interno"
-      pageTitle="Eventos Contábeis"
+      kicker="~/financeiro · eventos"
+      pageTitle="Eventos contábeis."
+      subtitle="Categorias internas usadas na DRE e nos lançamentos."
       addButtonLabel="Novo Evento Contábil"
       revenueTabLabel="Eventos de Receita"
       expenseTabLabel="Eventos de Despesa"

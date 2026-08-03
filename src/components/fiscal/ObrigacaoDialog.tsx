@@ -137,10 +137,10 @@ export function ObrigacaoDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {obligation ? 'Editar Obrigação' : 'Nova Obrigação'}
+            {obligation ? 'Editar obrigação' : 'Nova obrigação'}
           </DialogTitle>
           <DialogDescription>
-            Defina o regime, dia de vencimento e ajustes da obrigação.
+            Defina o regime, o dia de vencimento e os ajustes da obrigação.
           </DialogDescription>
         </DialogHeader>
 

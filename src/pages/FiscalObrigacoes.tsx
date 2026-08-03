@@ -56,6 +56,7 @@ import {
   ObrigacaoDialog,
   type FiscalObligationCatalog,
 } from '@/components/fiscal/ObrigacaoDialog';
+import { PageHeader, StatCardRow } from '@/components/ds';
 
 const REGIME_BADGE: Record<
   string,
@@ -304,32 +305,51 @@ export default function FiscalObrigacoes() {
     [sheetItem],
   );
 
+  const catalog = obligationsQuery.data ?? [];
+  const countByRegime = (regime: string) =>
+    catalog.filter((o) => o.applies_to?.includes(regime)).length;
+
   return (
     <TooltipProvider>
-      <div className="p-6 space-y-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-semibold">
-              Obrigações e Declarações
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Catálogo central de obrigações. Gerencie regimes,
-              vencimentos e ocorrências mensais.
-            </p>
-          </div>
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" /> Nova Obrigação
-          </Button>
-        </div>
+      <div className="space-y-6">
+        <PageHeader
+          kicker="~/tarefas · catálogo"
+          title="Obrigações e declarações."
+          subtitle="Catálogo que alimenta a geração automática de tarefas."
+          actions={
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4" /> Nova obrigação
+            </Button>
+          }
+        />
 
-        <div className="flex flex-wrap gap-3 items-center">
+        <StatCardRow
+          items={[
+            { label: 'Obrigações ativas', value: catalog.filter((o) => o.active).length, hint: 'no catálogo' },
+            { label: 'Simples Nacional', value: countByRegime('simples_nacional'), hint: 'regimes vinculados' },
+            { label: 'Lucro Presumido', value: countByRegime('lucro_presumido'), hint: 'regimes vinculados' },
+            { label: 'Lucro Real', value: countByRegime('lucro_real'), hint: 'regimes vinculados' },
+          ]}
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[240px] flex-1 max-w-2xl">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-ink-2" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar obrigação..."
+              className="h-10 border-line bg-paper pl-9 text-ui"
+            />
+          </div>
+
           <Select value={regimeFilter} onValueChange={setRegimeFilter}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="h-9 w-[130px] border-line bg-paper text-ui">
               <SelectValue placeholder="Regime" />
             </SelectTrigger>
             <SelectContent>
@@ -342,7 +362,7 @@ export default function FiscalObrigacoes() {
           </Select>
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="h-9 w-[140px] border-line bg-paper text-ui">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -351,19 +371,9 @@ export default function FiscalObrigacoes() {
               <SelectItem value="all">Todas</SelectItem>
             </SelectContent>
           </Select>
-
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por nome..."
-              className="pl-9"
-            />
-          </div>
         </div>
 
-        <div className="rounded-lg border bg-card">
+        <div className="rounded-lg border border-line bg-paper">
           <Table>
             <TableHeader>
               <TableRow>

@@ -40,14 +40,15 @@ export function AppHeader() {
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          {/* Tema como pill rotulada, não só ícone — é o que o Topbar mostra */}
+          {/* Tema e Agente IA são exclusivos do Topbar desktop — o Mobile Topbar
+              do Figma (62:7897) só tem busca + notificações. */}
           <button
             onClick={() => setTheme(isLight ? 'dark' : 'light')}
-            className="flex h-[30px] items-center gap-1.5 rounded-pill border border-line bg-paper px-2.5 text-meta text-muted-ink transition-colors hover:bg-bg-2 hover:text-ink"
+            className="hidden h-[30px] items-center gap-1.5 rounded-pill border border-line bg-paper px-2.5 text-meta text-muted-ink transition-colors hover:bg-bg-2 hover:text-ink md:flex"
             title={isLight ? 'Mudar para o tema escuro' : 'Mudar para o tema claro'}
           >
             {isLight ? <Sun className="h-[15px] w-[15px]" strokeWidth={1.75} /> : <Moon className="h-[15px] w-[15px]" strokeWidth={1.75} />}
-            <span className="hidden sm:inline">{isLight ? 'claro' : 'escuro'}</span>
+            <span>{isLight ? 'claro' : 'escuro'}</span>
           </button>
 
           <NotificationBell />
@@ -55,7 +56,7 @@ export function AppHeader() {
           {(isAdmin || isSuperAdmin) && (
             <button
               onClick={() => navigate('/tech/agente-ia')}
-              className="flex h-9 w-9 items-center justify-center rounded-md text-muted-ink transition-colors hover:bg-bg-2 hover:text-ink"
+              className="hidden h-9 w-9 items-center justify-center rounded-md text-muted-ink transition-colors hover:bg-bg-2 hover:text-ink md:flex"
               title="Agente IA"
             >
               <Bot className="h-[18px] w-[18px]" strokeWidth={1.75} />

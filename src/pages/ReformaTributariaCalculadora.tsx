@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Calculator, Download, History, Trash2 } from 'lucide-react';
+import { Download, History, Trash2, Plus } from 'lucide-react';
+import { PageHeader, StatCardRow, tabsListClass, tabsTriggerClass } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -45,7 +45,14 @@ export default function ReformaTributariaCalculadora() {
   const [meta, setMeta] = useState<MetaSimulacao | null>(null);
   const [salvo, setSalvo] = useState(false);
   const [aExcluir, setAExcluir] = useState<RtSimulation | null>(null);
-  const [aba, setAba] = useState('nova');
+  const [aba, setAba] = useState('historico');
+
+  const stats = {
+    total: simulacoes.length,
+    negativo: simulacoes.filter((s) => !s.resultado?.simplesFicaNoUnificado && (s.resultado?.variacaoValor ?? 0) > 0).length,
+    neutro: simulacoes.filter((s) => s.resultado?.simplesFicaNoUnificado || (s.resultado?.variacaoValor ?? 0) === 0).length,
+    positivo: simulacoes.filter((s) => !s.resultado?.simplesFicaNoUnificado && (s.resultado?.variacaoValor ?? 0) < 0).length,
+  };
 
   const nomeDe = (m: MetaSimulacao | null) => {
     if (!m) return 'Empresa';
@@ -77,35 +84,40 @@ export default function ReformaTributariaCalculadora() {
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold">
-            <Calculator className="h-6 w-6 text-primary" strokeWidth={1.75} />
-            Calculadora RT
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Estima o impacto da Reforma Tributária no cliente e monta um diagnóstico pronto para
-            entregar — com o motivo de o imposto subir ou cair.
-          </p>
-        </div>
-        <Badge variant="outline" className="gap-1.5">
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${aliquotas.fonte === 'api_oficial' ? 'bg-ok' : 'bg-warn'}`}
-          />
-          {aliquotas.fonte === 'api_oficial' ? 'Alíquota da Receita Federal' : 'Teto legal (26,5%)'}
-        </Badge>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        kicker="~/reforma tributária"
+        title="Calculadora RT."
+        subtitle="Simulação de impacto CBS/IBS por cliente da carteira."
+        actions={
+          <>
+            <Badge variant="outline" className="gap-1.5 h-9">
+              <span className={`h-1.5 w-1.5 rounded-full ${aliquotas.fonte === 'api_oficial' ? 'bg-ok' : 'bg-warn'}`} />
+              {aliquotas.fonte === 'api_oficial' ? 'Alíquota da Receita Federal' : 'Teto legal (26,5%)'}
+            </Badge>
+            <Button onClick={() => setAba('nova')}>
+              <Plus className="h-4 w-4" /> Nova simulação
+            </Button>
+          </>
+        }
+      />
+
+      <StatCardRow
+        items={[
+          { label: 'Simulações', value: stats.total, hint: 'na carteira' },
+          { label: 'Impacto negativo', value: stats.negativo, hint: 'clientes com aumento', emphasis: stats.negativo > 0 ? 'warm' : 'none' },
+          { label: 'Impacto neutro', value: stats.neutro, hint: 'sem variação relevante' },
+          { label: 'Impacto positivo', value: stats.positivo, hint: 'redução de carga' },
+        ]}
+      />
 
       <Tabs value={aba} onValueChange={setAba}>
-        <TabsList>
-          <TabsTrigger value="nova">Nova simulação</TabsTrigger>
-          <TabsTrigger value="historico" className="gap-1.5">
-            <History className="h-3.5 w-3.5" />
+        <TabsList className={tabsListClass}>
+          <TabsTrigger value="nova" className={tabsTriggerClass}>Nova simulação</TabsTrigger>
+          <TabsTrigger value="historico" className={tabsTriggerClass}>
+            <History className="h-[15px] w-[15px]" strokeWidth={1.75} />
             Histórico
-            {simulacoes.length > 0 && (
-              <span className="ml-1 text-xs text-muted-foreground">({simulacoes.length})</span>
-            )}
+            {simulacoes.length > 0 && <span className="text-muted-ink">({simulacoes.length})</span>}
           </TabsTrigger>
         </TabsList>
 
@@ -136,11 +148,7 @@ export default function ReformaTributariaCalculadora() {
         </TabsContent>
 
         <TabsContent value="historico" className="mt-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Diagnósticos gerados</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <div className="overflow-hidden rounded-lg border border-line bg-paper">
               {carregandoHistorico ? (
                 <Skeleton className="h-40 w-full" />
               ) : simulacoes.length === 0 ? (
@@ -216,8 +224,12 @@ export default function ReformaTributariaCalculadora() {
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
-          </Card>
+            {!carregandoHistorico && simulacoes.length > 0 && (
+              <div className="border-t border-line px-4 py-2.5 text-meta text-muted-ink-2">
+                {simulacoes.length} de {simulacoes.length} simulações · o Simples no regime unificado não sofre alteração
+              </div>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
 

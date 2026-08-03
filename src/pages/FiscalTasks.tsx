@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format, isValid, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Plus, Kanban, List, CalendarDays, CalendarIcon, X, ArrowRightLeft, Trash2, Bookmark, BookmarkPlus, Target } from 'lucide-react';
+import { Plus, CalendarDays, CalendarIcon, X, ArrowRightLeft, Trash2, Bookmark, BookmarkPlus, Building2, Users, FileText, ChevronDown, SlidersHorizontal, Gauge, LayoutDashboard, ListChecks } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
@@ -627,54 +627,51 @@ export default function FiscalTasks() {
         ))}
       </div>
 
-      {/* Filters Bar */}
-      <div className="flex flex-wrap gap-3 items-center">
-
-
-        {/* Competência */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Competência:</span>
-          <Select value={competenceMonth} onValueChange={setCompetenceMonth}>
-            <SelectTrigger className="h-9 w-[130px] text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {MESES.map((m, i) => (
-                <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={competenceYear} onValueChange={setCompetenceYear}>
-            <SelectTrigger className="h-9 w-[90px] text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {[2024, 2025, 2026, 2027].map((y) => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Date Range */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">De:</span>
-          <DateInput value={startDate} onChange={setStartDate} placeholder="DD/MM/AAAA" />
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Até:</span>
-          <DateInput value={endDate} onChange={setEndDate} placeholder="DD/MM/AAAA" />
-        </div>
-        {(startDate || endDate) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-9 gap-1.5 text-xs"
-            onClick={() => { setStartDate(undefined); setEndDate(undefined); }}
-          >
-            <X className="h-3.5 w-3.5" /> Limpar datas
-          </Button>
-        )}
+      {/* Filters Bar — 4 pills do Figma (filtros/f/*) + "Mais filtros" guardando
+          intervalo de datas e filtros salvos, que não têm slot no protótipo mas
+          continuam funcionais (nada de real foi descartado). */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Competência — pill único (Figma: ícone calendário + "Julho 2026" + chevron) */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="flex h-9 shrink-0 items-center gap-2 rounded-sm border border-line bg-paper px-3 text-ui text-ink transition-colors hover:bg-bg-2"
+            >
+              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-ink" strokeWidth={1.75} />
+              <span className="truncate">
+                {competenceMonth !== 'all' ? `${MESES[Number(competenceMonth) - 1]} ${competenceYear}` : 'Todas as competências'}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-ink-2" strokeWidth={1.75} />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64 space-y-2 p-3">
+            <Label className="text-xs">Competência</Label>
+            <div className="flex gap-2">
+              <Select value={competenceMonth} onValueChange={setCompetenceMonth}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {MESES.map((m, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={competenceYear} onValueChange={setCompetenceYear}>
+                <SelectTrigger className="h-9 w-[90px] text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[2024, 2025, 2026, 2027].map((y) => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </PopoverContent>
+        </Popover>
 
         {/* Client Filter */}
         <SearchableSelect
+          icon={Building2}
           value={filterContact}
           onChange={setFilterContact}
           options={fiscalContacts.map((c: any) => ({ value: c.id, label: c.name }))}
@@ -686,6 +683,7 @@ export default function FiscalTasks() {
         {/* Responsible Filter (hidden for colaborador) */}
         {!isColaborador && (
           <SearchableSelect
+            icon={Users}
             value={filterResponsible}
             onChange={setFilterResponsible}
             options={companyProfiles.map((p) => ({ value: p.id, label: p.full_name || p.email || '—' }))}
@@ -697,6 +695,7 @@ export default function FiscalTasks() {
 
         {/* Obligation Filter */}
         <SearchableSelect
+          icon={FileText}
           value={filterObligation}
           onChange={setFilterObligation}
           options={obligations.map((o) => ({ value: o.id, label: o.is_custom ? `★ ${o.name}` : o.name }))}
@@ -705,137 +704,153 @@ export default function FiscalTasks() {
           width="w-[220px]"
         />
 
-        {/* Saved Filters */}
+        {/* Mais filtros — intervalo de datas + filtros salvos */}
         <Popover open={savePopoverOpen} onOpenChange={setSavePopoverOpen}>
           <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 gap-1.5 text-xs"
-              disabled={savedFilters.length >= 5}
-              title={savedFilters.length >= 5 ? 'Máximo de 5 filtros salvos' : 'Salvar filtro atual'}
+            <button
+              type="button"
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-sm border border-line bg-paper px-3 text-ui text-muted-ink transition-colors hover:bg-bg-2"
             >
-              <BookmarkPlus className="w-3.5 h-3.5" /> Salvar filtro
-            </Button>
+              <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Mais filtros
+              {(startDate || endDate) && <span className="h-1.5 w-1.5 rounded-full bg-brand" />}
+            </button>
           </PopoverTrigger>
-          <PopoverContent align="start" className="w-64 space-y-2">
-            <Label className="text-xs">Nome do filtro</Label>
-            <Input
-              value={newFilterName}
-              onChange={(e) => setNewFilterName(e.target.value)}
-              placeholder="Ex: Vencendo essa semana"
-              className="h-8 text-sm"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const name = newFilterName.trim();
-                  if (!name) return;
-                  const next: SavedFilter = {
-                    id: crypto.randomUUID(),
-                    name,
-                    filters: {
-                      startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
-                      endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
-                      contact: filterContact,
-                      responsible: filterResponsible,
-                      obligation: filterObligation,
-                    },
-                  };
-                  persistSaved([...savedFilters, next].slice(0, 5));
-                  setNewFilterName('');
-                  setSavePopoverOpen(false);
-                  toast.success('Filtro salvo');
-                }
-              }}
-            />
-            <Button
-              size="sm"
-              className="w-full h-8"
-              onClick={() => {
-                const name = newFilterName.trim();
-                if (!name) return;
-                const next: SavedFilter = {
-                  id: crypto.randomUUID(),
-                  name,
-                  filters: {
-                    startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
-                    endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
-                    contact: filterContact,
-                    responsible: filterResponsible,
-                    obligation: filterObligation,
-                  },
-                };
-                persistSaved([...savedFilters, next].slice(0, 5));
-                setNewFilterName('');
-                setSavePopoverOpen(false);
-                toast.success('Filtro salvo');
-              }}
-            >
-              Salvar
-            </Button>
+          <PopoverContent align="start" className="w-72 space-y-3 p-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Intervalo de datas</Label>
+              <div className="flex items-center gap-2">
+                <DateInput value={startDate} onChange={setStartDate} placeholder="De" />
+                <DateInput value={endDate} onChange={setEndDate} placeholder="Até" />
+              </div>
+              {(startDate || endDate) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 text-xs"
+                  onClick={() => { setStartDate(undefined); setEndDate(undefined); }}
+                >
+                  <X className="h-3.5 w-3.5" /> Limpar datas
+                </Button>
+              )}
+            </div>
+
+            <div className="space-y-1.5 border-t border-line pt-3">
+              <Label className="text-xs">Salvar filtro atual</Label>
+              <div className="flex gap-1.5">
+                <Input
+                  value={newFilterName}
+                  onChange={(e) => setNewFilterName(e.target.value)}
+                  placeholder="Ex: Vencendo essa semana"
+                  className="h-8 text-sm"
+                  disabled={savedFilters.length >= 5}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    const name = newFilterName.trim();
+                    if (!name) return;
+                    const next: SavedFilter = {
+                      id: crypto.randomUUID(),
+                      name,
+                      filters: {
+                        startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
+                        endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
+                        contact: filterContact,
+                        responsible: filterResponsible,
+                        obligation: filterObligation,
+                      },
+                    };
+                    persistSaved([...savedFilters, next].slice(0, 5));
+                    setNewFilterName('');
+                    toast.success('Filtro salvo');
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="h-8 shrink-0"
+                  disabled={savedFilters.length >= 5 || !newFilterName.trim()}
+                  title={savedFilters.length >= 5 ? 'Máximo de 5 filtros salvos' : undefined}
+                  onClick={() => {
+                    const name = newFilterName.trim();
+                    if (!name) return;
+                    const next: SavedFilter = {
+                      id: crypto.randomUUID(),
+                      name,
+                      filters: {
+                        startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
+                        endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
+                        contact: filterContact,
+                        responsible: filterResponsible,
+                        obligation: filterObligation,
+                      },
+                    };
+                    persistSaved([...savedFilters, next].slice(0, 5));
+                    setNewFilterName('');
+                    toast.success('Filtro salvo');
+                  }}
+                >
+                  <BookmarkPlus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            {savedFilters.length > 0 && (
+              <div className="space-y-1 border-t border-line pt-3">
+                <Label className="text-xs">
+                  <Bookmark className="mr-1 inline h-3 w-3" /> Meus filtros ({savedFilters.length})
+                </Label>
+                {savedFilters.map((sf) => (
+                  <div key={sf.id} className="flex items-center justify-between gap-2 rounded-sm px-1.5 py-1 hover:bg-bg-2">
+                    <button
+                      type="button"
+                      className="flex-1 truncate text-left text-ui"
+                      onClick={() => {
+                        setStartDate(sf.filters.startDate ? parse(sf.filters.startDate, 'yyyy-MM-dd', new Date()) : undefined);
+                        setEndDate(sf.filters.endDate ? parse(sf.filters.endDate, 'yyyy-MM-dd', new Date()) : undefined);
+                        setFilterContact(sf.filters.contact || 'all');
+                        setFilterResponsible(sf.filters.responsible || 'all');
+                        setFilterObligation(sf.filters.obligation || 'all');
+                        toast.success(`Filtro "${sf.name}" aplicado`);
+                      }}
+                    >
+                      {sf.name}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Remover"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        persistSaved(savedFilters.filter((x) => x.id !== sf.id));
+                      }}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-ink hover:bg-bg hover:text-ink"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </PopoverContent>
         </Popover>
 
-        {savedFilters.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs">
-                <Bookmark className="w-3.5 h-3.5" /> Meus filtros ({savedFilters.length})
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-64">
-              <DropdownMenuLabel className="text-xs">Aplicar filtro salvo</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {savedFilters.map((sf) => (
-                <DropdownMenuItem
-                  key={sf.id}
-                  onSelect={(e) => e.preventDefault()}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <button
-                    type="button"
-                    className="flex-1 text-left truncate"
-                    onClick={() => {
-                      setStartDate(sf.filters.startDate ? parse(sf.filters.startDate, 'yyyy-MM-dd', new Date()) : undefined);
-                      setEndDate(sf.filters.endDate ? parse(sf.filters.endDate, 'yyyy-MM-dd', new Date()) : undefined);
-                      setFilterContact(sf.filters.contact || 'all');
-                      setFilterResponsible(sf.filters.responsible || 'all');
-                      setFilterObligation(sf.filters.obligation || 'all');
-                      toast.success(`Filtro "${sf.name}" aplicado`);
-                    }}
-                  >
-                    {sf.name}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Remover"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      persistSaved(savedFilters.filter((x) => x.id !== sf.id));
-                    }}
-                    className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-
-        {/* View Toggle */}
+        {/* View Toggle — ícones do Figma (visão: gauge/layout-dashboard/list-checks/calendar) */}
         <div className="ml-auto">
-          <ToggleGroup type="single" value={viewMode} onValueChange={v => v && setViewMode(v as ViewMode)} className="border border-border/50 rounded-md p-0.5">
-            <ToggleGroupItem value="myday" className="h-8 w-8 p-0" title="Meu Dia">
-              <Target className="h-4 w-4" />
+          <ToggleGroup
+            type="single"
+            value={viewMode}
+            onValueChange={v => v && setViewMode(v as ViewMode)}
+            className="gap-0.5 rounded-md border border-line bg-bg-2 p-1"
+          >
+            <ToggleGroupItem value="myday" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Meu Dia">
+              <Gauge className="h-[15px] w-[15px]" strokeWidth={1.75} />
             </ToggleGroupItem>
-            <ToggleGroupItem value="kanban" className="h-8 w-8 p-0" title="Kanban">
-              <Kanban className="h-4 w-4" />
+            <ToggleGroupItem value="kanban" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Kanban">
+              <LayoutDashboard className="h-[15px] w-[15px]" strokeWidth={1.75} />
             </ToggleGroupItem>
-            <ToggleGroupItem value="list" className="h-8 w-8 p-0" title="Lista">
-              <List className="h-4 w-4" />
+            <ToggleGroupItem value="list" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Lista">
+              <ListChecks className="h-[15px] w-[15px]" strokeWidth={1.75} />
             </ToggleGroupItem>
-            <ToggleGroupItem value="calendar" className="h-8 w-8 p-0" title="Calendário">
-              <CalendarDays className="h-4 w-4" />
+            <ToggleGroupItem value="calendar" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Calendário">
+              <CalendarDays className="h-[15px] w-[15px]" strokeWidth={1.75} />
             </ToggleGroupItem>
           </ToggleGroup>
         </div>
