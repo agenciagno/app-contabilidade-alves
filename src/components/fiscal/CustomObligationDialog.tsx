@@ -101,6 +101,7 @@ export function CustomObligationDialog({ open, onOpenChange, initial }: Props) {
       frequency: 'monthly',
       due_rule: `day_${dueDay}`,
       holiday_adjustment: businessDaysOnly ? 'prev_business_day' : 'none',
+      internal_delivery_offset: internalOffset,
       requires_employees: false,
       active: true,
       is_custom: true,

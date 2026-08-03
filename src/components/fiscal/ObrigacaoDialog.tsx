@@ -15,6 +15,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { Database } from '@/integrations/supabase/types';
 
 export type FiscalObligationCatalog =
@@ -35,10 +42,21 @@ const REGIME_OPTIONS: { value: string; label: string }[] = [
   { value: 'lucro_real', label: 'Lucro Real' },
 ];
 
-function extractDay(due_rule: string | undefined | null): string {
-  if (!due_rule) return '';
-  const m = due_rule.match(/^day_(\d+)$/);
-  return m ? m[1] : '';
+const ALL_REGIMES = REGIME_OPTIONS.map((r) => r.value);
+
+type Category = 'fiscal' | 'recorrente';
+type DueRuleType = 'day' | 'bday';
+
+function extractDueRule(due_rule: string | undefined | null): {
+  type: DueRuleType;
+  value: string;
+} {
+  if (!due_rule) return { type: 'day', value: '' };
+  const bday = due_rule.match(/^bday_(\d+)$/);
+  if (bday) return { type: 'bday', value: bday[1] };
+  const day = due_rule.match(/^day_(\d+)$/);
+  if (day) return { type: 'day', value: day[1] };
+  return { type: 'day', value: '' };
 }
 
 export function ObrigacaoDialog({
@@ -50,7 +68,9 @@ export function ObrigacaoDialog({
 }: ObrigacaoDialogProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [category, setCategory] = useState<Category>('fiscal');
   const [selectedRegimes, setSelectedRegimes] = useState<string[]>([]);
+  const [dueRuleType, setDueRuleType] = useState<DueRuleType>('day');
   const [dueDay, setDueDay] = useState('');
   const [requiresEmployees, setRequiresEmployees] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -58,15 +78,20 @@ export function ObrigacaoDialog({
   useEffect(() => {
     if (!open) return;
     if (obligation) {
+      const dueRule = extractDueRule(obligation.due_rule);
       setName(obligation.name ?? '');
       setDescription(obligation.description ?? '');
+      setCategory((obligation.category as Category) ?? 'fiscal');
       setSelectedRegimes(obligation.applies_to ?? []);
-      setDueDay(extractDay(obligation.due_rule));
+      setDueRuleType(dueRule.type);
+      setDueDay(dueRule.value);
       setRequiresEmployees(!!obligation.requires_employees);
     } else {
       setName('');
       setDescription('');
+      setCategory('fiscal');
       setSelectedRegimes([]);
+      setDueRuleType('day');
       setDueDay('');
       setRequiresEmployees(false);
     }
@@ -83,22 +108,28 @@ export function ObrigacaoDialog({
       toast.error('Informe um nome com ao menos 3 caracteres.');
       return;
     }
-    if (selectedRegimes.length === 0) {
+    if (category === 'fiscal' && selectedRegimes.length === 0) {
       toast.error('Selecione ao menos um regime.');
       return;
     }
     const dayNum = parseInt(dueDay, 10);
-    if (!Number.isFinite(dayNum) || dayNum < 1 || dayNum > 31) {
-      toast.error('Dia de vencimento deve ser entre 1 e 31.');
+    const maxDay = dueRuleType === 'bday' ? 23 : 31;
+    if (!Number.isFinite(dayNum) || dayNum < 1 || dayNum > maxDay) {
+      toast.error(
+        dueRuleType === 'bday'
+          ? 'Nº do dia útil deve ser entre 1 e 23.'
+          : 'Dia de vencimento deve ser entre 1 e 31.',
+      );
       return;
     }
 
     const payload = {
       name: name.trim(),
       description: description.trim() || null,
-      applies_to: selectedRegimes,
+      category,
+      applies_to: category === 'recorrente' ? ALL_REGIMES : selectedRegimes,
       frequency: 'monthly',
-      due_rule: `day_${dayNum}`,
+      due_rule: dueRuleType === 'bday' ? `bday_${dayNum}` : `day_${dayNum}`,
       holiday_adjustment: 'advance',
       requires_employees: requiresEmployees,
       active: true,
@@ -140,7 +171,7 @@ export function ObrigacaoDialog({
             {obligation ? 'Editar obrigação' : 'Nova obrigação'}
           </DialogTitle>
           <DialogDescription>
-            Defina o regime, o dia de vencimento e os ajustes da obrigação.
+            Defina o tipo, o regime (quando aplicável), o vencimento e os ajustes da obrigação.
           </DialogDescription>
         </DialogHeader>
 
@@ -166,36 +197,73 @@ export function ObrigacaoDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Regime(s) *</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {REGIME_OPTIONS.map((r) => (
-                <label
-                  key={r.value}
-                  className="flex items-center gap-2 rounded-md border p-2 cursor-pointer hover:bg-muted/50"
-                >
-                  <Checkbox
-                    checked={selectedRegimes.includes(r.value)}
-                    onCheckedChange={() => toggleRegime(r.value)}
-                  />
-                  <span className="text-sm">{r.label}</span>
-                </label>
-              ))}
-            </div>
+            <Label>Tipo *</Label>
+            <Select value={category} onValueChange={(v) => setCategory(v as Category)}>
+              <SelectTrigger id="ob-category">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fiscal">Fiscal declaratório</SelectItem>
+                <SelectItem value="recorrente">Tarefa recorrente</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {category === 'fiscal'
+                ? 'Declaração/obrigação fiscal, vinculada a regime(s) tributário(s).'
+                : 'Tarefa recorrente mensal (ex: folha de pagamento), aplicada a todas as empresas elegíveis, sem depender de regime.'}
+            </p>
           </div>
 
+          {category === 'fiscal' && (
+            <div className="space-y-2">
+              <Label>Regime(s) *</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {REGIME_OPTIONS.map((r) => (
+                  <label
+                    key={r.value}
+                    className="flex items-center gap-2 rounded-md border p-2 cursor-pointer hover:bg-muted/50"
+                  >
+                    <Checkbox
+                      checked={selectedRegimes.includes(r.value)}
+                      onCheckedChange={() => toggleRegime(r.value)}
+                    />
+                    <span className="text-sm">{r.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="ob-day">Dia de vencimento *</Label>
-            <Input
-              id="ob-day"
-              type="number"
-              min={1}
-              max={31}
-              value={dueDay}
-              onChange={(e) => setDueDay(e.target.value)}
-              className="w-24"
-            />
+            <Label>Vencimento *</Label>
+            <div className="flex items-center gap-2">
+              <Select
+                value={dueRuleType}
+                onValueChange={(v) => setDueRuleType(v as DueRuleType)}
+              >
+                <SelectTrigger id="ob-due-type" className="w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Dia fixo do mês</SelectItem>
+                  <SelectItem value="bday">Nº dia útil do mês</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                id="ob-day"
+                type="number"
+                min={1}
+                max={dueRuleType === 'bday' ? 23 : 31}
+                value={dueDay}
+                onChange={(e) => setDueDay(e.target.value)}
+                className="w-24"
+                placeholder={dueRuleType === 'bday' ? 'Ex: 5' : 'Ex: 20'}
+              />
+            </div>
             <p className="text-xs text-muted-foreground">
-              Ajuste automático para último dia útil anterior se cair em fim de semana.
+              {dueRuleType === 'bday'
+                ? 'Ex: "5" = 5º dia útil de cada mês, já calculado automaticamente.'
+                : 'Ajuste automático para último dia útil anterior se cair em fim de semana.'}
             </p>
           </div>
 

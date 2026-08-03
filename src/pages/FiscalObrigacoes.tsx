@@ -93,10 +93,22 @@ function extractDay(due_rule: string): number | null {
   return m ? parseInt(m[1], 10) : null;
 }
 
+function extractBusinessDay(due_rule: string): number | null {
+  const m = due_rule?.match(/^bday_(\d+)$/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function ordinal(n: number): string {
+  return `${n}º`;
+}
+
 function humanizeDueRule(due_rule: string, frequency: string): string {
-  const day = extractDay(due_rule);
   const freq = frequency === 'monthly' ? 'Mensal' : frequency;
-  return day ? `Dia ${day} · ${freq}` : `${due_rule} · ${freq}`;
+  const day = extractDay(due_rule);
+  if (day) return `Dia ${day} · ${freq}`;
+  const bday = extractBusinessDay(due_rule);
+  if (bday) return `${ordinal(bday)} dia útil · ${freq}`;
+  return `${due_rule} · ${freq}`;
 }
 
 function adjustToLastBusinessDay(date: Date): Date {
@@ -104,6 +116,21 @@ function adjustToLastBusinessDay(date: Date): Date {
   const dow = result.getDay();
   if (dow === 6) result.setDate(result.getDate() - 1);
   if (dow === 0) result.setDate(result.getDate() - 2);
+  return result;
+}
+
+function isWeekend(date: Date): boolean {
+  const dow = date.getDay();
+  return dow === 0 || dow === 6;
+}
+
+function nthBusinessDayOfMonth(year: number, month: number, n: number): Date {
+  const result = new Date(year, month, 1);
+  let count = 0;
+  while (count < n) {
+    if (!isWeekend(result)) count++;
+    if (count < n) result.setDate(result.getDate() + 1);
+  }
   return result;
 }
 
@@ -147,18 +174,29 @@ interface Occurrence {
 
 function buildOccurrences(due_rule: string, count = 6): Occurrence[] {
   const day = extractDay(due_rule);
-  if (!day) return [];
+  const bday = extractBusinessDay(due_rule);
+  if (!day && !bday) return [];
   const occ: Occurrence[] = [];
   const now = new Date();
   for (let i = 0; i < count; i++) {
     const year = now.getFullYear();
     const month = now.getMonth() + i;
-    const raw = new Date(year, month, day);
-    if (raw.getMonth() !== ((month % 12) + 12) % 12) {
-      // dia inválido para o mês (ex: 31 em fev) — pular
-      continue;
+    const normMonth = ((month % 12) + 12) % 12;
+    const normYear = year + Math.floor(month / 12);
+
+    let raw: Date;
+    let adjusted: Date;
+    if (bday) {
+      raw = nthBusinessDayOfMonth(normYear, normMonth, bday);
+      adjusted = raw;
+    } else {
+      raw = new Date(year, month, day!);
+      if (raw.getMonth() !== normMonth) {
+        // dia inválido para o mês (ex: 31 em fev) — pular
+        continue;
+      }
+      adjusted = adjustToLastBusinessDay(raw);
     }
-    const adjusted = adjustToLastBusinessDay(raw);
     const internal = subtractBusinessDays(adjusted, 2);
     occ.push({
       monthLabel: `${MONTH_NAMES[adjusted.getMonth()]} ${adjusted.getFullYear()}`,
@@ -171,7 +209,23 @@ function buildOccurrences(due_rule: string, count = 6): Occurrence[] {
   return occ;
 }
 
-function RegimeBadges({ regimes }: { regimes: string[] }) {
+function RegimeBadges({
+  regimes,
+  category,
+}: {
+  regimes: string[];
+  category?: string | null;
+}) {
+  if (category === 'recorrente') {
+    return (
+      <Badge
+        variant="outline"
+        className="bg-muted text-muted-foreground border-line"
+      >
+        Recorrente · todas as empresas
+      </Badge>
+    );
+  }
   return (
     <div className="flex flex-wrap gap-1">
       {regimes.map((r) => {
@@ -199,6 +253,7 @@ export default function FiscalObrigacoes() {
   const queryClient = useQueryClient();
 
   const [regimeFilter, setRegimeFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('active');
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -252,6 +307,8 @@ export default function FiscalObrigacoes() {
   const filtered = useMemo(() => {
     const all = obligationsQuery.data ?? [];
     return all.filter((o) => {
+      if (categoryFilter !== 'all' && (o.category ?? 'fiscal') !== categoryFilter)
+        return false;
       if (regimeFilter !== 'all' && !o.applies_to?.includes(regimeFilter))
         return false;
       if (statusFilter === 'active' && !o.active) return false;
@@ -263,7 +320,7 @@ export default function FiscalObrigacoes() {
         return false;
       return true;
     });
-  }, [obligationsQuery.data, regimeFilter, statusFilter, search]);
+  }, [obligationsQuery.data, categoryFilter, regimeFilter, statusFilter, search]);
 
   const handleToggleActive = async (
     ob: FiscalObligationCatalog,
@@ -348,6 +405,17 @@ export default function FiscalObrigacoes() {
             />
           </div>
 
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="h-9 w-[150px] border-line bg-paper text-ui">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              <SelectItem value="fiscal">Fiscal declaratório</SelectItem>
+              <SelectItem value="recorrente">Tarefa recorrente</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Select value={regimeFilter} onValueChange={setRegimeFilter}>
             <SelectTrigger className="h-9 w-[130px] border-line bg-paper text-ui">
               <SelectValue placeholder="Regime" />
@@ -425,7 +493,7 @@ export default function FiscalObrigacoes() {
                     >
                       <TableCell className="font-medium">{ob.name}</TableCell>
                       <TableCell>
-                        <RegimeBadges regimes={ob.applies_to ?? []} />
+                        <RegimeBadges regimes={ob.applies_to ?? []} category={ob.category} />
                       </TableCell>
                       <TableCell>
                         {humanizeDueRule(ob.due_rule, ob.frequency)}
@@ -487,7 +555,7 @@ export default function FiscalObrigacoes() {
             {sheetItem && (
               <div className="mt-4 space-y-6">
                 <div className="space-y-2">
-                  <RegimeBadges regimes={sheetItem.applies_to ?? []} />
+                  <RegimeBadges regimes={sheetItem.applies_to ?? []} category={sheetItem.category} />
                   <p className="text-sm text-muted-foreground">
                     {humanizeDueRule(sheetItem.due_rule, sheetItem.frequency)}
                   </p>

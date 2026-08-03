@@ -1065,62 +1065,6 @@ export type Database = {
         }
         Relationships: []
       }
-      tenant_invoices: {
-        Row: {
-          company_id: string
-          competencia: string
-          created_at: string
-          descricao: string | null
-          id: string
-          metodo: string | null
-          observacao: string | null
-          origem: string
-          pago_em: string | null
-          status: string
-          updated_at: string
-          valor: number
-          vencimento: string
-        }
-        Insert: {
-          company_id: string
-          competencia: string
-          created_at?: string
-          descricao?: string | null
-          id?: string
-          metodo?: string | null
-          observacao?: string | null
-          origem?: string
-          pago_em?: string | null
-          status?: string
-          updated_at?: string
-          valor: number
-          vencimento: string
-        }
-        Update: {
-          company_id?: string
-          competencia?: string
-          created_at?: string
-          descricao?: string | null
-          id?: string
-          metodo?: string | null
-          observacao?: string | null
-          origem?: string
-          pago_em?: string | null
-          status?: string
-          updated_at?: string
-          valor?: number
-          vencimento?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tenant_invoices_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       contact_documents: {
         Row: {
           category: string | null
@@ -2158,6 +2102,7 @@ export type Database = {
         Row: {
           active: boolean | null
           applies_to: string[]
+          category: string
           code: string | null
           company_id: string | null
           created_at: string
@@ -2167,6 +2112,7 @@ export type Database = {
           google_calendar_event_id: string | null
           holiday_adjustment: string
           id: string
+          internal_delivery_offset: number
           is_custom: boolean
           jurisdiction: string | null
           name: string
@@ -2180,6 +2126,7 @@ export type Database = {
         Insert: {
           active?: boolean | null
           applies_to: string[]
+          category?: string
           code?: string | null
           company_id?: string | null
           created_at?: string
@@ -2189,6 +2136,7 @@ export type Database = {
           google_calendar_event_id?: string | null
           holiday_adjustment: string
           id?: string
+          internal_delivery_offset?: number
           is_custom?: boolean
           jurisdiction?: string | null
           name: string
@@ -2202,6 +2150,7 @@ export type Database = {
         Update: {
           active?: boolean | null
           applies_to?: string[]
+          category?: string
           code?: string | null
           company_id?: string | null
           created_at?: string
@@ -2211,6 +2160,7 @@ export type Database = {
           google_calendar_event_id?: string | null
           holiday_adjustment?: string
           id?: string
+          internal_delivery_offset?: number
           is_custom?: boolean
           jurisdiction?: string | null
           name?: string
@@ -3409,6 +3359,13 @@ export type Database = {
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "rt_simulations_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
         ]
       }
       support_sessions: {
@@ -3443,6 +3400,62 @@ export type Database = {
           {
             foreignKeyName: "support_sessions_target_company_id_fkey"
             columns: ["target_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_invoices: {
+        Row: {
+          company_id: string
+          competencia: string
+          created_at: string
+          descricao: string | null
+          id: string
+          metodo: string | null
+          observacao: string | null
+          origem: string
+          pago_em: string | null
+          status: string
+          updated_at: string
+          valor: number
+          vencimento: string
+        }
+        Insert: {
+          company_id: string
+          competencia: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          metodo?: string | null
+          observacao?: string | null
+          origem?: string
+          pago_em?: string | null
+          status?: string
+          updated_at?: string
+          valor: number
+          vencimento: string
+        }
+        Update: {
+          company_id?: string
+          competencia?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          metodo?: string | null
+          observacao?: string | null
+          origem?: string
+          pago_em?: string | null
+          status?: string
+          updated_at?: string
+          valor?: number
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_invoices_company_id_fkey"
+            columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
@@ -3805,6 +3818,10 @@ export type Database = {
         Returns: Json
       }
       generate_my_recurring_transactions: { Args: never; Returns: number }
+      generate_tenant_invoices: {
+        Args: { p_company_id?: string }
+        Returns: number
+      }
       generate_tenant_invoices_admin: {
         Args: { p_company_id?: string }
         Returns: number
