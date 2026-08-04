@@ -17,6 +17,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -196,6 +206,7 @@ interface TaskDetailModalProps {
   profiles: { id: string; full_name: string | null }[];
   onUpdate: (id: string, data: Partial<FiscalTask>) => void;
   onDelete: (id: string) => void;
+  onDeleteGroup?: (ids: string[]) => void;
   groupTasks?: FiscalTask[] | null;
   onUploadForTask?: (task: FiscalTask, file: File) => Promise<void>;
 }
@@ -214,7 +225,7 @@ const statusBadgeClass: Record<string, string> = {
   concluido: 'bg-ok/15 text-ok dark:text-ok border-ok/30',
 };
 
-export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, onUpdate, onDelete, groupTasks, onUploadForTask }: TaskDetailModalProps) {
+export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, onUpdate, onDelete, onDeleteGroup, groupTasks, onUploadForTask }: TaskDetailModalProps) {
   const { isColaborador, isSuperAdmin, isAdmin } = useUserRole();
   const { company } = useCompany();
   const { user } = useAuth();
@@ -266,6 +277,26 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
 
   const patchGroupTask = (id: string, patch: Partial<FiscalTask>) => {
     setGroupTasksState((prev) => prev.map((t) => (t.id === id ? ({ ...t, ...patch } as FiscalTask) : t)));
+  };
+  const removeGroupTask = (id: string) => {
+    setGroupTasksState((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // type 'group' = botão "Excluir tarefa" no rodapé, apaga o card inteiro (todas as
+  // obrigações). type 'item' = exclusão de uma única obrigação do checklist (admin/super_admin).
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'group' | 'item'; ids: string[] } | null>(null);
+
+  const confirmDelete = () => {
+    if (!deleteConfirm) return;
+    if (deleteConfirm.type === 'group') {
+      onDeleteGroup?.(deleteConfirm.ids);
+      onOpenChange(false);
+    } else {
+      onDelete(deleteConfirm.ids[0]);
+      removeGroupTask(deleteConfirm.ids[0]);
+      if (groupTasksState.length <= 1) onOpenChange(false);
+    }
+    setDeleteConfirm(null);
   };
 
   // Current user's profile (for authoring notes)
@@ -652,6 +683,8 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                     onUpload={handleChecklistUpload}
                     onComplete={(t) => handleOpenCompletion(t, false)}
                     onUncomplete={handleUncomplete}
+                    canDelete={canEdit}
+                    onDelete={(t) => setDeleteConfirm({ type: 'item', ids: [t.id] })}
                   />
                 ))}
               </div>
@@ -873,7 +906,10 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => { onDelete(task.id); onOpenChange(false); }}
+                  onClick={() => {
+                    const ids = groupTasksState.length > 1 ? groupTasksState.map((t) => t.id) : [task.id];
+                    setDeleteConfirm({ type: 'group', ids });
+                  }}
                 >
                   <Trash2 className="w-4 h-4" /> Excluir tarefa
                 </Button>
@@ -900,6 +936,28 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
         onOpenChange={(o) => { if (!o) setCompletionTarget(null); }}
         onConfirm={handleConfirmCompletion}
       />
+
+      {/* Confirmação de exclusão — card inteiro ou item individual do checklist */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => { if (!o) setDeleteConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleteConfirm?.type === 'group' ? 'Excluir tarefa?' : 'Excluir item do checklist?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirm?.type === 'group'
+                ? deleteConfirm.ids.length > 1
+                  ? `Esta ação não pode ser desfeita. As ${deleteConfirm.ids.length} obrigações deste card serão excluídas.`
+                  : 'Esta ação não pode ser desfeita.'
+                : 'Esta ação não pode ser desfeita. Só esta obrigação será removida do checklist — o restante do card permanece.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }
@@ -909,11 +967,15 @@ function ChecklistRow({
   onUpload,
   onComplete,
   onUncomplete,
+  canDelete,
+  onDelete,
 }: {
   task: FiscalTask;
   onUpload?: (task: FiscalTask, file: File) => Promise<void>;
   onComplete?: (task: FiscalTask) => void;
   onUncomplete?: (task: FiscalTask) => void;
+  canDelete?: boolean;
+  onDelete?: (task: FiscalTask) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const done = task.status === 'concluido' || !!task.attachment_url;
@@ -955,30 +1017,43 @@ function ChecklistRow({
           {task.title}
         </span>
       </div>
-      {done && task.attachment_url ? (
-        <button
-          type="button"
-          onClick={() => abrirDocumentoViaEdge('transaction-attachments', task.attachment_url!)}
-          className="text-xs text-primary underline shrink-0 inline-flex items-center gap-1"
-        >
-          <Paperclip className="w-3 h-3" /> Ver anexo
-        </button>
+      <div className="flex items-center gap-1.5 shrink-0">
+        {done && task.attachment_url ? (
+          <button
+            type="button"
+            onClick={() => abrirDocumentoViaEdge('transaction-attachments', task.attachment_url!)}
+            className="text-xs text-primary underline shrink-0 inline-flex items-center gap-1"
+          >
+            <Paperclip className="w-3 h-3" /> Ver anexo
+          </button>
 
-      ) : done ? (
-        <Badge variant="outline" className="text-[10px] bg-ok/10 text-ok dark:text-ok border-ok/30 shrink-0">
-          ✅ Anexado
-        </Badge>
-      ) : (
-        <>
-          <Label htmlFor={inputId} className="cursor-pointer shrink-0">
-            <div className="inline-flex items-center gap-1 px-2 py-1 rounded border border-dashed border-border hover:bg-muted/50 text-xs">
-              <Upload className="w-3 h-3" />
-              {uploading ? 'Enviando...' : '📎 Anexar'}
-            </div>
-          </Label>
-          <input id={inputId} type="file" className="hidden" onChange={handle} disabled={uploading} />
-        </>
-      )}
+        ) : done ? (
+          <Badge variant="outline" className="text-[10px] bg-ok/10 text-ok dark:text-ok border-ok/30 shrink-0">
+            ✅ Anexado
+          </Badge>
+        ) : (
+          <>
+            <Label htmlFor={inputId} className="cursor-pointer shrink-0">
+              <div className="inline-flex items-center gap-1 px-2 py-1 rounded border border-dashed border-border hover:bg-muted/50 text-xs">
+                <Upload className="w-3 h-3" />
+                {uploading ? 'Enviando...' : '📎 Anexar'}
+              </div>
+            </Label>
+            <input id={inputId} type="file" className="hidden" onChange={handle} disabled={uploading} />
+          </>
+        )}
+        {canDelete && (
+          <button
+            type="button"
+            onClick={() => onDelete?.(task)}
+            aria-label={`Excluir ${task.title}`}
+            title="Excluir esta obrigação do checklist"
+            className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

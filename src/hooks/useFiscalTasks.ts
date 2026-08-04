@@ -236,11 +236,31 @@ export function useFiscalTasks(filters: FiscalTaskFilters = {}) {
     },
   });
 
+  // Exclui o card inteiro (todas as obrigações do grupo) numa única chamada, em vez de
+  // depender de N chamadas de deleteTask — evita N toasts e N invalidations por 1 clique.
+  const deleteTasks = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('fiscal_tasks')
+        .delete()
+        .in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: (_data, ids) => {
+      queryClient.invalidateQueries({ queryKey: ['fiscal-tasks'] });
+      toast({ title: ids.length > 1 ? `${ids.length} tarefas excluídas com sucesso` : 'Tarefa excluída com sucesso' });
+    },
+    onError: () => {
+      toast({ title: 'Erro ao excluir tarefas', variant: 'destructive' });
+    },
+  });
+
   return {
     tasks,
     isLoading,
     createTask,
     updateTask,
     deleteTask,
+    deleteTasks,
   };
 }

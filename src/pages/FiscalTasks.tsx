@@ -247,7 +247,7 @@ export default function FiscalTasks() {
     competenceYear: competenceYear ? Number(competenceYear) : null,
   }), [startDate, endDate, filterContact, filterResponsible, filterObligation, obligations, competenceMonth, competenceYear]);
 
-  const { tasks, isLoading, createTask, updateTask, deleteTask } = useFiscalTasks(filters);
+  const { tasks, isLoading, createTask, updateTask, deleteTask, deleteTasks } = useFiscalTasks(filters);
 
   // Closed-period guard
   const { data: closedPeriods } = useClosedPeriodsMap();
@@ -985,6 +985,11 @@ export default function FiscalTasks() {
         profiles={companyProfiles}
         onUpdate={(id, data) => { if (!guardLocked(id)) updateTask.mutate({ id, ...data }); }}
         onDelete={id => { if (!guardLocked(id)) deleteTask.mutate(id); }}
+        onDeleteGroup={ids => {
+          const lockedId = ids.find(id => isTaskLocked(id));
+          if (lockedId) { guardLocked(lockedId); return; }
+          deleteTasks.mutate(ids);
+        }}
         groupTasks={selectedGroupTasks}
         onUploadForTask={handleUploadAttachment}
       />
