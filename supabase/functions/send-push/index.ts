@@ -65,8 +65,13 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
   // ── Autorização ───────────────────────────────────────────────
+  // Duas formas de reconhecer "sou o service role": decodificar um JWT legado
+  // com role=service_role (chaves antigas), ou comparar direto com o valor
+  // atual da service role key (chaves novas sb_secret_..., que não são JWT e
+  // não têm claim de role pra decodificar — comparação exata é o único jeito).
   const authHeader = req.headers.get("Authorization") ?? "";
-  const isService = decodeJwtRole(authHeader) === "service_role";
+  const bearerToken = authHeader.replace(/^Bearer\s+/i, "");
+  const isService = bearerToken === SERVICE_KEY || decodeJwtRole(authHeader) === "service_role";
 
   let isSuper = false;
   let callerCompany: string | null = null;

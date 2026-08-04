@@ -2804,6 +2804,7 @@ export type Database = {
           read_at: string | null
           reference_id: string | null
           reference_type: string | null
+          show_on_login_only: boolean
           task_id: string | null
           title: string
           type: string
@@ -2820,6 +2821,7 @@ export type Database = {
           read_at?: string | null
           reference_id?: string | null
           reference_type?: string | null
+          show_on_login_only?: boolean
           task_id?: string | null
           title: string
           type: string
@@ -2836,6 +2838,7 @@ export type Database = {
           read_at?: string | null
           reference_id?: string | null
           reference_type?: string | null
+          show_on_login_only?: boolean
           task_id?: string | null
           title?: string
           type?: string

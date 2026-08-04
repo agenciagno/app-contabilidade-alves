@@ -7,6 +7,11 @@
 // Canal popup: insere direto em `notifications` (mesma tabela que já alimenta o sino), uma
 // linha por usuário-alvo, com type='popup'.
 //
+// Push e popup são tentados de forma independente (canal 'both'): uma falha no push não
+// impede o popup de ser entregue, e vice-versa. Só marca a linha como 'failed' se TODOS os
+// canais pedidos falharem; se algum canal falhar mas outro funcionar, marca 'sent' com o
+// detalhe do canal que falhou em `error` (não é silencioso).
+//
 // Envio imediato (sem agendamento) não passa por aqui — a Central de Notificações despacha
 // direto (push via send-push, popup via insert direto), síncrono, como sempre foi.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -62,15 +67,19 @@ Deno.serve(async (req) => {
   let failed = 0;
 
   for (const row of due as ScheduledRow[]) {
-    try {
-      const target = {
-        type: row.target_type,
-        companyId: row.target_company_id ?? undefined,
-        userId: row.target_user_id ?? undefined,
-        userIds: row.target_user_ids ?? undefined,
-      };
+    const wantsPush = row.channel === "push" || row.channel === "both";
+    const wantsPopup = row.channel === "popup" || row.channel === "both";
+    let pushError: string | null = null;
+    let popupError: string | null = null;
 
-      if (row.channel === "push" || row.channel === "both") {
+    if (wantsPush) {
+      try {
+        const target = {
+          type: row.target_type,
+          companyId: row.target_company_id ?? undefined,
+          userId: row.target_user_id ?? undefined,
+          userIds: row.target_user_ids ?? undefined,
+        };
         const res = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
           method: "POST",
           headers: {
@@ -87,9 +96,13 @@ Deno.serve(async (req) => {
         if (!res.ok) {
           throw new Error(`send-push falhou (${res.status}): ${await res.text()}`);
         }
+      } catch (e) {
+        pushError = (e as Error)?.message ?? String(e);
       }
+    }
 
-      if (row.channel === "popup" || row.channel === "both") {
+    if (wantsPopup) {
+      try {
         let recipients: { user_id: string; company_id: string | null }[] = [];
 
         if (row.target_type === "user" && row.target_user_id) {
@@ -129,22 +142,35 @@ Deno.serve(async (req) => {
           const { error: insErr } = await admin.from("notifications").insert(rows);
           if (insErr) throw insErr;
         }
+      } catch (e) {
+        popupError = (e as Error)?.message ?? String(e);
       }
+    }
 
+    const failures = [
+      pushError ? `push: ${pushError}` : null,
+      popupError ? `popup: ${popupError}` : null,
+    ].filter(Boolean);
+    const attempted = [wantsPush, wantsPopup].filter(Boolean).length;
+
+    if (failures.length > 0 && failures.length === attempted) {
+      // todos os canais pedidos falharam
       await admin
         .from("scheduled_notifications")
-        .update({ status: "sent", sent_at: new Date().toISOString() })
+        .update({ status: "failed", error: failures.join(" | ") })
         .eq("id", row.id);
-      sent++;
-    } catch (e) {
+      failed++;
+    } else {
+      // sucesso total ou parcial — parcial fica registrado em `error` pra investigar depois
       await admin
         .from("scheduled_notifications")
         .update({
-          status: "failed",
-          error: (e as Error)?.message ?? String(e),
+          status: "sent",
+          sent_at: new Date().toISOString(),
+          error: failures.length > 0 ? failures.join(" | ") : null,
         })
         .eq("id", row.id);
-      failed++;
+      sent++;
     }
   }
 

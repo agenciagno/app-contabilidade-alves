@@ -20,7 +20,7 @@ import {
 
 type TargetType = 'all' | 'company' | 'user' | 'users';
 type Channel = 'push' | 'popup' | 'both';
-type ScheduleMode = 'now' | 'schedule';
+type ScheduleMode = 'now' | 'schedule' | 'next_login';
 
 interface CompanyRow { id: string; name: string; cnpj: string | null }
 interface ProfileRow { user_id: string; full_name: string | null; email: string | null }
@@ -336,11 +336,17 @@ export default function CentralNotificacoes() {
             body: finalBody,
             action_url: finalUrl,
             button_label: finalButtonLabel,
+            show_on_login_only: scheduleMode === 'next_login',
           }));
           const { error } = await supabase.from('notifications').insert(rows);
           if (error) throw error;
           popupCount = rows.length;
         }
+      }
+
+      if (scheduleMode === 'next_login' && !overrideTarget) {
+        toast.success(`Pronto — pop-up vai aparecer na próxima abertura/login de ${popupCount} usuário(s).`);
+        return;
       }
 
       const parts = [pushSummary, channel !== 'push' ? `pop-up: ${popupCount} usuário(s)` : ''].filter(Boolean);
@@ -580,8 +586,15 @@ export default function CentralNotificacoes() {
               <SelectContent>
                 <SelectItem value="now">Enviar agora</SelectItem>
                 <SelectItem value="schedule">Agendar para depois</SelectItem>
+                <SelectItem value="next_login">Na próxima abertura/login</SelectItem>
               </SelectContent>
             </Select>
+            {scheduleMode === 'next_login' && (
+              <p className="text-xs text-muted-foreground">
+                Vale só pro canal pop-up — não interrompe quem já está com o sistema aberto,
+                aparece só na próxima vez que a pessoa entrar. Push (se marcado) é enviado agora.
+              </p>
+            )}
           </div>
 
           {scheduleMode === 'schedule' && (
@@ -610,7 +623,7 @@ export default function CentralNotificacoes() {
           <div className="flex items-center gap-2 pt-2">
             <Button onClick={() => send()} disabled={sending} className="gap-1.5">
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              {scheduleMode === 'schedule' ? 'Agendar' : 'Enviar'}
+              {scheduleMode === 'schedule' ? 'Agendar' : scheduleMode === 'next_login' ? 'Programar' : 'Enviar'}
             </Button>
             <Button variant="outline" onClick={sendTestToMe} disabled={sending}>
               Enviar teste para mim

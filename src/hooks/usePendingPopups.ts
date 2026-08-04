@@ -9,6 +9,7 @@ export interface PopupNotification {
   body: string | null;
   action_url: string | null;
   button_label: string | null;
+  show_on_login_only: boolean;
   created_at: string;
 }
 
@@ -23,7 +24,7 @@ export function usePendingPopups() {
       if (!userId) return [];
       const { data, error } = await (supabase as any)
         .from('notifications')
-        .select('id, title, body, action_url, button_label, created_at')
+        .select('id, title, body, action_url, button_label, show_on_login_only, created_at')
         .eq('user_id', userId)
         .eq('type', 'popup')
         .is('read_at', null)
@@ -35,6 +36,9 @@ export function usePendingPopups() {
   });
 
   // Realtime: um pop-up agendado pode chegar enquanto o usuário já está com o app aberto.
+  // Exceção: pop-up marcado "só na próxima abertura/login" não deve interromper uma sessão
+  // já ativa — fica esperando e só aparece no próximo mount (fetch inicial acima já pega
+  // qualquer pop-up não lido, com ou sem essa flag).
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
@@ -42,7 +46,8 @@ export function usePendingPopups() {
       .on(
         'postgres_changes' as any,
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-        () => {
+        (payload: any) => {
+          if (payload?.new?.show_on_login_only) return;
           queryClient.invalidateQueries({ queryKey: ['popup-notifications', userId] });
         }
       )
