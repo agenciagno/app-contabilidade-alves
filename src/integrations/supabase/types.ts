@@ -2766,6 +2766,33 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_lists: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          updated_at: string
+          user_ids: string[]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_ids?: string[]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_ids?: string[]
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           action_url: string | null
@@ -3390,6 +3417,7 @@ export type Database = {
           target_company_id: string | null
           target_type: string
           target_user_id: string | null
+          target_user_ids: string[] | null
           title: string
         }
         Insert: {
@@ -3407,6 +3435,7 @@ export type Database = {
           target_company_id?: string | null
           target_type: string
           target_user_id?: string | null
+          target_user_ids?: string[] | null
           title: string
         }
         Update: {
@@ -3424,6 +3453,7 @@ export type Database = {
           target_company_id?: string | null
           target_type?: string
           target_user_id?: string | null
+          target_user_ids?: string[] | null
           title?: string
         }
         Relationships: [

@@ -13,16 +13,19 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 
-type TargetType = 'all' | 'company' | 'user';
+type TargetType = 'all' | 'company' | 'user' | 'users';
 type Channel = 'push' | 'popup' | 'both';
 type ScheduleMode = 'now' | 'schedule';
 
 interface CompanyRow { id: string; name: string; cnpj: string | null }
 interface ProfileRow { user_id: string; full_name: string | null; email: string | null }
+interface InternalUserRow extends ProfileRow { department: string | null }
+interface SavedListRow { id: string; name: string; user_ids: string[] }
 interface ScheduledRow {
   id: string;
   title: string;
@@ -31,6 +34,7 @@ interface ScheduledRow {
   target_type: TargetType;
   target_company_id: string | null;
   target_user_id: string | null;
+  target_user_ids: string[] | null;
   scheduled_at: string;
 }
 
@@ -40,9 +44,15 @@ const CHANNEL_LABEL: Record<Channel, string> = {
   both: 'Push + pop-up',
 };
 
-// Resolve os user_id/company_id alvo a partir do mesmo padrão all/company/user
+// Os 8 valores fixos de profiles.department (mesmo CHECK do banco).
+const DEPARTMENTS = [
+  'Departamento Contábil', 'Departamento Financeiro', 'Departamento de Legalização/Comercial',
+  'Departamento Pessoal', 'Departamento Fiscal', 'Diretoria', 'Departamento de Tecnologia', 'Suporte',
+];
+
+// Resolve os user_id/company_id alvo a partir do mesmo padrão all/company/user/users
 // usado pela send-push, pra fazer o fan-out do canal pop-up direto em `notifications`.
-async function resolvePopupRecipients(target: { type: TargetType; companyId?: string; userId?: string }) {
+async function resolvePopupRecipients(target: { type: TargetType; companyId?: string; userId?: string; userIds?: string[] }) {
   if (target.type === 'user') {
     if (!target.userId) return [];
     const { data, error } = await supabase
@@ -52,6 +62,15 @@ async function resolvePopupRecipients(target: { type: TargetType; companyId?: st
       .maybeSingle();
     if (error) throw error;
     return data ? [data] : [];
+  }
+  if (target.type === 'users') {
+    if (!target.userIds || target.userIds.length === 0) return [];
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('user_id, company_id')
+      .in('user_id', target.userIds);
+    if (error) throw error;
+    return data ?? [];
   }
   let q = supabase.from('profiles').select('user_id, company_id');
   if (target.type === 'company' && target.companyId) {
@@ -75,6 +94,9 @@ export default function CentralNotificacoes() {
   const [targetType, setTargetType] = useState<TargetType>('all');
   const [companyId, setCompanyId] = useState<string>('');
   const [userId, setUserId] = useState<string>('');
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [listName, setListName] = useState('');
+  const [selectedListId, setSelectedListId] = useState('');
   const [scheduleMode, setScheduleMode] = useState<ScheduleMode>('now');
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
@@ -115,6 +137,74 @@ export default function CentralNotificacoes() {
     },
   });
 
+  // Usuários internos da CA (para alvo = vários usuários / atalho por departamento).
+  const { data: internalUsers = [] } = useQuery({
+    queryKey: ['notify-internal-users', company?.id],
+    enabled: isSuperAdmin && targetType === 'users' && !!company?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email, department')
+        .eq('company_id', company!.id)
+        .order('full_name');
+      if (error) throw error;
+      return (data as InternalUserRow[]) ?? [];
+    },
+  });
+
+  // Listas de usuários salvas, reutilizáveis.
+  const { data: savedLists = [] } = useQuery({
+    queryKey: ['notify-saved-lists'],
+    enabled: isSuperAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('notification_lists')
+        .select('id, name, user_ids')
+        .order('name');
+      if (error) throw error;
+      return (data as SavedListRow[]) ?? [];
+    },
+  });
+
+  const saveListMutation = useMutation({
+    mutationFn: async () => {
+      if (!listName.trim()) throw new Error('Informe um nome pra lista.');
+      const { error } = await supabase
+        .from('notification_lists')
+        .upsert({ name: listName.trim(), user_ids: Array.from(selectedUserIds) }, { onConflict: 'name' });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Lista salva.');
+      queryClient.invalidateQueries({ queryKey: ['notify-saved-lists'] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Falha ao salvar lista.'),
+  });
+
+  const addDepartment = (dept: string) => {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      internalUsers.filter((u) => u.department === dept).forEach((u) => next.add(u.user_id));
+      return next;
+    });
+  };
+
+  const toggleUser = (id: string) => {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const loadList = (listId: string) => {
+    setSelectedListId(listId);
+    const list = savedLists.find((l) => l.id === listId);
+    if (!list) return;
+    setSelectedUserIds(new Set(list.user_ids));
+    setListName(list.name);
+  };
+
   // Agendamentos pendentes (ainda não disparados).
   const { data: pending = [] } = useQuery({
     queryKey: ['notify-pending-scheduled'],
@@ -122,7 +212,7 @@ export default function CentralNotificacoes() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('scheduled_notifications')
-        .select('id, title, body, channel, target_type, target_company_id, target_user_id, scheduled_at')
+        .select('id, title, body, channel, target_type, target_company_id, target_user_id, target_user_ids, scheduled_at')
         .eq('status', 'pending')
         .order('scheduled_at', { ascending: true });
       if (error) throw error;
@@ -173,6 +263,7 @@ export default function CentralNotificacoes() {
   const buildTarget = () => {
     if (targetType === 'all') return { type: 'all' as const };
     if (targetType === 'company') return { type: 'company' as const, companyId };
+    if (targetType === 'users') return { type: 'users' as const, userIds: Array.from(selectedUserIds) };
     return { type: 'user' as const, userId };
   };
 
@@ -182,6 +273,7 @@ export default function CentralNotificacoes() {
     if (!title.trim()) return 'Informe um título.';
     if (targetType === 'company' && !companyId) return 'Selecione uma empresa.';
     if (targetType === 'user' && !userId) return 'Selecione um usuário.';
+    if (targetType === 'users' && selectedUserIds.size === 0) return 'Selecione ao menos um usuário.';
     if (channel !== 'push' && buttonLabel.trim() && !url.trim()) return 'Informe o link do botão.';
     if (scheduleMode === 'schedule') {
       if (!scheduledAt) return 'Informe data e hora do agendamento.';
@@ -211,6 +303,7 @@ export default function CentralNotificacoes() {
           target_type: target.type,
           target_company_id: target.type === 'company' ? target.companyId : null,
           target_user_id: target.type === 'user' ? target.userId : null,
+          target_user_ids: target.type === 'users' ? target.userIds : null,
           scheduled_at: scheduledAt!.toISOString(),
         });
         if (error) throw error;
@@ -272,6 +365,9 @@ export default function CentralNotificacoes() {
     if (row.target_type === 'company') {
       const c = companies.find((c) => c.id === row.target_company_id);
       return c ? `Empresa: ${c.name}` : 'Empresa';
+    }
+    if (row.target_type === 'users') {
+      return `${row.target_user_ids?.length ?? 0} usuário(s)`;
     }
     const u = pendingUsers.find((u) => u.user_id === row.target_user_id);
     return u ? `Usuário: ${u.full_name || u.email}` : 'Usuário';
@@ -358,9 +454,94 @@ export default function CentralNotificacoes() {
                 <SelectItem value="all">Todos da carteira</SelectItem>
                 <SelectItem value="company">Uma empresa</SelectItem>
                 <SelectItem value="user">Um usuário</SelectItem>
+                <SelectItem value="users">Vários usuários</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {targetType === 'users' && (
+            <div className="space-y-3 rounded-md border border-border/50 p-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Atalho por departamento</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {DEPARTMENTS.map((d) => (
+                    <Button
+                      key={d}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => addDepartment(d)}
+                    >
+                      + {d.replace('Departamento de ', '').replace('Departamento ', '')}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="max-h-48 overflow-y-auto space-y-0.5 border-t border-border/40 pt-2">
+                {internalUsers.map((u) => (
+                  <label key={u.user_id} className="flex items-center gap-2 text-sm py-1 cursor-pointer">
+                    <Checkbox
+                      checked={selectedUserIds.has(u.user_id)}
+                      onCheckedChange={() => toggleUser(u.user_id)}
+                    />
+                    <span className="flex-1 truncate">{u.full_name || u.email}</span>
+                    {u.department && (
+                      <span className="text-[10px] text-muted-foreground shrink-0">
+                        {u.department.replace('Departamento de ', '').replace('Departamento ', '')}
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between border-t border-border/40 pt-2">
+                <span className="text-xs text-muted-foreground">{selectedUserIds.size} selecionado(s)</span>
+                {selectedUserIds.size > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => { setSelectedUserIds(new Set()); setSelectedListId(''); setListName(''); }}
+                  >
+                    Limpar
+                  </Button>
+                )}
+              </div>
+
+              {savedLists.length > 0 && (
+                <Select value={selectedListId} onValueChange={loadList}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Carregar lista salva" /></SelectTrigger>
+                  <SelectContent>
+                    {savedLists.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>{l.name} ({l.user_ids.length})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              <div className="flex items-center gap-2">
+                <Input
+                  value={listName}
+                  onChange={(e) => setListName(e.target.value)}
+                  placeholder="Nome da lista"
+                  className="h-8 text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs shrink-0"
+                  disabled={selectedUserIds.size === 0 || saveListMutation.isPending}
+                  onClick={() => saveListMutation.mutate()}
+                >
+                  Salvar lista
+                </Button>
+              </div>
+            </div>
+          )}
 
           {(targetType === 'company' || targetType === 'user') && (
             <div className="space-y-1.5">

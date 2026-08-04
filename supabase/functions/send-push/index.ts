@@ -22,9 +22,10 @@ const json = (body: unknown, status = 200) =>
   });
 
 interface Target {
-  type: "all" | "company" | "user";
+  type: "all" | "company" | "user" | "users";
   companyId?: string;
   userId?: string;
+  userIds?: string[];
 }
 interface Body {
   title: string;
@@ -118,6 +119,12 @@ Deno.serve(async (req) => {
       }
     }
     query = query.eq("user_id", target.userId);
+  } else if (target.type === "users") {
+    if (!target.userIds || target.userIds.length === 0) {
+      return json({ error: "missing_users" }, 400);
+    }
+    if (!isService && !isSuper) return json({ error: "forbidden" }, 403);
+    query = query.in("user_id", target.userIds);
   } else {
     return json({ error: "invalid_target" }, 400);
   }

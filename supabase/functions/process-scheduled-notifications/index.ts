@@ -32,9 +32,10 @@ interface ScheduledRow {
   action_url: string | null;
   button_label: string | null;
   channel: "push" | "popup" | "both";
-  target_type: "all" | "company" | "user";
+  target_type: "all" | "company" | "user" | "users";
   target_company_id: string | null;
   target_user_id: string | null;
+  target_user_ids: string[] | null;
 }
 
 Deno.serve(async (req) => {
@@ -47,7 +48,7 @@ Deno.serve(async (req) => {
   const { data: due, error: dueErr } = await admin
     .from("scheduled_notifications")
     .select(
-      "id, title, body, action_url, button_label, channel, target_type, target_company_id, target_user_id",
+      "id, title, body, action_url, button_label, channel, target_type, target_company_id, target_user_id, target_user_ids",
     )
     .eq("status", "pending")
     .lte("scheduled_at", new Date().toISOString())
@@ -66,6 +67,7 @@ Deno.serve(async (req) => {
         type: row.target_type,
         companyId: row.target_company_id ?? undefined,
         userId: row.target_user_id ?? undefined,
+        userIds: row.target_user_ids ?? undefined,
       };
 
       if (row.channel === "push" || row.channel === "both") {
@@ -97,6 +99,13 @@ Deno.serve(async (req) => {
             .eq("user_id", row.target_user_id)
             .maybeSingle();
           if (prof) recipients = [prof];
+        } else if (row.target_type === "users" && row.target_user_ids?.length) {
+          const { data: profs, error: profErr } = await admin
+            .from("profiles")
+            .select("user_id, company_id")
+            .in("user_id", row.target_user_ids);
+          if (profErr) throw profErr;
+          recipients = profs ?? [];
         } else {
           let q = admin.from("profiles").select("user_id, company_id");
           if (row.target_type === "company" && row.target_company_id) {
