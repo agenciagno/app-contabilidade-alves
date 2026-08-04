@@ -11,6 +11,7 @@ import { MobileBottomNav } from './MobileBottomNav';
 import { ForcePasswordChange } from '@/components/auth/ForcePasswordChange';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { NotificationPopupModal } from '@/components/notifications/NotificationPopupModal';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -132,7 +133,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <SidebarProvider>
-      
+      <NotificationPopupModal />
       {/*
         No desktop o shell tem altura fixa e quem rola é o conteúdo — é isso que
         faz o header `sticky` realmente fixar. Antes o `overflow-x-hidden` do

@@ -2770,6 +2770,7 @@ export type Database = {
         Row: {
           action_url: string | null
           body: string | null
+          button_label: string | null
           company_id: string | null
           created_at: string
           id: string
@@ -2785,6 +2786,7 @@ export type Database = {
         Insert: {
           action_url?: string | null
           body?: string | null
+          button_label?: string | null
           company_id?: string | null
           created_at?: string
           id?: string
@@ -2800,6 +2802,7 @@ export type Database = {
         Update: {
           action_url?: string | null
           body?: string | null
+          button_label?: string | null
           company_id?: string | null
           created_at?: string
           id?: string
@@ -3368,6 +3371,68 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_cofre_global"
             referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      scheduled_notifications: {
+        Row: {
+          action_url: string | null
+          body: string | null
+          button_label: string | null
+          channel: string
+          created_at: string
+          created_by: string
+          error: string | null
+          id: string
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          target_company_id: string | null
+          target_type: string
+          target_user_id: string | null
+          title: string
+        }
+        Insert: {
+          action_url?: string | null
+          body?: string | null
+          button_label?: string | null
+          channel?: string
+          created_at?: string
+          created_by?: string
+          error?: string | null
+          id?: string
+          scheduled_at: string
+          sent_at?: string | null
+          status?: string
+          target_company_id?: string | null
+          target_type: string
+          target_user_id?: string | null
+          title: string
+        }
+        Update: {
+          action_url?: string | null
+          body?: string | null
+          button_label?: string | null
+          channel?: string
+          created_at?: string
+          created_by?: string
+          error?: string | null
+          id?: string
+          scheduled_at?: string
+          sent_at?: string | null
+          status?: string
+          target_company_id?: string | null
+          target_type?: string
+          target_user_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_notifications_target_company_id_fkey"
+            columns: ["target_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
         ]
       }

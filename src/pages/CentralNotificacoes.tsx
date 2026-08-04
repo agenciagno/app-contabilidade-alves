@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Send, Loader2 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Send, Loader2, X, CalendarClock } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { PageHeader } from '@/components/ds';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,20 +18,66 @@ import {
 } from '@/components/ui/select';
 
 type TargetType = 'all' | 'company' | 'user';
+type Channel = 'push' | 'popup' | 'both';
+type ScheduleMode = 'now' | 'schedule';
 
 interface CompanyRow { id: string; name: string; cnpj: string | null }
 interface ProfileRow { user_id: string; full_name: string | null; email: string | null }
+interface ScheduledRow {
+  id: string;
+  title: string;
+  body: string | null;
+  channel: Channel;
+  target_type: TargetType;
+  target_company_id: string | null;
+  target_user_id: string | null;
+  scheduled_at: string;
+}
+
+const CHANNEL_LABEL: Record<Channel, string> = {
+  push: 'Push (notificação do dispositivo)',
+  popup: 'Pop-up (dentro do sistema)',
+  both: 'Push + pop-up',
+};
+
+// Resolve os user_id/company_id alvo a partir do mesmo padrão all/company/user
+// usado pela send-push, pra fazer o fan-out do canal pop-up direto em `notifications`.
+async function resolvePopupRecipients(target: { type: TargetType; companyId?: string; userId?: string }) {
+  if (target.type === 'user') {
+    if (!target.userId) return [];
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('user_id, company_id')
+      .eq('user_id', target.userId)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? [data] : [];
+  }
+  let q = supabase.from('profiles').select('user_id, company_id');
+  if (target.type === 'company' && target.companyId) {
+    q = q.eq('company_id', target.companyId);
+  }
+  const { data, error } = await q;
+  if (error) throw error;
+  return data ?? [];
+}
 
 export default function CentralNotificacoes() {
   const { isSuperAdmin, isLoading: roleLoading } = useUserRole();
   const { company } = useCompany();
+  const queryClient = useQueryClient();
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [url, setUrl] = useState('/');
+  const [buttonLabel, setButtonLabel] = useState('');
+  const [channel, setChannel] = useState<Channel>('push');
   const [targetType, setTargetType] = useState<TargetType>('all');
   const [companyId, setCompanyId] = useState<string>('');
   const [userId, setUserId] = useState<string>('');
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>('now');
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('');
   const [sending, setSending] = useState(false);
 
   // Empresas da carteira (clientes) + a própria CA, para o seletor.
@@ -37,7 +85,10 @@ export default function CentralNotificacoes() {
     queryKey: ['notify-client-companies'],
     enabled: isSuperAdmin,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('list_client_companies');
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name, cnpj')
+        .eq('is_internal', false);
       if (error) throw error;
       return (data as CompanyRow[]) ?? [];
     },
@@ -64,6 +115,53 @@ export default function CentralNotificacoes() {
     },
   });
 
+  // Agendamentos pendentes (ainda não disparados).
+  const { data: pending = [] } = useQuery({
+    queryKey: ['notify-pending-scheduled'],
+    enabled: isSuperAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('scheduled_notifications')
+        .select('id, title, body, channel, target_type, target_company_id, target_user_id, scheduled_at')
+        .eq('status', 'pending')
+        .order('scheduled_at', { ascending: true });
+      if (error) throw error;
+      return (data as ScheduledRow[]) ?? [];
+    },
+  });
+
+  const pendingUserIds = useMemo(
+    () => Array.from(new Set(pending.filter((p) => p.target_type === 'user' && p.target_user_id).map((p) => p.target_user_id as string))),
+    [pending]
+  );
+  const { data: pendingUsers = [] } = useQuery({
+    queryKey: ['notify-pending-user-names', pendingUserIds],
+    enabled: pendingUserIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email')
+        .in('user_id', pendingUserIds);
+      if (error) throw error;
+      return (data as ProfileRow[]) ?? [];
+    },
+  });
+
+  const cancelScheduled = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('scheduled_notifications')
+        .update({ status: 'cancelled' })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notify-pending-scheduled'] });
+      toast.success('Agendamento cancelado.');
+    },
+    onError: (e: any) => toast.error(`Falha ao cancelar: ${e?.message ?? 'erro desconhecido'}`),
+  });
+
   if (!roleLoading && !isSuperAdmin) {
     return (
       <div className="p-6">
@@ -78,10 +176,17 @@ export default function CentralNotificacoes() {
     return { type: 'user' as const, userId };
   };
 
+  const scheduledAt = scheduleDate && scheduleTime ? new Date(`${scheduleDate}T${scheduleTime}:00`) : null;
+
   const validate = () => {
     if (!title.trim()) return 'Informe um título.';
     if (targetType === 'company' && !companyId) return 'Selecione uma empresa.';
     if (targetType === 'user' && !userId) return 'Selecione um usuário.';
+    if (channel !== 'push' && buttonLabel.trim() && !url.trim()) return 'Informe o link do botão.';
+    if (scheduleMode === 'schedule') {
+      if (!scheduledAt) return 'Informe data e hora do agendamento.';
+      if (scheduledAt.getTime() <= Date.now()) return 'Escolha uma data/hora futura.';
+    }
     return null;
   };
 
@@ -90,21 +195,63 @@ export default function CentralNotificacoes() {
     if (err) { toast.error(err); return; }
     setSending(true);
     try {
-      const { data, error } = await supabase.functions.invoke('send-push', {
-        body: {
-          title: title.trim() || 'Contabilidade Alves',
-          body: body.trim(),
-          url: url.trim() || '/',
-          target: overrideTarget ?? buildTarget(),
-        },
-      });
-      if (error) throw error;
-      const r = data as { sent?: number; failed?: number; cleaned?: number; note?: string };
-      if (r?.note === 'no_tokens' || (r?.sent ?? 0) === 0) {
-        toast.warning('Nenhum dispositivo com notificações ativas para esse destinatário.');
-      } else {
-        toast.success(`Enviado: ${r.sent} dispositivo(s)${r.failed ? `, ${r.failed} falha(s)` : ''}.`);
+      const target = overrideTarget ?? buildTarget();
+      const finalTitle = title.trim() || 'Contabilidade Alves';
+      const finalBody = body.trim();
+      const finalUrl = url.trim() || '/';
+      const finalButtonLabel = channel !== 'push' ? (buttonLabel.trim() || null) : null;
+
+      if (scheduleMode === 'schedule' && !overrideTarget) {
+        const { error } = await supabase.from('scheduled_notifications').insert({
+          title: finalTitle,
+          body: finalBody,
+          action_url: finalUrl,
+          button_label: finalButtonLabel,
+          channel,
+          target_type: target.type,
+          target_company_id: target.type === 'company' ? target.companyId : null,
+          target_user_id: target.type === 'user' ? target.userId : null,
+          scheduled_at: scheduledAt!.toISOString(),
+        });
+        if (error) throw error;
+        toast.success(`Agendado para ${format(scheduledAt!, "dd/MM 'às' HH:mm", { locale: ptBR })}.`);
+        queryClient.invalidateQueries({ queryKey: ['notify-pending-scheduled'] });
+        return;
       }
+
+      let pushSummary = '';
+      if (channel === 'push' || channel === 'both') {
+        const { data, error } = await supabase.functions.invoke('send-push', {
+          body: { title: finalTitle, body: finalBody, url: finalUrl, target },
+        });
+        if (error) throw error;
+        const r = data as { sent?: number; failed?: number; note?: string };
+        pushSummary = r?.note === 'no_tokens' || (r?.sent ?? 0) === 0
+          ? 'push: nenhum dispositivo ativo'
+          : `push: ${r.sent} dispositivo(s)${r.failed ? `, ${r.failed} falha(s)` : ''}`;
+      }
+
+      let popupCount = 0;
+      if (channel === 'popup' || channel === 'both') {
+        const recipients = await resolvePopupRecipients(target);
+        if (recipients.length > 0) {
+          const rows = recipients.map((r) => ({
+            user_id: r.user_id,
+            company_id: r.company_id,
+            type: 'popup',
+            title: finalTitle,
+            body: finalBody,
+            action_url: finalUrl,
+            button_label: finalButtonLabel,
+          }));
+          const { error } = await supabase.from('notifications').insert(rows);
+          if (error) throw error;
+          popupCount = rows.length;
+        }
+      }
+
+      const parts = [pushSummary, channel !== 'push' ? `pop-up: ${popupCount} usuário(s)` : ''].filter(Boolean);
+      toast.success(`Enviado — ${parts.join(' · ')}`);
     } catch (e: any) {
       toast.error(`Falha ao enviar: ${e?.message ?? 'erro desconhecido'}`);
     } finally {
@@ -120,18 +267,28 @@ export default function CentralNotificacoes() {
     await send({ type: 'user', userId: uid });
   };
 
+  const targetLabel = (row: ScheduledRow) => {
+    if (row.target_type === 'all') return 'Todos da carteira';
+    if (row.target_type === 'company') {
+      const c = companies.find((c) => c.id === row.target_company_id);
+      return c ? `Empresa: ${c.name}` : 'Empresa';
+    }
+    const u = pendingUsers.find((u) => u.user_id === row.target_user_id);
+    return u ? `Usuário: ${u.full_name || u.email}` : 'Usuário';
+  };
+
   return (
     <div className="max-w-2xl space-y-6">
       <PageHeader
         kicker="~/tech · notificações"
         title="Central de notificações."
-        subtitle="Envie uma notificação push para quem instalou o app e ativou notificações."
+        subtitle="Envie push, pop-up in-app, ou os dois — agora ou agendado."
       />
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Nova notificação</CardTitle>
-          <CardDescription>Título e mensagem aparecem na notificação do dispositivo.</CardDescription>
+          <CardDescription>Título e mensagem aparecem no push e/ou no pop-up, conforme o canal.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
@@ -158,13 +315,39 @@ export default function CentralNotificacoes() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="notify-url">Abrir ao tocar (rota)</Label>
-            <Input
-              id="notify-url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="/"
-            />
+            <Label>Canal</Label>
+            <Select value={channel} onValueChange={(v) => setChannel(v as Channel)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(CHANNEL_LABEL) as Channel[]).map((c) => (
+                  <SelectItem key={c} value={c}>{CHANNEL_LABEL[c]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="notify-url">Link (opcional)</Label>
+              <Input
+                id="notify-url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="/"
+              />
+            </div>
+            {channel !== 'push' && (
+              <div className="space-y-1.5">
+                <Label htmlFor="notify-button-label">Texto do botão (pop-up)</Label>
+                <Input
+                  id="notify-button-label"
+                  value={buttonLabel}
+                  maxLength={40}
+                  onChange={(e) => setButtonLabel(e.target.value)}
+                  placeholder="Ex.: Ver boleto"
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -209,10 +392,44 @@ export default function CentralNotificacoes() {
             </div>
           )}
 
+          <div className="space-y-1.5">
+            <Label>Quando</Label>
+            <Select value={scheduleMode} onValueChange={(v) => setScheduleMode(v as ScheduleMode)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="now">Enviar agora</SelectItem>
+                <SelectItem value="schedule">Agendar para depois</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {scheduleMode === 'schedule' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="notify-date">Data</Label>
+                <Input
+                  id="notify-date"
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="notify-time">Hora</Label>
+                <Input
+                  id="notify-time"
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-2 pt-2">
             <Button onClick={() => send()} disabled={sending} className="gap-1.5">
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Enviar
+              {scheduleMode === 'schedule' ? 'Agendar' : 'Enviar'}
             </Button>
             <Button variant="outline" onClick={sendTestToMe} disabled={sending}>
               Enviar teste para mim
@@ -220,6 +437,42 @@ export default function CentralNotificacoes() {
           </div>
         </CardContent>
       </Card>
+
+      {pending.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-1.5">
+              <CalendarClock className="w-4 h-4" />
+              Agendados
+            </CardTitle>
+            <CardDescription>Ainda não disparados — dá pra cancelar até a hora marcada.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pending.map((row) => (
+              <div key={row.id} className="flex items-start justify-between gap-3 border border-border/50 rounded-md px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{row.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {format(new Date(row.scheduled_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    {' · '}{CHANNEL_LABEL[row.channel]}
+                    {' · '}{targetLabel(row)}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => {
+                    if (window.confirm('Cancelar este agendamento?')) cancelScheduled.mutate(row.id);
+                  }}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
