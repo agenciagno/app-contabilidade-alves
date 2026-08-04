@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, User, Mail, ShieldCheck, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { PUBLIC_APP_URL } from '@/lib/environment';
 import { toast } from 'sonner';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { z } from 'zod';
@@ -133,7 +134,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
     setSendingResetEmail(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(editUser.email, {
-        redirectTo: `${window.location.origin}/redefinir-senha`,
+        redirectTo: `${PUBLIC_APP_URL}/redefinir-senha`,
       });
       if (error) throw error;
       toast.success('E-mail de redefinição enviado');

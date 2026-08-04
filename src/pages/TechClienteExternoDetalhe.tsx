@@ -36,6 +36,7 @@ import {
   invoiceState, type TenantUserRow, type TenantInvoiceRow,
 } from '@/hooks/useTenants';
 import { formatDoc, brl, dateBR, competenciaBR, BILLING_CYCLE_LABEL } from '@/lib/tenant-format';
+import { PUBLIC_APP_URL } from '@/lib/environment';
 
 /** Sempre habilitados: sem eles o cliente não consegue nem entrar nem se configurar. */
 const MODULOS_FIXOS = ['home', 'configuracoes'];
@@ -557,7 +558,7 @@ function AbaUsuarios({
     setAcao(`email-${u.user_id}`);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(u.email, {
-        redirectTo: window.location.origin + '/redefinir-senha',
+        redirectTo: PUBLIC_APP_URL + '/redefinir-senha',
       });
       if (error) throw error;
       toast.success('E-mail de redefinição disparado. Se o cliente não receber, use Reemitir senha.');

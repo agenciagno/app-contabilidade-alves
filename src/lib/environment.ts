@@ -17,3 +17,10 @@ export function isDevEnvironment(): boolean {
     host === '127.0.0.1'
   );
 }
+
+/**
+ * URL pública fixa de produção. Links de e-mail (redefinição de senha, convites) sempre
+ * apontam pra cá, nunca pra `window.location.origin` — quem dispara a ação pode estar
+ * num ambiente de dev/preview, mas quem recebe o e-mail só consegue abrir o domínio real.
+ */
+export const PUBLIC_APP_URL = 'https://app.contabilidadealves.com.br';

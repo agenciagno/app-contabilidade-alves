@@ -14,6 +14,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
 import CompanyDataCard from '@/components/settings/CompanyDataCard';
 import { maskCpf, maskPhone, unmaskPhone } from '@/lib/utils';
+import { PUBLIC_APP_URL } from '@/lib/environment';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -157,7 +158,7 @@ export default function MinhaConta() {
     setSendingReset(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-        redirectTo: `${window.location.origin}/redefinir-senha`,
+        redirectTo: `${PUBLIC_APP_URL}/redefinir-senha`,
       });
       if (error) throw error;
       toast.success('Link enviado! Confira seu e-mail para definir a nova senha.');

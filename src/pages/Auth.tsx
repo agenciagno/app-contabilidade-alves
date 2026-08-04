@@ -10,6 +10,7 @@ import { Loader2, User, Lock, Eye, EyeOff, ShieldX, Shield } from 'lucide-react'
 import { PendingApprovalScreen } from '@/components/auth/PendingApprovalScreen';
 import { Logo } from '@/components/brand/Logo';
 import { supabase } from '@/integrations/supabase/client';
+import { PUBLIC_APP_URL } from '@/lib/environment';
 import { z } from 'zod';
 
 const loginSchema = z.object({
@@ -101,7 +102,7 @@ export default function Auth() {
     }
     setSendingReset(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/redefinir-senha`,
+      redirectTo: `${PUBLIC_APP_URL}/redefinir-senha`,
     });
     setSendingReset(false);
     if (error) {
