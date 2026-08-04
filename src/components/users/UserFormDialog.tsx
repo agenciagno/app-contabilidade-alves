@@ -182,9 +182,20 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
       if (isEditMode) {
         const resolvedModules = showModulePicker ? allowedModules : ALL_MODULE_KEYS;
 
+        const emailChanged = email !== editUser!.email;
         const { data: updateData, error: updateError } = await supabase.functions.invoke(
           'admin-update-user',
-          { body: { userId: editUser!.userId, fullName, role, statusActive, allowedModules: resolvedModules, department: department || null } }
+          {
+            body: {
+              userId: editUser!.userId,
+              fullName,
+              email: emailChanged ? email : undefined,
+              role,
+              statusActive,
+              allowedModules: resolvedModules,
+              department: department || null,
+            },
+          }
         );
         if (updateError) throw new Error(updateError.message || 'Erro ao atualizar usuário');
         if (updateData?.error) throw new Error(updateData.error);
@@ -286,7 +297,6 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
                 className="pl-10"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                disabled={isEditMode}
               />
             </div>
             {errors.email && <p className="text-destructive text-sm">{errors.email}</p>}
