@@ -30,6 +30,21 @@ const formSchema = z.object({
   email: z.string().email('Email inválido'),
 });
 
+// supabase.functions.invoke() só expõe "Edge Function returned a non-2xx status code" em
+// error.message — a mensagem real que a function devolveu no corpo JSON fica em error.context
+// (o Response bruto). Sem isso, todo erro de edge function vira essa mensagem genérica e inútil.
+async function extractFunctionError(error: any, fallback: string): Promise<string> {
+  if (error?.context && typeof error.context.json === 'function') {
+    try {
+      const body = await error.context.json();
+      if (body?.error) return body.error;
+    } catch {
+      // corpo não era JSON — segue pro fallback
+    }
+  }
+  return error?.message || fallback;
+}
+
 export interface EditUserData {
   userId: string;
   fullName: string;
@@ -197,7 +212,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
             },
           }
         );
-        if (updateError) throw new Error(updateError.message || 'Erro ao atualizar usuário');
+        if (updateError) throw new Error(await extractFunctionError(updateError, 'Erro ao atualizar usuário'));
         if (updateData?.error) throw new Error(updateData.error);
 
         // Atualizar senha (opcional)
@@ -210,7 +225,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
           const { data: pwData, error: pwErr } = await supabase.functions.invoke('admin-update-user-password', {
             body: { userId: editUser!.userId, newPassword },
           });
-          if (pwErr) throw new Error(pwErr.message || 'Erro ao atualizar senha');
+          if (pwErr) throw new Error(await extractFunctionError(pwErr, 'Erro ao atualizar senha'));
           if (pwData?.error) throw new Error(pwData.error);
           toast.success('Senha atualizada com sucesso!');
         }
@@ -239,7 +254,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
             department: department || null,
           },
         });
-        if (fnError) throw new Error(fnError.message || 'Erro ao criar usuário');
+        if (fnError) throw new Error(await extractFunctionError(fnError, 'Erro ao criar usuário'));
         if (data?.error) throw new Error(data.error);
 
         addNotification({
