@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,6 @@ const isArchivedContact = (c: Contact) => ARCHIVED_STATUSES.includes(((c as any)
 
 export default function Contacts() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { toast } = useToast();
   const { isSuperAdmin, isAdmin } = useUserRole();
   const { contacts, isLoading, createContact, updateContact, deleteContact } = useContacts();
@@ -52,7 +51,7 @@ export default function Contacts() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | undefined>();
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterFinancialStatus, setFilterFinancialStatus] = useState('all');
+  const [filterStatusCliente, setFilterStatusCliente] = useState('all');
   const [filterCategoria, setFilterCategoria] = useState('all');
   const [filterRegime, setFilterRegime] = useState('all');
   const [filterResponsible, setFilterResponsible] = useState('all');
@@ -63,13 +62,6 @@ export default function Contacts() {
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const canBulkAction = isSuperAdmin || isAdmin;
-
-  useEffect(() => {
-    if (location.state?.filterStatus === 'inadimplente') {
-      setFilterFinancialStatus('inadimplente');
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state]);
 
   const getFinancialStatus = (contactId: string) => {
     const today = new Date().toISOString().split('T')[0];
@@ -101,10 +93,9 @@ export default function Contacts() {
         (c.razao_social || '').toLowerCase().includes(q) ||
         (c.nome_fantasia || '').toLowerCase().includes(q) ||
         (c.document || '').toLowerCase().includes(q);
-      let matchesFinancialStatus = true;
-      if (filterFinancialStatus !== 'all') {
-        const { isInadimplente } = getFinancialStatus(c.id);
-        matchesFinancialStatus = filterFinancialStatus === 'inadimplente' ? isInadimplente : !isInadimplente;
+      let matchesStatusCliente = true;
+      if (filterStatusCliente !== 'all') {
+        matchesStatusCliente = (c.status_cliente || '') === filterStatusCliente;
       }
       let matchesCategoria = true;
       if (filterCategoria !== 'all') {
@@ -129,9 +120,9 @@ export default function Contacts() {
         matchesResponsible = filterResponsible === 'none' ? !rid : rid === filterResponsible;
       }
 
-      return matchesSearch && matchesFinancialStatus && matchesCategoria && matchesRegime && matchesResponsible && !isArchivedContact(c);
-    });
-  }, [contacts, searchTerm, filterFinancialStatus, filterCategoria, filterRegime, filterResponsible, transactions]);
+      return matchesSearch && matchesStatusCliente && matchesCategoria && matchesRegime && matchesResponsible && !isArchivedContact(c);
+    }).sort((a, b) => getContactDisplayName(a).localeCompare(getContactDisplayName(b), 'pt-BR', { sensitivity: 'base' }));
+  }, [contacts, searchTerm, filterStatusCliente, filterCategoria, filterRegime, filterResponsible, transactions]);
 
   const archivedContacts = useMemo(() => {
     const q = searchTerm.toLowerCase();
@@ -145,16 +136,16 @@ export default function Contacts() {
         (c.nome_fantasia || '').toLowerCase().includes(q) ||
         (c.document || '').toLowerCase().includes(q)
       );
-    });
+    }).sort((a, b) => getContactDisplayName(a).localeCompare(getContactDisplayName(b), 'pt-BR', { sensitivity: 'base' }));
   }, [contacts, searchTerm]);
 
   const activeContacts = filteredContacts.filter(c => c.is_active);
   const inactiveContacts = filteredContacts.filter(c => !c.is_active);
-  const hasActiveFilters = searchTerm || filterFinancialStatus !== 'all' || filterCategoria !== 'all' || filterRegime !== 'all' || filterResponsible !== 'all';
+  const hasActiveFilters = searchTerm || filterStatusCliente !== 'all' || filterCategoria !== 'all' || filterRegime !== 'all' || filterResponsible !== 'all';
 
   const clearFilters = () => {
     setSearchTerm('');
-    setFilterFinancialStatus('all');
+    setFilterStatusCliente('all');
     setFilterCategoria('all');
     setFilterRegime('all');
     setFilterResponsible('all');
@@ -240,7 +231,6 @@ export default function Contacts() {
   };
 
   const ContactCard = ({ contact }: { contact: Contact }) => {
-    const { titulosVencidos } = getFinancialStatus(contact.id);
     const responsavel = fiscalProfiles.find(p => p.id === contact.responsible_id)?.full_name;
     return (
       <EmpresaCard
@@ -250,7 +240,7 @@ export default function Contacts() {
         regime={contact.tax_regime ? TAX_REGIME_LABELS[contact.tax_regime] ?? contact.tax_regime : null}
         porte={contact.porte}
         responsavel={responsavel}
-        titulosVencidos={titulosVencidos}
+        status={contact.status_cliente}
         inativo={!contact.is_active}
         onAbrir={() => goToProfile(contact)}
         onNomeClick={(e) => {
@@ -398,14 +388,15 @@ export default function Contacts() {
                   className="pl-9 h-9 bg-card border-border"
                 />
               </div>
-              <Select value={filterFinancialStatus} onValueChange={setFilterFinancialStatus}>
+              <Select value={filterStatusCliente} onValueChange={setFilterStatusCliente}>
                 <SelectTrigger className="w-[140px] h-9 bg-card border-border">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="adimplente">Adimplentes</SelectItem>
-                  <SelectItem value="inadimplente">Inadimplentes</SelectItem>
+                  <SelectItem value="Ativo">Ativo</SelectItem>
+                  <SelectItem value="Suspenso">Suspenso</SelectItem>
+                  <SelectItem value="Inativo">Inativa</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={filterCategoria} onValueChange={setFilterCategoria}>

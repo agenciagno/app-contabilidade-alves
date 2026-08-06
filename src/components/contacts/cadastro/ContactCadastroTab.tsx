@@ -32,7 +32,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ContactBillingCard } from '../ContactBillingCard';
 import { ContactObligationsSelector } from '@/components/fiscal/ContactObligationsSelector';
 import { useCompany } from '@/hooks/useCompany';
-import { maskPhone, maskCPFCNPJ, getDocumentType } from '@/lib/utils';
+import { maskPhone, maskCPF, maskCPFCNPJ, getDocumentType } from '@/lib/utils';
 import { toast } from 'sonner';
 import { TAX_REGIMES } from '@/constants/taxRegimes';
 import { PORTE_OPTIONS } from '@/constants/porte';
@@ -881,7 +881,9 @@ function SociosSection({ contactId }: { contactId: string }) {
                     {p.ativo === false && <Badge variant="outline" className="text-xs">Inativo</Badge>}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {p.cpf || '—'} · {p.participation_percentage || 0}%
+                    {p.cpf ? maskCPF(p.cpf) : '—'}
+                    {p.whatsapp && ` · ${maskPhone(p.whatsapp)}`}
+                    {' · '}{p.participation_percentage || 0}%
                     {p.data_entrada && ` · Entrada: ${p.data_entrada}`}
                     {p.data_saida && ` · Saída: ${p.data_saida}`}
                   </p>
@@ -961,10 +963,10 @@ function PartnerDialogV2({
         </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
           <Field label="Nome *"><Input value={f.name || ''} onChange={e => setF({ ...f, name: e.target.value })} /></Field>
-          <Field label="CPF"><Input value={f.cpf || ''} onChange={e => setF({ ...f, cpf: e.target.value })} /></Field>
+          <Field label="CPF"><Input value={f.cpf || ''} onChange={e => setF({ ...f, cpf: maskCPF(e.target.value) })} /></Field>
           <Field label="RG"><Input value={f.rg || ''} onChange={e => setF({ ...f, rg: e.target.value })} /></Field>
           <Field label="E-mail"><Input type="email" value={f.email || ''} onChange={e => setF({ ...f, email: e.target.value })} /></Field>
-          <Field label="WhatsApp"><Input value={f.whatsapp || ''} onChange={e => setF({ ...f, whatsapp: e.target.value })} /></Field>
+          <Field label="WhatsApp"><Input value={f.whatsapp || ''} onChange={e => setF({ ...f, whatsapp: maskPhone(e.target.value) })} /></Field>
           <Field label="Participação (%)">
             <Input type="number" step="0.01" value={f.participation_percentage ?? 0}
               onChange={e => setF({ ...f, participation_percentage: e.target.value })} />
