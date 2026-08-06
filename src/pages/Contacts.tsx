@@ -66,23 +66,9 @@ export default function Contacts() {
   const getFinancialStatus = (contactId: string) => {
     const today = new Date().toISOString().split('T')[0];
     const contactTransactions = transactions.filter(t => t.contact_id === contactId);
-    // O card mostra "3 títulos vencidos", não só devendo/em dia — mesma regra de
-    // antes (não pago e vencido), só que contada em vez de reduzida a booleano.
     const vencidos = contactTransactions.filter(t => !t.is_paid && t.due_date && t.due_date < today).length;
-    return { isInadimplente: vencidos > 0, titulosVencidos: vencidos };
+    return { isInadimplente: vencidos > 0 };
   };
-
-  const summaryStats = useMemo(() => {
-    const total = contacts.length;
-    let adimplentes = 0;
-    let inadimplentes = 0;
-    contacts.forEach(contact => {
-      const { isInadimplente } = getFinancialStatus(contact.id);
-      if (isInadimplente) inadimplentes++;
-      else adimplentes++;
-    });
-    return { total, adimplentes, inadimplentes };
-  }, [contacts, transactions]);
 
   const filteredContacts = useMemo(() => {
     return contacts.filter(c => {
@@ -331,7 +317,6 @@ export default function Contacts() {
       <PageHeader
         kicker="~/cadastros"
         title="Empresas."
-        subtitle={`${summaryStats.total} contatos · ${summaryStats.adimplentes} adimplentes · ${summaryStats.inadimplentes} com título vencido.`}
       />
 
       <Tabs defaultValue="clientes" className="space-y-4">
@@ -448,12 +433,10 @@ export default function Contacts() {
               )}
             </div>
 
-            {/* Linha de contadores do protótipo: rótulo + número + o que ele conta */}
+            {/* Total muda com os filtros aplicados — reflete filteredContacts, não o total bruto */}
             <div className="flex flex-wrap items-center gap-4">
               <span className="text-kicker uppercase text-muted-ink-2">Ativos</span>
-              <Contador tom="bg-muted-ink-2" valor={summaryStats.total} label="total" />
-              <Contador tom="bg-ok" valor={summaryStats.adimplentes} label="adimplentes" />
-              <Contador tom="bg-danger" valor={summaryStats.inadimplentes} label="inadimplentes" />
+              <Contador tom="bg-muted-ink-2" valor={filteredContacts.length} label="total" />
             </div>
 
             {/* Card View */}
