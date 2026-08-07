@@ -15,6 +15,7 @@ export interface FiscalTaskRow {
   created_at: string | null;
   responsible_id: string | null;
   contact_id: string | null;
+  department: string | null;
   contacts?: { tax_regime: string | null; name?: string | null } | null;
   fiscal_obligations_catalog?: { name: string | null } | null;
 }
@@ -41,6 +42,7 @@ export interface Task48hRow {
   status: string;
   fiscal_due_date: string | null;
   responsible_id: string | null;
+  department: string | null;
   contacts: { name: string | null; tax_regime: string | null } | null;
   responsible: { full_name: string | null } | null;
   fiscal_obligations_catalog: { name: string | null } | null;
@@ -87,7 +89,7 @@ export function useFiscalTasksOfMonth(year: number, month: number) {
     queryFn: async () => {
       let q = (supabase as any)
         .from('fiscal_tasks')
-        .select('id, status, title, due_date, fiscal_due_date, completed_at, created_at, responsible_id, contact_id, contacts(tax_regime, name), fiscal_obligations_catalog(name)')
+        .select('id, status, title, due_date, fiscal_due_date, completed_at, created_at, responsible_id, contact_id, department, contacts(tax_regime, name), fiscal_obligations_catalog(name)')
         .eq('company_id', companyId)
         .eq('competence_year', year)
         .eq('competence_month', month);
@@ -121,7 +123,7 @@ export function useFiscalUpcomingTasksRange(startDate: string, endDate: string) 
       let q = (supabase as any)
         .from('fiscal_tasks')
         .select(
-          'id, title, status, fiscal_due_date, responsible_id, contacts(name, tax_regime), responsible:profiles!fiscal_tasks_responsible_id_fkey(full_name), fiscal_obligations_catalog(name)'
+          'id, title, status, fiscal_due_date, responsible_id, department, contacts(name, tax_regime), responsible:profiles!fiscal_tasks_responsible_id_fkey(full_name), fiscal_obligations_catalog(name)'
         )
         .eq('company_id', companyId)
         .neq('status', 'concluido')

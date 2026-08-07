@@ -2106,6 +2106,7 @@ export type Database = {
           code: string | null
           company_id: string | null
           created_at: string
+          department: string
           description: string | null
           due_rule: string
           frequency: string
@@ -2130,6 +2131,7 @@ export type Database = {
           code?: string | null
           company_id?: string | null
           created_at?: string
+          department?: string
           description?: string | null
           due_rule: string
           frequency: string
@@ -2154,6 +2156,7 @@ export type Database = {
           code?: string | null
           company_id?: string | null
           created_at?: string
+          department?: string
           description?: string | null
           due_rule?: string
           frequency?: string
@@ -2242,6 +2245,7 @@ export type Database = {
           contact_id: string | null
           created_at: string
           delivery_date: string | null
+          department: string | null
           description: string | null
           due_date: string
           fiscal_due_date: string | null
@@ -2269,6 +2273,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           delivery_date?: string | null
+          department?: string | null
           description?: string | null
           due_date: string
           fiscal_due_date?: string | null
@@ -2296,6 +2301,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           delivery_date?: string | null
+          department?: string | null
           description?: string | null
           due_date?: string
           fiscal_due_date?: string | null

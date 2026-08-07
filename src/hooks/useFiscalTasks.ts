@@ -14,6 +14,7 @@ export interface FiscalTask {
   contact_id: string | null;
   responsible_id: string | null;
   group_key: string | null;
+  department: string | null;
   title: string;
   description: string | null;
   status: 'a_fazer' | 'aguardando_cliente' | 'em_progresso' | 'concluido';

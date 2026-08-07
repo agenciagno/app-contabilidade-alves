@@ -24,6 +24,7 @@ import { GroupedTaskCard } from './GroupedTaskCard';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveCoverageByContact } from '@/hooks/useTemporaryTransfers';
 import { fiscalTaskContactLabel, isFiscalTaskDone } from '@/lib/fiscal-filters';
+import { obligationDepartmentLabel } from '@/constants/obligationDepartments';
 
 const COLUMNS = [
   { id: 'a_fazer', label: 'A fazer', color: 'bg-state-todo' },
@@ -71,6 +72,7 @@ interface GroupItem {
   id: string; // group-<contactId>-<dueDate>
   dueDate: string;
   contactId: string | null;
+  department: string | null;
   tasks: FiscalTask[];
   displayStatus: string;
 }
@@ -176,6 +178,7 @@ function SortableGroup({ item, contactsMap, profilesMap, onUploadAttachment, onC
       <GroupedTaskCard
         groupId={item.id}
         contactName={fiscalTaskContactLabel(item.contactId, contactsMap, item.tasks[0]?.title)}
+        departmentLabel={obligationDepartmentLabel(item.department)}
         dueDate={item.dueDate}
         tasks={item.tasks}
         responsibleInitials={profile.initials}
@@ -209,14 +212,17 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
     try { return differenceInDays(parseISO(effDate(t)), today) < 0; } catch { return false; }
   };
 
-  // Build items: 1 card per contact within the current period (competence)
+  // Build items: 1 card por cliente+setor dentro do período (competence) — uma
+  // empresa com tarefas de Fiscal e de Pessoal vira 2 cards separados, cada um
+  // com o responsável do setor certo. Tarefas sem cliente (contact_id nulo) só se
+  // agrupam entre si quando compartilham group_key (checklist do modal de Nova
+  // Tarefa); sem isso, cada uma vira seu próprio card, com chave única por tarefa.
   const itemsByStatus = useMemo(() => {
-    // Tarefas sem cliente (contact_id nulo) só se agrupam entre si quando compartilham
-    // group_key (checklist criado junto no modal de Nova Tarefa); sem isso, cada uma
-    // vira seu próprio card, com chave única por tarefa.
     const groupsMap = new Map<string, FiscalTask[]>();
     for (const t of tasks) {
-      const key = t.contact_id ?? t.group_key ?? `__sem_cliente_${t.id}`;
+      const key = t.contact_id
+        ? `${t.contact_id}::${t.department ?? ''}`
+        : (t.group_key ?? `__sem_cliente_${t.id}`);
       const arr = groupsMap.get(key) ?? [];
       arr.push(t);
       groupsMap.set(key, arr);
@@ -225,6 +231,7 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
     const items: KanbanItem[] = [];
     for (const [key, group] of groupsMap.entries()) {
       const contactId = group[0].contact_id;
+      const department = group[0].department;
       const sorted = [...group].sort((a, b) => {
         const da = effDate(a);
         const db = effDate(b);
@@ -251,6 +258,7 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
         type: 'group',
         id: `group-${key}`,
         contactId,
+        department,
         dueDate: badgeDate,
         tasks: sorted,
         displayStatus: best,
@@ -421,6 +429,7 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
           <GroupedTaskCard
             groupId={activeItem.id}
             contactName={fiscalTaskContactLabel(activeItem.contactId, contactsMap, activeItem.tasks[0]?.title)}
+            departmentLabel={obligationDepartmentLabel(activeItem.department)}
             dueDate={activeItem.dueDate}
             tasks={activeItem.tasks}
             responsibleInitials={profilesMap[activeItem.tasks[0]?.responsible_id || '']?.initials || '?'}

@@ -15,6 +15,7 @@ import { TaskCompletionDialog } from './TaskCompletionDialog';
 interface GroupedTaskCardProps {
   groupId: string;
   contactName: string;
+  departmentLabel?: string | null;
   dueDate: string;
   tasks: FiscalTask[]; // sorted
   responsibleInitials: string;
@@ -47,6 +48,7 @@ function getDueDateColor(dueDate: string) {
 
 export function GroupedTaskCard({
   contactName,
+  departmentLabel,
   tasks,
   responsibleInitials,
   onUploadAttachment,
@@ -114,7 +116,12 @@ export function GroupedTaskCard({
         {/* Header */}
         <div className="space-y-1">
           <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-semibold text-foreground truncate flex-1">{contactName}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground truncate">{contactName}</p>
+              {departmentLabel && (
+                <p className="text-[10px] text-muted-foreground truncate">{departmentLabel}</p>
+              )}
+            </div>
             <Avatar className="w-6 h-6 shrink-0">
               <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
                 {responsibleInitials}

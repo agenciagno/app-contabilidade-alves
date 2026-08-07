@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { Database } from '@/integrations/supabase/types';
+import { OBLIGATION_DEPARTMENTS, type ObligationDepartment } from '@/constants/obligationDepartments';
 
 export type FiscalObligationCatalog =
   Database['public']['Tables']['fiscal_obligations_catalog']['Row'];
@@ -69,6 +70,7 @@ export function ObrigacaoDialog({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<Category>('fiscal');
+  const [department, setDepartment] = useState<ObligationDepartment>('fiscal');
   const [selectedRegimes, setSelectedRegimes] = useState<string[]>([]);
   const [dueRuleType, setDueRuleType] = useState<DueRuleType>('day');
   const [dueDay, setDueDay] = useState('');
@@ -82,6 +84,7 @@ export function ObrigacaoDialog({
       setName(obligation.name ?? '');
       setDescription(obligation.description ?? '');
       setCategory((obligation.category as Category) ?? 'fiscal');
+      setDepartment((obligation.department as ObligationDepartment) ?? 'fiscal');
       setSelectedRegimes(obligation.applies_to ?? []);
       setDueRuleType(dueRule.type);
       setDueDay(dueRule.value);
@@ -90,6 +93,7 @@ export function ObrigacaoDialog({
       setName('');
       setDescription('');
       setCategory('fiscal');
+      setDepartment('fiscal');
       setSelectedRegimes([]);
       setDueRuleType('day');
       setDueDay('');
@@ -127,6 +131,7 @@ export function ObrigacaoDialog({
       name: name.trim(),
       description: description.trim() || null,
       category,
+      department,
       applies_to: category === 'recorrente' ? ALL_REGIMES : selectedRegimes,
       frequency: 'monthly',
       due_rule: dueRuleType === 'bday' ? `bday_${dayNum}` : `day_${dayNum}`,
@@ -203,7 +208,7 @@ export function ObrigacaoDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="fiscal">Fiscal declaratório</SelectItem>
+                <SelectItem value="fiscal">Departamento Fiscal</SelectItem>
                 <SelectItem value="recorrente">Tarefa recorrente</SelectItem>
               </SelectContent>
             </Select>
@@ -211,6 +216,23 @@ export function ObrigacaoDialog({
               {category === 'fiscal'
                 ? 'Declaração/obrigação fiscal, vinculada a regime(s) tributário(s).'
                 : 'Tarefa recorrente mensal (ex: folha de pagamento), aplicada a todas as empresas elegíveis, sem depender de regime.'}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Setor *</Label>
+            <Select value={department} onValueChange={(v) => setDepartment(v as ObligationDepartment)}>
+              <SelectTrigger id="ob-department">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {OBLIGATION_DEPARTMENTS.map((d) => (
+                  <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Define o responsável (por cliente) que recebe a tarefa gerada, e agrupa num card próprio no Kanban de Tarefas.
             </p>
           </div>
 

@@ -53,6 +53,8 @@ import {
 } from '@/hooks/useFiscalDashboard';
 import { GenerateDeadlineAlertsButton } from '@/components/fiscal/GenerateDeadlineAlertsButton';
 import { StatCardRow } from '@/components/ds';
+import { TAX_REGIMES } from '@/constants/taxRegimes';
+import { OBLIGATION_DEPARTMENTS } from '@/constants/obligationDepartments';
 
 
 const MONTHS = [
@@ -61,11 +63,17 @@ const MONTHS = [
 ];
 const YEARS = [2025, 2026, 2027];
 
+// Bug antigo: comparava contra 'Simples Nacional' (Title Case) enquanto
+// contacts.tax_regime guarda 'simples_nacional' (snake_case) — nunca batia,
+// zerava a lista toda vez que uma aba de regime era clicada.
 const REGIMES = [
   { value: 'todos', label: 'Todos' },
-  { value: 'Simples Nacional', label: 'Simples Nacional' },
-  { value: 'Lucro Presumido', label: 'Lucro Presumido' },
-  { value: 'Lucro Real', label: 'Lucro Real' },
+  ...TAX_REGIMES.filter((r) => ['simples_nacional', 'lucro_presumido', 'lucro_real'].includes(r.value)),
+];
+
+const DEPARTMENTS = [
+  { value: 'todos', label: 'Todos' },
+  ...OBLIGATION_DEPARTMENTS.map((d) => ({ value: d.value, label: d.short })),
 ];
 
 const todayIso = () => {
@@ -322,6 +330,7 @@ export default function FiscalDashboard() {
   const [year, setYear] = useState<number>(now.getFullYear());
   const [month, setMonth] = useState<number>(now.getMonth() + 1);
   const [regime, setRegime] = useState<string>('todos');
+  const [department, setDepartment] = useState<string>('todos');
 
   // Próximos Vencimentos – filtro
   const [upcomingPreset, setUpcomingPreset] = useState<UpcomingPreset>('2');
@@ -349,11 +358,18 @@ export default function FiscalDashboard() {
     if (regime === 'todos') return arr;
     return arr.filter((t) => (t.contacts?.tax_regime ?? '') === regime);
   };
+  const filterByDepartment = <T extends { department?: string | null }>(arr: T[]): T[] => {
+    if (department === 'todos') return arr;
+    return arr.filter((t) => t.department === department);
+  };
 
-  const tasks = useMemo(() => filterByRegime(tasksQ.data ?? []), [tasksQ.data, regime]);
+  const tasks = useMemo(
+    () => filterByDepartment(filterByRegime(tasksQ.data ?? [])),
+    [tasksQ.data, regime, department],
+  );
   const upcomingTasks = useMemo(
-    () => filterByRegime(upcomingTasksQ.data ?? []),
-    [upcomingTasksQ.data, regime],
+    () => filterByDepartment(filterByRegime(upcomingTasksQ.data ?? [])),
+    [upcomingTasksQ.data, regime, department],
   );
 
   const kpis = useMemo(() => {
@@ -420,20 +436,38 @@ export default function FiscalDashboard() {
           </div>
         </div>
 
-        {/* Regime filter */}
-        <div className="no-print">
-          <ToggleGroup
-            type="single"
-            value={regime}
-            onValueChange={(v) => v && setRegime(v)}
-            className="justify-start flex-wrap"
-          >
-            {REGIMES.map((r) => (
-              <ToggleGroupItem key={r.value} value={r.value} className="text-xs">
-                {r.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+        {/* Regime e Setor filters */}
+        <div className="flex flex-col gap-2 no-print sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground shrink-0">Regime:</span>
+            <ToggleGroup
+              type="single"
+              value={regime}
+              onValueChange={(v) => v && setRegime(v)}
+              className="justify-start flex-wrap"
+            >
+              {REGIMES.map((r) => (
+                <ToggleGroupItem key={r.value} value={r.value} className="text-xs">
+                  {r.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground shrink-0">Setor:</span>
+            <ToggleGroup
+              type="single"
+              value={department}
+              onValueChange={(v) => v && setDepartment(v)}
+              className="justify-start flex-wrap"
+            >
+              {DEPARTMENTS.map((d) => (
+                <ToggleGroupItem key={d.value} value={d.value} className="text-xs">
+                  {d.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
         </div>
       </div>
 
@@ -577,29 +611,15 @@ export default function FiscalDashboard() {
 type ClientRow = {
   contactId: string;
   name: string;
-  taxRegime: string | null;
   pendentes: number;
   emAndamento: number;
   aguardando: number;
   atrasadas: number;
   concluidas: number;
   total: number;
-  compliance: number;
 };
 
-type SortKey = 'name' | 'regime' | 'pendentes' | 'emAndamento' | 'aguardando' | 'atrasadas' | 'concluidas' | 'compliance';
-
-const REGIME_SHORT: Record<string, string> = {
-  'Simples Nacional': 'SN',
-  'Lucro Presumido': 'LP',
-  'Lucro Real': 'LR',
-  'MEI': 'MEI',
-};
-
-function regimeShortLabel(regime: string | null | undefined) {
-  if (!regime) return '—';
-  return REGIME_SHORT[regime] ?? regime;
-}
+type SortKey = 'name' | 'pendentes' | 'emAndamento' | 'aguardando' | 'atrasadas' | 'concluidas';
 
 function ClientPendenciesSection({
   tasks,
@@ -625,14 +645,12 @@ function ClientPendenciesSection({
         row = {
           contactId: cid,
           name: t.contacts?.name ?? '—',
-          taxRegime: t.contacts?.tax_regime ?? null,
           pendentes: 0,
           emAndamento: 0,
           aguardando: 0,
           atrasadas: 0,
           concluidas: 0,
           total: 0,
-          compliance: 0,
         };
         map.set(cid, row);
       }
@@ -643,9 +661,6 @@ function ClientPendenciesSection({
       else if (t.status === 'concluido') row.concluidas += 1;
       if (t.status !== 'concluido' && t.due_date && t.due_date < today) row.atrasadas += 1;
     }
-    for (const row of map.values()) {
-      row.compliance = row.total > 0 ? Math.round((row.concluidas / row.total) * 100) : 0;
-    }
     return Array.from(map.values());
   }, [tasks, today]);
 
@@ -655,7 +670,6 @@ function ClientPendenciesSection({
     const sorted = [...list].sort((a, b) => {
       const dir = sortDir === 'asc' ? 1 : -1;
       if (sortKey === 'name') return a.name.localeCompare(b.name) * dir;
-      if (sortKey === 'regime') return (a.taxRegime ?? '').localeCompare(b.taxRegime ?? '') * dir;
       const av = (a as any)[sortKey] as number;
       const bv = (b as any)[sortKey] as number;
       if (av === bv) return a.name.localeCompare(b.name);
@@ -674,7 +688,7 @@ function ClientPendenciesSection({
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortKey(key);
-      setSortDir(key === 'name' || key === 'regime' ? 'asc' : 'desc');
+      setSortDir(key === 'name' ? 'asc' : 'desc');
     }
     setPage(1);
   };
@@ -715,19 +729,17 @@ function ClientPendenciesSection({
           <TableHeader>
             <TableRow>
               <TableHead><SortBtn k="name" label="Cliente" /></TableHead>
-              <TableHead><SortBtn k="regime" label="Regime" /></TableHead>
               <TableHead className="text-right"><SortBtn k="pendentes" label="Pendentes" align="right" /></TableHead>
               <TableHead className="text-right"><SortBtn k="emAndamento" label="Em Andamento" align="right" /></TableHead>
               <TableHead className="text-right"><SortBtn k="aguardando" label="Aguardando" align="right" /></TableHead>
               <TableHead className="text-right"><SortBtn k="atrasadas" label="Atrasadas" align="right" /></TableHead>
               <TableHead className="text-right"><SortBtn k="concluidas" label="Concluídas" align="right" /></TableHead>
-              <TableHead className="text-right"><SortBtn k="compliance" label="% Compliance" align="right" /></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {pageRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
                   Nenhum cliente encontrado
                 </TableCell>
               </TableRow>
@@ -744,9 +756,6 @@ function ClientPendenciesSection({
                       <span className="truncate">{r.name}</span>
                     </button>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-[10px]">{regimeShortLabel(r.taxRegime)}</Badge>
-                  </TableCell>
                   <TableCell className="text-right tabular-nums">{r.pendentes}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.emAndamento}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.aguardando}</TableCell>
@@ -758,16 +767,6 @@ function ClientPendenciesSection({
                     )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{r.concluidas}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    <span className={cn(
-                      'font-medium',
-                      r.compliance >= 90 ? 'text-ok dark:text-ok'
-                        : r.compliance >= 70 ? 'text-warn dark:text-warn'
-                        : 'text-danger dark:text-danger',
-                    )}>
-                      {r.compliance}%
-                    </span>
-                  </TableCell>
                 </TableRow>
               ))
             )}

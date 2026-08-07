@@ -57,6 +57,7 @@ import {
   type FiscalObligationCatalog,
 } from '@/components/fiscal/ObrigacaoDialog';
 import { PageHeader, StatCardRow } from '@/components/ds';
+import { obligationDepartmentLabel } from '@/constants/obligationDepartments';
 
 const REGIME_BADGE: Record<
   string,
@@ -411,7 +412,7 @@ export default function FiscalObrigacoes() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os tipos</SelectItem>
-              <SelectItem value="fiscal">Fiscal declaratório</SelectItem>
+              <SelectItem value="fiscal">Departamento Fiscal</SelectItem>
               <SelectItem value="recorrente">Tarefa recorrente</SelectItem>
             </SelectContent>
           </Select>
@@ -446,6 +447,7 @@ export default function FiscalObrigacoes() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
+                <TableHead>Setor</TableHead>
                 <TableHead>Regime(s)</TableHead>
                 <TableHead>Vencimento</TableHead>
                 <TableHead>Empresas</TableHead>
@@ -457,7 +459,7 @@ export default function FiscalObrigacoes() {
               {obligationsQuery.isLoading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 6 }).map((__, j) => (
+                    {Array.from({ length: 7 }).map((__, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-5 w-full" />
                       </TableCell>
@@ -466,7 +468,7 @@ export default function FiscalObrigacoes() {
                 ))
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-12 text-center">
+                  <TableCell colSpan={7} className="py-12 text-center">
                     <div className="flex flex-col items-center gap-3 text-muted-foreground">
                       <BookOpen className="h-10 w-10" />
                       <span>
@@ -490,6 +492,11 @@ export default function FiscalObrigacoes() {
                       onClick={() => setSheetItem(ob)}
                     >
                       <TableCell className="font-medium">{ob.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[10px]">
+                          {obligationDepartmentLabel((ob as any).department, 'short')}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         <RegimeBadges regimes={ob.applies_to ?? []} category={ob.category} />
                       </TableCell>
