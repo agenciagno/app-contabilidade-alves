@@ -191,7 +191,7 @@
     --muted-ink: #a1a1aa;
     --muted-ink-2: #71717a;
     /* No escuro brand é quase-branco; texto sobre ele tem de ser tinta escura.
-       O Figma manda #ffffff nos dois modos — seria branco sobre branco. */
+       O Figma concorda: text/on-brand no modo Dark é #101923 (auditado 07/08/2026). */
     --on-brand: #101923;
 
     --line: #262626;

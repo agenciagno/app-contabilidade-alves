@@ -29,14 +29,20 @@ export default {
         'h4-card':    ['16px',   { lineHeight: '24px',   letterSpacing: '-0.24px', fontWeight: '600' }],
         'body':       ['14.5px', { lineHeight: '21.75px' }],
         'body-sm':    ['14px',   { lineHeight: '21px' }],
-        'nav':        ['13.5px', { lineHeight: '20.25px',letterSpacing: '-0.07px' }],
+        // SC/nav-idle e SC/nav-active são DOIS tokens no Figma, com pesos
+        // diferentes. `nav` sem fontWeight fazia o item idle cair em 400.
+        'nav':        ['13.5px', { lineHeight: '20.25px',letterSpacing: '-0.07px', fontWeight: '500' }],
+        'nav-active': ['13.5px', { lineHeight: '20.25px',letterSpacing: '-0.07px', fontWeight: '600' }],
         'ui':         ['13px',   { lineHeight: '19.5px' }],
         'ui-strong':  ['13px',   { lineHeight: '19.5px', letterSpacing: '-0.065px', fontWeight: '600' }],
         'link':       ['12.5px', { lineHeight: '18.75px',letterSpacing: '-0.06px', fontWeight: '600' }],
+        // SC/mono no Figma. Mantém o nome `mono-sm` no código: já está em uso
+        // e o par nome↔token está mapeado em _context/marca/04-design-system.md.
         'mono-sm':    ['12.5px', { lineHeight: '18.75px' }],
         'meta':       ['11.5px', { lineHeight: '17.25px' }],
         'kicker':     ['11px',   { lineHeight: '16.5px', letterSpacing: '0.66px',  fontWeight: '500' }],
-        'badge':      ['10.5px', { lineHeight: '15.75px' }],
+        'kicker-bold':['11px',   { lineHeight: '16.5px', letterSpacing: '0.66px',  fontWeight: '700' }],
+        'badge':      ['10.5px', { lineHeight: '15.75px', fontWeight: '500' }],
       },
 
       colors: {
