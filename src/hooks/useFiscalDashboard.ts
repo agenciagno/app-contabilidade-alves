@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 
 export interface FiscalTaskRow {
@@ -16,7 +17,7 @@ export interface FiscalTaskRow {
   responsible_id: string | null;
   contact_id: string | null;
   department: string | null;
-  contacts?: { tax_regime: string | null; name?: string | null } | null;
+  contacts?: { tax_regime: string | null; name?: string | null; document?: string | null } | null;
   fiscal_obligations_catalog?: { name: string | null } | null;
 }
 
@@ -89,7 +90,7 @@ export function useFiscalTasksOfMonth(year: number, month: number) {
     queryFn: async () => {
       let q = (supabase as any)
         .from('fiscal_tasks')
-        .select('id, status, title, due_date, fiscal_due_date, completed_at, created_at, responsible_id, contact_id, department, contacts(tax_regime, name), fiscal_obligations_catalog(name)')
+        .select('id, status, title, due_date, fiscal_due_date, completed_at, created_at, responsible_id, contact_id, department, contacts(tax_regime, name, document), fiscal_obligations_catalog(name)')
         .eq('company_id', companyId)
         .eq('competence_year', year)
         .eq('competence_month', month);
@@ -211,6 +212,32 @@ export function useUpcomingFiscalTasks() {
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as UpcomingTaskRow[];
+    },
+  });
+}
+
+// Conclui várias tarefas de uma vez (Calendário Fiscal > Sheet do dia), numa única
+// chamada — mesmo padrão do `deleteTasks` em useFiscalTasks.ts.
+export function useCompleteFiscalTasks() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await (supabase as any)
+        .from('fiscal_tasks')
+        .update({ status: 'concluido', completed_at: new Date().toISOString() })
+        .in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: (_data, ids) => {
+      queryClient.invalidateQueries({ queryKey: ['fiscal-dashboard'] });
+      toast({
+        title: ids.length > 1 ? `${ids.length} tarefas concluídas com sucesso` : 'Tarefa concluída com sucesso',
+      });
+    },
+    onError: () => {
+      toast({ title: 'Erro ao concluir tarefas', variant: 'destructive' });
     },
   });
 }

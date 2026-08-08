@@ -1,27 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { useQueryClient } from '@tanstack/react-query';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   AlertTriangle,
   ArrowUpDown,
-  CalendarIcon,
   CheckCircle2,
-  ChevronDown,
-  Clock,
-  Download,
-  ListChecks,
   RefreshCw,
-  ShieldAlert,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -37,22 +30,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
-import { cn } from '@/lib/utils';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { cn, maskCPFCNPJ } from '@/lib/utils';
 
 import { useUserRole } from '@/hooks/useUserRole';
 import {
   useFiscalTasksOfMonth,
   useFiscalCollaborators,
-  useFiscalUpcomingTasksRange,
+  useCompleteFiscalTasks,
   FiscalTaskRow,
 } from '@/hooks/useFiscalDashboard';
-import { GenerateDeadlineAlertsButton } from '@/components/fiscal/GenerateDeadlineAlertsButton';
-import { StatCardRow } from '@/components/ds';
+import { StatCardRow, DsBadge, SearchField, tabsListClass, tabsTriggerClass } from '@/components/ds';
 import { TAX_REGIMES } from '@/constants/taxRegimes';
 import { OBLIGATION_DEPARTMENTS } from '@/constants/obligationDepartments';
 
@@ -81,15 +72,6 @@ const todayIso = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-const isoFromDate = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-const inDaysIso = (n: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return isoFromDate(d);
-};
-
 const isLateTask = (t: { status: string; due_date: string | null }, today: string) =>
   t.status !== 'concluido' && !!t.due_date && t.due_date < today;
 
@@ -102,7 +84,7 @@ function KpiCard({
 }: {
   label: string;
   value: number;
-  icon: typeof ListChecks;
+  icon: typeof ArrowUpDown;
   borderClass: string;
   iconClass: string;
 }) {
@@ -121,206 +103,6 @@ function KpiCard({
   );
 }
 
-
-function StatusBadge({ status, isLate }: { status: string; isLate: boolean }) {
-  if (isLate) {
-    return <Badge className="bg-danger/15 text-danger dark:text-danger border-danger/30 hover:bg-danger/20">Atrasado</Badge>;
-  }
-  if (status === 'em_progresso') return <Badge className="bg-warn/15 text-warn dark:text-warn border-warn/30 hover:bg-warn/20">Em andamento</Badge>;
-  if (status === 'aguardando_cliente') return <Badge className="bg-warn/15 text-warn dark:text-warn border-warn/30 hover:bg-warn/20">Aguardando</Badge>;
-  if (status === 'a_fazer') return <Badge className="bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/20">A Fazer</Badge>;
-  if (status === 'concluido') return <Badge className="bg-ok/15 text-ok dark:text-ok border-ok/30 hover:bg-ok/20">Concluído</Badge>;
-  return <Badge variant="secondary">{status}</Badge>;
-}
-
-type RiskBand = 'critico' | 'atencao' | 'regular';
-
-interface RiskClient {
-  contact_id: string;
-  name: string;
-  atrasadas: number;
-  oldestObligation: string | null;
-  oldestDueDate: string | null;
-  daysLate: number;
-}
-
-function RiskRadarCard({
-  tasks,
-  today,
-  onClientClick,
-  onSeeAll,
-}: {
-  tasks: FiscalTaskRow[];
-  today: string;
-  onClientClick: (contactId: string) => void;
-  onSeeAll: () => void;
-}) {
-  const [openBand, setOpenBand] = useState<RiskBand | null>(null);
-
-  const { critico, atencao, regular } = useMemo(() => {
-    const byContact = new Map<string, { name: string; atrasadasList: FiscalTaskRow[]; hasAny: boolean }>();
-    tasks.forEach((t) => {
-      if (!t.contact_id) return;
-      const name = t.contacts?.name ?? '—';
-      const entry = byContact.get(t.contact_id) ?? { name, atrasadasList: [], hasAny: false };
-      entry.hasAny = true;
-      if (isLateTask(t, today)) entry.atrasadasList.push(t);
-      byContact.set(t.contact_id, entry);
-    });
-
-    const buildRow = (contact_id: string, name: string, lates: FiscalTaskRow[]): RiskClient => {
-      const sorted = [...lates].sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? ''));
-      const oldest = sorted[0];
-      const daysLate = oldest?.due_date ? differenceInDays(parseISO(today), parseISO(oldest.due_date)) : 0;
-      return {
-        contact_id,
-        name,
-        atrasadas: lates.length,
-        oldestObligation: oldest?.fiscal_obligations_catalog?.name ?? oldest?.title ?? null,
-        oldestDueDate: oldest?.due_date ?? null,
-        daysLate,
-      };
-    };
-
-    const critico: RiskClient[] = [];
-    const atencao: RiskClient[] = [];
-    const regular: RiskClient[] = [];
-    byContact.forEach((v, k) => {
-      const row = buildRow(k, v.name, v.atrasadasList);
-      if (row.atrasadas >= 3) critico.push(row);
-      else if (row.atrasadas >= 1) atencao.push(row);
-      else regular.push(row);
-    });
-
-    critico.sort((a, b) => b.atrasadas - a.atrasadas || b.daysLate - a.daysLate);
-    atencao.sort((a, b) => b.atrasadas - a.atrasadas || b.daysLate - a.daysLate);
-    regular.sort((a, b) => a.name.localeCompare(b.name));
-    return { critico, atencao, regular };
-  }, [tasks, today]);
-
-  const bands: Array<{
-    key: RiskBand;
-    icon: string;
-    label: string;
-    list: RiskClient[];
-    color: string;
-    bg: string;
-  }> = [
-    { key: 'critico', icon: '🔴', label: 'Crítico', list: critico, color: 'text-danger dark:text-danger', bg: 'bg-danger/10 hover:bg-danger/15 border-danger/30' },
-    { key: 'atencao', icon: '🟡', label: 'Atenção', list: atencao, color: 'text-warn dark:text-warn', bg: 'bg-warn/10 hover:bg-warn/15 border-warn/30' },
-    { key: 'regular', icon: '🟢', label: 'Regular', list: regular, color: 'text-ok dark:text-ok', bg: 'bg-ok/10 hover:bg-ok/15 border-ok/30' },
-  ];
-
-  const active = bands.find((b) => b.key === openBand);
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <ShieldAlert className="h-5 w-5 text-warn" />
-          Radar de Risco
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {bands.map((b) => (
-            <button
-              key={b.key}
-              type="button"
-              onClick={() => setOpenBand(openBand === b.key ? null : b.key)}
-              className={cn(
-                'flex items-center justify-between rounded-md border px-4 py-3 transition-colors text-left',
-                b.bg,
-                openBand === b.key && 'ring-2 ring-offset-1 ring-offset-background ring-current'
-              )}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-lg leading-none">{b.icon}</span>
-                <span className={cn('text-sm font-medium', b.color)}>{b.label}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={cn('text-2xl font-semibold', b.color)}>{b.list.length}</span>
-                <ChevronDown
-                  className={cn(
-                    'h-4 w-4 text-muted-foreground transition-transform',
-                    openBand === b.key && 'rotate-180'
-                  )}
-                />
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <Collapsible open={!!active}>
-          <CollapsibleContent>
-            {active && (
-              <div className="mt-2 rounded-md border bg-muted/30">
-                {active.list.length === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground text-center">
-                    Nenhum cliente nesta faixa.
-                  </div>
-                ) : (
-                  <>
-                    <div className="divide-y">
-                      {active.list.slice(0, 10).map((c) => (
-                        <button
-                          key={c.contact_id}
-                          type="button"
-                          onClick={() => onClientClick(c.contact_id)}
-                          className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-muted/60 text-left"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium truncate">{c.name}</p>
-                            {active.key !== 'regular' && c.oldestObligation && (
-                              <p className="text-xs text-muted-foreground truncate">
-                                Mais antiga: {c.oldestObligation}
-                                {c.oldestDueDate && ` — ${format(parseISO(c.oldestDueDate), 'dd/MM/yyyy')}`}
-                              </p>
-                            )}
-                          </div>
-                          {active.key !== 'regular' ? (
-                            <div className="flex items-center gap-2 shrink-0">
-                              <Badge variant="secondary" className="bg-danger/15 text-danger dark:text-danger border-danger/30">
-                                {c.atrasadas} atrasada{c.atrasadas > 1 ? 's' : ''}
-                              </Badge>
-                              <Badge variant="outline" className="text-xs">
-                                {c.daysLate}d
-                              </Badge>
-                            </div>
-                          ) : (
-                            <Badge variant="outline" className="text-xs shrink-0">Em dia</Badge>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                    {active.list.length > 10 && (
-                      <div className="p-2 border-t flex justify-end">
-                        <Button variant="ghost" size="sm" onClick={onSeeAll}>
-                          Ver todos ({active.list.length})
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </CollapsibleContent>
-        </Collapsible>
-      </CardContent>
-    </Card>
-  );
-}
-
-type UpcomingPreset = '2' | '7' | '15' | '30' | 'custom';
-
-const PRESET_OPTIONS: { value: UpcomingPreset; label: string }[] = [
-  { value: '2', label: '2 dias' },
-  { value: '7', label: '7 dias' },
-  { value: '15', label: '15 dias' },
-  { value: '30', label: '30 dias' },
-  { value: 'custom', label: 'Personalizado' },
-];
-
 export default function FiscalDashboard() {
   const { isAdmin, isSuperAdmin, isLoading: roleLoading } = useUserRole();
   const qc = useQueryClient();
@@ -332,25 +114,9 @@ export default function FiscalDashboard() {
   const [regime, setRegime] = useState<string>('todos');
   const [department, setDepartment] = useState<string>('todos');
 
-  // Próximos Vencimentos – filtro
-  const [upcomingPreset, setUpcomingPreset] = useState<UpcomingPreset>('2');
-  const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
-  const [customOpen, setCustomOpen] = useState(false);
-
-  const { upcomingStart, upcomingEnd } = useMemo(() => {
-    if (upcomingPreset === 'custom') {
-      const from = customRange.from ? isoFromDate(customRange.from) : todayIso();
-      const to = customRange.to
-        ? isoFromDate(customRange.to)
-        : (customRange.from ? isoFromDate(customRange.from) : inDaysIso(7));
-      return { upcomingStart: from, upcomingEnd: to };
-    }
-    return { upcomingStart: todayIso(), upcomingEnd: inDaysIso(Number(upcomingPreset)) };
-  }, [upcomingPreset, customRange]);
-
   const tasksQ = useFiscalTasksOfMonth(year, month);
   const collabsQ = useFiscalCollaborators();
-  const upcomingTasksQ = useFiscalUpcomingTasksRange(upcomingStart, upcomingEnd);
+  const completeTasks = useCompleteFiscalTasks();
 
   const today = todayIso();
 
@@ -366,10 +132,6 @@ export default function FiscalDashboard() {
   const tasks = useMemo(
     () => filterByDepartment(filterByRegime(tasksQ.data ?? [])),
     [tasksQ.data, regime, department],
-  );
-  const upcomingTasks = useMemo(
-    () => filterByDepartment(filterByRegime(upcomingTasksQ.data ?? [])),
-    [upcomingTasksQ.data, regime, department],
   );
 
   const kpis = useMemo(() => {
@@ -389,14 +151,9 @@ export default function FiscalDashboard() {
   if (!isAdmin && !isSuperAdmin) return <Navigate to="/fiscal/tarefas" replace />;
 
   const handleRefresh = () => qc.invalidateQueries({ queryKey: ['fiscal-dashboard'] });
-  const handleExport = () => window.print();
-
-  const fmtTime = (s: string | null) => (s ? format(parseISO(s), 'dd/MM') : '—');
 
   const goToKanbanByContact = (contactId: string) =>
     navigate(`/fiscal/tarefas?view=kanban&contact_id=${contactId}`);
-
-  const upcomingCount = upcomingTasks.length;
 
   return (
     <div className="p-6 space-y-6">
@@ -408,66 +165,43 @@ export default function FiscalDashboard() {
               ~/tarefas · {MONTHS[month - 1]?.toLowerCase()} {year}
             </p>
             <h1 className="text-display text-ink">Dashboard fiscal.</h1>
-            <p className="text-body text-muted-ink">
-              {tasks.length.toLocaleString('pt-BR')} obrigações no mês · {kpis.atrasadas} atrasadas · {semResponsavel} sem responsável.
-            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 no-print">
+          <div className="flex items-center gap-2 overflow-x-auto flex-nowrap no-print">
+            <Button variant="outline" size="sm" onClick={handleRefresh}>
+              <RefreshCw className="h-4 w-4" /> Atualizar
+            </Button>
             <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[130px] text-xs shrink-0"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {MONTHS.map((m, i) => <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-              <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-[85px] text-xs shrink-0"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={handleRefresh}>
-              <RefreshCw className="h-4 w-4" /> Atualizar
-            </Button>
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="h-4 w-4" /> Exportar PDF
-            </Button>
-            <GenerateDeadlineAlertsButton />
-
+            <Select value={department} onValueChange={setDepartment}>
+              <SelectTrigger className="h-8 w-[120px] text-xs shrink-0"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {DEPARTMENTS.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        {/* Regime e Setor filters */}
-        <div className="flex flex-col gap-2 no-print sm:flex-row sm:items-center sm:gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground shrink-0">Regime:</span>
-            <ToggleGroup
-              type="single"
-              value={regime}
-              onValueChange={(v) => v && setRegime(v)}
-              className="justify-start flex-wrap"
-            >
+        {/* Regime */}
+        <div className="no-print">
+          <Tabs value={regime} onValueChange={setRegime}>
+            <TabsList className={cn(tabsListClass, 'overflow-x-auto flex-nowrap')}>
               {REGIMES.map((r) => (
-                <ToggleGroupItem key={r.value} value={r.value} className="text-xs">
+                <TabsTrigger key={r.value} value={r.value} className={tabsTriggerClass}>
                   {r.label}
-                </ToggleGroupItem>
+                </TabsTrigger>
               ))}
-            </ToggleGroup>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground shrink-0">Setor:</span>
-            <ToggleGroup
-              type="single"
-              value={department}
-              onValueChange={(v) => v && setDepartment(v)}
-              className="justify-start flex-wrap"
-            >
-              {DEPARTMENTS.map((d) => (
-                <ToggleGroupItem key={d.value} value={d.value} className="text-xs">
-                  {d.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          </div>
+            </TabsList>
+          </Tabs>
         </div>
       </div>
 
@@ -512,97 +246,352 @@ export default function FiscalDashboard() {
         ]}
       />
 
-      {/* Próximos Vencimentos */}
-      <Card>
-        <CardHeader className="flex flex-col gap-3 space-y-0 pb-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            Próximos Vencimentos
-            <Badge variant="secondary">{upcomingCount}</Badge>
-          </CardTitle>
-          <div className="flex flex-wrap items-center gap-2 no-print">
-            <ToggleGroup
-              type="single"
-              value={upcomingPreset}
-              onValueChange={(v) => {
-                if (!v) return;
-                setUpcomingPreset(v as UpcomingPreset);
-                if (v === 'custom') setCustomOpen(true);
-              }}
-              className="flex-wrap"
-            >
-              {PRESET_OPTIONS.map((p) => (
-                <ToggleGroupItem key={p.value} value={p.value} className="text-xs h-8">
-                  {p.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-            {upcomingPreset === 'custom' && (
-              <Popover open={customOpen} onOpenChange={setCustomOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 gap-1.5">
-                    <CalendarIcon className="h-3.5 w-3.5" />
-                    {customRange.from && customRange.to
-                      ? `${format(customRange.from, 'dd/MM', { locale: ptBR })} – ${format(customRange.to, 'dd/MM', { locale: ptBR })}`
-                      : 'Escolher datas'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <Calendar
-                    mode="range"
-                    selected={customRange as any}
-                    onSelect={(r: any) => setCustomRange(r ?? {})}
-                    numberOfMonths={2}
-                    locale={ptBR}
-                    className="p-3 pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {upcomingTasksQ.isLoading ? (
-            <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-          ) : upcomingTasks.length === 0 ? (
-            <div className="flex items-center gap-3 py-6 text-muted-foreground">
-              <CheckCircle2 className="h-5 w-5 text-ok" />
-              <span>Nenhuma obrigação vencendo no período selecionado</span>
-            </div>
-          ) : (
-            <div className="max-h-[420px] overflow-y-auto divide-y">
-              {upcomingTasks.map((t) => (
-                <div key={t.id} className="flex items-center gap-3 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{t.contacts?.name ?? '—'}</p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {t.fiscal_obligations_catalog?.name ?? t.title ?? '—'}
-                    </p>
-                  </div>
-                  <div className="text-sm text-muted-foreground whitespace-nowrap">{fmtTime(t.fiscal_due_date)}</div>
-                  <Avatar className="h-7 w-7">
-                    <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                      {(t.responsible?.full_name ?? '?').charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <StatusBadge status={t.status} isLate={false} />
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Risk Radar */}
-      <RiskRadarCard
+      {/* Calendário Fiscal */}
+      <FiscalCalendarCard
         tasks={tasks}
         today={today}
-        onClientClick={goToKanbanByContact}
-        onSeeAll={() => navigate('/fiscal/tarefas?filter=atrasadas')}
+        year={year}
+        month={month}
+        isLoading={tasksQ.isLoading}
+        isCompleting={completeTasks.isPending}
+        onCompleteTasks={(ids) => completeTasks.mutate(ids)}
       />
 
       {/* Pendências por Cliente */}
       <ClientPendenciesSection tasks={tasks} today={today} onClientClick={goToKanbanByContact} />
     </div>
+  );
+}
+
+
+// ---- Calendário Fiscal ----
+type DayStatus = 'ok' | 'warn' | 'danger';
+
+const dayDotClass: Record<DayStatus, string> = {
+  ok: 'bg-ok',
+  warn: 'bg-warn',
+  danger: 'bg-danger',
+};
+
+const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+function FiscalCalendarCard({
+  tasks,
+  today,
+  year,
+  month,
+  isLoading,
+  isCompleting,
+  onCompleteTasks,
+}: {
+  tasks: FiscalTaskRow[];
+  today: string;
+  year: number;
+  month: number;
+  isLoading: boolean;
+  isCompleting: boolean;
+  onCompleteTasks: (ids: string[]) => void;
+}) {
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  const byDay = useMemo(() => {
+    const map = new Map<string, FiscalTaskRow[]>();
+    tasks.forEach((t) => {
+      if (!t.fiscal_due_date) return;
+      const list = map.get(t.fiscal_due_date) ?? [];
+      list.push(t);
+      map.set(t.fiscal_due_date, list);
+    });
+    return map;
+  }, [tasks]);
+
+  const obligationCards = useMemo(() => {
+    const map = new Map<string, { key: string; name: string; dueDate: string; concluidas: number; pendentes: number }>();
+    tasks.forEach((t) => {
+      if (!t.fiscal_due_date) return;
+      const name = t.fiscal_obligations_catalog?.name ?? t.title ?? 'Obrigação';
+      const key = `${name}__${t.fiscal_due_date}`;
+      const row = map.get(key) ?? { key, name, dueDate: t.fiscal_due_date, concluidas: 0, pendentes: 0 };
+      if (t.status === 'concluido') row.concluidas += 1;
+      else row.pendentes += 1;
+      map.set(key, row);
+    });
+    return Array.from(map.values()).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  }, [tasks]);
+
+  const gridDays = useMemo(() => {
+    const startWeekday = new Date(year, month - 1, 1).getDay();
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const cells: Array<{ day: number; iso: string } | null> = [];
+    for (let i = 0; i < startWeekday; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push({ day: d, iso: `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}` });
+    }
+    return cells;
+  }, [year, month]);
+
+  const dayStatus = (iso: string): DayStatus | null => {
+    const list = byDay.get(iso);
+    if (!list || list.length === 0) return null;
+    if (list.some((t) => isLateTask(t, today))) return 'danger';
+    if (list.every((t) => t.status === 'concluido')) return 'ok';
+    return 'warn';
+  };
+
+  const selectedTasks = selectedDay ? (byDay.get(selectedDay) ?? []) : [];
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Calendário Fiscal</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-56 w-full" />
+          </div>
+        ) : obligationCards.length === 0 ? (
+          <div className="flex items-center gap-3 py-6 text-muted-foreground">
+            <CheckCircle2 className="h-5 w-5 text-ok" />
+            <span>Nenhuma obrigação lançada neste mês</span>
+          </div>
+        ) : (
+          <>
+            {/* Fileira de cards de obrigação */}
+            <div className="flex gap-3 overflow-x-auto flex-nowrap pb-1 -mx-1 px-1">
+              {obligationCards.map((c) => (
+                <div
+                  key={c.key}
+                  className="flex w-[168px] shrink-0 flex-col gap-1 rounded-md border border-line bg-paper p-3"
+                >
+                  <span className="text-lg font-bold leading-none text-ink">
+                    {format(parseISO(c.dueDate), 'dd/MM')}
+                  </span>
+                  <span className="text-sm font-medium text-ink truncate" title={c.name}>{c.name}</span>
+                  <span className="text-xs text-muted-ink">{MONTHS[month - 1]} {year}</span>
+                  <span className="text-xs text-muted-ink">
+                    {c.concluidas} transmitida{c.concluidas !== 1 ? 's' : ''} · {c.pendentes} pendente{c.pendentes !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Grade do mês */}
+            <div>
+              <div className="grid grid-cols-7 gap-1 text-center text-[11px] uppercase text-muted-ink mb-1">
+                {WEEKDAYS.map((d) => <div key={d}>{d}</div>)}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {gridDays.map((cell, i) => {
+                  if (!cell) return <div key={`empty-${i}`} />;
+                  const status = dayStatus(cell.iso);
+                  const isToday = cell.iso === today;
+                  return status ? (
+                    <button
+                      key={cell.iso}
+                      type="button"
+                      onClick={() => setSelectedDay(cell.iso)}
+                      className={cn(
+                        'flex flex-col items-center justify-center gap-1 rounded-md py-2 text-sm text-ink transition-colors hover:bg-bg-2',
+                        isToday && 'bg-bg-2 font-semibold',
+                      )}
+                    >
+                      <span>{cell.day}</span>
+                      <span className={cn('h-1.5 w-1.5 rounded-full', dayDotClass[status])} />
+                    </button>
+                  ) : (
+                    <div
+                      key={cell.iso}
+                      className={cn(
+                        'flex flex-col items-center justify-center gap-1 rounded-md py-2 text-sm text-muted-ink',
+                        isToday && 'bg-bg-2 font-semibold text-ink',
+                      )}
+                    >
+                      <span>{cell.day}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
+      </CardContent>
+
+      <DayTasksSheet
+        open={!!selectedDay}
+        onOpenChange={(o) => !o && setSelectedDay(null)}
+        dateIso={selectedDay}
+        tasks={selectedTasks}
+        today={today}
+        isCompleting={isCompleting}
+        onCompleteTasks={onCompleteTasks}
+      />
+    </Card>
+  );
+}
+
+type DayTaskStatus = 'concluida' | 'vencida' | 'pendente';
+
+const dayTaskStatusLabel: Record<DayTaskStatus, string> = {
+  concluida: 'Concluída',
+  vencida: 'Vencida',
+  pendente: 'Pendente',
+};
+
+const dayTaskStatusTone: Record<DayTaskStatus, 'ok' | 'danger' | 'warn'> = {
+  concluida: 'ok',
+  vencida: 'danger',
+  pendente: 'warn',
+};
+
+function DayTasksSheet({
+  open,
+  onOpenChange,
+  dateIso,
+  tasks,
+  today,
+  isCompleting,
+  onCompleteTasks,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  dateIso: string | null;
+  tasks: FiscalTaskRow[];
+  today: string;
+  isCompleting: boolean;
+  onCompleteTasks: (ids: string[]) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'todos' | DayTaskStatus>('todos');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setSearch('');
+    setStatusFilter('todos');
+    setSelected(new Set());
+  }, [dateIso]);
+
+  const rows = useMemo(
+    () =>
+      tasks.map((t) => {
+        const statusKey: DayTaskStatus = t.status === 'concluido'
+          ? 'concluida'
+          : isLateTask(t, today) ? 'vencida' : 'pendente';
+        return { task: t, statusKey };
+      }),
+    [tasks, today],
+  );
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const qDigits = q.replace(/\D/g, '');
+    return rows.filter(({ task, statusKey }) => {
+      if (statusFilter !== 'todos' && statusKey !== statusFilter) return false;
+      if (!q) return true;
+      const name = (task.contacts?.name ?? '').toLowerCase();
+      const doc = (task.contacts?.document ?? '').replace(/\D/g, '');
+      return name.includes(q) || (qDigits && doc.includes(qDigits));
+    });
+  }, [rows, search, statusFilter]);
+
+  const toggleSelected = (id: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id); else next.delete(id);
+      return next;
+    });
+  };
+
+  const handleComplete = () => {
+    onCompleteTasks(Array.from(selected));
+    setSelected(new Set());
+  };
+
+  const dateLabel = dateIso ? format(parseISO(dateIso), "dd 'de' MMMM", { locale: ptBR }) : '';
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto px-6 py-6">
+        <SheetHeader className="space-y-1 pb-4">
+          <SheetTitle className="text-2xl first-letter:uppercase">{dateLabel}</SheetTitle>
+          <p className="text-sm text-muted-foreground">
+            {tasks.length} {tasks.length === 1 ? 'obrigação' : 'obrigações'} vencendo neste dia
+          </p>
+        </SheetHeader>
+
+        <div className="space-y-4 pb-8">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <SearchField
+              placeholder="Buscar por razão social ou CNPJ"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              wrapperClassName="w-full sm:max-w-xs"
+            />
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'todos' | DayTaskStatus)}>
+              <SelectTrigger className="h-9 w-full sm:w-[170px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os status</SelectItem>
+                <SelectItem value="concluida">Concluída</SelectItem>
+                <SelectItem value="vencida">Vencida</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10" />
+                <TableHead>Razão Social</TableHead>
+                <TableHead>CNPJ</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
+                    Nenhuma empresa encontrada
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map(({ task, statusKey }) => (
+                  <TableRow key={task.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selected.has(task.id)}
+                        disabled={statusKey === 'concluida'}
+                        onCheckedChange={(v) => toggleSelected(task.id, !!v)}
+                        aria-label={`Selecionar ${task.contacts?.name ?? ''}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">{task.contacts?.name ?? '—'}</TableCell>
+                    <TableCell className="text-muted-ink">
+                      {task.contacts?.document ? maskCPFCNPJ(task.contacts.document) : '—'}
+                    </TableCell>
+                    <TableCell>
+                      <DsBadge tone={dayTaskStatusTone[statusKey]}>{dayTaskStatusLabel[statusKey]}</DsBadge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+
+          {selected.size > 0 && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-line bg-bg-2 px-4 py-3">
+              <span className="text-sm text-ink">
+                {selected.size} {selected.size === 1 ? 'empresa selecionada' : 'empresas selecionadas'}
+              </span>
+              <Button size="sm" onClick={handleComplete} disabled={isCompleting}>
+                Concluir tarefas
+              </Button>
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
