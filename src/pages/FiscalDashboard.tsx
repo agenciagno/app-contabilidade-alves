@@ -7,6 +7,9 @@ import {
   AlertTriangle,
   ArrowUpDown,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
   RefreshCw,
 } from 'lucide-react';
 
@@ -255,6 +258,7 @@ export default function FiscalDashboard() {
         isLoading={tasksQ.isLoading}
         isCompleting={completeTasks.isPending}
         onCompleteTasks={(ids) => completeTasks.mutate(ids)}
+        onMonthChange={(y, m) => { setYear(y); setMonth(m); }}
       />
 
       {/* Pendências por Cliente */}
@@ -273,7 +277,35 @@ const dayDotClass: Record<DayStatus, string> = {
   danger: 'bg-danger',
 };
 
+const dayRingClass: Record<DayStatus, string> = {
+  ok: 'border-ok text-ok',
+  warn: 'border-warn text-warn',
+  danger: 'border-danger text-danger',
+};
+
+const LEGEND: Array<{ status: DayStatus; label: string }> = [
+  { status: 'ok', label: 'Em dia' },
+  { status: 'warn', label: 'Pendente' },
+  { status: 'danger', label: 'Atrasado' },
+];
+
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const WEEKDAYS_ABBR = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+
+const statusOf = (list: FiscalTaskRow[], today: string): DayStatus => {
+  if (list.some((t) => isLateTask(t, today))) return 'danger';
+  if (list.every((t) => t.status === 'concluido')) return 'ok';
+  return 'warn';
+};
+
+type ObligationGroup = {
+  key: string;
+  name: string;
+  dueDate: string;
+  tasks: FiscalTaskRow[];
+};
+
+type CalendarSelection = { title: string; dueDate: string; tasks: FiscalTaskRow[] };
 
 function FiscalCalendarCard({
   tasks,
@@ -283,6 +315,7 @@ function FiscalCalendarCard({
   isLoading,
   isCompleting,
   onCompleteTasks,
+  onMonthChange,
 }: {
   tasks: FiscalTaskRow[];
   today: string;
@@ -291,8 +324,9 @@ function FiscalCalendarCard({
   isLoading: boolean;
   isCompleting: boolean;
   onCompleteTasks: (ids: string[]) => void;
+  onMonthChange: (year: number, month: number) => void;
 }) {
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [selection, setSelection] = useState<CalendarSelection | null>(null);
 
   const byDay = useMemo(() => {
     const map = new Map<string, FiscalTaskRow[]>();
@@ -305,16 +339,15 @@ function FiscalCalendarCard({
     return map;
   }, [tasks]);
 
-  const obligationCards = useMemo(() => {
-    const map = new Map<string, { key: string; name: string; dueDate: string; concluidas: number; pendentes: number }>();
+  const obligationGroups = useMemo(() => {
+    const map = new Map<string, ObligationGroup>();
     tasks.forEach((t) => {
       if (!t.fiscal_due_date) return;
       const name = t.fiscal_obligations_catalog?.name ?? t.title ?? 'Obrigação';
       const key = `${name}__${t.fiscal_due_date}`;
-      const row = map.get(key) ?? { key, name, dueDate: t.fiscal_due_date, concluidas: 0, pendentes: 0 };
-      if (t.status === 'concluido') row.concluidas += 1;
-      else row.pendentes += 1;
-      map.set(key, row);
+      const group = map.get(key) ?? { key, name, dueDate: t.fiscal_due_date, tasks: [] };
+      group.tasks.push(t);
+      map.set(key, group);
     });
     return Array.from(map.values()).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   }, [tasks]);
@@ -333,52 +366,124 @@ function FiscalCalendarCard({
   const dayStatus = (iso: string): DayStatus | null => {
     const list = byDay.get(iso);
     if (!list || list.length === 0) return null;
-    if (list.some((t) => isLateTask(t, today))) return 'danger';
-    if (list.every((t) => t.status === 'concluido')) return 'ok';
-    return 'warn';
+    return statusOf(list, today);
   };
 
-  const selectedTasks = selectedDay ? (byDay.get(selectedDay) ?? []) : [];
+  const vencidos = useMemo(() => tasks.filter((t) => isLateTask(t, today)).length, [tasks, today]);
+  const pendentesCount = useMemo(
+    () => tasks.filter((t) => t.status !== 'concluido' && !isLateTask(t, today)).length,
+    [tasks, today],
+  );
+
+  const openDay = (iso: string) => {
+    const list = byDay.get(iso);
+    if (!list || list.length === 0) return;
+    const names = new Set(list.map((t) => t.fiscal_obligations_catalog?.name ?? t.title ?? 'Obrigação'));
+    const title = names.size === 1 ? [...names][0] : format(parseISO(iso), "dd 'de' MMMM", { locale: ptBR });
+    setSelection({ title, dueDate: iso, tasks: list });
+  };
+
+  const openGroup = (g: ObligationGroup) => setSelection({ title: g.name, dueDate: g.dueDate, tasks: g.tasks });
+
+  const shiftMonth = (delta: number) => {
+    let m = month + delta;
+    let y = year;
+    if (m < 1) { m = 12; y -= 1; }
+    if (m > 12) { m = 1; y += 1; }
+    onMonthChange(y, m);
+  };
+
+  const goToToday = () => {
+    const now = new Date();
+    onMonthChange(now.getFullYear(), now.getMonth() + 1);
+  };
 
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader className="flex flex-col gap-1 space-y-0 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-base">Calendário Fiscal</CardTitle>
+        <span className="text-xs text-muted-ink">
+          {MONTHS[month - 1]?.toLowerCase()} {year} · {obligationGroups.length} {obligationGroups.length === 1 ? 'obrigação mapeada' : 'obrigações mapeadas'}
+        </span>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-4">
         {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-56 w-full" />
           </div>
-        ) : obligationCards.length === 0 ? (
-          <div className="flex items-center gap-3 py-6 text-muted-foreground">
-            <CheckCircle2 className="h-5 w-5 text-ok" />
-            <span>Nenhuma obrigação lançada neste mês</span>
-          </div>
         ) : (
           <>
-            {/* Fileira de cards de obrigação */}
-            <div className="flex gap-3 overflow-x-auto flex-nowrap pb-1 -mx-1 px-1">
-              {obligationCards.map((c) => (
-                <div
-                  key={c.key}
-                  className="flex w-[168px] shrink-0 flex-col gap-1 rounded-md border border-line bg-paper p-3"
-                >
-                  <span className="text-lg font-bold leading-none text-ink">
-                    {format(parseISO(c.dueDate), 'dd/MM')}
-                  </span>
-                  <span className="text-sm font-medium text-ink truncate" title={c.name}>{c.name}</span>
-                  <span className="text-xs text-muted-ink">{MONTHS[month - 1]} {year}</span>
-                  <span className="text-xs text-muted-ink">
-                    {c.concluidas} transmitida{c.concluidas !== 1 ? 's' : ''} · {c.pendentes} pendente{c.pendentes !== 1 ? 's' : ''}
-                  </span>
-                </div>
+            {/* Legenda */}
+            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-ink">
+              {LEGEND.map((l) => (
+                <span key={l.status} className="inline-flex items-center gap-1.5">
+                  <span className={cn('h-1.5 w-1.5 rounded-full', dayDotClass[l.status])} />
+                  {l.label}
+                </span>
               ))}
             </div>
 
+            {/* Navegador de mês + resumo */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => shiftMonth(-1)} aria-label="Mês anterior">
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="w-[120px] text-center text-sm font-medium text-ink">{MONTHS[month - 1]} {year}</span>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => shiftMonth(1)} aria-label="Próximo mês">
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                {vencidos > 0 && <DsBadge tone="danger">{vencidos} vencido{vencidos !== 1 ? 's' : ''}</DsBadge>}
+                {pendentesCount > 0 && <DsBadge tone="warn">{pendentesCount} pendente{pendentesCount !== 1 ? 's' : ''}</DsBadge>}
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-ink">
+                <span>Hoje: {format(parseISO(today), 'dd/MM')}</span>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={goToToday}>
+                  Voltar para hoje
+                </Button>
+              </div>
+            </div>
+
+            {obligationGroups.length === 0 ? (
+              <div className="flex items-center gap-3 py-6 text-muted-foreground">
+                <CheckCircle2 className="h-5 w-5 text-ok" />
+                <span>Nenhuma obrigação lançada neste mês</span>
+              </div>
+            ) : (
+              <div className="flex gap-3 overflow-x-auto flex-nowrap pb-1 -mx-1 px-1">
+                {obligationGroups.map((g) => {
+                  const status = statusOf(g.tasks, today);
+                  const concluidas = g.tasks.filter((t) => t.status === 'concluido').length;
+                  const pendentes = g.tasks.length - concluidas;
+                  const dueDate = parseISO(g.dueDate);
+                  return (
+                    <button
+                      key={g.key}
+                      type="button"
+                      onClick={() => openGroup(g)}
+                      className="flex w-[168px] shrink-0 flex-col items-center gap-2 rounded-md border border-line bg-paper p-3 text-center transition-colors hover:bg-bg-2"
+                    >
+                      <span className={cn('flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full border-2', dayRingClass[status])}>
+                        <span className="text-[9px] uppercase leading-none">{WEEKDAYS_ABBR[dueDate.getDay()]}</span>
+                        <span className="text-lg font-bold leading-none">{dueDate.getDate()}</span>
+                      </span>
+                      <div className="w-full space-y-0.5 text-left">
+                        <p className="text-sm font-medium text-ink truncate" title={g.name}>{g.name}</p>
+                        <p className="text-xs text-muted-ink">Competência {MONTHS[month - 1]}/{year}</p>
+                        <p className="text-xs text-muted-ink">
+                          {concluidas} transmitida{concluidas !== 1 ? 's' : ''} · {pendentes} pendente{pendentes !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Grade do mês */}
             <div>
+              <p className="mb-2 text-[11px] uppercase tracking-[0.05em] text-muted-ink-2">Calendário do mês</p>
               <div className="grid grid-cols-7 gap-1 text-center text-[11px] uppercase text-muted-ink mb-1">
                 {WEEKDAYS.map((d) => <div key={d}>{d}</div>)}
               </div>
@@ -391,7 +496,7 @@ function FiscalCalendarCard({
                     <button
                       key={cell.iso}
                       type="button"
-                      onClick={() => setSelectedDay(cell.iso)}
+                      onClick={() => openDay(cell.iso)}
                       className={cn(
                         'flex flex-col items-center justify-center gap-1 rounded-md py-2 text-sm text-ink transition-colors hover:bg-bg-2',
                         isToday && 'bg-bg-2 font-semibold',
@@ -418,11 +523,10 @@ function FiscalCalendarCard({
         )}
       </CardContent>
 
-      <DayTasksSheet
-        open={!!selectedDay}
-        onOpenChange={(o) => !o && setSelectedDay(null)}
-        dateIso={selectedDay}
-        tasks={selectedTasks}
+      <CalendarSelectionSheet
+        open={!!selection}
+        onOpenChange={(o) => !o && setSelection(null)}
+        selection={selection}
         today={today}
         isCompleting={isCompleting}
         onCompleteTasks={onCompleteTasks}
@@ -445,19 +549,17 @@ const dayTaskStatusTone: Record<DayTaskStatus, 'ok' | 'danger' | 'warn'> = {
   pendente: 'warn',
 };
 
-function DayTasksSheet({
+function CalendarSelectionSheet({
   open,
   onOpenChange,
-  dateIso,
-  tasks,
+  selection,
   today,
   isCompleting,
   onCompleteTasks,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  dateIso: string | null;
-  tasks: FiscalTaskRow[];
+  selection: CalendarSelection | null;
   today: string;
   isCompleting: boolean;
   onCompleteTasks: (ids: string[]) => void;
@@ -466,11 +568,13 @@ function DayTasksSheet({
   const [statusFilter, setStatusFilter] = useState<'todos' | DayTaskStatus>('todos');
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  const tasks = selection?.tasks ?? [];
+
   useEffect(() => {
     setSearch('');
     setStatusFilter('todos');
     setSelected(new Set());
-  }, [dateIso]);
+  }, [selection?.title, selection?.dueDate]);
 
   const rows = useMemo(
     () =>
@@ -508,15 +612,19 @@ function DayTasksSheet({
     setSelected(new Set());
   };
 
-  const dateLabel = dateIso ? format(parseISO(dateIso), "dd 'de' MMMM", { locale: ptBR }) : '';
+  const groupStatus = statusOf(tasks, today);
+  const empresasCount = new Set(tasks.map((t) => t.contact_id)).size;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto px-6 py-6">
         <SheetHeader className="space-y-1 pb-4">
-          <SheetTitle className="text-2xl first-letter:uppercase">{dateLabel}</SheetTitle>
-          <p className="text-sm text-muted-foreground">
-            {tasks.length} {tasks.length === 1 ? 'obrigação' : 'obrigações'} vencendo neste dia
+          <SheetTitle className="text-2xl">{selection?.title}</SheetTitle>
+          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <span className={cn('h-1.5 w-1.5 rounded-full', dayDotClass[groupStatus])} />
+            {groupStatus === 'ok' ? 'Concluído' : 'Aberto'}
+            {selection?.dueDate && ` · Vencimento: ${format(parseISO(selection.dueDate), 'dd/MM/yyyy')}`}
+            {` · ${empresasCount} ${empresasCount === 1 ? 'empresa' : 'empresas'}`}
           </p>
         </SheetHeader>
 
@@ -538,6 +646,17 @@ function DayTasksSheet({
               </SelectContent>
             </Select>
           </div>
+
+          {selected.size > 0 && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-line bg-bg-2 px-4 py-3">
+              <span className="text-sm text-ink">
+                {selected.size} {selected.size === 1 ? 'empresa selecionada' : 'empresas selecionadas'}
+              </span>
+              <Button size="sm" onClick={handleComplete} disabled={isCompleting}>
+                <Plus className="h-4 w-4" /> Concluir tarefas
+              </Button>
+            </div>
+          )}
 
           <Table>
             <TableHeader>
@@ -561,7 +680,6 @@ function DayTasksSheet({
                     <TableCell>
                       <Checkbox
                         checked={selected.has(task.id)}
-                        disabled={statusKey === 'concluida'}
                         onCheckedChange={(v) => toggleSelected(task.id, !!v)}
                         aria-label={`Selecionar ${task.contacts?.name ?? ''}`}
                       />
@@ -578,17 +696,6 @@ function DayTasksSheet({
               )}
             </TableBody>
           </Table>
-
-          {selected.size > 0 && (
-            <div className="flex items-center justify-between gap-3 rounded-md border border-line bg-bg-2 px-4 py-3">
-              <span className="text-sm text-ink">
-                {selected.size} {selected.size === 1 ? 'empresa selecionada' : 'empresas selecionadas'}
-              </span>
-              <Button size="sm" onClick={handleComplete} disabled={isCompleting}>
-                Concluir tarefas
-              </Button>
-            </div>
-          )}
         </div>
       </SheetContent>
     </Sheet>
