@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPages } from '@/lib/fetch-all';
 import { useCompany } from '@/hooks/useCompany';
 import {
   BookOpen,
@@ -287,14 +288,18 @@ export default function FiscalObrigacoes() {
     queryKey: ['client-obligations-count', companyId],
     enabled: !!companyId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('client_obligations')
-        .select('obligation_id')
-        .eq('company_id', companyId!);
-      if (error) throw error;
+      // fetchAllPages: a tabela já passa de 1000 linhas — sem isso o PostgREST
+      // corta e a contagem de empresas por obrigação fica menor que a real.
+      const data = await fetchAllPages<{ obligation_id: string }>(() =>
+        supabase
+          .from('client_obligations')
+          .select('obligation_id')
+          .eq('company_id', companyId!)
+          .order('id', { ascending: true })
+      );
       const counts: Record<string, number> = {};
-      (data ?? []).forEach((row) => {
-        const id = (row as { obligation_id: string }).obligation_id;
+      data.forEach((row) => {
+        const id = row.obligation_id;
         counts[id] = (counts[id] ?? 0) + 1;
       });
       return counts;

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPages } from '@/lib/fetch-all';
 
 /**
  * Returns IDs of contacts eligible for the Fiscal module:
@@ -8,14 +9,18 @@ import { supabase } from '@/integrations/supabase/client';
  * - tagged as "cliente" in categorias
  */
 export async function fetchValidFiscalContactIds(companyId: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('contacts')
-    .select('id, tax_regime, categorias')
-    .eq('company_id', companyId)
-    .eq('is_active', true)
-    .not('tax_regime', 'is', null);
-  if (error) throw error;
-  return (data ?? [])
+  // fetchAllPages: este filtro decide quais tarefas o Kanban mostra — se o
+  // PostgREST cortar em 1000 contatos, tarefas de clientes válidos somem.
+  const data = await fetchAllPages<{ id: string; tax_regime: string | null; categorias: string[] | null }>(() =>
+    supabase
+      .from('contacts')
+      .select('id, tax_regime, categorias')
+      .eq('company_id', companyId)
+      .eq('is_active', true)
+      .not('tax_regime', 'is', null)
+      .order('id', { ascending: true })
+  );
+  return data
     .filter((r: any) => {
       const v = (r.tax_regime ?? '').toString().trim();
       const isCliente = Array.isArray(r.categorias) && r.categorias.includes('cliente');

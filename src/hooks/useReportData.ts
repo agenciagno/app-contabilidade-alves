@@ -6,6 +6,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { zebraPorData } from '@/lib/pdf-zebra';
+import { fetchAllPages } from '@/lib/fetch-all';
 
 interface ReportFilters {
   startDate?: Date;
@@ -37,55 +38,59 @@ export function useReportData(filters: ReportFilters) {
     queryKey: ['report-data', activeCompanyId, filters],
     enabled: !!activeCompanyId,
     queryFn: async () => {
-      let query = supabase
-        .from('transactions')
-        .select(`
-          id,
-          description,
-          amount,
-          type,
-          date,
-          due_date,
-          is_paid,
-          category:categories(id, name, color),
-          bank:banks(id, name, color),
-          contact:contacts(id, name, type, tax_regime, phone)
-        `)
-        .eq('company_id', activeCompanyId!)
-        .is('deleted_at', null)
-        .eq('is_transfer', false)
-        .order('date', { ascending: false });
+      // fetchAllPages: sem isso o PostgREST corta em 1000 linhas e o relatório
+      // soma incompleto em períodos longos (>1000 lançamentos no filtro).
+      const buildQuery = () => {
+        let query = supabase
+          .from('transactions')
+          .select(`
+            id,
+            description,
+            amount,
+            type,
+            date,
+            due_date,
+            is_paid,
+            category:categories(id, name, color),
+            bank:banks(id, name, color),
+            contact:contacts(id, name, type, tax_regime, phone)
+          `)
+          .eq('company_id', activeCompanyId!)
+          .is('deleted_at', null)
+          .eq('is_transfer', false)
+          .order('date', { ascending: false })
+          .order('id', { ascending: false });
 
-      if (filters.startDate) {
-        query = query.gte('date', format(filters.startDate, 'yyyy-MM-dd'));
-      }
-      if (filters.endDate) {
-        query = query.lte('date', format(filters.endDate, 'yyyy-MM-dd'));
-      }
-      if (filters.categoryId && filters.categoryId !== 'all') {
-        query = query.eq('category_id', filters.categoryId);
-      }
-      if (filters.bankId && filters.bankId !== 'all') {
-        query = query.eq('bank_id', filters.bankId);
-      }
-      if (filters.transactionType && filters.transactionType !== 'all') {
-        query = query.eq('type', filters.transactionType);
-      }
-      if (filters.contactId && filters.contactId !== 'all') {
-        query = query.eq('contact_id', filters.contactId);
-      }
-      if (filters.paymentStatus && filters.paymentStatus !== 'all') {
-        query = query.eq('is_paid', filters.paymentStatus === 'paid');
-      }
-      // Exclude invisible bank transactions
-      if (filters.invisibleBankIds && filters.invisibleBankIds.length > 0) {
-        const notInFilter = filters.invisibleBankIds.map(id => `bank_id.neq.${id}`).join(',');
-        query = query.or(`bank_id.is.null,and(${notInFilter})`);
-      }
+        if (filters.startDate) {
+          query = query.gte('date', format(filters.startDate, 'yyyy-MM-dd'));
+        }
+        if (filters.endDate) {
+          query = query.lte('date', format(filters.endDate, 'yyyy-MM-dd'));
+        }
+        if (filters.categoryId && filters.categoryId !== 'all') {
+          query = query.eq('category_id', filters.categoryId);
+        }
+        if (filters.bankId && filters.bankId !== 'all') {
+          query = query.eq('bank_id', filters.bankId);
+        }
+        if (filters.transactionType && filters.transactionType !== 'all') {
+          query = query.eq('type', filters.transactionType);
+        }
+        if (filters.contactId && filters.contactId !== 'all') {
+          query = query.eq('contact_id', filters.contactId);
+        }
+        if (filters.paymentStatus && filters.paymentStatus !== 'all') {
+          query = query.eq('is_paid', filters.paymentStatus === 'paid');
+        }
+        // Exclude invisible bank transactions
+        if (filters.invisibleBankIds && filters.invisibleBankIds.length > 0) {
+          const notInFilter = filters.invisibleBankIds.map(id => `bank_id.neq.${id}`).join(',');
+          query = query.or(`bank_id.is.null,and(${notInFilter})`);
+        }
+        return query;
+      };
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as ReportTransaction[];
+      return fetchAllPages<ReportTransaction>(buildQuery);
     },
   });
 }

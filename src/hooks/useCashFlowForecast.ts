@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { addDays, format, startOfDay, parseISO, isWithinInterval, getDate } from 'date-fns';
 import { useBanks } from './useBanks';
 import { useActiveCompany } from '@/contexts/CompanyContext';
+import { fetchAllPages } from '@/lib/fetch-all';
 
 interface ForecastTransaction {
   id: string;
@@ -79,34 +80,37 @@ export function useCashFlowForecast(days: number = 30) {
   const { data: pendingTransactions = [], isLoading: loadingTransactions } = useQuery({
     queryKey: ['cash-flow-pending', activeCompanyId, days, invisibleBankIds],
     queryFn: async () => {
-      let query = supabase
-        .from('transactions')
-        .select(`
-          id,
-          date,
-          description,
-          amount,
-          type,
-          is_paid,
-          bank_id,
-          category:categories(name, color)
-        `)
-        .eq('company_id', activeCompanyId!)
-        .is('deleted_at', null)
-        .eq('is_transfer', false)
-        .eq('is_paid', false)
-        .gte('date', format(today, 'yyyy-MM-dd'))
-        .lte('date', format(endDate, 'yyyy-MM-dd'))
-        .order('date');
+      // fetchAllPages: sem isso o PostgREST corta em 1000 linhas e a projeção
+      // do fluxo de caixa perderia lançamentos pendentes na janela.
+      const data = await fetchAllPages<any>(() => {
+        let query = supabase
+          .from('transactions')
+          .select(`
+            id,
+            date,
+            description,
+            amount,
+            type,
+            is_paid,
+            bank_id,
+            category:categories(name, color)
+          `)
+          .eq('company_id', activeCompanyId!)
+          .is('deleted_at', null)
+          .eq('is_transfer', false)
+          .eq('is_paid', false)
+          .gte('date', format(today, 'yyyy-MM-dd'))
+          .lte('date', format(endDate, 'yyyy-MM-dd'))
+          .order('date')
+          .order('id');
 
-      // Exclude transactions from invisible banks
-      if (invisibleBankIds.length > 0) {
-        const notInFilter = invisibleBankIds.map(id => `bank_id.neq.${id}`).join(',');
-        query = query.or(`bank_id.is.null,and(${notInFilter})`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
+        // Exclude transactions from invisible banks
+        if (invisibleBankIds.length > 0) {
+          const notInFilter = invisibleBankIds.map(id => `bank_id.neq.${id}`).join(',');
+          query = query.or(`bank_id.is.null,and(${notInFilter})`);
+        }
+        return query;
+      });
       return data.map(t => ({
         id: t.id,
         date: t.date,
@@ -149,25 +153,28 @@ export function useCashFlowForecast(days: number = 30) {
   // Fetch paid transactions of the past window to reconstruct the REALIZED balance curve.
   const { data: paidHistory = [], isLoading: loadingHistory } = useQuery({
     queryKey: ['cash-flow-realized', activeCompanyId, days, invisibleBankIds],
-    queryFn: async () => {
-      let query = supabase
-        .from('transactions')
-        .select('date, amount, paid_amount, type, bank_id')
-        .eq('company_id', activeCompanyId!)
-        .is('deleted_at', null)
-        .eq('is_transfer', false)
-        .eq('is_paid', true)
-        .not('date', 'is', null)
-        .gte('date', format(addDays(today, -days), 'yyyy-MM-dd'))
-        .lte('date', format(today, 'yyyy-MM-dd'));
-      if (invisibleBankIds.length > 0) {
-        const notInFilter = invisibleBankIds.map(id => `bank_id.neq.${id}`).join(',');
-        query = query.or(`bank_id.is.null,and(${notInFilter})`);
-      }
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as { date: string; amount: number; paid_amount: number | null; type: string }[];
-    },
+    queryFn: async () =>
+      // fetchAllPages: a janela realizada já beira 1000 linhas (~500/mês) — sem
+      // isso a curva de saldo realizado perderia lançamentos em silêncio.
+      fetchAllPages<{ date: string; amount: number; paid_amount: number | null; type: string }>(() => {
+        let query = supabase
+          .from('transactions')
+          .select('date, amount, paid_amount, type, bank_id')
+          .eq('company_id', activeCompanyId!)
+          .is('deleted_at', null)
+          .eq('is_transfer', false)
+          .eq('is_paid', true)
+          .not('date', 'is', null)
+          .gte('date', format(addDays(today, -days), 'yyyy-MM-dd'))
+          .lte('date', format(today, 'yyyy-MM-dd'))
+          .order('date')
+          .order('id');
+        if (invisibleBankIds.length > 0) {
+          const notInFilter = invisibleBankIds.map(id => `bank_id.neq.${id}`).join(',');
+          query = query.or(`bank_id.is.null,and(${notInFilter})`);
+        }
+        return query;
+      }),
     enabled: !!activeCompanyId,
   });
 

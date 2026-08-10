@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { createAuditLog, getFieldChanges } from '@/hooks/useAuditLog';
 import { createGlobalLog } from '@/hooks/useGlobalLogs';
+import { fetchAllPages } from '@/lib/fetch-all';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 
 export type TaxRegime = 'mei' | 'simples_nacional' | 'lucro_presumido' | 'lucro_real' | 'nao_aplica';
@@ -124,16 +125,17 @@ export function useContacts() {
 
   const { data: contacts = [], isLoading, error } = useQuery({
     queryKey: ['contacts', activeCompanyId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('*')
-        .eq('company_id', activeCompanyId!)
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      return data as Contact[];
-    },
+    queryFn: async () =>
+      // fetchAllPages: garante a carteira completa mesmo acima de 1000 contatos
+      // (teto silencioso do PostgREST) — lista de clientes nunca pode truncar.
+      fetchAllPages<Contact>(() =>
+        supabase
+          .from('contacts')
+          .select('*')
+          .eq('company_id', activeCompanyId!)
+          .order('name', { ascending: true })
+          .order('id', { ascending: true })
+      ),
     enabled: !!activeCompanyId,
     staleTime: 1000 * 30,
     gcTime: 1000 * 60 * 5,

@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPages } from '@/lib/fetch-all';
 import { useQuery } from '@tanstack/react-query';
 import { useCompany } from '@/hooks/useCompany';
 import { FiscalCalendarEffectiveRow } from '@/hooks/useFiscalCalendar';
@@ -53,14 +54,16 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
     { obligation_id: string; contact_id: string }[]
   >({
     queryKey: ['client-obligations-all', companyId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('client_obligations')
-        .select('obligation_id, contact_id')
-        .eq('company_id', companyId!);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      // fetchAllPages: a tabela já passa de 1000 linhas — sem isso o PostgREST
+      // corta e o preview subconta clientes por obrigação.
+      fetchAllPages<{ obligation_id: string; contact_id: string }>(() =>
+        supabase
+          .from('client_obligations')
+          .select('obligation_id, contact_id')
+          .eq('company_id', companyId!)
+          .order('id', { ascending: true })
+      ),
     enabled: !!companyId,
   });
 

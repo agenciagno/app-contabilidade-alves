@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchAllPages } from '@/lib/fetch-all';
 
 export interface ContactTransaction {
   id: string;
@@ -20,35 +21,36 @@ export function useContactTransactions(contactId: string | undefined, invisibleB
     queryKey: ['contact-transactions', contactId, invisibleBankIds],
     queryFn: async () => {
       if (!contactId) return [];
-      
-      let query = supabase
-        .from('transactions')
-        .select(`
-          id,
-          description,
-          amount,
-          paid_amount,
-          type,
-          date,
-          due_date,
-          is_paid,
-          bank_id,
-          category:categories(id, name, color),
-          bank:banks(id, name)
-        `)
-        .is('deleted_at', null)
-        .eq('contact_id', contactId);
 
-      // Exclude transactions from invisible banks
-      if (invisibleBankIds && invisibleBankIds.length > 0) {
-        const notInFilter = invisibleBankIds.map(id => `bank_id.neq.${id}`).join(',');
-        query = query.or(`bank_id.is.null,and(${notInFilter})`);
-      }
+      // fetchAllPages: o status de inadimplência é derivado da lista completa —
+      // se o PostgREST cortar em 1000, título vencido pode sumir do cálculo.
+      return fetchAllPages<ContactTransaction>(() => {
+        let query = supabase
+          .from('transactions')
+          .select(`
+            id,
+            description,
+            amount,
+            paid_amount,
+            type,
+            date,
+            due_date,
+            is_paid,
+            bank_id,
+            category:categories(id, name, color),
+            bank:banks(id, name)
+          `)
+          .is('deleted_at', null)
+          .eq('contact_id', contactId);
 
-      const { data, error } = await query.order('date', { ascending: false });
+        // Exclude transactions from invisible banks
+        if (invisibleBankIds && invisibleBankIds.length > 0) {
+          const notInFilter = invisibleBankIds.map(id => `bank_id.neq.${id}`).join(',');
+          query = query.or(`bank_id.is.null,and(${notInFilter})`);
+        }
 
-      if (error) throw error;
-      return data as ContactTransaction[];
+        return query.order('date', { ascending: false }).order('id', { ascending: false });
+      });
     },
     enabled: !!contactId,
   });

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { fetchAllPages } from '@/lib/fetch-all';
 
 export interface TrashItem {
   id: string;
@@ -21,32 +22,33 @@ export function useTrash(searchTerm: string, dateFrom?: string, dateTo?: string)
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['trash-items', searchTerm, dateFrom, dateTo],
-    queryFn: async () => {
-      let query = supabase
-        .from('transactions')
-        .select(`
-          id, description, amount, type, due_date, date, deleted_at,
-          contact:contacts(id, name),
-          category:categories(id, name),
-          bank:banks(id, name)
-        `)
-        .not('deleted_at', 'is', null)
-        .order('deleted_at', { ascending: false });
+    queryFn: async () =>
+      // fetchAllPages: lixeira acima de 1000 itens não pode esconder linha —
+      // restaurar/excluir precisa enxergar tudo (teto silencioso do PostgREST).
+      fetchAllPages<TrashItem>(() => {
+        let query = supabase
+          .from('transactions')
+          .select(`
+            id, description, amount, type, due_date, date, deleted_at,
+            contact:contacts(id, name),
+            category:categories(id, name),
+            bank:banks(id, name)
+          `)
+          .not('deleted_at', 'is', null)
+          .order('deleted_at', { ascending: false })
+          .order('id', { ascending: false });
 
-      if (searchTerm) {
-        query = query.or(`description.ilike.%${searchTerm}%`);
-      }
-      if (dateFrom) {
-        query = query.gte('deleted_at', dateFrom);
-      }
-      if (dateTo) {
-        query = query.lte('deleted_at', dateTo + 'T23:59:59');
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as TrashItem[];
-    },
+        if (searchTerm) {
+          query = query.or(`description.ilike.%${searchTerm}%`);
+        }
+        if (dateFrom) {
+          query = query.gte('deleted_at', dateFrom);
+        }
+        if (dateTo) {
+          query = query.lte('deleted_at', dateTo + 'T23:59:59');
+        }
+        return query;
+      }),
     staleTime: 1000 * 15,
   });
 
