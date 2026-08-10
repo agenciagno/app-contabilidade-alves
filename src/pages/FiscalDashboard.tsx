@@ -483,56 +483,52 @@ function FiscalCalendarCard({
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <div className="relative">
-              <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-paper to-transparent" />
-              <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-paper to-transparent" />
-              <div className="flex gap-3 overflow-x-auto flex-nowrap pb-1">
-                {weekDays.map((wd) => {
-                  const hasTasks = wd.tasks.length > 0;
-                  const status = hasTasks ? statusOf(wd.tasks, today) : null;
-                  const concluidas = wd.tasks.filter((t) => t.status === 'concluido').length;
-                  const pendentes = wd.tasks.length - concluidas;
-                  const names = new Set(wd.tasks.map((t) => t.fiscal_obligations_catalog?.name ?? t.title ?? 'Obrigação'));
-                  const label = names.size === 1 ? [...names][0] : `${names.size} obrigações`;
-                  const isToday = wd.iso === today;
-                  return (
-                    <div
-                      key={wd.iso}
-                      role={hasTasks ? 'button' : undefined}
-                      tabIndex={hasTasks ? 0 : undefined}
-                      onClick={hasTasks ? () => openDay(wd.iso) : undefined}
-                      onKeyDown={hasTasks ? (e) => { if (e.key === 'Enter' || e.key === ' ') openDay(wd.iso); } : undefined}
-                      className={cn(
-                        'flex w-[148px] shrink-0 flex-col gap-2 rounded-md border border-line bg-paper p-3 text-left transition-colors',
-                        hasTasks && 'cursor-pointer hover:bg-bg-2',
-                        isToday && 'border-ink/40',
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={cn(
-                            'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold',
-                            status ? dayRingClass[status] : 'border-line text-muted-ink',
-                          )}
-                        >
-                          {wd.date.getDate()}
-                        </span>
-                        <span className="text-[10px] uppercase text-muted-ink">{WEEKDAYS_ABBR[wd.date.getDay()]}</span>
-                      </div>
-                      {hasTasks ? (
-                        <div className="space-y-0.5">
-                          <p className="text-sm font-medium text-ink truncate" title={label}>{label}</p>
-                          <p className="text-xs text-muted-ink">
-                            {concluidas} transmitida{concluidas !== 1 ? 's' : ''} · {pendentes} pendente{pendentes !== 1 ? 's' : ''}
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-ink-2">Sem obrigações</p>
-                      )}
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+              {weekDays.map((wd) => {
+                const hasTasks = wd.tasks.length > 0;
+                const status = hasTasks ? statusOf(wd.tasks, today) : null;
+                const concluidas = wd.tasks.filter((t) => t.status === 'concluido').length;
+                const pendentes = wd.tasks.length - concluidas;
+                const names = new Set(wd.tasks.map((t) => t.fiscal_obligations_catalog?.name ?? t.title ?? 'Obrigação'));
+                const label = names.size === 1 ? [...names][0] : `${names.size} obrigações`;
+                const isToday = wd.iso === today;
+                return (
+                  <div
+                    key={wd.iso}
+                    role={hasTasks ? 'button' : undefined}
+                    tabIndex={hasTasks ? 0 : undefined}
+                    onClick={hasTasks ? () => openDay(wd.iso) : undefined}
+                    onKeyDown={hasTasks ? (e) => { if (e.key === 'Enter' || e.key === ' ') openDay(wd.iso); } : undefined}
+                    className={cn(
+                      'flex min-w-0 flex-col gap-2 rounded-md border border-line bg-paper p-2.5 text-left transition-colors',
+                      hasTasks && 'cursor-pointer hover:bg-bg-2',
+                      isToday && 'border-ink/40',
+                    )}
+                  >
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span
+                        className={cn(
+                          'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold',
+                          status ? dayRingClass[status] : 'border-line text-muted-ink',
+                        )}
+                      >
+                        {wd.date.getDate()}
+                      </span>
+                      <span className="min-w-0 truncate text-[10px] uppercase text-muted-ink">{WEEKDAYS_ABBR[wd.date.getDay()]}</span>
                     </div>
-                  );
-                })}
-              </div>
+                    {hasTasks ? (
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="text-xs font-medium text-ink truncate" title={label}>{label}</p>
+                        <p className="text-[11px] text-muted-ink truncate">
+                          {concluidas} transmitida{concluidas !== 1 ? 's' : ''} · {pendentes} pendente{pendentes !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="truncate text-[11px] text-muted-ink-2">Sem obrigações</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Grade do mês */}
