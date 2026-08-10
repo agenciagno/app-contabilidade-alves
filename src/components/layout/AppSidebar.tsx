@@ -50,6 +50,7 @@ import { UserMenu } from './UserMenu';
 import { useCompany } from '@/hooks/useCompany';
 import { usePinnedShortcuts, PinnedShortcut } from '@/hooks/usePinnedShortcuts';
 import { useModuleAccess, type RoleGated } from '@/hooks/useModuleAccess';
+import { useAudience } from '@/hooks/useAudience';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 
 import {
@@ -144,6 +145,8 @@ interface SubMenuItem extends MenuItem, RoleGated {
 interface SectionDivider {
   kind: 'section';
   label: string;
+  /** Audiência do divisor — ausente = aparece nas duas visões. */
+  audience?: 'internal' | 'external' | 'both';
 }
 
 interface SimpleModule extends RoleGated {
@@ -308,6 +311,9 @@ export const menuEntries: MenuEntry[] = [
     moduleKey: 'diagnostico_ca',
   },
 
+  // Divisor só da visão interna — no Sistema Externo o menu é curto e o rótulo
+  // seria ruído (pedido de Gabriel, 10/08).
+  { kind: 'section', label: 'Administração', audience: 'internal' },
   {
     kind: 'collapsible',
     title: 'Financeiro',
@@ -379,6 +385,7 @@ export function AppSidebar() {
   const { companyName, companyCnpj, company } = useCompany();
   const { pinnedShortcuts, isPinned, togglePin } = usePinnedShortcuts();
   const { isModuleVisible, isSubItemVisible, passesRoleGate } = useModuleAccess();
+  const audience = useAudience();
   const { pendingCount } = usePendingApprovals();
 
   const logoUrl: string | null = (company as any)?.logo_url ?? null;
@@ -407,8 +414,10 @@ export function AppSidebar() {
 
   // Divisor só aparece se existir ao menos um item visível abaixo dele,
   // antes do próximo divisor — senão sobra um rótulo órfão no menu.
+  // Divisor com audiência declarada também respeita a visão ativa.
   const visibleEntries = menuEntries.filter((entry, index) => {
     if (entry.kind !== 'section') return isEntryVisible(entry);
+    if (entry.audience && entry.audience !== 'both' && entry.audience !== audience) return false;
     for (let i = index + 1; i < menuEntries.length; i++) {
       const next = menuEntries[i];
       if (next.kind === 'section') break;
