@@ -66,4 +66,17 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     include: ["@tanstack/react-query"],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Vendors estáveis em chunks próprios: deploy do app não invalida
+        // o cache dessas bibliotecas no PWA (hash só muda quando a lib muda).
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-query": ["@tanstack/react-query"],
+        },
+      },
+    },
+  },
 }));

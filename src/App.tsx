@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,52 +12,69 @@ import { ModuleGuard } from "@/components/auth/ModuleGuard";
 import { PwaUpdateBanner } from "@/components/PwaUpdateBanner";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 
-// Pages
+// Páginas de entrada ficam no bundle inicial; o resto carrega sob demanda por rota.
 import Auth from "@/pages/Auth";
 import RedefinirSenha from "@/pages/RedefinirSenha";
-import Home from "@/pages/Home";
-import Dashboard from "@/pages/Dashboard";
-import Transactions from "@/pages/Transactions";
-
-import Contacts from "@/pages/Contacts";
-import ContactProfile from "@/pages/ContactProfile";
-import Banks from "@/pages/Banks";
-import Categories from "@/pages/Categories";
-import ClientCategories from "@/pages/ClientCategories";
-import DRE from "@/pages/DRE";
-import SettingsPage from "@/pages/SettingsPage";
-import CrmDispatches from "@/pages/CrmDispatches";
-import ClientReport from "@/pages/ClientReport";
-import Boletos from "@/pages/Boletos";
-import ConciliacaoSicoob from "@/pages/ConciliacaoSicoob";
-import PagarReceber from "@/pages/PagarReceber";
-import Parties from "@/pages/Parties";
-import CashFlow from "@/pages/CashFlow";
-import FiscalTasks from "@/pages/FiscalTasks";
-import FiscalCalendar from "@/pages/FiscalCalendar";
-import FiscalDashboard from "@/pages/FiscalDashboard";
-import FiscalCollaborators from "@/pages/FiscalCollaborators";
-import FiscalObrigacoes from "@/pages/FiscalObrigacoes";
-
 import NoAccess from "@/pages/NoAccess";
 import NotFound from "@/pages/NotFound";
-import Newsletter from "@/pages/Newsletter";
-import CofreGlobal from "@/pages/CofreGlobal";
-import TechClientesExternos from "@/pages/TechClientesExternos";
-import TechClienteExternoDetalhe from "@/pages/TechClienteExternoDetalhe";
-import TechLGPD from "@/pages/TechLGPD";
-import TechAgenteIA from "@/pages/TechAgenteIA";
-import CentralNotificacoes from "@/pages/CentralNotificacoes";
-import MetasOrcamentos from "@/pages/MetasOrcamentos";
-import MinhaConta from "@/pages/MinhaConta";
-import Suporte from "@/pages/Suporte";
-import Faturas from "@/pages/Faturas";
-import Equipe from "@/pages/Equipe";
-import ReformaTributariaCalculadora from "@/pages/ReformaTributariaCalculadora";
 import { EmBreve } from "@/components/EmBreve";
 
+const Home = lazy(() => import("@/pages/Home"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Transactions = lazy(() => import("@/pages/Transactions"));
+const Contacts = lazy(() => import("@/pages/Contacts"));
+const ContactProfile = lazy(() => import("@/pages/ContactProfile"));
+const Banks = lazy(() => import("@/pages/Banks"));
+const Categories = lazy(() => import("@/pages/Categories"));
+const ClientCategories = lazy(() => import("@/pages/ClientCategories"));
+const DRE = lazy(() => import("@/pages/DRE"));
+const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
+const CrmDispatches = lazy(() => import("@/pages/CrmDispatches"));
+const ClientReport = lazy(() => import("@/pages/ClientReport"));
+const Boletos = lazy(() => import("@/pages/Boletos"));
+const ConciliacaoSicoob = lazy(() => import("@/pages/ConciliacaoSicoob"));
+const PagarReceber = lazy(() => import("@/pages/PagarReceber"));
+const Parties = lazy(() => import("@/pages/Parties"));
+const CashFlow = lazy(() => import("@/pages/CashFlow"));
+const FiscalTasks = lazy(() => import("@/pages/FiscalTasks"));
+const FiscalCalendar = lazy(() => import("@/pages/FiscalCalendar"));
+const FiscalDashboard = lazy(() => import("@/pages/FiscalDashboard"));
+const FiscalCollaborators = lazy(() => import("@/pages/FiscalCollaborators"));
+const FiscalObrigacoes = lazy(() => import("@/pages/FiscalObrigacoes"));
+const Newsletter = lazy(() => import("@/pages/Newsletter"));
+const CofreGlobal = lazy(() => import("@/pages/CofreGlobal"));
+const TechClientesExternos = lazy(() => import("@/pages/TechClientesExternos"));
+const TechClienteExternoDetalhe = lazy(() => import("@/pages/TechClienteExternoDetalhe"));
+const TechLGPD = lazy(() => import("@/pages/TechLGPD"));
+const TechAgenteIA = lazy(() => import("@/pages/TechAgenteIA"));
+const CentralNotificacoes = lazy(() => import("@/pages/CentralNotificacoes"));
+const MetasOrcamentos = lazy(() => import("@/pages/MetasOrcamentos"));
+const MinhaConta = lazy(() => import("@/pages/MinhaConta"));
+const Suporte = lazy(() => import("@/pages/Suporte"));
+const Faturas = lazy(() => import("@/pages/Faturas"));
+const Equipe = lazy(() => import("@/pages/Equipe"));
+const ReformaTributariaCalculadora = lazy(() => import("@/pages/ReformaTributariaCalculadora"));
 
-const queryClient = new QueryClient();
+const RouteFallback = () => (
+  <div className="flex h-screen w-full items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground" />
+  </div>
+);
+
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Dados considerados frescos por 60s: trocar de aba/janela não refaz
+      // todas as queries da tela. Realtime (notificações) usa canal próprio
+      // e invalidações explícitas continuam funcionando normalmente.
+      staleTime: 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -69,6 +87,7 @@ const App = () => (
           <PwaInstallBanner />
           <BrowserRouter>
             <NotificationProvider>
+              <Suspense fallback={<RouteFallback />}>
               <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/redefinir-senha" element={<RedefinirSenha />} />
@@ -152,6 +171,7 @@ const App = () => (
 
               <Route path="*" element={<NotFound />} />
               </Routes>
+              </Suspense>
             </NotificationProvider>
           </BrowserRouter>
         </TooltipProvider>
