@@ -327,6 +327,9 @@ function FiscalCalendarCard({
   onMonthChange: (year: number, month: number) => void;
 }) {
   const [selection, setSelection] = useState<CalendarSelection | null>(null);
+  // Deslocamento em semanas a partir da semana corrente — só a fileira de dias em
+  // destaque usa isso; a grade do mês continua navegando por mês (decisão de Gabriel).
+  const [weekOffset, setWeekOffset] = useState(0);
 
   const byDay = useMemo(() => {
     const map = new Map<string, FiscalTaskRow[]>();
@@ -352,22 +355,31 @@ function FiscalCalendarCard({
     return Array.from(map.values()).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   }, [tasks]);
 
-  // Fileira de dias em destaque: sempre a semana corrente (Dom–Sáb contendo "hoje"),
-  // independente do mês navegado pelas setas — decisão de Gabriel (09/08/2026).
-  const { weekStart, weekEnd } = useMemo(() => {
-    const t = parseISO(today);
-    const start = new Date(t);
-    start.setDate(t.getDate() - t.getDay());
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    return { weekStart: iso(start), weekEnd: iso(end) };
-  }, [today]);
+  // Fileira de dias em destaque: semana completa (Seg–Dom), mostrando todo dia mesmo
+  // sem obrigação — pedido do Gabriel (09/08/2026). Setas próprias deslocam por semana,
+  // independente do mês navegado pela grade abaixo.
+  const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-  const weekGroups = useMemo(
-    () => obligationGroups.filter((g) => g.dueDate >= weekStart && g.dueDate <= weekEnd),
-    [obligationGroups, weekStart, weekEnd],
-  );
+  const weekStartDate = useMemo(() => {
+    const t = parseISO(today);
+    const mondayOffset = (t.getDay() + 6) % 7; // Dom=6, Seg=0, ..., Sáb=5
+    const monday = new Date(t);
+    monday.setDate(t.getDate() - mondayOffset + weekOffset * 7);
+    return monday;
+  }, [today, weekOffset]);
+
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(weekStartDate);
+      d.setDate(weekStartDate.getDate() + i);
+      const iso = isoOf(d);
+      return { date: d, iso, tasks: byDay.get(iso) ?? [] };
+    });
+  }, [weekStartDate, byDay]);
+
+  const weekRangeLabel = `${format(weekStartDate, 'dd/MM')} – ${format(weekDays[6].date, 'dd/MM')}`;
+
+  const shiftWeek = (delta: number) => setWeekOffset((o) => o + delta);
 
   const gridDays = useMemo(() => {
     const startWeekday = new Date(year, month - 1, 1).getDay();
@@ -400,8 +412,6 @@ function FiscalCalendarCard({
     setSelection({ title, dueDate: iso, tasks: list });
   };
 
-  const openGroup = (g: ObligationGroup) => setSelection({ title: g.name, dueDate: g.dueDate, tasks: g.tasks });
-
   const shiftMonth = (delta: number) => {
     let m = month + delta;
     let y = year;
@@ -413,6 +423,7 @@ function FiscalCalendarCard({
   const goToToday = () => {
     const now = new Date();
     onMonthChange(now.getFullYear(), now.getMonth() + 1);
+    setWeekOffset(0);
   };
 
   return (
@@ -462,46 +473,67 @@ function FiscalCalendarCard({
               </div>
             </div>
 
-            {obligationGroups.length === 0 ? (
-              <div className="flex items-center gap-3 py-6 text-muted-foreground">
-                <CheckCircle2 className="h-5 w-5 text-ok" />
-                <span>Nenhuma obrigação lançada neste mês</span>
-              </div>
-            ) : weekGroups.length === 0 ? (
-              <div className="flex items-center gap-3 py-6 text-muted-foreground">
-                <CheckCircle2 className="h-5 w-5 text-ok" />
-                <span>Nenhuma obrigação vencendo nesta semana</span>
-              </div>
-            ) : (
-              <div className="flex gap-3 overflow-x-auto flex-nowrap pb-1 -mx-1 px-1">
-                {weekGroups.map((g) => {
-                  const status = statusOf(g.tasks, today);
-                  const concluidas = g.tasks.filter((t) => t.status === 'concluido').length;
-                  const pendentes = g.tasks.length - concluidas;
-                  const dueDate = parseISO(g.dueDate);
+            {/* Fileira de dias em destaque — semana completa, com setas próprias */}
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => shiftWeek(-1)} aria-label="Semana anterior">
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <span className="text-xs font-medium text-muted-ink">{weekRangeLabel}</span>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => shiftWeek(1)} aria-label="Próxima semana">
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-paper to-transparent" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-paper to-transparent" />
+              <div className="flex gap-3 overflow-x-auto flex-nowrap pb-1">
+                {weekDays.map((wd) => {
+                  const hasTasks = wd.tasks.length > 0;
+                  const status = hasTasks ? statusOf(wd.tasks, today) : null;
+                  const concluidas = wd.tasks.filter((t) => t.status === 'concluido').length;
+                  const pendentes = wd.tasks.length - concluidas;
+                  const names = new Set(wd.tasks.map((t) => t.fiscal_obligations_catalog?.name ?? t.title ?? 'Obrigação'));
+                  const label = names.size === 1 ? [...names][0] : `${names.size} obrigações`;
+                  const isToday = wd.iso === today;
                   return (
-                    <button
-                      key={g.key}
-                      type="button"
-                      onClick={() => openGroup(g)}
-                      className="flex w-[168px] shrink-0 flex-col items-center gap-2 rounded-md border border-line bg-paper p-3 text-center transition-colors hover:bg-bg-2"
+                    <div
+                      key={wd.iso}
+                      role={hasTasks ? 'button' : undefined}
+                      tabIndex={hasTasks ? 0 : undefined}
+                      onClick={hasTasks ? () => openDay(wd.iso) : undefined}
+                      onKeyDown={hasTasks ? (e) => { if (e.key === 'Enter' || e.key === ' ') openDay(wd.iso); } : undefined}
+                      className={cn(
+                        'flex w-[148px] shrink-0 flex-col gap-2 rounded-md border border-line bg-paper p-3 text-left transition-colors',
+                        hasTasks && 'cursor-pointer hover:bg-bg-2',
+                        isToday && 'border-ink/40',
+                      )}
                     >
-                      <span className={cn('flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full border-2', dayRingClass[status])}>
-                        <span className="text-[9px] uppercase leading-none">{WEEKDAYS_ABBR[dueDate.getDay()]}</span>
-                        <span className="text-lg font-bold leading-none">{dueDate.getDate()}</span>
-                      </span>
-                      <div className="w-full space-y-0.5 text-left">
-                        <p className="text-sm font-medium text-ink truncate" title={g.name}>{g.name}</p>
-                        <p className="text-xs text-muted-ink">Competência {MONTHS[month - 1]}/{year}</p>
-                        <p className="text-xs text-muted-ink">
-                          {concluidas} transmitida{concluidas !== 1 ? 's' : ''} · {pendentes} pendente{pendentes !== 1 ? 's' : ''}
-                        </p>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold',
+                            status ? dayRingClass[status] : 'border-line text-muted-ink',
+                          )}
+                        >
+                          {wd.date.getDate()}
+                        </span>
+                        <span className="text-[10px] uppercase text-muted-ink">{WEEKDAYS_ABBR[wd.date.getDay()]}</span>
                       </div>
-                    </button>
+                      {hasTasks ? (
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-medium text-ink truncate" title={label}>{label}</p>
+                          <p className="text-xs text-muted-ink">
+                            {concluidas} transmitida{concluidas !== 1 ? 's' : ''} · {pendentes} pendente{pendentes !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-ink-2">Sem obrigações</p>
+                      )}
+                    </div>
                   );
                 })}
               </div>
-            )}
+            </div>
 
             {/* Grade do mês */}
             <div>
