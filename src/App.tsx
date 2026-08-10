@@ -62,6 +62,10 @@ const RouteFallback = () => (
     <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground" />
   </div>
 );
+// Com v7_startTransition no router, trocar de rota mantém a tela atual até o
+// chunk da próxima página chegar — este fallback externo só aparece em carga
+// direta por URL (primeiro paint), nunca na navegação interna. O fallback de
+// navegação (miolo do conteúdo, sidebar fixa) vive no AppLayout.
 
 
 const queryClient = new QueryClient({
@@ -88,7 +92,7 @@ const App = () => (
           <Sonner />
           <PwaUpdateBanner />
           <PwaInstallBanner />
-          <BrowserRouter>
+          <BrowserRouter future={{ v7_startTransition: true }}>
             <NotificationProvider>
               <Suspense fallback={<RouteFallback />}>
               <Routes>

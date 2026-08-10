@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, Suspense, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -149,7 +149,19 @@ export function AppLayout({ children }: AppLayoutProps) {
           <AppHeader />
           {/* pb extra no mobile: a bottom nav é fixa e cobriria o fim da página */}
           <main className="min-w-0 max-w-full flex-1 p-3 pb-24 sm:p-4 sm:pb-24 md:p-6 md:pb-6 lg:p-8 lg:pb-8">
-            {children}
+            {/* Fallback de navegação: se uma página lazy suspender aqui, só o
+                miolo mostra spinner — sidebar e header ficam no lugar. Com
+                v7_startTransition no router isso quase nunca aparece: a tela
+                anterior segue visível até o chunk chegar. */}
+            <Suspense
+              fallback={
+                <div className="flex h-64 w-full items-center justify-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              }
+            >
+              {children}
+            </Suspense>
           </main>
         </SidebarInset>
         <MobileBottomNav />
