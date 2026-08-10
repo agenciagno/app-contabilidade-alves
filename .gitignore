@@ -33,3 +33,6 @@ dist-ssr
 
 # Supabase CLI
 supabase/.temp
+
+# Segredos locais (nunca versionar)
+.env
