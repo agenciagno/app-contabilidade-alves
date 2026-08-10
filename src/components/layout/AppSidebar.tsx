@@ -308,7 +308,6 @@ export const menuEntries: MenuEntry[] = [
     moduleKey: 'diagnostico_ca',
   },
 
-  { kind: 'section', label: 'Administração' },
   {
     kind: 'collapsible',
     title: 'Financeiro',
@@ -326,7 +325,7 @@ export const menuEntries: MenuEntry[] = [
       { title: 'DRE', url: '/dre', icon: FileBarChart, iconName: 'file-bar-chart', subKey: 'financeiro_dre' },
       // Clientes & Fornecedores mudou de casa: na visão externa vive no grupo
       // Cadastro (decisão Gabriel 10/08). Categorias segue aqui, só no externo.
-      { title: 'Categorias', url: '/financeiro/categorias-clientes', icon: Tags, iconName: 'tags', sectionBreak: 'Módulo vendido a clientes', subKey: 'financeiro_categorias' },
+      { title: 'Categorias', url: '/financeiro/categorias-clientes', icon: Tags, iconName: 'tags', subKey: 'financeiro_categorias' },
       { title: 'Metas & Orçamentos', url: '/financeiro/metas-orcamentos', icon: Target, iconName: 'target', subKey: 'financeiro_metas_orcamentos' },
     ],
   },
