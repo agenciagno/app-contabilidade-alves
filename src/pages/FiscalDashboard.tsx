@@ -352,6 +352,23 @@ function FiscalCalendarCard({
     return Array.from(map.values()).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   }, [tasks]);
 
+  // Fileira de dias em destaque: sempre a semana corrente (Dom–Sáb contendo "hoje"),
+  // independente do mês navegado pelas setas — decisão de Gabriel (09/08/2026).
+  const { weekStart, weekEnd } = useMemo(() => {
+    const t = parseISO(today);
+    const start = new Date(t);
+    start.setDate(t.getDate() - t.getDay());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return { weekStart: iso(start), weekEnd: iso(end) };
+  }, [today]);
+
+  const weekGroups = useMemo(
+    () => obligationGroups.filter((g) => g.dueDate >= weekStart && g.dueDate <= weekEnd),
+    [obligationGroups, weekStart, weekEnd],
+  );
+
   const gridDays = useMemo(() => {
     const startWeekday = new Date(year, month - 1, 1).getDay();
     const daysInMonth = new Date(year, month, 0).getDate();
@@ -450,9 +467,14 @@ function FiscalCalendarCard({
                 <CheckCircle2 className="h-5 w-5 text-ok" />
                 <span>Nenhuma obrigação lançada neste mês</span>
               </div>
+            ) : weekGroups.length === 0 ? (
+              <div className="flex items-center gap-3 py-6 text-muted-foreground">
+                <CheckCircle2 className="h-5 w-5 text-ok" />
+                <span>Nenhuma obrigação vencendo nesta semana</span>
+              </div>
             ) : (
               <div className="flex gap-3 overflow-x-auto flex-nowrap pb-1 -mx-1 px-1">
-                {obligationGroups.map((g) => {
+                {weekGroups.map((g) => {
                   const status = statusOf(g.tasks, today);
                   const concluidas = g.tasks.filter((t) => t.status === 'concluido').length;
                   const pendentes = g.tasks.length - concluidas;
