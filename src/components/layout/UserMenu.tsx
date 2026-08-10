@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, UserCog, LifeBuoy, Languages, Receipt, ChevronsUpDown, Building, Rocket } from 'lucide-react';
+import { LogOut, UserCog, LifeBuoy, Languages, Receipt, ChevronsUpDown, Building, Rocket, Eye } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
+import { useAudience } from '@/hooks/useAudience';
+import { useTenants } from '@/hooks/useTenants';
 import { useViewMode, type ViewMode } from '@/contexts/ViewModeContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -31,7 +33,11 @@ export function UserMenu({ variant = 'avatar' }: { variant?: 'avatar' | 'bar' })
   const { signOut } = useAuth();
   const { fullName, email, avatarUrl, isAdmin, isSuperAdmin, role } = useUserRole();
   const { company } = useCompany();
-  const { viewMode, setViewMode } = useViewMode();
+  const { viewMode, setViewMode, previewTenant, setPreviewTenant } = useViewMode();
+  const audience = useAudience();
+  // Lista de tenants pro "Ver como cliente" — a query já é gated por super admin.
+  const { data: tenants = [] } = useTenants();
+  const externalTenants = tenants.filter((t) => !t.is_internal);
 
   const handleViewModeChange = (value: string) => {
     setViewMode(value as ViewMode);
@@ -40,10 +46,9 @@ export function UserMenu({ variant = 'avatar' }: { variant?: 'avatar' | 'bar' })
     navigate('/');
   };
 
-  // Faturas é da empresa que assina o sistema. Equipe interna da CA e
-  // colaboradores não veem.
-  const isInternalCompany = (company as any)?.is_internal === true;
-  const showFaturas = !isInternalCompany && (isAdmin || isSuperAdmin);
+  // Faturas é do mundo do produto: tenant admin vê sempre; super admin só na
+  // visão Sistema Externo (audiência efetiva já resolve os dois casos).
+  const showFaturas = audience === 'external' && (isAdmin || isSuperAdmin);
 
   const initials = (fullName || 'U').substring(0, 2).toUpperCase();
 
@@ -117,6 +122,35 @@ export function UserMenu({ variant = 'avatar' }: { variant?: 'avatar' | 'bar' })
                 Sistema Externo
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
+
+            {viewMode === 'external' && externalTenants.length > 0 && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="gap-2">
+                  <Eye className="w-4 h-4" strokeWidth={1.75} />
+                  {previewTenant ? `Vendo: ${previewTenant.name}` : 'Ver como cliente'}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="max-w-72">
+                  {/* Preview VISUAL do plano do tenant no menu — dados continuam
+                      sendo os da CA (RLS). Sair pelo banner ou por "Visão padrão". */}
+                  {previewTenant && (
+                    <DropdownMenuItem onClick={() => setPreviewTenant(null)}>
+                      Visão padrão (sair do preview)
+                    </DropdownMenuItem>
+                  )}
+                  {externalTenants.map((t) => (
+                    <DropdownMenuItem
+                      key={t.id}
+                      onClick={() =>
+                        setPreviewTenant({ id: t.id, name: t.name, planModules: t.plan_modules ?? [] })
+                      }
+                      className="truncate"
+                    >
+                      {t.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
           </>
         )}
 

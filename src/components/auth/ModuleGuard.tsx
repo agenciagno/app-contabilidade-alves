@@ -37,7 +37,8 @@ export function ModuleGuard({
   // Fronteira estrutural interno×externo, antes de papel/plano: rota de módulo
   // interno não abre em audiência externa — nem por deep link, nem pro super
   // admin no modo Sistema Externo (o seletor redireciona pra Home, que é 'both').
-  if (!moduleAllowsAudience(moduleName, audience)) {
+  // Vale também por submódulo (ex.: DRE é interna dentro de um Financeiro 'both').
+  if (!moduleAllowsAudience(moduleName, audience) || (subModule && !moduleAllowsAudience(subModule, audience))) {
     return <Navigate to="/" replace />;
   }
 

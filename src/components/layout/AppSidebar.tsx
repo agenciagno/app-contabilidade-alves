@@ -184,10 +184,13 @@ export const menuEntries: MenuEntry[] = [
     icon: Send,
     moduleKey: 'tech',
     items: [
-      { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'tech_disparos' },
-      { title: 'Clientes Externos', url: '/tech/clientes-externos', icon: Building2, iconName: 'building-2', requireSuperAdmin: true },
-      { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check', requireAdmin: true },
-      { title: 'Agente IA', url: '/tech/agente-ia', icon: Bot, iconName: 'bot', requireAdmin: true },
+      // Audiência por item (decisão Gabriel 10/08): Disparos e Agente IA são da
+      // operação interna; Clientes Externos e LGPD vivem na visão do produto;
+      // Central de Notificações existe nas duas.
+      { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'tech_disparos', audience: 'internal' },
+      { title: 'Clientes Externos', url: '/tech/clientes-externos', icon: Building2, iconName: 'building-2', requireSuperAdmin: true, audience: 'external' },
+      { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check', requireAdmin: true, audience: 'external' },
+      { title: 'Agente IA', url: '/tech/agente-ia', icon: Bot, iconName: 'bot', requireAdmin: true, audience: 'internal' },
       { title: 'Central de Notificações', url: '/central-notificacoes', icon: BellRing, iconName: 'bell-ring', requireSuperAdmin: true },
     ],
   },
@@ -321,8 +324,9 @@ export const menuEntries: MenuEntry[] = [
       { title: 'Conciliação Sicoob', url: '/financeiro/conciliacao-sicoob', icon: Landmark, iconName: 'landmark', subKey: 'financeiro_conciliacao_sicoob' },
       { title: 'Eventos Contábeis', url: '/categorias', icon: Tags, iconName: 'tags', subKey: 'financeiro_eventos_contabeis' },
       { title: 'DRE', url: '/dre', icon: FileBarChart, iconName: 'file-bar-chart', subKey: 'financeiro_dre' },
-      { title: 'Clientes & Fornecedores', url: '/financeiro/clientes-fornecedores', icon: Contact, iconName: 'contact', sectionBreak: 'Módulo vendido a clientes', subKey: 'financeiro_clientes_fornecedores' },
-      { title: 'Categorias', url: '/financeiro/categorias-clientes', icon: Tags, iconName: 'tags', subKey: 'financeiro_categorias' },
+      // Clientes & Fornecedores mudou de casa: na visão externa vive no grupo
+      // Cadastro (decisão Gabriel 10/08). Categorias segue aqui, só no externo.
+      { title: 'Categorias', url: '/financeiro/categorias-clientes', icon: Tags, iconName: 'tags', sectionBreak: 'Módulo vendido a clientes', subKey: 'financeiro_categorias' },
       { title: 'Metas & Orçamentos', url: '/financeiro/metas-orcamentos', icon: Target, iconName: 'target', subKey: 'financeiro_metas_orcamentos' },
     ],
   },
@@ -338,6 +342,9 @@ export const menuEntries: MenuEntry[] = [
       { title: 'Alvarás', url: '/cadastros/alvaras', icon: FileText, iconName: 'file-text', subKey: 'cadastros_alvaras' },
       { title: 'Acessos', url: '/acessos', icon: LockKeyhole, iconName: 'lock-keyhole', subKey: 'acessos' },
       { title: 'Equipe', url: '/cadastros/equipe', icon: UsersRound, iconName: 'users-round', subKey: 'equipe' },
+      // Veio do grupo Financeiro: no Cadastro da visão externa (audiência
+      // 'external' via MODULE_AUDIENCE); permissão continua a do Financeiro.
+      { title: 'Clientes & Fornecedores', url: '/financeiro/clientes-fornecedores', icon: Contact, iconName: 'contact', moduleKey: 'financeiro', subKey: 'financeiro_clientes_fornecedores' },
     ],
   },
   {
@@ -381,7 +388,12 @@ export function AppSidebar() {
   const visibleItems = (entry: CollapsibleModule) =>
     entry.items.filter((item) => {
       if (!passesRoleGate(item)) return false;
-      if (item.moduleKey) return isModuleVisible(item.moduleKey);
+      // Item com módulo próprio (ex.: C&F no grupo Cadastro, que pertence ao
+      // Financeiro): checa o módulo dele E o submódulo dele, não os do grupo.
+      if (item.moduleKey) {
+        if (!isModuleVisible(item.moduleKey)) return false;
+        return isSubItemVisible(item.moduleKey, item.subKey);
+      }
       return isSubItemVisible(entry.moduleKey ?? '', item.subKey);
     });
 

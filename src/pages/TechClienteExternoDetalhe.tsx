@@ -28,7 +28,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MODULE_TREE } from '@/constants/modules';
+import { MODULE_TREE, moduleAllowsAudience } from '@/constants/modules';
 import { DsBadge, tabsListClass, tabsTriggerClass } from '@/components/ds';
 import { EmailField, isValidEmail, normalizeEmail } from '@/components/tech/EmailField';
 import {
@@ -879,9 +879,12 @@ function AbaModulos({ cliente, onChanged }: { cliente: Cliente; onChanged: () =>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
-          {MODULE_TREE.map((mod) => {
+          {/* Só módulos do produto (audiência externa) — módulo interno da CA
+              (Fiscal, Cadastro interno, etc.) não é oferecível a tenant. */}
+          {MODULE_TREE.filter((mod) => moduleAllowsAudience(mod.key, 'external')).map((mod) => {
             const fixo = MODULOS_FIXOS.includes(mod.key);
-            const filhos = mod.children?.map((c) => c.key) ?? [];
+            const filhosVisiveis = mod.children?.filter((c) => moduleAllowsAudience(c.key, 'external')) ?? [];
+            const filhos = filhosVisiveis.map((c) => c.key);
             const marcado = fixo || selecionados.includes(mod.key);
             return (
               <div key={mod.key} className="space-y-2">
@@ -894,9 +897,9 @@ function AbaModulos({ cliente, onChanged }: { cliente: Cliente; onChanged: () =>
                   <span className="text-sm font-medium">{mod.label}</span>
                   {fixo && <span className="text-xs text-muted-foreground">(fixo)</span>}
                 </label>
-                {marcado && mod.children?.length ? (
+                {marcado && filhosVisiveis.length ? (
                   <div className="ml-7 space-y-2 border-l border-border pl-3">
-                    {mod.children.map((filho) => (
+                    {filhosVisiveis.map((filho) => (
                       <label key={filho.key} className="flex items-center gap-3 cursor-pointer">
                         <Checkbox
                           checked={selecionados.includes(filho.key)}

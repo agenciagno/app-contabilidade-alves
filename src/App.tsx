@@ -10,6 +10,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ViewModeProvider } from "@/contexts/ViewModeContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ModuleGuard } from "@/components/auth/ModuleGuard";
+import { AudienceGuard } from "@/components/auth/AudienceGuard";
 import { PwaUpdateBanner } from "@/components/PwaUpdateBanner";
 import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 
@@ -124,13 +125,16 @@ const App = () => (
               <Route path="/fiscal/obrigacoes" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_obrigacoes_declaracoes" requireAdmin><FiscalObrigacoes /></ModuleGuard></AppLayout>} />
 
               <Route path="/acessos" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="acessos"><CofreGlobal /></ModuleGuard></AppLayout>} />
-              <Route path="/tech/clientes-externos" element={<AppLayout><TechClientesExternos /></AppLayout>} />
-              <Route path="/tech/clientes-externos/:id" element={<AppLayout><TechClienteExternoDetalhe /></AppLayout>} />
+              {/* Audiência por rota Tech (decisão Gabriel 10/08): Clientes Externos
+                  e LGPD vivem no Sistema Externo; Agente IA no Interno. As telas
+                  continuam checando papel (super admin/admin) por conta própria. */}
+              <Route path="/tech/clientes-externos" element={<AppLayout><AudienceGuard audience="external"><TechClientesExternos /></AudienceGuard></AppLayout>} />
+              <Route path="/tech/clientes-externos/:id" element={<AppLayout><AudienceGuard audience="external"><TechClienteExternoDetalhe /></AudienceGuard></AppLayout>} />
               {/* Rotas antigas: atalho fixado e link salvo continuam funcionando. */}
               <Route path="/admin/provisionar-cliente" element={<Navigate to="/tech/clientes-externos" replace />} />
               <Route path="/tech/operacao" element={<Navigate to="/tech/clientes-externos" replace />} />
-              <Route path="/tech/lgpd" element={<AppLayout><TechLGPD /></AppLayout>} />
-              <Route path="/tech/agente-ia" element={<AppLayout><TechAgenteIA /></AppLayout>} />
+              <Route path="/tech/lgpd" element={<AppLayout><AudienceGuard audience="external"><TechLGPD /></AudienceGuard></AppLayout>} />
+              <Route path="/tech/agente-ia" element={<AppLayout><AudienceGuard audience="internal"><TechAgenteIA /></AudienceGuard></AppLayout>} />
               <Route path="/central-notificacoes" element={<AppLayout><CentralNotificacoes /></AppLayout>} />
 
               {/* Conta do usuário */}

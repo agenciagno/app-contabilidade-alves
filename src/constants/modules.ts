@@ -138,11 +138,39 @@ export const MODULE_TREE: ModuleNode[] = [
  */
 export type ModuleAudience = 'internal' | 'external' | 'both';
 
+/**
+ * Mapa definido por Gabriel (10/08/2026). Vale para módulo de topo E submódulo:
+ * submódulo ausente herda do pai; módulo de topo ausente = 'internal'.
+ */
 export const MODULE_AUDIENCE: Record<string, ModuleAudience> = {
   home: 'both',
-  financeiro: 'both',
   suporte: 'both',
-  tech: 'internal',
+
+  // Financeiro: núcleo nos dois mundos; operação bancária/contábil da CA é interna;
+  // C&F e Categorias são do produto (no menu externo, C&F aparece sob Cadastro).
+  financeiro: 'both',
+  financeiro_boletos: 'internal',
+  financeiro_conciliacao_sicoob: 'internal',
+  financeiro_dre: 'internal',
+  financeiro_eventos_contabeis: 'internal',
+  financeiro_clientes_fornecedores: 'external',
+  financeiro_categorias: 'external',
+
+  // Tech: o grupo existe nos dois mundos; cada item declara o seu lado.
+  // (Clientes Externos, LGPD e Agente IA não têm chave de submódulo — a
+  // audiência deles vive no item do menu e no guard da rota.)
+  tech: 'both',
+  tech_disparos: 'internal',
+
+  // Cadastro: na visão externa só existem C&F (acima) e Equipe.
+  cadastro: 'both',
+  contatos: 'internal',
+  cadastros_procuracoes: 'internal',
+  cadastros_certificados: 'internal',
+  cadastros_alvaras: 'internal',
+  acessos: 'internal',
+  equipe: 'both',
+
   reforma_tributaria: 'internal',
   gestao360: 'internal',
   fiscal: 'internal',
@@ -155,14 +183,28 @@ export const MODULE_AUDIENCE: Record<string, ModuleAudience> = {
   analise_fiscal: 'internal',
   simulador_tributario: 'internal',
   diagnostico_ca: 'internal',
-  cadastro: 'internal',
   perfil_cliente: 'internal',
   configuracoes: 'internal',
 };
 
-/** O módulo existe para esta audiência? (ausente do mapa = interno) */
-export function moduleAllowsAudience(moduleKey: string, audience: 'internal' | 'external'): boolean {
-  const declared = MODULE_AUDIENCE[moduleKey] ?? 'internal';
+/** Pai de cada submódulo — para herança de audiência. */
+const PARENT_OF_SUBMODULE: Record<string, string> = MODULE_TREE.reduce((acc, m) => {
+  m.children?.forEach((c) => {
+    acc[c.key] = m.key;
+  });
+  return acc;
+}, {} as Record<string, string>);
+
+/**
+ * A chave (módulo ou submódulo) existe para esta audiência?
+ * Submódulo sem declaração herda do pai; topo sem declaração = 'internal'
+ * (padrão seguro: módulo novo não vaza pro produto até alguém declarar).
+ */
+export function moduleAllowsAudience(key: string, audience: 'internal' | 'external'): boolean {
+  const declared =
+    MODULE_AUDIENCE[key] ??
+    (PARENT_OF_SUBMODULE[key] ? MODULE_AUDIENCE[PARENT_OF_SUBMODULE[key]] : undefined) ??
+    'internal';
   return declared === 'both' || declared === audience;
 }
 

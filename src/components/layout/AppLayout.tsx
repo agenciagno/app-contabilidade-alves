@@ -6,6 +6,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './AppHeader';
 import { DevEnvironmentBanner } from './DevEnvironmentBanner';
+import { ViewAsClientBanner } from './ViewAsClientBanner';
 import { MobileBottomNav } from './MobileBottomNav';
 
 import { ForcePasswordChange } from '@/components/auth/ForcePasswordChange';
@@ -144,6 +145,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         <AppSidebar />
         <SidebarInset className="flex-1 min-w-0 md:h-svh md:overflow-y-auto md:overflow-x-hidden">
           <DevEnvironmentBanner />
+          <ViewAsClientBanner />
           <AppHeader />
           {/* pb extra no mobile: a bottom nav é fixa e cobriria o fim da página */}
           <main className="min-w-0 max-w-full flex-1 p-3 pb-24 sm:p-4 sm:pb-24 md:p-6 md:pb-6 lg:p-8 lg:pb-8">
