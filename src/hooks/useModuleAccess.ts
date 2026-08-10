@@ -1,10 +1,12 @@
 import { useCompany } from '@/hooks/useCompany';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAudience } from '@/hooks/useAudience';
 import {
   DEFAULT_PLAN_MODULES,
   LEGACY_MODULE_ALIASES,
   LEGACY_SUBMODULE_ALIASES,
   SUB_MODULES_BY_PARENT,
+  moduleAllowsAudience,
 } from '@/constants/modules';
 
 export interface RoleGated {
@@ -28,11 +30,15 @@ export interface RoleGated {
 export function useModuleAccess() {
   const { isSuperAdmin, isAdmin, allowedModules } = useUserRole();
   const { company } = useCompany();
+  const audience = useAudience();
 
   const planModules: string[] = (company as any)?.plan_modules ?? DEFAULT_PLAN_MODULES;
   const isExternalCompany = (company as any)?.is_internal === false;
 
   const isModuleVisible = (moduleKey: string) => {
+    // Audiência vem ANTES do papel: vale até para super admin — é o que faz o
+    // seletor Interno/Externo filtrar o menu de verdade.
+    if (!moduleAllowsAudience(moduleKey, audience)) return false;
     if (isSuperAdmin) return true;
     const keys = [moduleKey, ...(LEGACY_MODULE_ALIASES[moduleKey] ?? [])];
     const planOk = keys.some((k) => planModules.includes(k));
@@ -69,7 +75,9 @@ export function useModuleAccess() {
   const passesRoleGate = (item: RoleGated) => {
     if (item.requireSuperAdmin && !isSuperAdmin) return false;
     if (item.requireAdmin && !isAdmin && !isSuperAdmin) return false;
-    if (item.internalOnly && isExternalCompany && !isSuperAdmin) return false;
+    // Audiência efetiva no lugar de is_internal cru: pro usuário comum dá no
+    // mesmo; pro super admin faz o item sumir também no modo Sistema Externo.
+    if (item.internalOnly && audience === 'external') return false;
     return true;
   };
 

@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
+import { useAudience } from '@/hooks/useAudience';
 
 // Chaves, rótulos e agrupamentos vivem em src/constants/modules.ts — fonte única
 // compartilhada com o menu e o cadastro de usuário.
@@ -12,6 +13,7 @@ import {
   MODULE_PRIORITY,
   MODULE_ROUTE_MAP,
   SUB_MODULES_BY_PARENT,
+  moduleAllowsAudience,
 } from '@/constants/modules';
 
 interface ModuleGuardProps {
@@ -28,8 +30,16 @@ export function ModuleGuard({
 }: ModuleGuardProps) {
   const { isSuperAdmin, isAdmin, allowedModules, isLoading } = useUserRole();
   const { company, isLoading: loadingCompany } = useCompany();
+  const audience = useAudience();
 
   if (isLoading || loadingCompany) return null;
+
+  // Fronteira estrutural interno×externo, antes de papel/plano: rota de módulo
+  // interno não abre em audiência externa — nem por deep link, nem pro super
+  // admin no modo Sistema Externo (o seletor redireciona pra Home, que é 'both').
+  if (!moduleAllowsAudience(moduleName, audience)) {
+    return <Navigate to="/" replace />;
+  }
 
   if (isSuperAdmin) return <>{children}</>;
 

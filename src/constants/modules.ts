@@ -121,6 +121,51 @@ export const MODULE_TREE: ModuleNode[] = [
   { key: 'suporte', label: 'Suporte' },
 ];
 
+/**
+ * Fronteira estrutural interno × externo, por módulo de topo.
+ *
+ * AUDIÊNCIA ≠ PLANO: `plan_modules` diz o que o tenant CONTRATOU (comercial,
+ * muda por cliente); audiência diz o que é da operação interna da CA e não se
+ * vende (estrutural, não aparece pra tenant nem se estiver no plano).
+ *
+ * - 'both'     → existe nos dois mundos (produto vendido + operação CA)
+ * - 'internal' → só operação CA
+ * - módulo ausente do mapa → tratado como 'internal' (padrão seguro: módulo
+ *   novo não vaza pro produto até alguém declarar o contrário)
+ *
+ * Consumidores: useModuleAccess (menu/busca), ModuleGuard (rotas) e o seletor
+ * Interno/Externo do super admin (useAudience).
+ */
+export type ModuleAudience = 'internal' | 'external' | 'both';
+
+export const MODULE_AUDIENCE: Record<string, ModuleAudience> = {
+  home: 'both',
+  financeiro: 'both',
+  suporte: 'both',
+  tech: 'internal',
+  reforma_tributaria: 'internal',
+  gestao360: 'internal',
+  fiscal: 'internal',
+  mensagens: 'internal',
+  dashboard_federal: 'internal',
+  parcelamentos: 'internal',
+  certidoes: 'internal',
+  processos: 'internal',
+  score_fiscal: 'internal',
+  analise_fiscal: 'internal',
+  simulador_tributario: 'internal',
+  diagnostico_ca: 'internal',
+  cadastro: 'internal',
+  perfil_cliente: 'internal',
+  configuracoes: 'internal',
+};
+
+/** O módulo existe para esta audiência? (ausente do mapa = interno) */
+export function moduleAllowsAudience(moduleKey: string, audience: 'internal' | 'external'): boolean {
+  const declared = MODULE_AUDIENCE[moduleKey] ?? 'internal';
+  return declared === 'both' || declared === audience;
+}
+
 /** Toda chave válida (pais + filhos). */
 export const ALL_MODULE_KEYS: string[] = MODULE_TREE.flatMap((m) => [
   m.key,

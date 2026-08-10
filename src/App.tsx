@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { ViewModeProvider } from "@/contexts/ViewModeContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ModuleGuard } from "@/components/auth/ModuleGuard";
 import { PwaUpdateBanner } from "@/components/PwaUpdateBanner";
@@ -80,6 +81,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <AuthProvider>
+        <ViewModeProvider>
         <TooltipProvider>
           <Toaster />
           <Sonner />
@@ -175,6 +177,7 @@ const App = () => (
             </NotificationProvider>
           </BrowserRouter>
         </TooltipProvider>
+        </ViewModeProvider>
       </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>

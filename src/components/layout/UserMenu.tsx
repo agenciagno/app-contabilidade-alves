@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, UserCog, LifeBuoy, Languages, Receipt, ChevronsUpDown } from 'lucide-react';
+import { LogOut, UserCog, LifeBuoy, Languages, Receipt, ChevronsUpDown, Building, Rocket } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
+import { useViewMode, type ViewMode } from '@/contexts/ViewModeContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -30,6 +31,14 @@ export function UserMenu({ variant = 'avatar' }: { variant?: 'avatar' | 'bar' })
   const { signOut } = useAuth();
   const { fullName, email, avatarUrl, isAdmin, isSuperAdmin, role } = useUserRole();
   const { company } = useCompany();
+  const { viewMode, setViewMode } = useViewMode();
+
+  const handleViewModeChange = (value: string) => {
+    setViewMode(value as ViewMode);
+    // Rota interna aberta em modo externo redireciona via ModuleGuard; ir pra
+    // Home ('both') dá aterrissagem previsível nas duas direções.
+    navigate('/');
+  };
 
   // Faturas é da empresa que assina o sistema. Equipe interna da CA e
   // colaboradores não veem.
@@ -89,6 +98,27 @@ export function UserMenu({ variant = 'avatar' }: { variant?: 'avatar' | 'bar' })
             </div>
           </div>
         </DropdownMenuLabel>
+
+        {isSuperAdmin && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-meta text-muted-ink font-normal">
+              Visualização
+            </DropdownMenuLabel>
+            {/* Seletor Interno/Externo — só super admin. Filtra menu/rotas/busca
+                pela audiência escolhida; não altera permissão real de ninguém. */}
+            <DropdownMenuRadioGroup value={viewMode} onValueChange={handleViewModeChange}>
+              <DropdownMenuRadioItem value="internal" className="gap-2">
+                <Building className="w-4 h-4" strokeWidth={1.75} />
+                Sistema Interno
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="external" className="gap-2">
+                <Rocket className="w-4 h-4" strokeWidth={1.75} />
+                Sistema Externo
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </>
+        )}
 
         <DropdownMenuSeparator />
 
