@@ -110,6 +110,22 @@ export function ContactBillingCard({ contact }: Props) {
               <p className="text-muted-foreground">Não configurado</p>
             )}
           </div>
+          <div>
+            <label className="text-xs text-muted-foreground">E-mail para cobrança</label>
+            {contact.email_cobranca ? (
+              <p className="text-foreground">{contact.email_cobranca}</p>
+            ) : (
+              <p className="text-muted-foreground">Não configurado</p>
+            )}
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">WhatsApp para cobrança</label>
+            {contact.whatsapp_cobranca ? (
+              <p className="text-foreground">{contact.whatsapp_cobranca}</p>
+            ) : (
+              <p className="text-muted-foreground">Não configurado</p>
+            )}
+          </div>
 
           {/* Grupo B - Automações */}
           <div className="border-t border-border/50 pt-4 mt-4 space-y-4">

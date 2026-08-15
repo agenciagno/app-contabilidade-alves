@@ -1389,6 +1389,7 @@ export type Database = {
           document: string | null
           dp_responsible_id: string | null
           email: string | null
+          email_cobranca: string | null
           enviar_cobranca_auto: boolean
           financeiro_responsible_id: string | null
           grupo_escritorio: string | null
@@ -1402,7 +1403,6 @@ export type Database = {
           nome_fantasia: string | null
           notes: string | null
           numero_alvara: string | null
-          numero_cliente_sicoob: number | null
           origin: string
           phone: string | null
           porte: string | null
@@ -1426,6 +1426,7 @@ export type Database = {
           updated_at: string
           validade_alvara: string | null
           whatsapp: string | null
+          whatsapp_cobranca: string | null
         }
         Insert: {
           address?: string | null
@@ -1462,6 +1463,7 @@ export type Database = {
           document?: string | null
           dp_responsible_id?: string | null
           email?: string | null
+          email_cobranca?: string | null
           enviar_cobranca_auto?: boolean
           financeiro_responsible_id?: string | null
           grupo_escritorio?: string | null
@@ -1475,7 +1477,6 @@ export type Database = {
           nome_fantasia?: string | null
           notes?: string | null
           numero_alvara?: string | null
-          numero_cliente_sicoob?: number | null
           origin?: string
           phone?: string | null
           porte?: string | null
@@ -1499,6 +1500,7 @@ export type Database = {
           updated_at?: string
           validade_alvara?: string | null
           whatsapp?: string | null
+          whatsapp_cobranca?: string | null
         }
         Update: {
           address?: string | null
@@ -1535,6 +1537,7 @@ export type Database = {
           document?: string | null
           dp_responsible_id?: string | null
           email?: string | null
+          email_cobranca?: string | null
           enviar_cobranca_auto?: boolean
           financeiro_responsible_id?: string | null
           grupo_escritorio?: string | null
@@ -1548,7 +1551,6 @@ export type Database = {
           nome_fantasia?: string | null
           notes?: string | null
           numero_alvara?: string | null
-          numero_cliente_sicoob?: number | null
           origin?: string
           phone?: string | null
           porte?: string | null
@@ -1572,6 +1574,7 @@ export type Database = {
           updated_at?: string
           validade_alvara?: string | null
           whatsapp?: string | null
+          whatsapp_cobranca?: string | null
         }
         Relationships: [
           {

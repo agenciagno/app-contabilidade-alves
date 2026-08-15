@@ -25,7 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
 import { ContactObligationsSelector } from '@/components/fiscal/ContactObligationsSelector';
 import { lookupCnpj, pickEmptyFields } from '@/lib/cnpj-lookup';
-import { maskCPFCNPJ } from '@/lib/utils';
+import { maskCPFCNPJ, maskPhone } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -96,9 +96,8 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
     contact.boleto_due_day != null ? String(contact.boleto_due_day) : 'none'
   );
   const [canalEntrega, setCanalEntrega] = useState<string>(contact.canal_entrega || 'none');
-  const [numeroSicoob, setNumeroSicoob] = useState<string>(
-    contact.numero_cliente_sicoob != null ? String(contact.numero_cliente_sicoob) : ''
-  );
+  const [emailCobranca, setEmailCobranca] = useState(contact.email_cobranca ?? contact.email ?? '');
+  const [whatsappCobranca, setWhatsappCobranca] = useState(contact.whatsapp_cobranca ?? contact.whatsapp ?? '');
 
   // Dados Empresariais
   const [razaoSocial, setRazaoSocial] = useState(contact.razao_social || '');
@@ -194,7 +193,8 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
     setBoletoValue(contact.boleto_value != null ? String(contact.boleto_value) : '');
     setBoletoDueDay(contact.boleto_due_day != null ? String(contact.boleto_due_day) : 'none');
     setCanalEntrega(contact.canal_entrega || 'none');
-    setNumeroSicoob(contact.numero_cliente_sicoob != null ? String(contact.numero_cliente_sicoob) : '');
+    setEmailCobranca(contact.email_cobranca ?? contact.email ?? '');
+    setWhatsappCobranca(contact.whatsapp_cobranca ?? contact.whatsapp ?? '');
     setRazaoSocial(contact.razao_social || '');
     setNomeFantasia(contact.nome_fantasia || '');
     setNaturezaJuridica(contact.natureza_juridica || '');
@@ -345,12 +345,12 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
       updates = { notes: notes || null };
     } else if (section === 'cobranca') {
       const parsedValue = boletoValue.trim() === '' ? null : Number(boletoValue.replace(',', '.'));
-      const parsedSicoob = numeroSicoob.trim() === '' ? null : parseInt(numeroSicoob, 10);
       updates = {
         boleto_value: parsedValue !== null && !isNaN(parsedValue) ? parsedValue : null,
         boleto_due_day: boletoDueDay === 'none' ? null : parseInt(boletoDueDay, 10),
         canal_entrega: canalEntrega === 'none' ? null : (canalEntrega as 'whatsapp' | 'email' | 'impresso' | 'whatsapp_email'),
-        numero_cliente_sicoob: parsedSicoob !== null && !isNaN(parsedSicoob) ? parsedSicoob : null,
+        email_cobranca: emailCobranca.trim() || null,
+        whatsapp_cobranca: whatsappCobranca.trim() || null,
       };
     } else if (section === 'empresariais') {
       updates = {
@@ -837,15 +837,27 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-muted-foreground">Nº cliente Sicoob</Label>
+                <Label>E-mail para cobrança</Label>
                 <Input
-                  type="number"
-                  inputMode="numeric"
-                  value={numeroSicoob}
-                  onChange={(e) => setNumeroSicoob(e.target.value)}
-                  placeholder="Número do beneficiário no Sisbr"
-                  className="text-muted-foreground"
+                  type="email"
+                  value={emailCobranca}
+                  onChange={(e) => setEmailCobranca(e.target.value)}
+                  placeholder="email@exemplo.com"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Vem preenchido com o e-mail de Identificação — troque se o boleto deve ir pro responsável financeiro.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>WhatsApp para cobrança</Label>
+                <Input
+                  value={whatsappCobranca}
+                  onChange={(e) => setWhatsappCobranca(maskPhone(e.target.value))}
+                  placeholder="(XX) XXXXX-XXXX"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Vem preenchido com o WhatsApp de Identificação — troque se a cobrança deve ir pra outro contato.
+                </p>
               </div>
             </>
           )}

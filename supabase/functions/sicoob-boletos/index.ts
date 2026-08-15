@@ -101,7 +101,7 @@ function missingFields(c: Record<string, unknown>): string[] {
 }
 
 const CONTACT_COLS =
-  "id,name,document,email,phone,whatsapp,address,address_number,neighborhood,city,state,cep,boleto_value,boleto_due_day,canal_entrega,enviar_cobranca_auto,numero_cliente_sicoob";
+  "id,name,document,email,phone,whatsapp,email_cobranca,whatsapp_cobranca,address,address_number,neighborhood,city,state,cep,boleto_value,boleto_due_day,canal_entrega,enviar_cobranca_auto";
 
 // ---------- Sicoob ----------
 // Escopo padrão (boletos). Conta Corrente (extrato/saldo) usa cco_consulta — API 3 no portal
@@ -277,7 +277,9 @@ async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: C
       cidade: c.city,
       uf: c.state,
       cep: (c.cep || "").replace(/\D/g, ""),
-      email: c.email,
+      // E-mail de cobrança tem prioridade — pode ser o do responsável financeiro do cliente,
+      // não o representante legal cadastrado em Identificação.
+      email: c.email_cobranca || c.email,
     },
     // Texto padrão obrigatório em todo boleto — datas calculadas por boleto (dia seguinte ao
     // vencimento p/ multa/juros; dia 24 e último dia do mês de emissão p/ desconto).

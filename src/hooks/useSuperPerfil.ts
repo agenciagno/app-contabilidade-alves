@@ -21,7 +21,7 @@ const SUPER_PERFIL_COLUMNS = [
   'data_abertura_rf', 'data_encerramento_rf',
   'data_abertura_prefeitura', 'data_encerramento_prefeitura',
   'data_abertura_estado', 'data_encerramento_estado',
-  'canal_entrega', 'numero_cliente_sicoob', 'enviar_cobranca_auto',
+  'canal_entrega', 'email_cobranca', 'whatsapp_cobranca', 'enviar_cobranca_auto',
   'boleto_value', 'boleto_due_day',
 ].join(',');
 

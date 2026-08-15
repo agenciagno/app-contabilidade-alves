@@ -41,7 +41,8 @@ export interface Contact {
   boleto_due_day: number | null;
   boleto_start_date: string | null;
   canal_entrega: 'whatsapp' | 'email' | 'impresso' | 'whatsapp_email' | null;
-  numero_cliente_sicoob: number | null;
+  email_cobranca: string | null;
+  whatsapp_cobranca: string | null;
   enviar_cobranca_auto: boolean;
   origin: string;
   responsible_id: string | null;
@@ -106,7 +107,7 @@ type ContactOptionalKeys =
   | 'data_encerramento_junta' | 'data_encerramento_rf' | 'data_encerramento_prefeitura' | 'data_encerramento_estado'
   | 'siare_senha_encrypted';
 
-export type ContactInsert = Omit<Contact, 'id' | 'company_id' | 'created_at' | 'updated_at' | 'origin' | 'whatsapp' | 'responsible_id' | 'dp_responsible_id' | 'financeiro_responsible_id' | 'contabil_responsible_id' | 'comercial_responsible_id' | 'canal_entrega' | 'numero_cliente_sicoob' | 'enviar_cobranca_auto' | ContactOptionalKeys> & { origin?: string; whatsapp?: string | null; responsible_id?: string | null; dp_responsible_id?: string | null; financeiro_responsible_id?: string | null; contabil_responsible_id?: string | null; comercial_responsible_id?: string | null; canal_entrega?: string | null; numero_cliente_sicoob?: number | null; enviar_cobranca_auto?: boolean } & Partial<Pick<Contact, ContactOptionalKeys>>;
+export type ContactInsert = Omit<Contact, 'id' | 'company_id' | 'created_at' | 'updated_at' | 'origin' | 'whatsapp' | 'responsible_id' | 'dp_responsible_id' | 'financeiro_responsible_id' | 'contabil_responsible_id' | 'comercial_responsible_id' | 'canal_entrega' | 'email_cobranca' | 'whatsapp_cobranca' | 'enviar_cobranca_auto' | ContactOptionalKeys> & { origin?: string; whatsapp?: string | null; responsible_id?: string | null; dp_responsible_id?: string | null; financeiro_responsible_id?: string | null; contabil_responsible_id?: string | null; comercial_responsible_id?: string | null; canal_entrega?: string | null; email_cobranca?: string | null; whatsapp_cobranca?: string | null; enviar_cobranca_auto?: boolean } & Partial<Pick<Contact, ContactOptionalKeys>>;
 export type ContactUpdate = Partial<ContactInsert>;
 
 export function useContacts() {
@@ -211,6 +212,8 @@ export function useContacts() {
           tipo_cliente: 'Tipo de Cliente',
           setor_atuacao: 'Setor de Atuação',
           segmento_atuacao: 'Segmento de Atuação',
+          email_cobranca: 'E-mail de Cobrança',
+          whatsapp_cobranca: 'WhatsApp de Cobrança',
         };
 
         const taxRegimeLabels = TAX_REGIME_LABELS;
