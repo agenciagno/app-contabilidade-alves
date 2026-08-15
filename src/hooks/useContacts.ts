@@ -70,6 +70,8 @@ export interface Contact {
   regime_apuracao: string | null;
   numero_alvara: string | null;
   validade_alvara: string | null;
+  setor_atuacao: string | null;
+  segmento_atuacao: string | null;
   // Status e classificação
   status_cliente: string | null;
   tipo_cliente: string | null;
@@ -88,16 +90,6 @@ export interface Contact {
   data_encerramento_rf: string | null;
   data_encerramento_prefeitura: string | null;
   data_encerramento_estado: string | null;
-  // Departamento Pessoal
-  possui_funcionarios: boolean;
-  numero_funcionarios: number | null;
-  tipo_cartao_ponto: string | null;
-  medicina_trabalho: boolean;
-  grupo_cipa: string | null;
-  registro_entradas: boolean;
-  registro_saidas: boolean;
-  registro_icms: boolean;
-  inventario: boolean;
   // Criptografado
   siare_senha_encrypted: any | null;
 }
@@ -107,12 +99,11 @@ type ContactOptionalKeys =
   | 'natureza_juridica' | 'situacao_cadastral' | 'data_abertura_receita'
   | 'complemento' | 'segundo_email_contato'
   | 'ie' | 'im' | 'regime_apuracao' | 'numero_alvara' | 'validade_alvara'
+  | 'setor_atuacao' | 'segmento_atuacao'
   | 'status_cliente' | 'tipo_cliente' | 'tipo_estabelecimento' | 'grupo_escritorio'
   | 'data_inicio_contrato' | 'data_saida_cliente' | 'porte' | 'categorias'
   | 'data_abertura_junta' | 'data_abertura_rf' | 'data_abertura_prefeitura' | 'data_abertura_estado'
   | 'data_encerramento_junta' | 'data_encerramento_rf' | 'data_encerramento_prefeitura' | 'data_encerramento_estado'
-  | 'possui_funcionarios' | 'numero_funcionarios' | 'tipo_cartao_ponto' | 'medicina_trabalho'
-  | 'grupo_cipa' | 'registro_entradas' | 'registro_saidas' | 'registro_icms' | 'inventario'
   | 'siare_senha_encrypted';
 
 export type ContactInsert = Omit<Contact, 'id' | 'company_id' | 'created_at' | 'updated_at' | 'origin' | 'whatsapp' | 'responsible_id' | 'dp_responsible_id' | 'financeiro_responsible_id' | 'contabil_responsible_id' | 'comercial_responsible_id' | 'canal_entrega' | 'numero_cliente_sicoob' | 'enviar_cobranca_auto' | ContactOptionalKeys> & { origin?: string; whatsapp?: string | null; responsible_id?: string | null; dp_responsible_id?: string | null; financeiro_responsible_id?: string | null; contabil_responsible_id?: string | null; comercial_responsible_id?: string | null; canal_entrega?: string | null; numero_cliente_sicoob?: number | null; enviar_cobranca_auto?: boolean } & Partial<Pick<Contact, ContactOptionalKeys>>;
@@ -218,10 +209,8 @@ export function useContacts() {
           data_inicio_contrato: 'Data Início Contrato',
           status_cliente: 'Status do Cliente',
           tipo_cliente: 'Tipo de Cliente',
-          possui_funcionarios: 'Possui Funcionários',
-          numero_funcionarios: 'Nº Funcionários',
-          tipo_cartao_ponto: 'Tipo Cartão Ponto',
-          medicina_trabalho: 'Medicina do Trabalho',
+          setor_atuacao: 'Setor de Atuação',
+          segmento_atuacao: 'Segmento de Atuação',
         };
 
         const taxRegimeLabels = TAX_REGIME_LABELS;

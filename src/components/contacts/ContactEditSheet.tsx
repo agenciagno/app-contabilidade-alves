@@ -124,18 +124,6 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
   const [dataAberturaEstado, setDataAberturaEstado] = useState((contact.data_abertura_estado || '').slice(0, 10));
   const [dataEncerramentoEstado, setDataEncerramentoEstado] = useState((contact.data_encerramento_estado || '').slice(0, 10));
 
-  // Departamento Pessoal
-  const [possuiFuncionarios, setPossuiFuncionarios] = useState(!!contact.possui_funcionarios);
-  const [numeroFuncionarios, setNumeroFuncionarios] = useState<string>(
-    contact.numero_funcionarios != null ? String(contact.numero_funcionarios) : ''
-  );
-  const [tipoCartaoPonto, setTipoCartaoPonto] = useState(contact.tipo_cartao_ponto || 'none');
-  const [medicinaTrabalho, setMedicinaTrabalho] = useState(!!contact.medicina_trabalho);
-  const [grupoCipa, setGrupoCipa] = useState(contact.grupo_cipa || '');
-  const [registroEntradas, setRegistroEntradas] = useState(!!contact.registro_entradas);
-  const [registroSaidas, setRegistroSaidas] = useState(!!contact.registro_saidas);
-  const [registroIcms, setRegistroIcms] = useState(!!contact.registro_icms);
-  const [inventario, setInventario] = useState(!!contact.inventario);
   const [ie, setIe] = useState(contact.ie || '');
   const [im, setIm] = useState(contact.im || '');
   const [regimeApuracao, setRegimeApuracao] = useState(contact.regime_apuracao || 'none');
@@ -227,15 +215,6 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
     setDataEncerramentoPrefeitura((contact.data_encerramento_prefeitura || '').slice(0, 10));
     setDataAberturaEstado((contact.data_abertura_estado || '').slice(0, 10));
     setDataEncerramentoEstado((contact.data_encerramento_estado || '').slice(0, 10));
-    setPossuiFuncionarios(!!contact.possui_funcionarios);
-    setNumeroFuncionarios(contact.numero_funcionarios != null ? String(contact.numero_funcionarios) : '');
-    setTipoCartaoPonto(contact.tipo_cartao_ponto || 'none');
-    setMedicinaTrabalho(!!contact.medicina_trabalho);
-    setGrupoCipa(contact.grupo_cipa || '');
-    setRegistroEntradas(!!contact.registro_entradas);
-    setRegistroSaidas(!!contact.registro_saidas);
-    setRegistroIcms(!!contact.registro_icms);
-    setInventario(!!contact.inventario);
     setIe(contact.ie || '');
     setIm(contact.im || '');
     setRegimeApuracao(contact.regime_apuracao || 'none');
@@ -400,17 +379,7 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
         data_encerramento_estado: dataEncerramentoEstado || null,
       };
     } else if (section === 'departamento-pessoal') {
-      const parsedNumFunc = numeroFuncionarios.trim() === '' ? null : parseInt(numeroFuncionarios, 10);
       updates = {
-        possui_funcionarios: possuiFuncionarios,
-        numero_funcionarios: possuiFuncionarios && parsedNumFunc !== null && !isNaN(parsedNumFunc) ? parsedNumFunc : null,
-        tipo_cartao_ponto: tipoCartaoPonto === 'none' ? null : tipoCartaoPonto,
-        medicina_trabalho: medicinaTrabalho,
-        grupo_cipa: grupoCipa || null,
-        registro_entradas: registroEntradas,
-        registro_saidas: registroSaidas,
-        registro_icms: registroIcms,
-        inventario: inventario,
         ie: ie || null,
         im: im || null,
         regime_apuracao: regimeApuracao === 'none' ? null : regimeApuracao,
@@ -775,59 +744,6 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
 
           {section === 'departamento-pessoal' && (
             <>
-              <div className="flex items-center justify-between rounded-lg border border-border/50 p-4">
-                <Label>Possui Funcionários</Label>
-                <Switch checked={possuiFuncionarios} onCheckedChange={setPossuiFuncionarios} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Nº Funcionários</Label>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  value={numeroFuncionarios}
-                  onChange={e => setNumeroFuncionarios(e.target.value)}
-                  disabled={!possuiFuncionarios}
-                  placeholder="0"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Tipo Cartão Ponto</Label>
-                <Select value={tipoCartaoPonto} onValueChange={setTipoCartaoPonto}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Não informado</SelectItem>
-                    <SelectItem value="Central">Central</SelectItem>
-                    <SelectItem value="Convencional">Convencional</SelectItem>
-                    <SelectItem value="Eletrônico">Eletrônico</SelectItem>
-                    <SelectItem value="Espelho">Espelho</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-border/50 p-4">
-                <Label>Medicina do Trabalho</Label>
-                <Switch checked={medicinaTrabalho} onCheckedChange={setMedicinaTrabalho} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Grupo CIPA</Label>
-                <Input value={grupoCipa} onChange={e => setGrupoCipa(e.target.value)} placeholder="Grupo CIPA" />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-border/50 p-4">
-                <Label>Registro de Entradas</Label>
-                <Switch checked={registroEntradas} onCheckedChange={setRegistroEntradas} />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-border/50 p-4">
-                <Label>Registro de Saídas</Label>
-                <Switch checked={registroSaidas} onCheckedChange={setRegistroSaidas} />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-border/50 p-4">
-                <Label>Registro ICMS</Label>
-                <Switch checked={registroIcms} onCheckedChange={setRegistroIcms} />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-border/50 p-4">
-                <Label>Inventário</Label>
-                <Switch checked={inventario} onCheckedChange={setInventario} />
-              </div>
               <div className="space-y-1.5">
                 <Label>Inscrição Estadual (IE)</Label>
                 <Input value={ie} onChange={e => setIe(e.target.value)} placeholder="IE" />

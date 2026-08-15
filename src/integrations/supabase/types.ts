@@ -1391,14 +1391,11 @@ export type Database = {
           email: string | null
           enviar_cobranca_auto: boolean
           financeiro_responsible_id: string | null
-          grupo_cipa: string | null
           grupo_escritorio: string | null
           id: string
           ie: string | null
           im: string | null
-          inventario: boolean | null
           is_active: boolean
-          medicina_trabalho: boolean | null
           name: string
           natureza_juridica: string | null
           neighborhood: string | null
@@ -1406,27 +1403,23 @@ export type Database = {
           notes: string | null
           numero_alvara: string | null
           numero_cliente_sicoob: number | null
-          numero_funcionarios: number | null
           origin: string
           phone: string | null
           porte: string | null
-          possui_funcionarios: boolean | null
           razao_social: string | null
           regime_apuracao: string | null
-          registro_entradas: boolean | null
-          registro_icms: boolean | null
-          registro_saidas: boolean | null
           representative_legal: string | null
           responsible_id: string | null
           retencao_bloqueada: boolean
           retencao_bloqueio_motivo: string | null
+          segmento_atuacao: string | null
           segundo_email_contato: string | null
+          setor_atuacao: string | null
           siare_senha_encrypted: string | null
           situacao_cadastral: string | null
           state: string | null
           status_cliente: string | null
           tax_regime: string | null
-          tipo_cartao_ponto: string | null
           tipo_cliente: string | null
           tipo_estabelecimento: string | null
           type: string
@@ -1471,14 +1464,11 @@ export type Database = {
           email?: string | null
           enviar_cobranca_auto?: boolean
           financeiro_responsible_id?: string | null
-          grupo_cipa?: string | null
           grupo_escritorio?: string | null
           id?: string
           ie?: string | null
           im?: string | null
-          inventario?: boolean | null
           is_active?: boolean
-          medicina_trabalho?: boolean | null
           name: string
           natureza_juridica?: string | null
           neighborhood?: string | null
@@ -1486,27 +1476,23 @@ export type Database = {
           notes?: string | null
           numero_alvara?: string | null
           numero_cliente_sicoob?: number | null
-          numero_funcionarios?: number | null
           origin?: string
           phone?: string | null
           porte?: string | null
-          possui_funcionarios?: boolean | null
           razao_social?: string | null
           regime_apuracao?: string | null
-          registro_entradas?: boolean | null
-          registro_icms?: boolean | null
-          registro_saidas?: boolean | null
           representative_legal?: string | null
           responsible_id?: string | null
           retencao_bloqueada?: boolean
           retencao_bloqueio_motivo?: string | null
+          segmento_atuacao?: string | null
           segundo_email_contato?: string | null
+          setor_atuacao?: string | null
           siare_senha_encrypted?: string | null
           situacao_cadastral?: string | null
           state?: string | null
           status_cliente?: string | null
           tax_regime?: string | null
-          tipo_cartao_ponto?: string | null
           tipo_cliente?: string | null
           tipo_estabelecimento?: string | null
           type: string
@@ -1551,14 +1537,11 @@ export type Database = {
           email?: string | null
           enviar_cobranca_auto?: boolean
           financeiro_responsible_id?: string | null
-          grupo_cipa?: string | null
           grupo_escritorio?: string | null
           id?: string
           ie?: string | null
           im?: string | null
-          inventario?: boolean | null
           is_active?: boolean
-          medicina_trabalho?: boolean | null
           name?: string
           natureza_juridica?: string | null
           neighborhood?: string | null
@@ -1566,27 +1549,23 @@ export type Database = {
           notes?: string | null
           numero_alvara?: string | null
           numero_cliente_sicoob?: number | null
-          numero_funcionarios?: number | null
           origin?: string
           phone?: string | null
           porte?: string | null
-          possui_funcionarios?: boolean | null
           razao_social?: string | null
           regime_apuracao?: string | null
-          registro_entradas?: boolean | null
-          registro_icms?: boolean | null
-          registro_saidas?: boolean | null
           representative_legal?: string | null
           responsible_id?: string | null
           retencao_bloqueada?: boolean
           retencao_bloqueio_motivo?: string | null
+          segmento_atuacao?: string | null
           segundo_email_contato?: string | null
+          setor_atuacao?: string | null
           siare_senha_encrypted?: string | null
           situacao_cadastral?: string | null
           state?: string | null
           status_cliente?: string | null
           tax_regime?: string | null
-          tipo_cartao_ponto?: string | null
           tipo_cliente?: string | null
           tipo_estabelecimento?: string | null
           type?: string
@@ -1800,6 +1779,45 @@ export type Database = {
         Relationships: []
       }
       data_access_log: {
+        Row: {
+          acao: string
+          company_id: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          recurso: string
+          recurso_id: string | null
+          titular_id: string | null
+          titular_tipo: string | null
+          usuario_id: string
+        }
+        Insert: {
+          acao: string
+          company_id: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          recurso: string
+          recurso_id?: string | null
+          titular_id?: string | null
+          titular_tipo?: string | null
+          usuario_id: string
+        }
+        Update: {
+          acao?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          recurso?: string
+          recurso_id?: string | null
+          titular_id?: string | null
+          titular_tipo?: string | null
+          usuario_id?: string
+        }
+        Relationships: []
+      }
+      data_access_log_archive: {
         Row: {
           acao: string
           company_id: string
@@ -2416,7 +2434,85 @@ export type Database = {
           },
         ]
       }
+      global_logs_archive: {
+        Row: {
+          action: string
+          company_id: string
+          created_at: string
+          details: string
+          entity_id: string | null
+          entity_name: string | null
+          id: string
+          module: string
+          user_id: string
+          user_name: string | null
+        }
+        Insert: {
+          action: string
+          company_id: string
+          created_at?: string
+          details: string
+          entity_id?: string | null
+          entity_name?: string | null
+          id?: string
+          module: string
+          user_id: string
+          user_name?: string | null
+        }
+        Update: {
+          action?: string
+          company_id?: string
+          created_at?: string
+          details?: string
+          entity_id?: string | null
+          entity_name?: string | null
+          id?: string
+          module?: string
+          user_id?: string
+          user_name?: string | null
+        }
+        Relationships: []
+      }
       historico_eventos: {
+        Row: {
+          campos_alterados: string[] | null
+          created_at: string
+          dados_anteriores: Json | null
+          dados_novos: Json | null
+          id: string
+          operacao: string
+          registro_id: string
+          tabela: string
+          usuario_id: string | null
+          usuario_nome: string | null
+        }
+        Insert: {
+          campos_alterados?: string[] | null
+          created_at?: string
+          dados_anteriores?: Json | null
+          dados_novos?: Json | null
+          id?: string
+          operacao: string
+          registro_id: string
+          tabela: string
+          usuario_id?: string | null
+          usuario_nome?: string | null
+        }
+        Update: {
+          campos_alterados?: string[] | null
+          created_at?: string
+          dados_anteriores?: Json | null
+          dados_novos?: Json | null
+          id?: string
+          operacao?: string
+          registro_id?: string
+          tabela?: string
+          usuario_id?: string | null
+          usuario_nome?: string | null
+        }
+        Relationships: []
+      }
+      historico_eventos_archive: {
         Row: {
           campos_alterados: string[] | null
           created_at: string
@@ -3883,6 +3979,38 @@ export type Database = {
           },
         ]
       }
+      global_logs_completo: {
+        Row: {
+          action: string | null
+          arquivado: boolean | null
+          company_id: string | null
+          created_at: string | null
+          details: string | null
+          entity_id: string | null
+          entity_name: string | null
+          id: string | null
+          module: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Relationships: []
+      }
+      historico_eventos_completo: {
+        Row: {
+          arquivado: boolean | null
+          campos_alterados: string[] | null
+          created_at: string | null
+          dados_anteriores: Json | null
+          dados_novos: Json | null
+          id: string | null
+          operacao: string | null
+          registro_id: string | null
+          tabela: string | null
+          usuario_id: string | null
+          usuario_nome: string | null
+        }
+        Relationships: []
+      }
       vw_cofre_global: {
         Row: {
           acesso_id: string | null
@@ -3901,6 +4029,7 @@ export type Database = {
       }
     }
     Functions: {
+      archive_old_logs: { Args: never; Returns: undefined }
       can_access_company: { Args: { _company_id: string }; Returns: boolean }
       cofre_decrypt_internal: {
         Args: { p_encrypted: string; p_key: string }
