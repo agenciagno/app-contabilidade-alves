@@ -140,30 +140,36 @@ export function AppLayout({ children }: AppLayoutProps) {
         faz o header `sticky` realmente fixar. Antes o `overflow-x-hidden` do
         wrapper virava contexto de rolagem e o header subia junto com a página.
         No mobile segue rolando a página inteira.
+
+        Shell §6.2.1 do design system (10/08/2026): o header ocupa a largura
+        inteira, com a sidebar começando abaixo dele — por isso ele é irmão da
+        linha sidebar+conteúdo, não filho do SidebarInset como antes.
       */}
-      <div className="min-h-screen md:h-svh flex w-full max-w-[100vw] overflow-x-hidden md:overflow-hidden">
-        <AppSidebar />
-        <SidebarInset className="flex-1 min-w-0 md:h-svh md:overflow-y-auto md:overflow-x-hidden">
-          <DevEnvironmentBanner />
-          <ViewAsClientBanner />
-          <AppHeader />
-          {/* pb extra no mobile: a bottom nav é fixa e cobriria o fim da página */}
-          <main className="min-w-0 max-w-full flex-1 p-3 pb-24 sm:p-4 sm:pb-24 md:p-6 md:pb-6 lg:p-8 lg:pb-8">
-            {/* Fallback de navegação: se uma página lazy suspender aqui, só o
-                miolo mostra spinner — sidebar e header ficam no lugar. Com
-                v7_startTransition no router isso quase nunca aparece: a tela
-                anterior segue visível até o chunk chegar. */}
-            <Suspense
-              fallback={
-                <div className="flex h-64 w-full items-center justify-center">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                </div>
-              }
-            >
-              {children}
-            </Suspense>
-          </main>
-        </SidebarInset>
+      <div className="min-h-screen md:h-svh flex flex-col w-full max-w-[100vw] overflow-x-hidden md:overflow-hidden">
+        <AppHeader />
+        <div className="flex flex-1 min-h-0 w-full md:overflow-hidden">
+          <AppSidebar />
+          <SidebarInset className="flex-1 min-w-0 md:h-full md:overflow-y-auto md:overflow-x-hidden">
+            <DevEnvironmentBanner />
+            <ViewAsClientBanner />
+            {/* pb extra no mobile: a bottom nav é fixa e cobriria o fim da página */}
+            <main className="min-w-0 max-w-full flex-1 p-3 pb-24 sm:p-4 sm:pb-24 md:p-6 md:pb-6 lg:p-8 lg:pb-8">
+              {/* Fallback de navegação: se uma página lazy suspender aqui, só o
+                  miolo mostra spinner — sidebar e header ficam no lugar. Com
+                  v7_startTransition no router isso quase nunca aparece: a tela
+                  anterior segue visível até o chunk chegar. */}
+              <Suspense
+                fallback={
+                  <div className="flex h-64 w-full items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                }
+              >
+                {children}
+              </Suspense>
+            </main>
+          </SidebarInset>
+        </div>
         <MobileBottomNav />
       </div>
     </SidebarProvider>

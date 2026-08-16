@@ -919,7 +919,7 @@ const Home = () => {
               <div
                 className={cn(
                   'flex h-11 w-11 shrink-0 items-center justify-center rounded-md',
-                  s.accent ? 'bg-brand text-on-brand' : 'bg-bg-2 text-muted-ink'
+                  s.accent ? 'bg-action text-on-action' : 'bg-bg-2 text-muted-ink'
                 )}
               >
                 <s.icon className="h-5 w-5" strokeWidth={1.75} />

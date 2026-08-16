@@ -342,7 +342,7 @@ export default function ConciliacaoSicoob() {
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
                   Mais filtros
-                  {(valorMin || valorMax) && <span className="h-1.5 w-1.5 rounded-full bg-brand" />}
+                  {(valorMin || valorMax) && <span className="h-1.5 w-1.5 rounded-full bg-action" />}
                 </button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-64 space-y-2 p-3">

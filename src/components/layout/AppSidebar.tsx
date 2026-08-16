@@ -503,7 +503,7 @@ export function AppSidebar() {
                 to={entry.url}
                 end={entry.url === '/'}
                 className="flex h-9 items-center gap-2.5 rounded-sm px-3 text-nav text-muted-ink transition-[background,color] duration-[120ms] hover:bg-bg-2 hover:text-ink"
-                activeClassName="bg-bg-2 font-semibold text-ink"
+                activeClassName="bg-action-tint font-semibold text-ink"
               >
                 <entry.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
                 {showLabels && <span className="flex-1 truncate">{entry.title}</span>}
@@ -585,8 +585,9 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
-      {/* Marca: símbolo 28px + nome + CNPJ em mono, como no Shell/Sidebar do Figma */}
-      <SidebarHeader className="p-3">
+      {/* Marca+empresa: no desktop mora no AppHeader (§6.2.1) — aqui só sobra
+          pro drawer mobile, onde o header full-width não tem esse bloco. */}
+      <SidebarHeader className="p-3 md:hidden">
         <div className="flex items-center gap-2.5">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-brand">
             {logoUrl ? (
@@ -606,7 +607,7 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
 
-      <Separator className="bg-line" />
+      <Separator className="bg-line md:hidden" />
 
       <SidebarContent className="px-2">
         {/* Atalhos Fixados */}

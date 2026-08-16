@@ -81,7 +81,7 @@ export function EmpresaCard({
         <div className="flex min-w-0 flex-1 flex-col gap-[3px] pr-24">
           <p
             onClick={onNomeClick}
-            className={cn('truncate text-h4-card text-ink', onNomeClick && 'hover:text-brand')}
+            className={cn('truncate text-h4-card text-ink', onNomeClick && 'hover:text-action')}
           >
             {nome}
           </p>
@@ -98,7 +98,7 @@ export function EmpresaCard({
 
       <div className="mt-auto flex items-center gap-2.5 border-t border-line-2 bg-bg px-[18px] py-[11px]">
         <span className="flex-1 truncate text-meta text-muted-ink-2">ver super perfil</span>
-        <span className="flex shrink-0 items-center gap-1 text-link text-brand">
+        <span className="flex shrink-0 items-center gap-1 text-link text-action">
           Abrir
           <ArrowUpRight className="h-[13px] w-[13px]" strokeWidth={2} />
         </span>

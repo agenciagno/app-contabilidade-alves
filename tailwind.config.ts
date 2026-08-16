@@ -120,6 +120,21 @@ export default {
         'brand-soft': 'var(--brand-soft)',
 
         'on-banner': 'var(--on-banner)',
+        'on-banner-muted': 'var(--on-banner-muted)',
+        'banner-surface-active': 'var(--banner-surface-active)',
+        'banner-surface-soft': 'var(--banner-surface-soft)',
+        'banner-line': 'var(--banner-line)',
+        'banner-avatar': 'var(--banner-avatar)',
+
+        // Ação primária do produto (Figma "CA/Extensões", CSS var --accent).
+        // Chave Tailwind 'action', não 'accent': 'accent' já é ocupada pelo
+        // --accent nativo do shadcn (cor neutra de hover de menu/dropdown, em
+        // HSL) — usar o mesmo nome sobrescreveria esse token silenciosamente.
+        action: 'var(--accent)',
+        'action-hover': 'var(--accent-hover)',
+        'action-tint': 'var(--accent-tint)',
+        'action-soft': 'var(--accent-soft)',
+        'on-action': 'var(--on-accent)',
 
         // Estado de tarefa (Fiscal) — 4 etapas de fluxo, não juízo de valor
         'state-todo': 'var(--state-todo)',

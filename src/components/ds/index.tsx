@@ -117,7 +117,7 @@ export const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
   ({ className, wrapperClassName, shortcut, ...props }, ref) => (
     <div
       className={cn(
-        'relative flex h-9 items-center rounded-sm border border-line bg-bg px-3',
+        'relative flex h-10 items-center rounded-sm border border-line bg-paper px-3',
         'focus-within:border-ink/20 focus-within:ring-2 focus-within:ring-ring/20',
         wrapperClassName,
       )}
@@ -142,8 +142,9 @@ export const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
 SearchField.displayName = 'SearchField';
 
 /* ─────────────────────── Navegação lateral ───────────────────
-   NavItem 220×36 r8 · NavGroup idem com chevron · NavSubItem 32px
-   recuado 34px à esquerda, ativo em brand/tint */
+   NavItem 220×36 r8 (ativo em accent/tint desde 10/08/2026) · NavGroup idem
+   com chevron · NavSubItem 32px recuado 34px à esquerda, ativo em brand/tint
+   (nível 2 não mudou — só o item de topo liga ao acento) */
 
 const navBase =
   'flex w-full items-center rounded-sm transition-colors [&_svg]:shrink-0';
@@ -162,7 +163,7 @@ export function NavItem({ active = false, icon, className, children, ...props }:
       className={cn(
         navBase,
         'h-9 gap-2.5 px-3 [&_svg]:h-[18px] [&_svg]:w-[18px]',
-        active ? 'bg-bg-2 text-nav font-semibold text-ink' : 'text-nav text-muted-ink hover:bg-bg-2 hover:text-ink',
+        active ? 'bg-action-tint text-nav font-semibold text-ink' : 'text-nav text-muted-ink hover:bg-bg-2 hover:text-ink',
         className,
       )}
       {...props}

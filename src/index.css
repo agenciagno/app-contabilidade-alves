@@ -30,24 +30,25 @@
     --space-12: 48px;
     --space-20: 80px;
 
-    /* surface/* */
+    /* surface/* — cinza-azul derivado do navy (10/08/2026), não zinc puro */
     --paper: #ffffff;
-    --bg: #f7f7f5;
-    --bg-2: #f1f1ef;
-    --bg-3: #e6e6e3;
+    --bg: #f4f6f8;
+    --bg-2: #edf0f4;
+    --bg-3: #e2e7ee;
 
-    /* text/* */
-    --ink: #18181b;
-    --ink-2: #27272a;
-    --muted-ink: #71717a;
-    --muted-ink-2: #a1a1aa;
+    /* text/* — --ink é literalmente o navy da marca (#101923) */
+    --ink: #101923;
+    --ink-2: #243342;
+    --muted-ink: #5c6c7d;
+    --muted-ink-2: #93a1b0;
     --on-brand: #ffffff;
 
     /* line/* */
-    --line: #e4e4e7;
-    --line-2: #ededed;
+    --line: #e3e8ee;
+    --line-2: #eef1f5;
 
-    /* brand/* — família navy da marca (`_context/marca/`) */
+    /* brand/* — família navy da marca (`_context/marca/`). Só chrome/banner
+       desde 10/08/2026: a ação primária é --accent, ver abaixo. */
     --brand: #101923;
     --brand-2: #253a50;
     /* brand-deep é tinta sobre botão claro dentro do banner escuro — é o único
@@ -57,6 +58,16 @@
     --brand-ink: #1a2c3e;
     --brand-tint: #eef1f3;
     --brand-soft: #d0dbe5;
+
+    /* accent/* — extensão do produto (Figma "CA/Extensões"), ação primária
+       desde 10/08/2026. --brand renderiza quase preto; um azul vivo (~212°)
+       tira a "cara de template". Inverte por modo — usar sempre --on-accent,
+       nunca #ffffff fixo. */
+    --accent: #1d6fd8;
+    --accent-hover: #1a5fba;
+    --accent-tint: #eaf2fd;
+    --accent-soft: #c9ddf8;
+    --on-accent: #ffffff;
 
     /* status/* */
     --ok: #1a9f63;
@@ -70,18 +81,25 @@
        O DS tem 4 tons de status (ok/warn/danger) que dizem "está bom / atenção /
        ruim". Estado de tarefa é outra coisa: são 4 etapas de um fluxo, todas
        neutras em juízo, e precisam de matizes distintos para o Kanban funcionar.
-       Ancorados nos valores que já estavam em uso para não deslocar o visual. */
-    --state-todo: #2563eb;    /* 5.17:1 sobre branco */
+       "A fazer" deixou de ser azul (10/08/2026): idêntico ao --accent novo,
+       dois azuis significando coisas diferentes é defeito. Virou slate — o
+       único neutro dos quatro, e o semanticamente certo pro estado não-iniciado. */
+    --state-todo: #64748b;    /* 5.17:1 sobre branco */
     --state-doing: #c2410c;   /* 5.18:1 — o laranja anterior dava 3.56, abaixo de AA */
     --state-waiting: #a16207; /* 4.92:1 — o amarelo anterior dava 2.94 */
     --state-done: #059669;
 
     /* Banner de marca — superfície escura fixa, IGUAL nos dois modos.
        Não usar --brand/--ink aqui: eles invertem no escuro e o texto sumiria.
-       Por isso estes três ficam só no :root e não são redefinidos em .dark. */
+       Por isso esta família fica só no :root e não é redefinida em .dark. */
     --banner-from: #253a50;
     --banner-to: #101923;
     --on-banner: #ffffff;
+    --on-banner-muted: #9fb0c2;
+    --banner-surface-active: #2d353d; /* pílula do item de nav ativo, sobre navy */
+    --banner-surface-soft: #232b35;   /* cartão de conta no rodapé do sidebar navy */
+    --banner-line: #313942;
+    --banner-avatar: #454c53;
 
     /* Sombras — hairline sólida antes do blur (decisão 03) */
     --shadow-sm: 0 1px 0 #e4e4e7;
@@ -181,21 +199,21 @@
 
   .dark {
     /* ─── Design System CA — MODO ESCURO (modo Dark do SC/Color) ─── */
-    --paper: #161616;
-    --bg: #0a0a0a;
-    --bg-2: #111111;
-    --bg-3: #1f1f1f;
+    --paper: #14171b;
+    --bg: #0b0d10;
+    --bg-2: #16191e;
+    --bg-3: #23272e;
 
-    --ink: #fafafa;
-    --ink-2: #e4e4e7;
-    --muted-ink: #a1a1aa;
-    --muted-ink-2: #71717a;
+    --ink: #f4f7fa;
+    --ink-2: #dde3ea;
+    --muted-ink: #9aa8b5;
+    --muted-ink-2: #6b7885;
     /* No escuro brand é quase-branco; texto sobre ele tem de ser tinta escura.
        O Figma concorda: text/on-brand no modo Dark é #101923 (auditado 07/08/2026). */
     --on-brand: #101923;
 
-    --line: #262626;
-    --line-2: #1f1f1f;
+    --line: #262b32;
+    --line-2: #1b1f25;
 
     --brand: #fafafa;
     --brand-2: #fafafa;
@@ -205,6 +223,14 @@
     --brand-tint: #1a2c3e;
     --brand-soft: #253d54;
 
+    /* accent/* — inverte por modo: no escuro é claro o bastante pra se
+       destacar do fundo, e por isso pede tinta escura em cima (--on-accent). */
+    --accent: #5b9cf5;
+    --accent-hover: #7ab0f5;
+    --accent-tint: #16273d;
+    --accent-soft: #1e3a5f;
+    --on-accent: #0a1522;
+
     --ok: #1a9f63;
     --warn: #d97706;
     --danger: #dc2626;
@@ -212,8 +238,8 @@
     --warn-soft: #3c2a1d;
     --danger-soft: #3e201d;
 
-    /* Estado de tarefa — mais claros no escuro, senão somem no fundo #0a0a0a */
-    --state-todo: #60a5fa;
+    /* Estado de tarefa — mais claros no escuro, senão somem no fundo escuro */
+    --state-todo: #94a3b8;
     --state-doing: #fb923c;
     --state-waiting: #facc15;
     --state-done: #34d17f;

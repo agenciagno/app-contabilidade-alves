@@ -713,7 +713,7 @@ export default function FiscalTasks() {
             >
               <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
               Mais filtros
-              {(startDate || endDate) && <span className="h-1.5 w-1.5 rounded-full bg-brand" />}
+              {(startDate || endDate) && <span className="h-1.5 w-1.5 rounded-full bg-action" />}
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-72 space-y-3 p-3">

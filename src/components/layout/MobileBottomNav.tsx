@@ -41,7 +41,7 @@ export function MobileBottomNav() {
             to={d.url}
             className={cn(
               'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 py-3 text-badge transition-colors',
-              ativo ? 'font-semibold text-brand' : 'text-muted-ink',
+              ativo ? 'font-semibold text-action' : 'text-muted-ink',
             )}
           >
             <d.icon className="h-[21px] w-[21px] shrink-0" strokeWidth={1.75} />

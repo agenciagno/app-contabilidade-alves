@@ -305,7 +305,7 @@ export default function Boletos() {
               <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
               Mais filtros
               {(valorMin || valorMax || pagamentoStart || pagamentoEnd) && (
-                <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+                <span className="h-1.5 w-1.5 rounded-full bg-action" />
               )}
             </button>
           </PopoverTrigger>

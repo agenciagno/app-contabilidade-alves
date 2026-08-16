@@ -1,14 +1,21 @@
 import { useNavigate } from 'react-router-dom';
-import { Moon, Sun, Bot } from 'lucide-react';
+import { Moon, Sun, Bot, Building2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useCompany } from '@/hooks/useCompany';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { HeaderSearch } from './HeaderSearch';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { Logo } from '@/components/brand/Logo';
 import { isDevEnvironment } from '@/lib/environment';
 
 /**
  * Header — Shell/Topbar do Figma.
+ *
+ * Shell §6.2.1 do design system (10/08/2026): o header ocupa a largura
+ * inteira da janela e a sidebar começa abaixo dele — a marca vive aqui, não
+ * mais no topo da sidebar (essa segue com o bloco de empresa só no drawer
+ * mobile, onde esse header não cabe do jeito atual).
  *
  * Decisão 05 do redesign: de 5 ações para 3. Calculadora e calendário saíram
  * daqui e passaram a viver nas telas de Financeiro, onde os números estão;
@@ -19,12 +26,14 @@ import { isDevEnvironment } from '@/lib/environment';
 export function AppHeader() {
   const { resolvedTheme, setTheme } = useTheme();
   const { isAdmin, isSuperAdmin } = useUserRole();
+  const { companyName, companyCnpj, company } = useCompany();
   const navigate = useNavigate();
   const isDev = isDevEnvironment();
   const isLight = resolvedTheme !== 'dark';
+  const logoUrl: string | null = (company as any)?.logo_url ?? null;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-paper pt-[env(safe-area-inset-top)]">
+    <header className="sticky top-0 z-50 h-16 shrink-0 border-b border-line bg-paper pt-[env(safe-area-inset-top)]">
       <div className="flex h-16 items-center gap-3 px-4">
         <div className="flex shrink-0 items-center gap-2">
           <SidebarTrigger className="text-muted-ink hover:text-ink" />
@@ -33,6 +42,28 @@ export function AppHeader() {
               dev
             </span>
           )}
+        </div>
+
+        {/* Marca + empresa ativa — só desktop, onde o header tem espaço pra
+            sobrar; no mobile esse bloco vive no topo do drawer da sidebar. */}
+        <div className="hidden shrink-0 items-center gap-4 md:flex">
+          <Logo className="h-6" />
+          <span className="h-6 w-px bg-line" aria-hidden />
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-brand">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
+              ) : (
+                <Building2 className="h-4 w-4 text-on-brand" strokeWidth={1.5} />
+              )}
+            </div>
+            <div className="flex min-w-0 flex-col">
+              <span className="max-w-[180px] truncate text-ui-strong text-ink">{companyName}</span>
+              <span className="truncate font-mono text-meta text-muted-ink-2">
+                {companyCnpj || 'CNPJ não informado'}
+              </span>
+            </div>
+          </div>
         </div>
 
         <div className="flex min-w-0 flex-1 justify-center">
