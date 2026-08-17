@@ -105,6 +105,10 @@ export function CashFlowReportModal({
     for (let m = currentMonth; m <= 11; m++) s.add(m);
     return s;
   });
+  const [monthlyFilterMode, setMonthlyFilterMode] = useState<'months' | 'period'>('months');
+  const [monthlyPeriodStart, setMonthlyPeriodStart] = useState('');
+  const [monthlyPeriodEnd, setMonthlyPeriodEnd] = useState('');
+  const [monthlyGroupBy, setMonthlyGroupBy] = useState<'evento' | 'cliente'>('evento');
 
   // Auto-fill months when status or year changes
   const autoFillMonths = (status: 'paid' | 'pending', year: number) => {
@@ -136,6 +140,10 @@ export function CashFlowReportModal({
       setMonthlySelectedCategories(new Set());
       setMonthlyVersion('resumida');
       setMonthlyMonths(autoFillMonths('pending', currentYear));
+      setMonthlyFilterMode('months');
+      setMonthlyPeriodStart('');
+      setMonthlyPeriodEnd('');
+      setMonthlyGroupBy('evento');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialStartDate, initialEndDate, initialCategoryIds, initialContactIds]);
@@ -255,6 +263,37 @@ export function CashFlowReportModal({
     [monthlyMonths],
   );
 
+  // Colunas ativas da Consulta Mensal: meses do ano selecionado (modo padrão)
+  // ou os meses cobertos pelo período personalizado (pode cruzar anos).
+  const activeColumns = useMemo(() => {
+    if (monthlyFilterMode === 'period') {
+      if (!monthlyPeriodStart || !monthlyPeriodEnd) return [] as { year: number; month: number }[];
+      const [sy, sm] = monthlyPeriodStart.split('-').map(Number);
+      const [ey, em] = monthlyPeriodEnd.split('-').map(Number);
+      const endMonthIdx = em - 1;
+      const cols: { year: number; month: number }[] = [];
+      let y = sy, m = sm - 1, guard = 0;
+      while ((y < ey || (y === ey && m <= endMonthIdx)) && guard < 240) {
+        cols.push({ year: y, month: m });
+        m++;
+        if (m > 11) { m = 0; y++; }
+        guard++;
+      }
+      return cols;
+    }
+    return sortedSelectedMonths.map(m => ({ year: monthlyYear, month: m }));
+  }, [monthlyFilterMode, monthlyPeriodStart, monthlyPeriodEnd, sortedSelectedMonths, monthlyYear]);
+
+  const columnLabel = (c: { year: number; month: number }) =>
+    monthlyFilterMode === 'period' ? `${MONTHS_PT[c.month]}/${String(c.year).slice(2)}` : MONTHS_PT[c.month];
+
+  const monthlyPeriodDisplay = monthlyFilterMode === 'period'
+    ? (monthlyPeriodStart && monthlyPeriodEnd ? `${formatDateBR(monthlyPeriodStart)} a ${formatDateBR(monthlyPeriodEnd)}` : 'Selecione o período')
+    : `${sortedSelectedMonths.map(m => MONTHS_PT[m]).join(', ') || '—'} / ${monthlyYear}`;
+
+  const macroColumnLabel = monthlyGroupBy === 'cliente' ? 'Cliente/Fornecedor' : 'Evento';
+  const monthlyTitleSuffix = monthlyGroupBy === 'cliente' ? ' — por Cliente/Fornecedor' : '';
+
   // Expand selected categories to include children of any selected macro
   const expandedSelectedCategories = useMemo(() => {
     if (monthlySelectedCategories.size === 0) return monthlySelectedCategories;
@@ -270,54 +309,11 @@ export function CashFlowReportModal({
     return expanded;
   }, [monthlySelectedCategories, categories]);
 
-  const monthlyMatrix = useMemo(() => {
-    // Filter rows by year + status + category
-    const isPaid = monthlyStatus === 'paid';
-    const rows = txns.filter(t => {
-      if (t.is_paid !== isPaid) return false;
-      const ref = isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
-      if (!ref) return false;
-      if (parseInt(ref.slice(0, 4), 10) !== monthlyYear) return false;
-      if (expandedSelectedCategories.size > 0 && !expandedSelectedCategories.has(t.category_id)) return false;
-      return true;
-    });
-
-    // Aggregate by event/category name
-    const map = new Map<string, { name: string; color: string | null; monthly: number[]; total: number }>();
-    for (const t of rows) {
-      const ref = isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
-      if (!ref) continue;
-      const month = parseInt(ref.slice(5, 7), 10) - 1;
-      if (!sortedSelectedMonths.includes(month)) continue;
-      const name = t.category?.name || 'Sem evento';
-      const color = (t.category as any)?.color ?? null;
-      const cur = map.get(name) || { name, color, monthly: Array(12).fill(0), total: 0 };
-      const amt = Number(isPaid ? (t.paid_amount ?? t.amount) : t.amount);
-      const signed = t.type === 'receita' ? amt : -amt;
-      cur.monthly[month] += signed;
-      cur.total += signed;
-      map.set(name, cur);
-    }
-
-    // Hide events with total === 0
-    const events = Array.from(map.values())
-      .filter(e => Math.abs(e.total) > 0.0001)
-      .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
-
-    // Column totals + grand total (only for selected months)
-    const colTotals: number[] = Array(12).fill(0);
-    let grand = 0;
-    for (const e of events) {
-      for (const m of sortedSelectedMonths) {
-        colTotals[m] += e.monthly[m];
-      }
-      grand += e.total;
-    }
-    return { events, colTotals, grand };
-  }, [txns, monthlyYear, monthlyStatus, expandedSelectedCategories, sortedSelectedMonths, isReceivables]);
-
-  // ─── Hierarchical matrix for "Versão Completa" (Evento → Cliente/Fornecedor) ──
-  type HierarchicalEvent = {
+  // ─── Agrupamento mensal: Evento Contábil ou Cliente/Fornecedor ────
+  // Estrutura única (macro → filhos) serve tanto a Versão Resumida (só macro)
+  // quanto a Completa (macro + filhos) — e tanto o agrupamento por Evento
+  // quanto por Cliente/Fornecedor, trocando qual é macro e qual é filho.
+  type HierarchicalGroup = {
     macroName: string;
     macroColor: string | null;
     monthly: number[];
@@ -325,84 +321,94 @@ export function CashFlowReportModal({
     children: { name: string; color: string | null; monthly: number[]; total: number }[];
   };
 
-  const monthlyHierarchicalMatrix = useMemo(() => {
-    if (monthlyVersion !== 'completa') return { groups: [] as HierarchicalEvent[], colTotals: Array(12).fill(0) as number[], grand: 0 };
+  const getEventKey = (t: Transaction, catMap: Map<string, Category>) => {
+    const catId = t.category_id || '__none__';
+    const cat = catId !== '__none__' ? catMap.get(catId) : null;
+    return { id: catId, name: cat?.name || 'Sem evento', color: cat?.color ?? null };
+  };
+  const getContactKey = (t: Transaction) => ({
+    id: t.contact?.id || '__no_contact__',
+    name: t.contact?.name || 'Sem cliente/fornecedor',
+    color: null as string | null,
+  });
 
+  const monthlyGroups = useMemo(() => {
     const isPaid = monthlyStatus === 'paid';
     const catMap = new Map(categories.map(c => [c.id, c]));
+    const colIndex = new Map(activeColumns.map((c, i) => [`${c.year}-${pad2(c.month + 1)}`, i]));
 
     const rows = txns.filter(t => {
       if (t.is_paid !== isPaid) return false;
       const ref = isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
-      if (!ref) return false;
-      if (parseInt(ref.slice(0, 4), 10) !== monthlyYear) return false;
+      if (!ref || !colIndex.has(ref.slice(0, 7))) return false;
       if (expandedSelectedCategories.size > 0 && !expandedSelectedCategories.has(t.category_id)) return false;
       return true;
     });
 
-    // Group by category → contact
-    const eventMap = new Map<string, {
-      catName: string; catColor: string | null;
-      monthly: number[]; total: number;
-      contacts: Map<string, { name: string; monthly: number[]; total: number }>;
+    const macroKeyFn = monthlyGroupBy === 'cliente' ? getContactKey : (t: Transaction) => getEventKey(t, catMap);
+    const childKeyFn = monthlyGroupBy === 'cliente' ? (t: Transaction) => getEventKey(t, catMap) : getContactKey;
+
+    const macroMap = new Map<string, {
+      name: string; color: string | null; monthly: number[]; total: number;
+      children: Map<string, { name: string; monthly: number[]; total: number }>;
     }>();
 
     for (const t of rows) {
-      const ref = isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
-      if (!ref) continue;
-      const month = parseInt(ref.slice(5, 7), 10) - 1;
-      if (!sortedSelectedMonths.includes(month)) continue;
-
-      const catId = t.category_id || '__none__';
-      const cat = catId !== '__none__' ? catMap.get(catId) : null;
-      const catName = cat?.name || 'Sem evento';
-      const catColor = cat?.color ?? null;
-
+      const ref = (isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date))!;
+      const colIdx = colIndex.get(ref.slice(0, 7))!;
       const amt = Number(isPaid ? (t.paid_amount ?? t.amount) : t.amount);
       const signed = t.type === 'receita' ? amt : -amt;
 
-      let ev = eventMap.get(catId);
-      if (!ev) {
-        ev = { catName, catColor, monthly: Array(12).fill(0), total: 0, contacts: new Map() };
-        eventMap.set(catId, ev);
+      const macro = macroKeyFn(t);
+      let mg = macroMap.get(macro.id);
+      if (!mg) {
+        mg = { name: macro.name, color: macro.color, monthly: Array(activeColumns.length).fill(0), total: 0, children: new Map() };
+        macroMap.set(macro.id, mg);
       }
-      ev.monthly[month] += signed;
-      ev.total += signed;
+      mg.monthly[colIdx] += signed;
+      mg.total += signed;
 
-      const contactKey = t.contact?.id || '__no_contact__';
-      const contactName = t.contact?.name || 'Sem cliente/fornecedor';
-      let ct = ev.contacts.get(contactKey);
-      if (!ct) {
-        ct = { name: contactName, monthly: Array(12).fill(0), total: 0 };
-        ev.contacts.set(contactKey, ct);
+      const child = childKeyFn(t);
+      let cg = mg.children.get(child.id);
+      if (!cg) {
+        cg = { name: child.name, monthly: Array(activeColumns.length).fill(0), total: 0 };
+        mg.children.set(child.id, cg);
       }
-      ct.monthly[month] += signed;
-      ct.total += signed;
+      cg.monthly[colIdx] += signed;
+      cg.total += signed;
     }
 
-    const groups: HierarchicalEvent[] = Array.from(eventMap.values())
-      .filter(ev => Math.abs(ev.total) > 0.0001)
+    const groups: HierarchicalGroup[] = Array.from(macroMap.values())
+      .filter(g => Math.abs(g.total) > 0.0001)
       .sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
-      .map(ev => ({
-        macroName: ev.catName,
-        macroColor: ev.catColor,
-        monthly: ev.monthly,
-        total: ev.total,
-        children: Array.from(ev.contacts.values())
+      .map(g => ({
+        macroName: g.name,
+        macroColor: g.color,
+        monthly: g.monthly,
+        total: g.total,
+        children: Array.from(g.children.values())
           .filter(c => Math.abs(c.total) > 0.0001)
-          .sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
-          .map(c => ({ name: c.name, color: null, monthly: c.monthly, total: c.total })),
+          .sort((a, b) => Math.abs(b.total) - Math.abs(a.total)),
       }));
 
-    const colTotals: number[] = Array(12).fill(0);
+    const colTotals: number[] = Array(activeColumns.length).fill(0);
     let grand = 0;
     for (const g of groups) {
-      for (const m of sortedSelectedMonths) colTotals[m] += g.monthly[m];
+      g.monthly.forEach((v, i) => { colTotals[i] += v; });
       grand += g.total;
     }
 
     return { groups, colTotals, grand };
-  }, [monthlyVersion, txns, monthlyYear, monthlyStatus, expandedSelectedCategories, sortedSelectedMonths, categories, isReceivables]);
+  }, [txns, monthlyStatus, expandedSelectedCategories, activeColumns, categories, isReceivables, monthlyGroupBy]);
+
+  // Versão Resumida usa só o nível macro (mesmos totais, sem os filhos)
+  const monthlyMatrix = useMemo(() => ({
+    events: monthlyGroups.groups.map(g => ({ name: g.macroName, color: g.macroColor, monthly: g.monthly, total: g.total })),
+    colTotals: monthlyGroups.colTotals,
+    grand: monthlyGroups.grand,
+  }), [monthlyGroups]);
+
+  const monthlyHierarchicalMatrix = monthlyGroups;
 
   const monthlyCategoryLabel = useMemo(() => {
     if (monthlySelectedCategories.size === 0) return 'Todas';
@@ -411,7 +417,6 @@ export function CashFlowReportModal({
     return `${names.length} eventos: ${names.join(', ')}`;
   }, [monthlySelectedCategories, categories]);
   const monthlyStatusLabel = monthlyStatus === 'paid' ? 'Pago/Recebido' : 'Pagar/Receber';
-  const monthlyMonthsLabel = sortedSelectedMonths.map(m => MONTHS_PT[m]).join(', ') || '—';
 
   const toggleMonth = (m: number) => {
     setMonthlyMonths(prev => {
@@ -812,17 +817,22 @@ export function CashFlowReportModal({
   };
 
   // ─── Monthly Exports ──────────────────────────────────────────────
+  const monthlyFileSuffix = monthlyFilterMode === 'period'
+    ? `${monthlyPeriodStart || 'geral'}_${monthlyPeriodEnd || 'geral'}`
+    : `${monthlyYear}`;
+  const monthlyFilePrefix = `consulta-mensal${monthlyGroupBy === 'cliente' ? '-cliente' : ''}-${monthlyFileSuffix}-${monthlyStatus}`;
+
   const exportMonthlyPDF = () => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const emittedAt = `Emitido em ${pad2(today.getDate())}/${pad2(today.getMonth() + 1)}/${today.getFullYear()} às ${pad2(today.getHours())}:${pad2(today.getMinutes())}`;
 
     doc.setFontSize(13); doc.setFont('helvetica', 'bold');
-    doc.text(isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber', 14, 18);
+    doc.text((isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber') + monthlyTitleSuffix, 14, 18);
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-    doc.text(`Período: ${monthlyMonthsLabel} / ${monthlyYear} • ${monthlyStatusLabel}`, 14, 25);
+    doc.text(`Período: ${monthlyPeriodDisplay} • ${monthlyStatusLabel}`, 14, 25);
     const tableStartY = 32;
 
-    const monthsCount = sortedSelectedMonths.length || 1;
+    const monthsCount = activeColumns.length || 1;
     const pageW = 297 - 28;
 
     // Format values: try with R$ prefix; fall back to compact (no "R$ ") if too tight
@@ -842,12 +852,12 @@ export function CashFlowReportModal({
     const measureMax = (fmt: (v: number) => string, font: number) => {
       doc.setFontSize(font);
       let maxMonth = 0;
-      for (const m of sortedSelectedMonths) {
+      for (let i = 0; i < activeColumns.length; i++) {
         for (const e of monthlyMatrix.events) {
-          const w = doc.getTextWidth(fmt(e.monthly[m]));
+          const w = doc.getTextWidth(fmt(e.monthly[i]));
           if (w > maxMonth) maxMonth = w;
         }
-        const w = doc.getTextWidth(fmt(monthlyMatrix.colTotals[m]));
+        const w = doc.getTextWidth(fmt(monthlyMatrix.colTotals[i]));
         if (w > maxMonth) maxMonth = w;
       }
       let maxTotal = 0;
@@ -887,7 +897,7 @@ export function CashFlowReportModal({
     }
 
     const fmt = useCompact ? fmtCompact : fmtFull;
-    const head = [['Evento', ...sortedSelectedMonths.map(m => MONTHS_PT[m]), 'TOTAL']];
+    const head = [[macroColumnLabel, ...activeColumns.map(columnLabel), 'TOTAL']];
 
     // Build body rows based on version
     let body: string[][];
@@ -898,24 +908,24 @@ export function CashFlowReportModal({
       body = [];
       for (const g of monthlyHierarchicalMatrix.groups) {
         // Macro row
-        body.push([g.macroName, ...sortedSelectedMonths.map(m => fmt(g.monthly[m])), fmt(g.total)]);
+        body.push([g.macroName, ...g.monthly.map(fmt), fmt(g.total)]);
         rowMeta.push({ isMacro: true });
         // Children
         for (const c of g.children) {
-          body.push([c.name, ...sortedSelectedMonths.map(m => fmt(c.monthly[m])), fmt(c.total)]);
+          body.push([c.name, ...c.monthly.map(fmt), fmt(c.total)]);
           rowMeta.push({ isChild: true });
         }
       }
-      foot = [['TOTAL', ...sortedSelectedMonths.map(m => fmt(monthlyHierarchicalMatrix.colTotals[m])), fmt(monthlyHierarchicalMatrix.grand)]];
+      foot = [['TOTAL', ...monthlyHierarchicalMatrix.colTotals.map(fmt), fmt(monthlyHierarchicalMatrix.grand)]];
     } else {
       body = monthlyMatrix.events.map(e => [
         e.name,
-        ...sortedSelectedMonths.map(m => fmt(e.monthly[m])),
+        ...e.monthly.map(fmt),
         fmt(e.total),
       ]);
       foot = [[
         'TOTAL',
-        ...sortedSelectedMonths.map(m => fmt(monthlyMatrix.colTotals[m])),
+        ...monthlyMatrix.colTotals.map(fmt),
         fmt(monthlyMatrix.grand),
       ]];
     }
@@ -974,16 +984,16 @@ export function CashFlowReportModal({
       },
     });
 
-    doc.save(`consulta-mensal-${monthlyYear}-${monthlyStatus}.pdf`);
+    doc.save(`${monthlyFilePrefix}.pdf`);
   };
 
   const exportMonthlyXLS = () => {
-    const monthHeaders = sortedSelectedMonths.map(m => MONTHS_PT[m]);
-    const headers = ['Evento', ...monthHeaders, 'TOTAL'];
+    const monthHeaders = activeColumns.map(columnLabel);
+    const headers = [macroColumnLabel, ...monthHeaders, 'TOTAL'];
     const meta = `
       <tr><td colspan="${headers.length}"><b>${company?.name || 'Empresa'}</b></td></tr>
-      <tr><td colspan="${headers.length}">${isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber'}</td></tr>
-      <tr><td colspan="${headers.length}">Ano: ${monthlyYear} • Status: ${monthlyStatusLabel} • Evento: ${monthlyCategoryLabel}</td></tr>
+      <tr><td colspan="${headers.length}">${(isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber') + monthlyTitleSuffix}</td></tr>
+      <tr><td colspan="${headers.length}">Período: ${monthlyPeriodDisplay} • Status: ${monthlyStatusLabel} • Evento: ${monthlyCategoryLabel}</td></tr>
       <tr><td colspan="${headers.length}"></td></tr>
     `;
     let rows: string;
@@ -991,35 +1001,35 @@ export function CashFlowReportModal({
     if (monthlyVersion === 'completa') {
       const rowParts: string[] = [];
       for (const g of monthlyHierarchicalMatrix.groups) {
-        rowParts.push(`<tr style="background:#EBEBF0;font-weight:bold"><td>${g.macroName}</td>${sortedSelectedMonths.map(m => `<td>${g.monthly[m].toFixed(2).replace('.', ',')}</td>`).join('')}<td>${g.total.toFixed(2).replace('.', ',')}</td></tr>`);
+        rowParts.push(`<tr style="background:#EBEBF0;font-weight:bold"><td>${g.macroName}</td>${g.monthly.map(v => `<td>${v.toFixed(2).replace('.', ',')}</td>`).join('')}<td>${g.total.toFixed(2).replace('.', ',')}</td></tr>`);
         for (const c of g.children) {
-          rowParts.push(`<tr><td style="padding-left:16px;color:#666">${c.name}</td>${sortedSelectedMonths.map(m => `<td>${c.monthly[m].toFixed(2).replace('.', ',')}</td>`).join('')}<td>${c.total.toFixed(2).replace('.', ',')}</td></tr>`);
+          rowParts.push(`<tr><td style="padding-left:16px;color:#666">${c.name}</td>${c.monthly.map(v => `<td>${v.toFixed(2).replace('.', ',')}</td>`).join('')}<td>${c.total.toFixed(2).replace('.', ',')}</td></tr>`);
         }
       }
       rows = rowParts.join('');
-      totalRow = `<tr><td><b>TOTAL</b></td>${sortedSelectedMonths.map(m => `<td><b>${monthlyHierarchicalMatrix.colTotals[m].toFixed(2).replace('.', ',')}</b></td>`).join('')}<td><b>${monthlyHierarchicalMatrix.grand.toFixed(2).replace('.', ',')}</b></td></tr>`;
+      totalRow = `<tr><td><b>TOTAL</b></td>${monthlyHierarchicalMatrix.colTotals.map(v => `<td><b>${v.toFixed(2).replace('.', ',')}</b></td>`).join('')}<td><b>${monthlyHierarchicalMatrix.grand.toFixed(2).replace('.', ',')}</b></td></tr>`;
     } else {
       rows = monthlyMatrix.events.map(e =>
-        `<tr><td>${e.name}</td>${sortedSelectedMonths.map(m => `<td>${e.monthly[m].toFixed(2).replace('.', ',')}</td>`).join('')}<td>${e.total.toFixed(2).replace('.', ',')}</td></tr>`
+        `<tr><td>${e.name}</td>${e.monthly.map(v => `<td>${v.toFixed(2).replace('.', ',')}</td>`).join('')}<td>${e.total.toFixed(2).replace('.', ',')}</td></tr>`
       ).join('');
-      totalRow = `<tr><td><b>TOTAL</b></td>${sortedSelectedMonths.map(m => `<td><b>${monthlyMatrix.colTotals[m].toFixed(2).replace('.', ',')}</b></td>`).join('')}<td><b>${monthlyMatrix.grand.toFixed(2).replace('.', ',')}</b></td></tr>`;
+      totalRow = `<tr><td><b>TOTAL</b></td>${monthlyMatrix.colTotals.map(v => `<td><b>${v.toFixed(2).replace('.', ',')}</b></td>`).join('')}<td><b>${monthlyMatrix.grand.toFixed(2).replace('.', ',')}</b></td></tr>`;
     }
     const table = `<table>${meta}<tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>${rows}${totalRow}</table>`;
     const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>${table}</body></html>`;
     const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `consulta-mensal-${monthlyYear}-${monthlyStatus}.xls`; a.click();
+    a.href = url; a.download = `${monthlyFilePrefix}.xls`; a.click();
     URL.revokeObjectURL(url);
   };
 
   const exportMonthlyCSV = () => {
-    const monthHeaders = sortedSelectedMonths.map(m => MONTHS_PT[m]);
-    const headers = ['Evento', ...monthHeaders, 'TOTAL'];
+    const monthHeaders = activeColumns.map(columnLabel);
+    const headers = [macroColumnLabel, ...monthHeaders, 'TOTAL'];
     const meta = [
       company?.name || 'Empresa',
-      isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber',
-      `Ano: ${monthlyYear}`,
+      (isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber') + monthlyTitleSuffix,
+      `Período: ${monthlyPeriodDisplay}`,
       `Status: ${monthlyStatusLabel}`,
       `Evento Contábil: ${monthlyCategoryLabel}`,
       '',
@@ -1031,31 +1041,31 @@ export function CashFlowReportModal({
       for (const g of monthlyHierarchicalMatrix.groups) {
         rows.push([
           `"${g.macroName.replace(/"/g, '""')}"`,
-          ...sortedSelectedMonths.map(m => g.monthly[m].toFixed(2).replace('.', ',')),
+          ...g.monthly.map(v => v.toFixed(2).replace('.', ',')),
           g.total.toFixed(2).replace('.', ','),
         ].join(';'));
         for (const c of g.children) {
           rows.push([
             `"  ${c.name.replace(/"/g, '""')}"`,
-            ...sortedSelectedMonths.map(m => c.monthly[m].toFixed(2).replace('.', ',')),
+            ...c.monthly.map(v => v.toFixed(2).replace('.', ',')),
             c.total.toFixed(2).replace('.', ','),
           ].join(';'));
         }
       }
       totalRow = [
         'TOTAL',
-        ...sortedSelectedMonths.map(m => monthlyHierarchicalMatrix.colTotals[m].toFixed(2).replace('.', ',')),
+        ...monthlyHierarchicalMatrix.colTotals.map(v => v.toFixed(2).replace('.', ',')),
         monthlyHierarchicalMatrix.grand.toFixed(2).replace('.', ','),
       ].join(';');
     } else {
       rows = monthlyMatrix.events.map(e => [
         `"${e.name.replace(/"/g, '""')}"`,
-        ...sortedSelectedMonths.map(m => e.monthly[m].toFixed(2).replace('.', ',')),
+        ...e.monthly.map(v => v.toFixed(2).replace('.', ',')),
         e.total.toFixed(2).replace('.', ','),
       ].join(';'));
       totalRow = [
         'TOTAL',
-        ...sortedSelectedMonths.map(m => monthlyMatrix.colTotals[m].toFixed(2).replace('.', ',')),
+        ...monthlyMatrix.colTotals.map(v => v.toFixed(2).replace('.', ',')),
         monthlyMatrix.grand.toFixed(2).replace('.', ','),
       ].join(';');
     }
@@ -1063,7 +1073,7 @@ export function CashFlowReportModal({
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `consulta-mensal-${monthlyYear}-${monthlyStatus}.csv`; a.click();
+    a.href = url; a.download = `${monthlyFilePrefix}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -1211,7 +1221,26 @@ export function CashFlowReportModal({
 
           {mode === 'monthly' && (
             <div className="space-y-4">
-              {/* Year pills */}
+              {/* Filtrar por: Meses do Ano ou Período Personalizado */}
+              <div>
+                <Label className="text-sm font-semibold mb-2 block">Filtrar por</Label>
+                <ToggleGroup
+                  type="single"
+                  value={monthlyFilterMode}
+                  onValueChange={(v) => v && setMonthlyFilterMode(v as 'months' | 'period')}
+                  className="bg-muted/50 rounded-md p-1 w-full"
+                >
+                  <ToggleGroupItem value="months" className="flex-1 px-4 data-[state=on]:bg-background data-[state=on]:shadow-sm text-xs">
+                    Meses do Ano
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="period" className="flex-1 px-4 data-[state=on]:bg-background data-[state=on]:shadow-sm text-xs">
+                    Período Personalizado
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+
+              {monthlyFilterMode === 'months' && (
+              /* Year pills */
               <div>
                 <Label className="text-sm font-semibold mb-2 block">Ano</Label>
                 <div className="flex flex-wrap gap-2">
@@ -1232,6 +1261,7 @@ export function CashFlowReportModal({
                   ))}
                 </div>
               </div>
+              )}
 
               {/* Status pills */}
               <div>
@@ -1258,7 +1288,8 @@ export function CashFlowReportModal({
                 </div>
               </div>
 
-              {/* Months pills */}
+              {monthlyFilterMode === 'months' ? (
+              /* Months pills */
               <div>
                 <Label className="text-sm font-semibold mb-2 block">Meses</Label>
                 <div className="flex flex-wrap gap-2">
@@ -1276,6 +1307,25 @@ export function CashFlowReportModal({
                   ))}
                 </div>
               </div>
+              ) : (
+              /* Período personalizado */
+              <div>
+                <Label className="text-sm font-semibold mb-2 block">Período</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Data Início</Label>
+                    <Input type="date" value={monthlyPeriodStart} onChange={e => setMonthlyPeriodStart(e.target.value)} min="1900-01-01" max="9999-12-31" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Data Fim</Label>
+                    <Input type="date" value={monthlyPeriodEnd} onChange={e => setMonthlyPeriodEnd(e.target.value)} min="1900-01-01" max="9999-12-31" />
+                  </div>
+                </div>
+                {(!monthlyPeriodStart || !monthlyPeriodEnd) && (
+                  <p className="text-xs text-muted-foreground mt-1.5">Selecione as duas datas para gerar a consulta.</p>
+                )}
+              </div>
+              )}
 
               {/* Event Category multi-select dropdown */}
               <div>
@@ -1350,6 +1400,24 @@ export function CashFlowReportModal({
                 </Popover>
               </div>
 
+              {/* Agrupar por: Evento Contábil ou Cliente/Fornecedor */}
+              <div>
+                <Label className="text-sm font-semibold mb-2 block">Agrupar por</Label>
+                <ToggleGroup
+                  type="single"
+                  value={monthlyGroupBy}
+                  onValueChange={(v) => v && setMonthlyGroupBy(v as 'evento' | 'cliente')}
+                  className="bg-muted/50 rounded-md p-1 w-full"
+                >
+                  <ToggleGroupItem value="evento" className="flex-1 px-4 data-[state=on]:bg-background data-[state=on]:shadow-sm text-xs">
+                    Evento Contábil
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="cliente" className="flex-1 px-4 data-[state=on]:bg-background data-[state=on]:shadow-sm text-xs">
+                    Cliente/Fornecedor
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+
               {/* Version toggle */}
               <div>
                 <Label className="text-sm font-semibold mb-2 block">Versão do Relatório</Label>
@@ -1371,24 +1439,17 @@ export function CashFlowReportModal({
               {/* Preview summary */}
               <div className="rounded-lg border bg-muted/30 p-3 text-xs space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Eventos com valor:</span>
-                  <span className="font-semibold">
-                    {monthlyVersion === 'completa'
-                      ? `${monthlyHierarchicalMatrix.groups.length} eventos`
-                      : monthlyMatrix.events.length}
-                  </span>
+                  <span className="text-muted-foreground">{monthlyGroupBy === 'cliente' ? 'Clientes/Fornecedores' : 'Eventos'} com valor:</span>
+                  <span className="font-semibold">{monthlyMatrix.events.length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Meses selecionados:</span>
-                  <span className="font-semibold">{sortedSelectedMonths.length}</span>
+                  <span className="text-muted-foreground">{monthlyFilterMode === 'period' ? 'Meses no período' : 'Meses selecionados'}:</span>
+                  <span className="font-semibold">{activeColumns.length}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total geral:</span>
-                  <span className={cn('font-semibold',
-                    (monthlyVersion === 'completa' ? monthlyHierarchicalMatrix.grand : monthlyMatrix.grand) >= 0
-                      ? 'text-green-600' : 'text-red-600'
-                  )}>
-                    {formatCurrency(monthlyVersion === 'completa' ? monthlyHierarchicalMatrix.grand : monthlyMatrix.grand)}
+                  <span className={cn('font-semibold', monthlyMatrix.grand >= 0 ? 'text-green-600' : 'text-red-600')}>
+                    {formatCurrency(monthlyMatrix.grand)}
                   </span>
                 </div>
               </div>
