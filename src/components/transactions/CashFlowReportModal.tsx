@@ -100,6 +100,8 @@ export function CashFlowReportModal({
   const [monthlyVersion, setMonthlyVersion] = useState<'resumida' | 'completa'>('resumida');
   const [monthlySelectedCategories, setMonthlySelectedCategories] = useState<Set<string>>(new Set());
   const [monthlyCategorySearch, setMonthlyCategorySearch] = useState('');
+  const [monthlySelectedContacts, setMonthlySelectedContacts] = useState<Set<string>>(new Set());
+  const [monthlyContactSearch, setMonthlyContactSearch] = useState('');
   const [monthlyMonths, setMonthlyMonths] = useState<Set<number>>(() => {
     const s = new Set<number>();
     for (let m = currentMonth; m <= 11; m++) s.add(m);
@@ -138,6 +140,7 @@ export function CashFlowReportModal({
       setMonthlyYear(currentYear);
       setMonthlyStatus('pending');
       setMonthlySelectedCategories(new Set());
+      setMonthlySelectedContacts(new Set());
       setMonthlyVersion('resumida');
       setMonthlyMonths(autoFillMonths('pending', currentYear));
       setMonthlyFilterMode('months');
@@ -341,7 +344,14 @@ export function CashFlowReportModal({
       if (t.is_paid !== isPaid) return false;
       const ref = isPaid ? t.date : (isReceivables ? (t.due_date || t.expected_date) : t.expected_date);
       if (!ref || !colIndex.has(ref.slice(0, 7))) return false;
-      if (expandedSelectedCategories.size > 0 && !expandedSelectedCategories.has(t.category_id)) return false;
+      // O filtro pré-agregação segue a mesma dimensão do agrupamento ativo
+      // (Evento Contábil ou Cliente/Fornecedor) — a seleção de cada um fica
+      // guardada à parte, então trocar de aba não perde o filtro anterior.
+      if (monthlyGroupBy === 'cliente') {
+        if (monthlySelectedContacts.size > 0 && !monthlySelectedContacts.has(t.contact_id || '__no_contact__')) return false;
+      } else {
+        if (expandedSelectedCategories.size > 0 && !expandedSelectedCategories.has(t.category_id)) return false;
+      }
       return true;
     });
 
@@ -399,7 +409,7 @@ export function CashFlowReportModal({
     }
 
     return { groups, colTotals, grand };
-  }, [txns, monthlyStatus, expandedSelectedCategories, activeColumns, categories, isReceivables, monthlyGroupBy]);
+  }, [txns, monthlyStatus, expandedSelectedCategories, monthlySelectedContacts, activeColumns, categories, isReceivables, monthlyGroupBy]);
 
   // Versão Resumida usa só o nível macro (mesmos totais, sem os filhos)
   const monthlyMatrix = useMemo(() => ({
@@ -416,6 +426,14 @@ export function CashFlowReportModal({
     if (names.length === 1) return names[0];
     return `${names.length} eventos: ${names.join(', ')}`;
   }, [monthlySelectedCategories, categories]);
+  const monthlyContactLabel = useMemo(() => {
+    if (monthlySelectedContacts.size === 0) return 'Todos';
+    const names = contacts.filter(c => monthlySelectedContacts.has(c.id)).map(c => c.name);
+    if (names.length === 1) return names[0];
+    return `${names.length} selecionados: ${names.join(', ')}`;
+  }, [monthlySelectedContacts, contacts]);
+  const monthlyFilterDimensionLabel = monthlyGroupBy === 'cliente' ? 'Cliente/Fornecedor' : 'Evento Contábil';
+  const monthlyFilterValueLabel = monthlyGroupBy === 'cliente' ? monthlyContactLabel : monthlyCategoryLabel;
   const monthlyStatusLabel = monthlyStatus === 'paid' ? 'Pago/Recebido' : 'Pagar/Receber';
 
   const toggleMonth = (m: number) => {
@@ -993,7 +1011,7 @@ export function CashFlowReportModal({
     const meta = `
       <tr><td colspan="${headers.length}"><b>${company?.name || 'Empresa'}</b></td></tr>
       <tr><td colspan="${headers.length}">${(isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber') + monthlyTitleSuffix}</td></tr>
-      <tr><td colspan="${headers.length}">Período: ${monthlyPeriodDisplay} • Status: ${monthlyStatusLabel} • Evento: ${monthlyCategoryLabel}</td></tr>
+      <tr><td colspan="${headers.length}">Período: ${monthlyPeriodDisplay} • Status: ${monthlyStatusLabel} • ${monthlyFilterDimensionLabel}: ${monthlyFilterValueLabel}</td></tr>
       <tr><td colspan="${headers.length}"></td></tr>
     `;
     let rows: string;
@@ -1031,7 +1049,7 @@ export function CashFlowReportModal({
       (isReceivables ? 'Consulta Mensal — A Receber' : 'Consulta Mensal — Pagar/Receber') + monthlyTitleSuffix,
       `Período: ${monthlyPeriodDisplay}`,
       `Status: ${monthlyStatusLabel}`,
-      `Evento Contábil: ${monthlyCategoryLabel}`,
+      `${monthlyFilterDimensionLabel}: ${monthlyFilterValueLabel}`,
       '',
     ];
     let rows: string[];
@@ -1327,7 +1345,8 @@ export function CashFlowReportModal({
               </div>
               )}
 
-              {/* Event Category multi-select dropdown */}
+              {/* Filtro pré-agregação: dinâmico conforme o Agrupar por */}
+              {monthlyGroupBy === 'evento' ? (
               <div>
                 <Label className="text-sm font-semibold mb-2 block">Evento Contábil</Label>
                 <Popover>
@@ -1399,6 +1418,78 @@ export function CashFlowReportModal({
                   </PopoverContent>
                 </Popover>
               </div>
+              ) : (
+              <div>
+                <Label className="text-sm font-semibold mb-2 block">Cliente/Fornecedor</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between font-normal">
+                      <span className="truncate text-left">
+                        {monthlySelectedContacts.size === 0
+                          ? 'Todos os clientes/fornecedores'
+                          : monthlySelectedContacts.size === 1
+                          ? contacts.find(c => monthlySelectedContacts.has(c.id))?.name || '1 selecionado'
+                          : `${monthlySelectedContacts.size} selecionados`}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <div className="p-2 border-b space-y-2">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          value={monthlyContactSearch}
+                          onChange={(e) => setMonthlyContactSearch(e.target.value)}
+                          placeholder="Pesquisar cliente/fornecedor..."
+                          className="h-8 pl-7 text-sm"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMonthlySelectedContacts(new Set())}
+                        className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                      >
+                        <Checkbox checked={monthlySelectedContacts.size === 0} />
+                        <span>Todos os clientes/fornecedores</span>
+                      </button>
+                    </div>
+                    <ScrollArea className="h-64">
+                      <div className="p-2 space-y-0.5">
+                        {(() => {
+                          const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                          const q = norm(monthlyContactSearch.trim());
+                          const filtered = q ? contacts.filter(c => norm(c.name).includes(q)) : contacts;
+                          if (filtered.length === 0) {
+                            return <div className="px-2 py-4 text-sm text-muted-foreground text-center">Nenhum cliente/fornecedor encontrado</div>;
+                          }
+                          return filtered.map(ct => {
+                            const checked = monthlySelectedContacts.has(ct.id);
+                            return (
+                              <button
+                                key={ct.id}
+                                type="button"
+                                onClick={() => {
+                                  setMonthlySelectedContacts(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(ct.id)) next.delete(ct.id); else next.add(ct.id);
+                                    return next;
+                                  });
+                                }}
+                                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                              >
+                                <Checkbox checked={checked} />
+                                <span className="truncate">{ct.name}</span>
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              )}
 
               {/* Agrupar por: Evento Contábil ou Cliente/Fornecedor */}
               <div>
