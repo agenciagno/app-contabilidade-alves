@@ -713,11 +713,11 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
         <div className="ml-auto flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setExtratoOpen(true)}>
             <FileText className="w-4 h-4" />
-            Relatório de Extrato
+            Relatório Cliente/Fornecedor
           </Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setReportOpen(true)}>
             <FileText className="w-4 h-4" />
-            Relatório Cliente/Fornecedor
+            Gerar Relatório
           </Button>
         </div>
       </div>
