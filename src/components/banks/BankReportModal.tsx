@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { FileText, Table2, Download, Image, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
 import { Bank } from '@/hooks/useBanks';
 import { useCategories } from '@/hooks/useCategories';
+import { useContacts } from '@/hooks/useContacts';
 import { useBankTransactions } from '@/hooks/useBankTransactions';
 import { useCompany } from '@/hooks/useCompany';
 import jsPDF from 'jspdf';
@@ -36,6 +37,7 @@ function pad2(n: number) { return String(n).padStart(2, '0'); }
 
 export function BankReportModal({ open, onOpenChange, banks }: BankReportModalProps) {
   const { categories } = useCategories();
+  const { contacts } = useContacts();
   const { company } = useCompany();
   const summaryRef = useRef<HTMLDivElement>(null);
 
@@ -46,6 +48,7 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
   const [startDate, setStartDate] = useState(firstOfYear);
   const [endDate, setEndDate] = useState(todayStr);
   const [categoryId, setCategoryId] = useState('all');
+  const [contactId, setContactId] = useState('all');
   const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
 
   const banksList = banks.map(b => ({ id: b.id, initial_balance: b.initial_balance, is_active: b.is_active }));
@@ -57,7 +60,7 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
       bankId: effectiveBankId,
       startDate: startDate || null,
       endDate: endDate || null,
-      contactId: null,
+      contactId: contactId === 'all' ? null : contactId,
       categoryId: categoryId === 'all' ? null : categoryId,
     },
     banksList
@@ -110,6 +113,10 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
     ? categories.find(c => c.id === categoryId)?.name || 'Todos'
     : 'Todos';
 
+  const contactLabel = contactId !== 'all'
+    ? contacts.find(c => c.id === contactId)?.name || 'Todos'
+    : 'Todos';
+
   // ─── PDF Export ───────────────────────────────────────────────────
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -134,11 +141,12 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
     doc.text(`Período: ${periodLabel}`, 14, 40);
     doc.text(`Contas: ${accountsLabel}`, 14, 45);
     doc.text(`Evento Contábil: ${categoryLabel}`, 14, 50);
+    doc.text(`Cliente/Fornecedor: ${contactLabel}`, 14, 55);
 
     // ─── Cards compactos 4 colunas ───
     const cardW = 43;
     const cardH = 14;
-    const cardY = 56;
+    const cardY = 61;
     const gap = 2;
     const col1X = 14;
     const col2X = col1X + cardW + gap;
@@ -311,6 +319,7 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
       <tr><td colspan="8">Período: ${periodLabel}</td></tr>
       <tr><td colspan="8">Contas: ${accountsLabel}</td></tr>
       <tr><td colspan="8">Evento Contábil: ${categoryLabel}</td></tr>
+      <tr><td colspan="8">Cliente/Fornecedor: ${contactLabel}</td></tr>
       <tr><td colspan="8"></td></tr>
     `;
 
@@ -357,6 +366,7 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
       `Período: ${periodLabel}`,
       `Contas: ${accountsLabel}`,
       `Evento Contábil: ${categoryLabel}`,
+      `Cliente/Fornecedor: ${contactLabel}`,
       '',
     ];
 
@@ -551,19 +561,36 @@ ${transactions}
               )}
             </div>
 
-            <div>
-              <Label className="text-sm font-semibold mb-1 block">Evento Contábil</Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {categories.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-sm font-semibold mb-1 block">Evento Contábil</Label>
+                <Select value={categoryId} onValueChange={setCategoryId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {categories.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-sm font-semibold mb-1 block">Cliente/Fornecedor</Label>
+                <Select value={contactId} onValueChange={setContactId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {contacts.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -582,7 +609,7 @@ ${transactions}
               >
                 <div>
                   <h3 className="font-bold text-gray-900 text-sm">{company?.name || 'Extrato Bancário'}</h3>
-                  <p className="text-[10px] text-gray-500">Período: {periodLabel} • Contas: {accountsLabel} • Evento: {categoryLabel}</p>
+                  <p className="text-[10px] text-gray-500">Período: {periodLabel} • Contas: {accountsLabel} • Evento: {categoryLabel} • Cliente/Fornecedor: {contactLabel}</p>
                 </div>
                 <div className="grid grid-cols-4 gap-1.5">
                   <div className="bg-gray-50 rounded p-1.5">
