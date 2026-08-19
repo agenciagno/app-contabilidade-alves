@@ -296,7 +296,7 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
       body: filteredRows.map(r => [
         r.date,
         r.bank_name || '—',
-        r.description || '—',
+        r.notes || '—',
         r.contact_name || '—',
         r.category_name || '—',
         r.type === 'receita' ? formatCurrency(r.amount) : '',
@@ -383,7 +383,7 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
     const tableRows = filteredRows.map(r => [
       r.date,
       r.bank_name || '',
-      r.description,
+      r.notes || '',
       r.contact_name || '',
       r.category_name || '',
       r.type === 'receita' ? r.amount.toFixed(2).replace('.', ',') : '',
@@ -451,7 +451,7 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
     const dataLines = filteredRows.map(r => [
       r.date,
       r.bank_name || '',
-      `"${(r.description || '').replace(/"/g, '""')}"`,
+      `"${(r.notes || '').replace(/"/g, '""')}"`,
       `"${(r.contact_name || '').replace(/"/g, '""')}"`,
       r.category_name || '',
       r.type === 'receita' ? r.amount.toFixed(2).replace('.', ',') : '',

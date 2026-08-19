@@ -10,6 +10,7 @@ export interface BankStatementRow {
   bank_name: string | null;
   bank_id: string | null;
   description: string;
+  notes: string | null;
   type: 'receita' | 'despesa';
   amount: number;
   signed_amount: number;
@@ -97,7 +98,7 @@ async function fetchAllPeriodRows(
     let query = supabase
       .from('transactions')
       .select(`
-        id, date, description, type, amount, paid_amount, is_paid, bank_id,
+        id, date, description, notes, type, amount, paid_amount, is_paid, bank_id,
         contacts:contact_id (name),
         categories:category_id (name),
         banks:bank_id (name)
@@ -188,6 +189,7 @@ export function useBankTransactions(
       bank_name: t.banks?.name ?? null,
       bank_id: t.bank_id,
       description: t.description,
+      notes: t.notes ?? null,
       type: t.type as 'receita' | 'despesa',
       amount: eff,
       signed_amount: signed,
