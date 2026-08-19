@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Table2, Download, Image, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { FileText, Table2, Download, Image, ChevronDown, Search, X } from 'lucide-react';
 import { Bank } from '@/hooks/useBanks';
 import { useCategories } from '@/hooks/useCategories';
 import { useContacts } from '@/hooks/useContacts';
@@ -34,55 +35,67 @@ function formatDateBR(dateStr: string) {
 
 function pad2(n: number) { return String(n).padStart(2, '0'); }
 
-// Lista com busca + checkbox — mesmo padrão visual de "Contas Bancárias", reaproveitado
-// para Evento Contábil e Cliente/Fornecedor (listas que podem ter dezenas/centenas de itens).
-function ChecklistMultiSelect({ items, selectedIds, onToggle, searchPlaceholder, emptyLabel }: {
+// Dropdown fechado por padrão (mesmo visual do Select antigo), com busca + checkbox
+// dentro do popover — mantém a seleção múltipla sem ocupar espaço permanente na tela.
+function MultiSelectDropdown({ items, selectedIds, onToggle, onClear, placeholder, searchPlaceholder }: {
   items: { id: string; name: string }[];
   selectedIds: string[];
   onToggle: (id: string) => void;
+  onClear: () => void;
+  placeholder: string;
   searchPlaceholder: string;
-  emptyLabel: string;
 }) {
+  const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+
   const filtered = search
     ? items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
     : items;
 
+  const selectedNames = items.filter(i => selectedIds.includes(i.id)).map(i => i.name);
+  const label = selectedIds.length === 0
+    ? placeholder
+    : selectedIds.length === 1
+      ? selectedNames[0]
+      : `${selectedIds.length} selecionados`;
+
   return (
-    <div>
-      <Input
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        placeholder={searchPlaceholder}
-        className="h-7 text-xs mb-1"
-      />
-      <div className="grid grid-cols-1 gap-1 max-h-28 overflow-y-auto">
-        {filtered.map(item => (
-          <div
-            key={item.id}
-            className={`flex items-center gap-2 p-1.5 rounded border cursor-pointer transition-colors ${
-              selectedIds.includes(item.id)
-                ? 'border-primary bg-primary/5'
-                : 'border-border/50 hover:border-border'
-            }`}
-            onClick={() => onToggle(item.id)}
-          >
-            <Checkbox
-              checked={selectedIds.includes(item.id)}
-              onCheckedChange={() => onToggle(item.id)}
-              className="pointer-events-none h-3.5 w-3.5"
-            />
-            <span className="text-xs truncate">{item.name}</span>
+    <Popover open={open} onOpenChange={o => { setOpen(o); if (!o) setSearch(''); }}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent/40 transition-colors"
+        >
+          <span className={`truncate text-left ${selectedIds.length === 0 ? 'text-muted-foreground' : ''}`}>{label}</span>
+          <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start" onOpenAutoFocus={e => e.preventDefault()}>
+        <div className="p-2 border-b border-border/40">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={searchPlaceholder} className="h-7 text-xs pl-7" autoFocus />
           </div>
-        ))}
-        {filtered.length === 0 && (
-          <p className="text-xs text-muted-foreground">{emptyLabel}</p>
+        </div>
+        <div className="max-h-60 overflow-auto p-1">
+          {filtered.length > 0 ? filtered.map(item => (
+            <label key={item.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-xs">
+              <Checkbox checked={selectedIds.includes(item.id)} onCheckedChange={() => onToggle(item.id)} className="h-3.5 w-3.5" />
+              <span className="truncate">{item.name}</span>
+            </label>
+          )) : (
+            <p className="text-xs text-muted-foreground text-center py-4">Nenhum resultado</p>
+          )}
+        </div>
+        {selectedIds.length > 0 && (
+          <div className="p-2 border-t border-border/40">
+            <Button size="sm" variant="ghost" className="w-full h-7 text-xs" onClick={onClear}>
+              <X className="w-3 h-3 mr-1" /> Limpar ({selectedIds.length})
+            </Button>
+          </div>
         )}
-      </div>
-      {selectedIds.length === 0 && (
-        <p className="text-[10px] text-muted-foreground mt-0.5">Nenhuma = todas</p>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -628,23 +641,25 @@ ${transactions}
             <div className="space-y-3">
               <div>
                 <Label className="text-sm font-semibold mb-1 block">Evento Contábil</Label>
-                <ChecklistMultiSelect
+                <MultiSelectDropdown
                   items={categories}
                   selectedIds={selectedCategoryIds}
                   onToggle={toggleCategory}
+                  onClear={() => setSelectedCategoryIds([])}
+                  placeholder="Todos"
                   searchPlaceholder="Buscar evento..."
-                  emptyLabel="Nenhum evento"
                 />
               </div>
 
               <div>
                 <Label className="text-sm font-semibold mb-1 block">Cliente/Fornecedor</Label>
-                <ChecklistMultiSelect
+                <MultiSelectDropdown
                   items={contacts}
                   selectedIds={selectedContactIds}
                   onToggle={toggleContact}
+                  onClear={() => setSelectedContactIds([])}
+                  placeholder="Todos"
                   searchPlaceholder="Buscar cliente/fornecedor..."
-                  emptyLabel="Nenhum contato"
                 />
               </div>
             </div>
