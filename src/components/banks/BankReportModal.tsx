@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { FileText, Table2, Download, Image, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
@@ -35,6 +34,58 @@ function formatDateBR(dateStr: string) {
 
 function pad2(n: number) { return String(n).padStart(2, '0'); }
 
+// Lista com busca + checkbox — mesmo padrão visual de "Contas Bancárias", reaproveitado
+// para Evento Contábil e Cliente/Fornecedor (listas que podem ter dezenas/centenas de itens).
+function ChecklistMultiSelect({ items, selectedIds, onToggle, searchPlaceholder, emptyLabel }: {
+  items: { id: string; name: string }[];
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+  searchPlaceholder: string;
+  emptyLabel: string;
+}) {
+  const [search, setSearch] = useState('');
+  const filtered = search
+    ? items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
+    : items;
+
+  return (
+    <div>
+      <Input
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        placeholder={searchPlaceholder}
+        className="h-7 text-xs mb-1"
+      />
+      <div className="grid grid-cols-1 gap-1 max-h-28 overflow-y-auto">
+        {filtered.map(item => (
+          <div
+            key={item.id}
+            className={`flex items-center gap-2 p-1.5 rounded border cursor-pointer transition-colors ${
+              selectedIds.includes(item.id)
+                ? 'border-primary bg-primary/5'
+                : 'border-border/50 hover:border-border'
+            }`}
+            onClick={() => onToggle(item.id)}
+          >
+            <Checkbox
+              checked={selectedIds.includes(item.id)}
+              onCheckedChange={() => onToggle(item.id)}
+              className="pointer-events-none h-3.5 w-3.5"
+            />
+            <span className="text-xs truncate">{item.name}</span>
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <p className="text-xs text-muted-foreground">{emptyLabel}</p>
+        )}
+      </div>
+      {selectedIds.length === 0 && (
+        <p className="text-[10px] text-muted-foreground mt-0.5">Nenhuma = todas</p>
+      )}
+    </div>
+  );
+}
+
 export function BankReportModal({ open, onOpenChange, banks }: BankReportModalProps) {
   const { categories } = useCategories();
   const { contacts } = useContacts();
@@ -47,8 +98,8 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
 
   const [startDate, setStartDate] = useState(firstOfYear);
   const [endDate, setEndDate] = useState(todayStr);
-  const [categoryId, setCategoryId] = useState('all');
-  const [contactId, setContactId] = useState('all');
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
   const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
 
   const banksList = banks.map(b => ({ id: b.id, initial_balance: b.initial_balance, is_active: b.is_active }));
@@ -60,8 +111,8 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
       bankId: effectiveBankId,
       startDate: startDate || null,
       endDate: endDate || null,
-      contactId: contactId === 'all' ? null : contactId,
-      categoryId: categoryId === 'all' ? null : categoryId,
+      contactIds: selectedContactIds,
+      categoryIds: selectedCategoryIds,
     },
     banksList
   );
@@ -73,6 +124,18 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
   const toggleBank = (id: string) => {
     setSelectedBankIds(prev =>
       prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]
+    );
+  };
+
+  const toggleCategory = (id: string) => {
+    setSelectedCategoryIds(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    );
+  };
+
+  const toggleContact = (id: string) => {
+    setSelectedContactIds(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
     );
   };
 
@@ -109,12 +172,12 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
     ? banks.filter(b => selectedBankIds.includes(b.id)).map(b => b.name).join(', ')
     : 'Todas';
 
-  const categoryLabel = categoryId !== 'all'
-    ? categories.find(c => c.id === categoryId)?.name || 'Todos'
+  const categoryLabel = selectedCategoryIds.length > 0
+    ? categories.filter(c => selectedCategoryIds.includes(c.id)).map(c => c.name).join(', ')
     : 'Todos';
 
-  const contactLabel = contactId !== 'all'
-    ? contacts.find(c => c.id === contactId)?.name || 'Todos'
+  const contactLabel = selectedContactIds.length > 0
+    ? contacts.filter(c => selectedContactIds.includes(c.id)).map(c => c.name).join(', ')
     : 'Todos';
 
   // ─── PDF Export ───────────────────────────────────────────────────
@@ -216,10 +279,11 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
 
     autoTable(doc, {
       startY: sepY + 10,
-      head: [['Data', 'Banco', 'Cliente/Fornecedor', 'Evento', 'Entrada', 'Saída', 'Saldo']],
+      head: [['Data', 'Banco', 'Histórico', 'Cliente/Fornecedor', 'Evento', 'Entrada', 'Saída', 'Saldo']],
       body: filteredRows.map(r => [
         r.date,
         r.bank_name || '—',
+        r.description || '—',
         r.contact_name || '—',
         r.category_name || '—',
         r.type === 'receita' ? formatCurrency(r.amount) : '',
@@ -233,9 +297,9 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
       // em branco, em vez de alternar a cada linha.
       ...zebraPorData(filteredRows.map(r => r.date)),
       columnStyles: {
-        4: { halign: 'right', textColor: [22, 163, 74] },
-        5: { halign: 'right', textColor: [239, 68, 68] },
-        6: { halign: 'right', fontStyle: 'bold' },
+        5: { halign: 'right', textColor: [22, 163, 74] },
+        6: { halign: 'right', textColor: [239, 68, 68] },
+        7: { halign: 'right', fontStyle: 'bold' },
       },
       didDrawPage: (data) => {
         const pageCount = (doc as any).internal.getNumberOfPages();
@@ -564,32 +628,24 @@ ${transactions}
             <div className="space-y-3">
               <div>
                 <Label className="text-sm font-semibold mb-1 block">Evento Contábil</Label>
-                <Select value={categoryId} onValueChange={setCategoryId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {categories.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <ChecklistMultiSelect
+                  items={categories}
+                  selectedIds={selectedCategoryIds}
+                  onToggle={toggleCategory}
+                  searchPlaceholder="Buscar evento..."
+                  emptyLabel="Nenhum evento"
+                />
               </div>
 
               <div>
                 <Label className="text-sm font-semibold mb-1 block">Cliente/Fornecedor</Label>
-                <Select value={contactId} onValueChange={setContactId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {contacts.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <ChecklistMultiSelect
+                  items={contacts}
+                  selectedIds={selectedContactIds}
+                  onToggle={toggleContact}
+                  searchPlaceholder="Buscar cliente/fornecedor..."
+                  emptyLabel="Nenhum contato"
+                />
               </div>
             </div>
           </div>

@@ -23,6 +23,10 @@ export interface BankStatementFilters {
   endDate?: string | null;
   contactId?: string | null;
   categoryId?: string | null;
+  // Alternativa em lista a contactId/categoryId — quando informadas (e não vazias),
+  // têm prioridade e filtram via .in() em vez do .eq() de um único valor.
+  contactIds?: string[] | null;
+  categoryIds?: string[] | null;
 }
 
 export interface BankStatementResult {
@@ -84,8 +88,8 @@ async function fetchAllPeriodRows(
   activeBankIds: string[],
   startDate?: string | null,
   endDate?: string | null,
-  contactId?: string | null,
-  categoryId?: string | null
+  contactIds?: string[] | null,
+  categoryIds?: string[] | null
 ) {
   let allData: any[] = [];
   let offset = 0;
@@ -115,8 +119,8 @@ async function fetchAllPeriodRows(
 
     if (startDate) query = query.gte('date', startDate);
     if (endDate) query = query.lte('date', endDate);
-    if (contactId) query = query.eq('contact_id', contactId);
-    if (categoryId) query = query.eq('category_id', categoryId);
+    if (contactIds && contactIds.length > 0) query = query.in('contact_id', contactIds);
+    if (categoryIds && categoryIds.length > 0) query = query.in('category_id', categoryIds);
 
     const { data, error } = await query.range(offset, offset + PAGE_SIZE - 1);
     if (error) throw error;
@@ -132,9 +136,12 @@ export function useBankTransactions(
   filters: BankStatementFilters,
   banks: { id: string; initial_balance: number; is_active: boolean }[] = []
 ): BankStatementResult {
-  const { bankId, startDate, endDate, contactId, categoryId } = filters;
+  const { bankId, startDate, endDate, contactId, categoryId, contactIds, categoryIds } = filters;
   const { activeCompanyId } = useActiveCompany();
   const activeBankIds = banks.filter(b => b.is_active).map(b => b.id);
+
+  const effectiveContactIds = contactIds && contactIds.length > 0 ? contactIds : (contactId ? [contactId] : null);
+  const effectiveCategoryIds = categoryIds && categoryIds.length > 0 ? categoryIds : (categoryId ? [categoryId] : null);
 
   const { data: priorTransactions = [], isLoading: isLoadingPrior } = useQuery({
     queryKey: ['bank-transactions-prior', activeCompanyId, bankId, startDate],
@@ -144,8 +151,8 @@ export function useBankTransactions(
   });
 
   const { data: periodTransactions = [], isLoading: isLoadingPeriod } = useQuery({
-    queryKey: ['bank-transactions-period', activeCompanyId, bankId, startDate, endDate, contactId, categoryId],
-    queryFn: () => fetchAllPeriodRows(activeCompanyId!, bankId, activeBankIds, startDate, endDate, contactId, categoryId),
+    queryKey: ['bank-transactions-period', activeCompanyId, bankId, startDate, endDate, effectiveContactIds, effectiveCategoryIds],
+    queryFn: () => fetchAllPeriodRows(activeCompanyId!, bankId, activeBankIds, startDate, endDate, effectiveContactIds, effectiveCategoryIds),
     enabled: !!activeCompanyId,
     staleTime: 1000 * 30,
   });
