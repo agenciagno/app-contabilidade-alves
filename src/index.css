@@ -59,15 +59,22 @@
     --brand-tint: #eef1f3;
     --brand-soft: #d0dbe5;
 
-    /* accent/* — extensão do produto (Figma "CA/Extensões"), ação primária
-       desde 10/08/2026. --brand renderiza quase preto; um azul vivo (~212°)
-       tira a "cara de template". Inverte por modo — usar sempre --on-accent,
-       nunca #ffffff fixo. */
-    --accent: #1d6fd8;
-    --accent-hover: #1a5fba;
-    --accent-tint: #eaf2fd;
-    --accent-soft: #c9ddf8;
-    --on-accent: #ffffff;
+    /* action/* — extensão do produto (Figma "CA/Extensões", var "accent"),
+       ação primária desde 10/08/2026. --brand renderiza quase preto; um azul
+       vivo (~212°) tira a "cara de template". Inverte por modo — usar sempre
+       --on-action, nunca #ffffff fixo.
+       Nome da variável CSS é --action, não --accent (achado 18/08/2026): o
+       shadcn já define seu próprio --accent nativo (HSL, neutro, ver bloco
+       shadcn abaixo) mais adiante NO MESMO seletor — duas declarações de
+       --accent no mesmo :root/.dark faz a segunda vencer silenciosamente,
+       quebrando bg-action/border-action (variant="default" do Button) em
+       todo o app. A chave Tailwind já se chamava `action` desde sempre por
+       essa razão; a variável CSS por baixo dela não seguia a mesma regra. */
+    --action: #1d6fd8;
+    --action-hover: #1a5fba;
+    --action-tint: #eaf2fd;
+    --action-soft: #c9ddf8;
+    --on-action: #ffffff;
 
     /* status/* */
     --ok: #1a9f63;
@@ -223,13 +230,13 @@
     --brand-tint: #1a2c3e;
     --brand-soft: #253d54;
 
-    /* accent/* — inverte por modo: no escuro é claro o bastante pra se
-       destacar do fundo, e por isso pede tinta escura em cima (--on-accent). */
-    --accent: #5b9cf5;
-    --accent-hover: #7ab0f5;
-    --accent-tint: #16273d;
-    --accent-soft: #1e3a5f;
-    --on-accent: #0a1522;
+    /* action/* — inverte por modo: no escuro é claro o bastante pra se
+       destacar do fundo, e por isso pede tinta escura em cima (--on-action). */
+    --action: #5b9cf5;
+    --action-hover: #7ab0f5;
+    --action-tint: #16273d;
+    --action-soft: #1e3a5f;
+    --on-action: #0a1522;
 
     --ok: #1a9f63;
     --warn: #d97706;

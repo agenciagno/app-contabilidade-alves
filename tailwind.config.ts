@@ -126,15 +126,18 @@ export default {
         'banner-line': 'var(--banner-line)',
         'banner-avatar': 'var(--banner-avatar)',
 
-        // Ação primária do produto (Figma "CA/Extensões", CSS var --accent).
+        // Ação primária do produto (Figma "CA/Extensões", CSS var --action).
         // Chave Tailwind 'action', não 'accent': 'accent' já é ocupada pelo
         // --accent nativo do shadcn (cor neutra de hover de menu/dropdown, em
-        // HSL) — usar o mesmo nome sobrescreveria esse token silenciosamente.
-        action: 'var(--accent)',
-        'action-hover': 'var(--accent-hover)',
-        'action-tint': 'var(--accent-tint)',
-        'action-soft': 'var(--accent-soft)',
-        'on-action': 'var(--on-accent)',
+        // HSL). A variável CSS por baixo também precisa ser --action, não só
+        // a chave Tailwind — as duas usarem --accent colidia dentro do mesmo
+        // seletor em index.css e quebrava bg-action/border-action (achado
+        // 18/08/2026).
+        action: 'var(--action)',
+        'action-hover': 'var(--action-hover)',
+        'action-tint': 'var(--action-tint)',
+        'action-soft': 'var(--action-soft)',
+        'on-action': 'var(--on-action)',
 
         // Estado de tarefa (Fiscal) — 4 etapas de fluxo, não juízo de valor
         'state-todo': 'var(--state-todo)',

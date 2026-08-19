@@ -342,7 +342,10 @@ export const segmentedListClass =
 
 export const segmentedTriggerClass =
   'h-[34px] rounded-sm px-3 text-nav text-muted-ink ' +
-  'data-[state=active]:bg-paper data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-sc-sm';
+  // bg-paper funciona no claro (branco contra o bg-2 do trilho), mas no
+  // escuro paper e bg-2 são quase idênticos — achado no Figma DS 18/08/2026.
+  // dark:bg-bg-3 dá ao item ativo um degrau de luz que o trilho não tem.
+  'data-[state=active]:bg-paper dark:data-[state=active]:bg-bg-3 data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-sc-sm';
 
 /* ────────────────── Faixa de métricas (R4) ───────────────────
    Diferente da StatCardRow: aqui os indicadores dividem UM card, separados

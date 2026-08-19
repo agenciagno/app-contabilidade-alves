@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * Os nomes shadcn (outline/secondary/…) são preservados porque o app inteiro
  * já os consome; os três do DS são: default=primary, outline=secondary, ghost.
  *
- * Ação primária é --accent (classe Tailwind `action`) desde 10/08/2026 —
+ * Ação primária é --action (classe Tailwind `action`) desde 10/08/2026 —
  * --brand virou só chrome/banner. Ver _context/marca/04-design-system.md §3.3.
  */
 const buttonVariants = cva(
