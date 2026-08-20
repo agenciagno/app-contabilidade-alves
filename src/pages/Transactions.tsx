@@ -1133,6 +1133,12 @@ export default function Transactions() {
                           </div>
                         </div>
                         <div className="min-w-0 flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span
+                            title={transaction.type === 'receita' ? 'Receita' : 'Despesa'}
+                            className={`inline-flex items-center justify-center w-4 h-4 rounded-full shrink-0 ${transaction.type === 'receita' ? 'bg-ok/15 text-ok' : 'bg-danger/15 text-danger'}`}
+                          >
+                            {transaction.type === 'receita' ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                          </span>
                           {transaction.category ? (
                             <>
                               <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: transaction.category.color || '#3B82F6' }} />
