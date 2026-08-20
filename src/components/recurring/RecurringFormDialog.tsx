@@ -168,7 +168,10 @@ export function RecurringFormDialog({
     });
   };
 
-  const filteredCategories = categories;
+  // Evento Contábil: só sub-eventos aparecem no lançamento (macros seguem visíveis só na
+  // tela de cadastro Eventos Contábeis). Exceção: preserva a categoria já selecionada mesmo
+  // se for macro, pra não sumir ao editar uma recorrência legada.
+  const filteredCategories = categories.filter(c => c.parent_id !== null || c.id === formData.category_id);
   const activeBanks = banks.filter(b => b.is_active);
   const filteredContacts = contacts.filter(c => c.is_active);
 

@@ -30,6 +30,7 @@ interface Category {
   name: string;
   color: string | null;
   type: string;
+  parent_id: string | null;
 }
 
 interface CashFlowTabProps {
@@ -475,6 +476,10 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
     return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
   }, [transactions]);
 
+  // Evento Contábil: filtro da tabela mostra só sub-eventos (macros ficam ocultos aqui, mas
+  // seguem visíveis na tela de cadastro Eventos Contábeis).
+  const subCategories = useMemo(() => categories.filter(c => c.parent_id !== null), [categories]);
+
   const uniqueEventOptions = useMemo(() => {
     const set = new Set<string>();
     for (const t of transactions) {
@@ -884,7 +889,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                       <EventoMultiFilter
                         selected={categoryFilterIds}
                         onChange={setCategoryFilterIds}
-                        categories={categories as any}
+                        categories={subCategories}
                       />
                     </TableHead>
                     <TableHead className="text-xs whitespace-nowrap">Histórico</TableHead>

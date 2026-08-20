@@ -741,9 +741,10 @@ export default function Transactions() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [contacts]);
 
-  // Category options for the Evento Contábil column filter
+  // Category options for the Evento Contábil column filter — só sub-eventos (macros ficam
+  // ocultos aqui, mas seguem visíveis na tela de cadastro Eventos Contábeis).
   const categoryOptions = useMemo(() => {
-    return categories.map(c => ({ id: c.id, name: c.name, color: c.color || '#3B82F6' }));
+    return categories.filter(c => c.parent_id !== null).map(c => ({ id: c.id, name: c.name, color: c.color || '#3B82F6' }));
   }, [categories]);
 
   // Distinct values for NumericMultiFilter (full dataset, fetched only when popover opens)
@@ -966,7 +967,7 @@ export default function Transactions() {
           <CategoryMultiFilter
             selected={categoryFilters}
             onChange={setCategoryFilters}
-            categories={categories.map(c => ({ id: c.id, name: c.name, color: c.color || '#3B82F6' }))}
+            categories={categoryOptions}
           />
 
           <Popover>

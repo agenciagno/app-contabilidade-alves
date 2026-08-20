@@ -26,7 +26,7 @@ interface BulkEditDialogProps {
   onOpenChange: (open: boolean) => void;
   selectedIds: string[];
   contacts: Array<{ id: string; name: string; is_active: boolean }>;
-  categories: Array<{ id: string; name: string; type: string }>;
+  categories: Array<{ id: string; name: string; type: string; parent_id: string | null }>;
   banks: Array<{ id: string; name: string; is_active: boolean }>;
   onSuccess: () => void;
 }
@@ -80,6 +80,9 @@ export function BulkEditDialog({
 
   const activeContacts = contacts.filter(c => c.is_active);
   const activeBanks = banks.filter(b => b.is_active);
+  // Evento Contábil: só sub-eventos entram na edição em massa (macros seguem visíveis só na
+  // tela de cadastro Eventos Contábeis).
+  const subCategories = categories.filter(c => c.parent_id !== null);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -133,7 +136,7 @@ export function BulkEditDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="placeholder" disabled>Selecione o evento</SelectItem>
-                  {categories.map(c => (
+                  {subCategories.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>

@@ -1055,7 +1055,7 @@ export function DREConciliationModal({ open, onOpenChange, startDate, endDate }:
       onOpenChange={setBulkEditOpen}
       selectedIds={Array.from(selected)}
       contacts={contacts.map(c => ({ id: c.id, name: c.name, is_active: c.is_active }))}
-      categories={categories.map(c => ({ id: c.id, name: c.name, type: c.type }))}
+      categories={categories.map(c => ({ id: c.id, name: c.name, type: c.type, parent_id: c.parent_id }))}
       banks={banks.map(b => ({ id: b.id, name: b.name, is_active: b.is_active }))}
       onSuccess={() => {
         queryClient.invalidateQueries({ queryKey: ['dre-conciliation-v2'] });
