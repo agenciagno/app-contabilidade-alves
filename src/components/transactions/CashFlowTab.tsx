@@ -20,7 +20,6 @@ import { format, parseISO, isWithinInterval, startOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { calcularEncargosAtraso } from '@/lib/financial-utils';
 import { CashFlowReportModal } from './CashFlowReportModal';
-import { PagarReceberExtratoModal } from './PagarReceberExtratoModal';
 import type { Transaction } from '@/hooks/useTransactions';
 import type { Bank } from '@/hooks/useBanks';
 import type { Contact } from '@/hooks/useContacts';
@@ -443,7 +442,6 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
   }, [transactionsRaw, isReceivables]);
 
   const [reportOpen, setReportOpen] = useState(false);
-  const [extratoOpen, setExtratoOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; row: any | null }>({ open: false, row: null });
 
   // Global date filter — defaults to Jan 1 of current year → today
@@ -716,10 +714,6 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => setExtratoOpen(true)}>
-            <FileText className="w-4 h-4" />
-            Relatório Cliente/Fornecedor
-          </Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setReportOpen(true)}>
             <FileText className="w-4 h-4" />
             Gerar Relatório
@@ -1061,17 +1055,6 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
         initialEndDate={globalEndDate}
         initialCategoryIds={categoryFilterIds}
         initialContactIds={columnFilters.contactIds || []}
-        mode={mode}
-      />
-
-      {/* Relatório de Extrato — mesmo relatório da Conta Corrente, com filtro de Cliente/Fornecedor */}
-      <PagarReceberExtratoModal
-        open={extratoOpen}
-        onOpenChange={setExtratoOpen}
-        transactions={transactions}
-        banks={banks}
-        categories={categories}
-        contacts={contacts}
         mode={mode}
       />
     </div>

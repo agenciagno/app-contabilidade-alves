@@ -87,8 +87,10 @@ export function CashFlowReportModal({
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [categoryId, setCategoryId] = useState('all');
-  const [contactId, setContactId] = useState('all');
+  const [categoryIds, setCategoryIds] = useState<Set<string>>(new Set());
+  const [categorySearch, setCategorySearch] = useState('');
+  const [contactIds, setContactIds] = useState<Set<string>>(new Set());
+  const [contactSearch, setContactSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
 
   // Monthly query state
@@ -134,8 +136,10 @@ export function CashFlowReportModal({
       setMode('report');
       setStartDate(initialStartDate);
       setEndDate(initialEndDate);
-      setCategoryId(initialCategoryIds.length === 1 ? initialCategoryIds[0] : 'all');
-      setContactId(initialContactIds.length === 1 ? initialContactIds[0] : 'all');
+      setCategoryIds(new Set(initialCategoryIds));
+      setCategorySearch('');
+      setContactIds(new Set(initialContactIds));
+      setContactSearch('');
       setTypeFilter(isReceivables ? 'receita' : 'all');
       setMonthlyYear(currentYear);
       setMonthlyStatus('pending');
@@ -156,12 +160,16 @@ export function CashFlowReportModal({
   const periodLabel = startDate && endDate
     ? `${formatDateBR(startDate)} a ${formatDateBR(endDate)}`
     : 'Acumulado Geral';
-  const categoryLabel = categoryId !== 'all'
-    ? categories.find(c => c.id === categoryId)?.name || 'Todos'
-    : 'Todos';
-  const contactLabel = contactId !== 'all'
-    ? contacts.find(c => c.id === contactId)?.name || 'Todos'
-    : 'Todos';
+  const categoryLabel = categoryIds.size === 0
+    ? 'Todos'
+    : categoryIds.size === 1
+      ? categories.find(c => categoryIds.has(c.id))?.name || '1 selecionado'
+      : `${categoryIds.size} eventos selecionados`;
+  const contactLabel = contactIds.size === 0
+    ? 'Todos'
+    : contactIds.size === 1
+      ? contacts.find(c => contactIds.has(c.id))?.name || '1 selecionado'
+      : `${contactIds.size} selecionados`;
   const typeLabel = typeFilter === 'receita' ? 'A Receber' : typeFilter === 'despesa' ? 'A Pagar' : 'Todos';
 
   const clearDates = () => { setStartDate(''); setEndDate(''); };
@@ -182,6 +190,10 @@ export function CashFlowReportModal({
       .map(g => ({ ...g, saldo: g.receber - g.pagar }))
       .sort((a, b) => (Math.abs(b.receber) + Math.abs(b.pagar)) - (Math.abs(a.receber) + Math.abs(a.pagar)));
   };
+
+  // Evento Contábil: só sub-eventos aparecem nos filtros (macros ficam ocultos aqui, mas
+  // seguem visíveis na tela de cadastro Eventos Contábeis).
+  const subCategories = useMemo(() => categories.filter(c => c.parent_id !== null && c.parent_id !== undefined), [categories]);
 
   const activeBanks = useMemo(() => banks.filter(b => b.is_active), [banks]);
   const totalBankBalance = useMemo(() => activeBanks.reduce((s, b) => s + Number(b.current_balance), 0), [activeBanks]);
@@ -215,13 +227,13 @@ export function CashFlowReportModal({
       });
     }
 
-    if (categoryId !== 'all') result = result.filter(t => t.category_id === categoryId);
-    if (contactId !== 'all') result = result.filter(t => t.contact_id === contactId);
+    if (categoryIds.size > 0) result = result.filter(t => !!t.category_id && categoryIds.has(t.category_id));
+    if (contactIds.size > 0) result = result.filter(t => !!t.contact_id && contactIds.has(t.contact_id));
     if (typeFilter !== 'all') result = result.filter(t => t.type === typeFilter);
 
     result.sort((a, b) => (dateKeyOf(a) || '').localeCompare(dateKeyOf(b) || ''));
     return result;
-  }, [txns, startDate, endDate, categoryId, contactId, typeFilter, isReceivables]);
+  }, [txns, startDate, endDate, categoryIds, contactIds, typeFilter, isReceivables]);
 
   // Running balance rows
   const rowsWithBalance = useMemo(() => {
@@ -1157,27 +1169,132 @@ export function CashFlowReportModal({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label className="text-sm font-semibold mb-1 block">Evento Contábil</Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {categories.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between font-normal">
+                    <span className="truncate text-left">{categoryLabel}</span>
+                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <div className="p-2 border-b space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        value={categorySearch}
+                        onChange={(e) => setCategorySearch(e.target.value)}
+                        placeholder="Pesquisar evento..."
+                        className="h-8 pl-7 text-sm"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCategoryIds(new Set())}
+                      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                    >
+                      <Checkbox checked={categoryIds.size === 0} />
+                      <span>Todos</span>
+                    </button>
+                  </div>
+                  <ScrollArea className="h-64">
+                    <div className="p-2 space-y-0.5">
+                      {(() => {
+                        const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        const q = norm(categorySearch.trim());
+                        const filtered = q ? subCategories.filter(c => norm(c.name).includes(q)) : subCategories;
+                        if (filtered.length === 0) {
+                          return <div className="px-2 py-4 text-sm text-muted-foreground text-center">Nenhum evento encontrado</div>;
+                        }
+                        return filtered.map(cat => {
+                          const checked = categoryIds.has(cat.id);
+                          return (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => {
+                                setCategoryIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(cat.id)) next.delete(cat.id); else next.add(cat.id);
+                                  return next;
+                                });
+                              }}
+                              className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                            >
+                              <Checkbox checked={checked} />
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat.color || '#3B82F6' }} />
+                              <span className="truncate">{cat.name}</span>
+                            </button>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label className="text-sm font-semibold mb-1 block">Cliente/Fornecedor</Label>
-              <Select value={contactId} onValueChange={setContactId}>
-                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {contacts.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between font-normal">
+                    <span className="truncate text-left">{contactLabel}</span>
+                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <div className="p-2 border-b space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        value={contactSearch}
+                        onChange={(e) => setContactSearch(e.target.value)}
+                        placeholder="Pesquisar cliente/fornecedor..."
+                        className="h-8 pl-7 text-sm"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setContactIds(new Set())}
+                      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                    >
+                      <Checkbox checked={contactIds.size === 0} />
+                      <span>Todos</span>
+                    </button>
+                  </div>
+                  <ScrollArea className="h-64">
+                    <div className="p-2 space-y-0.5">
+                      {(() => {
+                        const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        const q = norm(contactSearch.trim());
+                        const filtered = q ? contacts.filter(c => norm(c.name).includes(q)) : contacts;
+                        if (filtered.length === 0) {
+                          return <div className="px-2 py-4 text-sm text-muted-foreground text-center">Nenhum cliente/fornecedor encontrado</div>;
+                        }
+                        return filtered.map(ct => {
+                          const checked = contactIds.has(ct.id);
+                          return (
+                            <button
+                              key={ct.id}
+                              type="button"
+                              onClick={() => {
+                                setContactIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(ct.id)) next.delete(ct.id); else next.add(ct.id);
+                                  return next;
+                                });
+                              }}
+                              className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                            >
+                              <Checkbox checked={checked} />
+                              <span className="truncate">{ct.name}</span>
+                            </button>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
             </div>
             {!isReceivables && (
             <div>
@@ -1387,7 +1504,7 @@ export function CashFlowReportModal({
                         {(() => {
                           const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
                           const q = norm(monthlyCategorySearch.trim());
-                          const filtered = q ? categories.filter(c => norm(c.name).includes(q)) : categories;
+                          const filtered = q ? subCategories.filter(c => norm(c.name).includes(q)) : subCategories;
                           if (filtered.length === 0) {
                             return <div className="px-2 py-4 text-sm text-muted-foreground text-center">Nenhum evento encontrado</div>;
                           }
