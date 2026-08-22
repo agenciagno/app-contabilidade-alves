@@ -13,13 +13,14 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
-  AlertTriangle, FileText, TrendingUp, TrendingDown, Building2,
-  Filter, Search, X, ChevronUp, ChevronDown, CalendarDays,
+  AlertTriangle, FileText, TrendingUp, TrendingDown, Landmark,
+  Filter, Search, X, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import { format, parseISO, isWithinInterval, startOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { calcularEncargosAtraso } from '@/lib/financial-utils';
 import { CashFlowReportModal } from './CashFlowReportModal';
+import { IconBox } from '@/components/ds';
 import type { Transaction } from '@/hooks/useTransactions';
 import type { Bank } from '@/hooks/useBanks';
 import type { Contact } from '@/hooks/useContacts';
@@ -84,7 +85,8 @@ type SortOrder = 'asc' | 'desc';
 function ColumnFilterIcon({ active }: { active: boolean }) {
   return (
     <span className="relative inline-flex items-center">
-      <Filter className={`w-3.5 h-3.5 transition-colors ${active ? 'text-primary' : 'text-muted-foreground/70 hover:text-primary'}`} />
+      {/* w-3 (12px, era 14px) — mesmo ajuste já feito em Lançamentos (21/08/2026). */}
+      <Filter className={`w-3 h-3 transition-colors ${active ? 'text-primary' : 'text-muted-foreground/70 hover:text-primary'}`} />
       {active && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-primary" />}
     </span>
   );
@@ -688,7 +690,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
             <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Data de Vencimento</span>
           )}
           <div className="flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-muted-foreground" />
+            {/* Sem ícone de calendário — Figma mostra só os inputs, texto "até" entre eles (21/08/2026). */}
             <div className="flex items-center gap-1.5">
               <Input
                 type="date"
@@ -723,57 +725,53 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
 
       {/* KPIs */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${isReceivables ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
-        {/* Capital de Giro */}
-        <Card className="bg-card border-border/50 border-l-2 border-l-blue-500">
+        {/* Capital de Giro — usa token --action (21/08/2026, era text-blue-500/400 e
+            var(--apple-blue) soltos, dívida técnica já registrada). Sem borda-esquerda
+            colorida: o Figma não tem esse traço nos 4 cards. */}
+        <Card className="bg-card">
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Capital de Giro</p>
-                <p className={`text-2xl font-extrabold ${capitalDeGiro >= 0 ? 'text-blue-400' : 'text-danger'}`}>
+                <p className={`text-2xl font-extrabold ${capitalDeGiro >= 0 ? 'text-action' : 'text-danger'}`}>
                   {formatCurrency(capitalDeGiro)}
                 </p>
               </div>
-              <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Building2 className="w-4 h-4 text-blue-500" />
-              </div>
+              <IconBox tone="accent" icon={<Landmark />} />
             </div>
           </CardContent>
         </Card>
 
         {/* Entradas */}
-        <Card className="bg-card border-border/50 border-l-2 border-l-ok">
+        <Card className="bg-card">
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Entradas</p>
                 <p className="text-2xl font-extrabold text-ok">{formatCurrency(kpis.receitasPendentes)}</p>
               </div>
-              <div className="w-9 h-9 rounded-full bg-ok/10 flex items-center justify-center">
-                <TrendingUp className="w-4 h-4 text-ok" />
-              </div>
+              <IconBox tone="ok" icon={<TrendingUp />} />
             </div>
           </CardContent>
         </Card>
 
         {/* Saídas */}
         {!isReceivables && (
-        <Card className="bg-card border-border/50 border-l-2 border-l-danger">
+        <Card className="bg-card">
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Saídas</p>
                 <p className="text-2xl font-extrabold text-danger">{formatCurrency(kpis.despesasPendentes)}</p>
               </div>
-              <div className="w-9 h-9 rounded-full bg-danger/10 flex items-center justify-center">
-                <TrendingDown className="w-4 h-4 text-danger" />
-              </div>
+              <IconBox tone="danger" icon={<TrendingDown />} />
             </div>
           </CardContent>
         </Card>
         )}
 
         {/* Saldos Atuais */}
-        <Card className="bg-card border-border/50">
+        <Card className="bg-card">
           <CardContent className="p-4">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Saldos Atuais</p>
             <div className="space-y-1">
@@ -790,7 +788,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
               ))}
               <div className="flex items-center justify-between text-sm border-t border-border/50 pt-1 mt-1">
                 <span className="font-semibold text-muted-foreground">Disponível Total</span>
-                <span className="font-bold tabular-nums" style={{ color: totalBankBalance >= 0 ? 'var(--apple-blue)' : 'var(--apple-red)' }}>
+                <span className={`font-bold tabular-nums ${totalBankBalance >= 0 ? 'text-action' : 'text-danger'}`}>
                   {formatCurrency(totalBankBalance)}
                 </span>
               </div>
@@ -800,7 +798,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
       </div>
 
       {/* Data Grid */}
-      <Card className="bg-card border-border/50">
+      <Card className="bg-card">
         <CardContent className="p-0">
           <TooltipProvider>
             <div className="overflow-auto max-h-[70vh]">

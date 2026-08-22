@@ -54,6 +54,8 @@ const iconBoxTone = {
   warn: 'bg-warn-soft text-warn',
   danger: 'bg-danger-soft text-danger',
   info: 'bg-brand-tint text-brand',
+  /** Ação/neutro financeiro (ex.: Capital de Giro) — Pagar/Receber, 21/08/2026. */
+  accent: 'bg-action-tint text-action',
   neutral: 'bg-bg-2 text-muted-ink',
 } as const;
 
