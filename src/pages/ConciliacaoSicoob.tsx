@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { format, addMonths, startOfMonth, parseISO, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  RefreshCw, CalendarDays, SlidersHorizontal, ArrowUpDown, CheckCircle2, Loader2, X, FlaskConical,
+  RefreshCw, CheckCircle2, Loader2, X, FlaskConical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -50,6 +50,16 @@ function getMonthOptions(): { value: string; mes: number; ano: number }[] {
 // de "CRÉD.LIQUIDAÇÃO COBRANÇA" (nem numeroDocumento é o nosso_numero — confirmado em 20/07), então
 // o cruzamento é por valor + proximidade de data, não por identificador único.
 const JANELA_DIAS = 10;
+
+// Texto real (não é copy nova) — já existia só na aba Divergências; agora também
+// abre pelo "Ver detalhes" do banner de teste (22/08/2026), mesmo conteúdo nos 2 lugares.
+const textoJanelaMatching = (
+  <>
+    O Sicoob não manda identificador do boleto nos lançamentos de recebimento — o cruzamento é por
+    valor + data próxima do vencimento (±{JANELA_DIAS} dias). Quando mais de um boleto bate, escolha
+    manualmente antes de confirmar. Nenhuma baixa acontece sem essa confirmação.
+  </>
+);
 
 interface Candidatos {
   pendentes: BoletoParaMatch[];
@@ -275,12 +285,32 @@ export default function ConciliacaoSicoob() {
           icon={<FlaskConical />}
           title="Teste — confirme cada baixa manualmente"
           description="Leitura e confirmação manual, sem baixa automática."
+          action={
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="shrink-0">Ver detalhes</Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 text-body-sm text-ink">
+                {textoJanelaMatching}
+              </PopoverContent>
+            </Popover>
+          }
         />
 
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-meta text-muted-ink">
-          <span>Saldo Sicoob <span className="font-medium text-ink">{saldoLoading ? '…' : saldoError ? '—' : fmtBRL(saldo?.saldo)}</span></span>
-          <span>Bloqueado <span className="font-medium text-ink">{saldoLoading ? '…' : fmtBRL(saldo?.saldoBloqueado)}</span></span>
-          <span>Limite disponível <span className="font-medium text-ink">{saldoLoading ? '…' : fmtBRL(saldo?.saldoLimite)}</span></span>
+        {/* Faixa de saldos — card próprio, label em cima/valor embaixo (era texto solto em linha). */}
+        <div className="flex flex-wrap gap-x-10 gap-y-2 rounded-lg border border-line bg-paper px-5 py-4">
+          <div>
+            <p className="text-kicker uppercase text-muted-ink-2">Saldo Sicoob</p>
+            <p className="mt-1 font-mono text-ui-strong text-ink">{saldoLoading ? '…' : saldoError ? '—' : fmtBRL(saldo?.saldo)}</p>
+          </div>
+          <div>
+            <p className="text-kicker uppercase text-muted-ink-2">Bloqueado</p>
+            <p className="mt-1 font-mono text-ui-strong text-ink">{saldoLoading ? '…' : fmtBRL(saldo?.saldoBloqueado)}</p>
+          </div>
+          <div>
+            <p className="text-kicker uppercase text-muted-ink-2">Limite Disponível</p>
+            <p className="mt-1 font-mono text-ui-strong text-ink">{saldoLoading ? '…' : fmtBRL(saldo?.saldoLimite)}</p>
+          </div>
         </div>
 
         <StatCardRow
@@ -310,9 +340,9 @@ export default function ConciliacaoSicoob() {
               wrapperClassName="flex-1 min-w-[240px]"
             />
 
+            {/* Sem ícone à esquerda (calendário/setas/sliders) nos 3 chips — Figma só tem texto + chevron do próprio Select (22/08/2026). */}
             <Select value={periodo} onValueChange={setPeriodo}>
               <SelectTrigger className="h-9 w-auto gap-2 rounded-sm border-line bg-paper px-3 text-ui text-ink [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:opacity-100 [&>svg]:text-muted-ink-2">
-                <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-ink" strokeWidth={1.75} />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -325,7 +355,6 @@ export default function ConciliacaoSicoob() {
             </Select>
 
             <SearchableSelect
-              icon={ArrowUpDown}
               value={tipoFilter}
               onChange={setTipoFilter}
               options={tipos.map((t) => ({ value: t, label: tipoLabel(t) }))}
@@ -340,7 +369,6 @@ export default function ConciliacaoSicoob() {
                   type="button"
                   className="flex h-9 shrink-0 items-center gap-1.5 rounded-sm border border-line bg-paper px-3 text-ui text-muted-ink transition-colors hover:bg-bg-2"
                 >
-                  <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
                   Mais filtros
                   {(valorMin || valorMax) && <span className="h-1.5 w-1.5 rounded-full bg-action" />}
                 </button>
@@ -368,6 +396,11 @@ export default function ConciliacaoSicoob() {
                 <X className="h-3.5 w-3.5" /> Limpar filtros
               </Button>
             )}
+
+            {/* Contador — mesmo valor real do rodapé da tabela, só repetido aqui em cima (Figma mostra nos 2 lugares). */}
+            <span className="ml-auto shrink-0 text-meta text-muted-ink">
+              {filteredRows.length} de {extrato?.transacoes.length ?? 0} movimentos · competência {String(selected.mes).padStart(2, '0')}/{selected.ano}
+            </span>
           </div>
 
           <TabsContent value="extrato" className="mt-0">
@@ -383,11 +416,7 @@ export default function ConciliacaoSicoob() {
           </TabsContent>
 
           <TabsContent value="divergencias" className="mt-0 space-y-3">
-            <p className="max-w-2xl text-xs text-muted-foreground">
-              O Sicoob não manda identificador do boleto nos lançamentos de recebimento — o cruzamento é por
-              valor + data próxima do vencimento (±{JANELA_DIAS} dias). Quando mais de um boleto bate, escolha
-              manualmente antes de confirmar. Nenhuma baixa acontece sem essa confirmação.
-            </p>
+            <p className="max-w-2xl text-xs text-muted-foreground">{textoJanelaMatching}</p>
             {renderTabela(filteredRows.filter((r) => r.status === 'AMBIGUO'))}
           </TabsContent>
         </Tabs>
