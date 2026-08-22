@@ -340,7 +340,8 @@ function CategoryMultiFilter({
 function ColumnFilterIcon({ active }: { active: boolean }) {
   return (
     <span className="relative inline-flex items-center">
-      <Filter className={`w-3.5 h-3.5 transition-colors ${active ? 'text-primary' : 'text-muted-foreground/70 hover:text-primary'}`} />
+      {/* w-3 (12px, era 14px) — pedido Gabriel 21/08/2026, ficava grande perto do texto 11px do cabeçalho */}
+      <Filter className={`w-3 h-3 transition-colors ${active ? 'text-primary' : 'text-muted-foreground/70 hover:text-primary'}`} />
       {active && (
         <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-primary" />
       )}
@@ -1172,11 +1173,11 @@ export default function Transactions() {
                             ? `${transaction.type === 'receita' ? '+' : '-'}${formatCurrency(Number(transaction.paid_amount))}`
                             : '—'}
                         </div>
-                        <div className="flex gap-1.5 justify-center">
-                          {/* Ícones 12-15% menores (w-4→w-3.5) que o resto do sistema, mesmo asset — pedido Figma 21/08/2026. */}
-                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted" onClick={() => handleEdit(transaction)}><Pencil className="w-3.5 h-3.5 text-muted-foreground" /></Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-ok/10" onClick={() => handleSettle(transaction)}><CircleDollarSign className="w-3.5 h-3.5 text-ok" /></Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-destructive/10" onClick={() => setDeleteId(transaction.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
+                        <div className="flex gap-0.5 justify-center">
+                          {/* Botão 24px/ícone 12px (era 28px/14px) + gap menor — pedido Gabriel 21/08/2026, ainda grande demais. */}
+                          <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted" onClick={() => handleEdit(transaction)}><Pencil className="w-3 h-3 text-muted-foreground" /></Button>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-ok/10" onClick={() => handleSettle(transaction)}><CircleDollarSign className="w-3 h-3 text-ok" /></Button>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-destructive/10" onClick={() => setDeleteId(transaction.id)}><Trash2 className="w-3 h-3 text-destructive" /></Button>
                         </div>
                       </div>
                     );
