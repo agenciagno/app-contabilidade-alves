@@ -683,52 +683,59 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
 
   return (
     <div className="space-y-4">
-      {/* Header: Global date filter + report button */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1">
-          {isReceivables && (
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Data de Vencimento</span>
-          )}
-          <div className="flex items-center gap-2">
-            {/*
-              Sem ícone de calendário — Figma mostra só os inputs, texto "até"
-              entre eles. Continua sendo <input type="date"> de verdade (sem
-              popover novo, só a apresentação mudou), mas o indicador nativo
-              do navegador (ícone de calendário do Chrome) é escondido via
-              ::-webkit-calendar-picker-indicator — senão ele reaparece
-              sozinho mesmo sem o ícone que a gente desenha (21/08/2026).
-            */}
-            <div className="flex items-center gap-1.5">
-              <Input
-                type="date"
-                value={globalStartDate}
-                onChange={e => setGlobalStartDate(e.target.value)}
-                max="9999-12-31"
-                className="h-8 text-xs w-[140px] [&::-webkit-calendar-picker-indicator]:hidden"
-              />
-              <span className="text-xs text-muted-foreground">até</span>
-              <Input
-                type="date"
-                value={globalEndDate}
-                onChange={e => setGlobalEndDate(e.target.value)}
-                max="9999-12-31"
-                className="h-8 text-xs w-[140px] [&::-webkit-calendar-picker-indicator]:hidden"
-              />
-            </div>
-            {(globalStartDate !== defaultStart || globalEndDate !== defaultEnd) && (
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setGlobalStartDate(defaultStart); setGlobalEndDate(defaultEnd); }}>
-                <X className="w-3.5 h-3.5" />
-              </Button>
+      {/*
+        Header: filtro de data global + botão de relatório, dentro de um
+        Card — no Figma essa fileira inteira tem fundo --paper/borda --line,
+        igual aos blocos vizinhos (KPIs, tabela). Antes flutuava direto no
+        cinza da página, achado medindo pixel a pixel a referência (21/08/2026).
+      */}
+      <Card className="bg-card">
+        <CardContent className="flex flex-wrap items-end gap-3 p-4">
+          <div className="flex flex-col gap-1">
+            {isReceivables && (
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Data de Vencimento</span>
             )}
+            <div className="flex items-center gap-2">
+              {/*
+                Sem ícone de calendário — Figma mostra só os inputs, texto "até"
+                entre eles. Continua sendo <input type="date"> de verdade (sem
+                popover novo, só a apresentação mudou), mas o indicador nativo
+                do navegador (ícone de calendário do Chrome) é escondido via
+                ::-webkit-calendar-picker-indicator — senão ele reaparece
+                sozinho mesmo sem o ícone que a gente desenha (21/08/2026).
+              */}
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="date"
+                  value={globalStartDate}
+                  onChange={e => setGlobalStartDate(e.target.value)}
+                  max="9999-12-31"
+                  className="h-8 text-xs w-[140px] [&::-webkit-calendar-picker-indicator]:hidden"
+                />
+                <span className="text-xs text-muted-foreground">até</span>
+                <Input
+                  type="date"
+                  value={globalEndDate}
+                  onChange={e => setGlobalEndDate(e.target.value)}
+                  max="9999-12-31"
+                  className="h-8 text-xs w-[140px] [&::-webkit-calendar-picker-indicator]:hidden"
+                />
+              </div>
+              {(globalStartDate !== defaultStart || globalEndDate !== defaultEnd) && (
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setGlobalStartDate(defaultStart); setGlobalEndDate(defaultEnd); }}>
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          {/* Sem ícone — Figma mostra só o texto (21/08/2026). */}
-          <Button variant="outline" size="sm" onClick={() => setReportOpen(true)}>
-            Gerar Relatório
-          </Button>
-        </div>
-      </div>
+          <div className="ml-auto flex items-center gap-2">
+            {/* Sem ícone — Figma mostra só o texto (21/08/2026). */}
+            <Button variant="outline" size="sm" onClick={() => setReportOpen(true)}>
+              Gerar Relatório
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* KPIs */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${isReceivables ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
@@ -736,28 +743,25 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
             var(--apple-blue) soltos, dívida técnica já registrada). Sem borda-esquerda
             colorida: o Figma não tem esse traço nos 4 cards. */}
         <Card className="bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Capital de Giro</p>
-                <p className={`text-2xl font-extrabold ${capitalDeGiro >= 0 ? 'text-action' : 'text-danger'}`}>
-                  {formatCurrency(capitalDeGiro)}
-                </p>
-              </div>
-              <IconBox tone="accent" icon={<Landmark />} />
+          <CardContent className="flex items-center gap-3 p-4">
+            {/* Ícone à esquerda, não à direita — medido pixel a pixel no Figma (21/08/2026). */}
+            <IconBox tone="accent" icon={<Landmark />} />
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Capital de Giro</p>
+              <p className={`text-2xl font-extrabold ${capitalDeGiro >= 0 ? 'text-action' : 'text-danger'}`}>
+                {formatCurrency(capitalDeGiro)}
+              </p>
             </div>
           </CardContent>
         </Card>
 
         {/* Entradas */}
         <Card className="bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Entradas</p>
-                <p className="text-2xl font-extrabold text-ok">{formatCurrency(kpis.receitasPendentes)}</p>
-              </div>
-              <IconBox tone="ok" icon={<TrendingUp />} />
+          <CardContent className="flex items-center gap-3 p-4">
+            <IconBox tone="ok" icon={<TrendingUp />} />
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Entradas</p>
+              <p className="text-2xl font-extrabold text-ok">{formatCurrency(kpis.receitasPendentes)}</p>
             </div>
           </CardContent>
         </Card>
@@ -765,13 +769,11 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
         {/* Saídas */}
         {!isReceivables && (
         <Card className="bg-card">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Saídas</p>
-                <p className="text-2xl font-extrabold text-danger">{formatCurrency(kpis.despesasPendentes)}</p>
-              </div>
-              <IconBox tone="danger" icon={<TrendingDown />} />
+          <CardContent className="flex items-center gap-3 p-4">
+            <IconBox tone="danger" icon={<TrendingDown />} />
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Saídas</p>
+              <p className="text-2xl font-extrabold text-danger">{formatCurrency(kpis.despesasPendentes)}</p>
             </div>
           </CardContent>
         </Card>
