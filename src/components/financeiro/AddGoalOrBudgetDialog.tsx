@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useFinancialGoals } from '@/hooks/useFinancialGoals';
 import { useBudgets } from '@/hooks/useBudgets';
+import { segmentedListClass, segmentedTriggerClass } from '@/components/ds';
+import { cn } from '@/lib/utils';
 
 interface Props {
   open: boolean;
@@ -78,9 +80,9 @@ export function AddGoalOrBudgetDialog({ open, onOpenChange, monthYear }: Props) 
           <DialogDescription>Cadastre uma meta financeira ou um orçamento por categoria.</DialogDescription>
         </DialogHeader>
         <Tabs value={tab} onValueChange={(v) => setTab(v as 'meta' | 'orcamento')}>
-          <TabsList className="w-full">
-            <TabsTrigger value="meta" className="flex-1">Meta Financeira</TabsTrigger>
-            <TabsTrigger value="orcamento" className="flex-1">Orçamento por Categoria</TabsTrigger>
+          <TabsList className={cn(segmentedListClass, 'w-full h-11')}>
+            <TabsTrigger value="meta" className={cn(segmentedTriggerClass, 'flex-1 h-9')}>Meta Financeira</TabsTrigger>
+            <TabsTrigger value="orcamento" className={cn(segmentedTriggerClass, 'flex-1 h-9')}>Orçamento por Categoria</TabsTrigger>
           </TabsList>
 
           <TabsContent value="meta">

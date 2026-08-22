@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { Category } from '@/hooks/useCategories';
+import { segmentedListClass, segmentedTriggerClass } from '@/components/ds';
+import { cn } from '@/lib/utils';
 
 interface CategoryFormDialogLabels {
   dialogTitleNew: string;
@@ -81,11 +83,11 @@ export function CategoryFormDialog({ open, onOpenChange, category, categories = 
           <div className="space-y-2">
             <Label>Tipo</Label>
             <Tabs value={type} onValueChange={(v) => { setType(v as 'receita' | 'despesa'); setParentId(null); }}>
-              <TabsList className="w-full h-9">
-                <TabsTrigger value="receita" className="flex-1 gap-1.5 text-xs h-7">
+              <TabsList className={cn(segmentedListClass, 'w-full h-11')}>
+                <TabsTrigger value="receita" className={cn(segmentedTriggerClass, 'flex-1 h-9 gap-1.5')}>
                   <TrendingUp className="w-3.5 h-3.5" /> Receita
                 </TabsTrigger>
-                <TabsTrigger value="despesa" className="flex-1 gap-1.5 text-xs h-7">
+                <TabsTrigger value="despesa" className={cn(segmentedTriggerClass, 'flex-1 h-9 gap-1.5')}>
                   <TrendingDown className="w-3.5 h-3.5" /> Despesa
                 </TabsTrigger>
               </TabsList>
