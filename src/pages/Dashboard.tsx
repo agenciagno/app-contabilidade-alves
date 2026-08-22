@@ -455,7 +455,6 @@ export default function Dashboard() {
                             cy="50%"
                             innerRadius={50}
                             outerRadius={80}
-                            paddingAngle={2}
                             dataKey="value"
                           >
                             {revenueCategoryChartData.map((entry, index) => (
@@ -503,7 +502,6 @@ export default function Dashboard() {
                             cy="50%"
                             innerRadius={50}
                             outerRadius={80}
-                            paddingAngle={2}
                             dataKey="value"
                           >
                             {categoryChartData.map((entry, index) => (

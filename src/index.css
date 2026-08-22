@@ -166,24 +166,30 @@
     /* Modal overlay */
     --modal-overlay: rgba(0,0,0,0.45);
 
-    /* ─── shadcn/ui — Light. Mesmos valores do bloco acima, em HSL. ─── */
+    /* ─── shadcn/ui — Light. Mesmos valores do bloco acima, em HSL. ───
+       Reconferido 21/08/2026: --foreground/--muted/--border etc. ainda
+       carregavam a conversão zinc de antes do 10/08 (comentário errado
+       apontava #18181b/#71717a/#e4e4e7, os hex antigos) — nunca tinham
+       sido resincronizados com os tokens reais cinza-azul. É o mesmo tipo
+       de deriva já documentado em §1.4 do design system, só que na camada
+       de base (background/card/border), não nos componentes. */
     --background: 60 11% 96%;      /* bg      #f7f7f5 */
-    --foreground: 240 6% 10%;      /* ink     #18181b */
+    --foreground: 212 37% 10%;     /* ink     #101923 */
 
     --card: 0 0% 100%;             /* paper   #ffffff */
-    --card-foreground: 240 6% 10%;
+    --card-foreground: 212 37% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 6% 10%;
+    --popover-foreground: 212 37% 10%;
 
     --primary: 212 37% 10%;        /* brand   #101923 */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 60 7% 94%;        /* bg-2    #f1f1ef */
-    --secondary-foreground: 240 6% 10%;
+    --secondary: 214 24% 94%;      /* bg-2    #edf0f4 */
+    --secondary-foreground: 212 37% 10%;
 
-    --muted: 60 7% 94%;
-    --muted-foreground: 240 4% 46%;  /* muted #71717a */
+    --muted: 214 24% 94%;          /* bg-2    #edf0f4 */
+    --muted-foreground: 211 15% 43%; /* muted-ink #5c6c7d */
 
     --accent: 60 7% 94%;
     --accent-foreground: 240 6% 10%;
@@ -197,19 +203,19 @@
     --warning: 32 95% 44%;         /* warn    #d97706 */
     --warning-foreground: 0 0% 100%;
 
-    --border: 240 6% 90%;          /* line    #e4e4e7 */
-    --input: 240 6% 90%;
+    --border: 213 24% 91%;         /* line    #e3e8ee */
+    --input: 213 24% 91%;
     --ring: 212 37% 10%;
 
     --radius: 0.875rem;            /* 14px — card. Botão/input usam --r-sm. */
 
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 6% 10%;
+    --sidebar-foreground: 212 37% 10%;
     --sidebar-primary: 212 37% 10%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 60 7% 94%;
-    --sidebar-accent-foreground: 240 6% 10%;
-    --sidebar-border: 240 6% 90%;
+    --sidebar-accent-foreground: 212 37% 10%;
+    --sidebar-border: 213 24% 91%;
     --sidebar-ring: 212 37% 10%;
   }
 
@@ -307,24 +313,29 @@
 
     --modal-overlay: rgba(0,0,0,0.65);
 
-    /* ─── shadcn/ui — Dark ─── */
-    --background: 0 0% 4%;         /* bg      #0a0a0a */
-    --foreground: 0 0% 98%;        /* ink     #fafafa */
+    /* ─── shadcn/ui — Dark ─── Reconferido 21/08/2026: era cinza puro
+       (0 0% N%), zero matiz — a mesma deriva zinc do bloco claro, só que
+       aqui nunca tinha sido tocada nem uma vez desde o redesign de 10/08.
+       É provavelmente a causa principal do modo escuro do sistema não
+       bater com o Figma: fundo/card/popover/borda vinham todos cinza
+       neutro em vez do cinza-azul derivado do navy. */
+    --background: 216 19% 5%;      /* bg      #0b0d10 */
+    --foreground: 210 37% 97%;     /* ink     #f4f7fa */
 
-    --card: 0 0% 9%;               /* paper   #161616 */
-    --card-foreground: 0 0% 98%;
+    --card: 214 15% 9%;            /* paper   #14171b */
+    --card-foreground: 210 37% 97%;
 
-    --popover: 0 0% 9%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 214 15% 9%;         /* paper   #14171b */
+    --popover-foreground: 210 37% 97%;
 
     --primary: 0 0% 98%;           /* brand   #fafafa */
     --primary-foreground: 212 37% 10%;  /* on-brand #101923 — não branco */
 
-    --secondary: 0 0% 12%;         /* bg-3    #1f1f1f */
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 218 14% 16%;      /* bg-3    #23272e */
+    --secondary-foreground: 210 37% 97%;
 
-    --muted: 0 0% 7%;              /* bg-2    #111111 */
-    --muted-foreground: 240 5% 65%;   /* muted #a1a1aa */
+    --muted: 218 15% 10%;          /* bg-2    #16191e */
+    --muted-foreground: 209 15% 66%;  /* muted-ink #9aa8b5 */
 
     --accent: 0 0% 12%;
     --accent-foreground: 0 0% 98%;
@@ -338,17 +349,17 @@
     --warning: 32 95% 44%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 0 0% 15%;            /* line    #262626 */
-    --input: 0 0% 15%;
+    --border: 215 14% 17%;         /* line    #262b32 */
+    --input: 215 14% 17%;
     --ring: 0 0% 98%;
 
-    --sidebar-background: 0 0% 9%;
-    --sidebar-foreground: 0 0% 98%;
+    --sidebar-background: 214 15% 9%;  /* paper #14171b */
+    --sidebar-foreground: 210 37% 97%;
     --sidebar-primary: 0 0% 98%;
     --sidebar-primary-foreground: 212 37% 10%;
     --sidebar-accent: 0 0% 12%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 0 0% 12%;
+    --sidebar-accent-foreground: 210 37% 97%;
+    --sidebar-border: 215 14% 17%;     /* line #262b32 */
     --sidebar-ring: 0 0% 98%;
   }
 
