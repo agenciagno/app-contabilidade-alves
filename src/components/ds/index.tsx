@@ -258,7 +258,7 @@ export interface StatCardProps
   hint?: React.ReactNode;
   /** 0–100. Ausente esconde a barra. Mesmo desenho de `MetricaFaixa`. */
   progresso?: number;
-  tom?: 'ok' | 'warn' | 'danger' | 'brand';
+  tom?: 'ok' | 'warn' | 'danger' | 'brand' | 'action';
 }
 
 export function StatCard({ index, icon, label, value, hint, progresso, tom, emphasis, className, ...props }: StatCardProps) {
@@ -374,7 +374,7 @@ export interface MetricaFaixaItem {
   hint?: React.ReactNode;
   /** 0–100. Ausente esconde a barra. */
   progresso?: number;
-  tom?: 'ok' | 'warn' | 'danger' | 'brand';
+  tom?: 'ok' | 'warn' | 'danger' | 'brand' | 'action';
 }
 
 const barraTom = {
@@ -382,6 +382,8 @@ const barraTom = {
   warn: 'bg-warn',
   danger: 'bg-danger',
   brand: 'bg-brand',
+  /** Progresso ainda não atingido (Metas Financeiras, 22/08/2026) — mesmo azul do CTA. */
+  action: 'bg-action',
 } as const;
 
 export function MetricaFaixa({ items, className }: { items: MetricaFaixaItem[]; className?: string }) {

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Pencil, Trash2, Check, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { cn } from '@/lib/utils';
 import type { FinancialGoal } from '@/hooks/useFinancialGoals';
 
 const formatCurrency = (v: number) =>
@@ -43,21 +43,26 @@ export function GoalCard({ goal, onUpdateProgress, onDelete, isSaving }: Props) 
   };
 
   return (
-    <Card className="border-border/30">
+    <Card className="border-line bg-paper">
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-medium text-foreground leading-tight">{goal.title}</p>
-          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive" onClick={onDelete}>
+          <p className="font-medium text-ink leading-tight">{goal.title}</p>
+          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-danger" onClick={onDelete}>
             <Trash2 className="w-3.5 h-3.5" />
           </Button>
         </div>
 
         <div className="space-y-1.5">
-          <Progress value={pct} className={reached ? '[&>div]:bg-ok' : ''} />
+          <div className="h-1.5 w-full overflow-hidden rounded-pill bg-bg-3">
+            <div
+              className={cn('h-full rounded-pill', reached ? 'bg-ok' : 'bg-action')}
+              style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+            />
+          </div>
           <div className="flex items-center justify-between text-xs">
             {editing ? (
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">R$</span>
+                <span className="text-muted-ink">R$</span>
                 <Input
                   autoFocus
                   value={draft}
@@ -75,19 +80,19 @@ export function GoalCard({ goal, onUpdateProgress, onDelete, isSaving }: Props) 
               <button
                 type="button"
                 onClick={startEdit}
-                className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                className="flex items-center gap-1 text-muted-ink hover:text-ink"
               >
                 {formatCurrency(goal.current_value)} / {formatCurrency(goal.target_value)}
                 <Pencil className="w-3 h-3" />
               </button>
             )}
-            <span className={`font-semibold ${reached ? 'text-ok' : 'text-foreground'}`}>
+            <span className={cn('font-semibold', reached ? 'text-ok' : 'text-ink')}>
               {Math.round(pct)}%
             </span>
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/30">
+        <div className="flex items-center justify-between text-[11px] text-muted-ink pt-1 border-t border-line-2">
           <span>Início: {format(parseISO(goal.start_date), 'dd/MM/yyyy')}</span>
           <span>Fim: {format(parseISO(goal.end_date), 'dd/MM/yyyy')}</span>
         </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Target, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -43,7 +43,7 @@ export default function MetasOrcamentos() {
         subtitle="Teto de gasto por categoria e progresso das metas do período."
         actions={
           <Button onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4" /> Nova meta
+            <Plus className="h-4 w-4" /> Nova meta / Orçamento
           </Button>
         }
       />
@@ -89,7 +89,12 @@ export default function MetasOrcamentos() {
                 const st = statusFor(r.pct, r.over);
                 return (
                   <TableRow key={r.categoryId}>
-                    <TableCell className="font-medium text-ink">{r.categoryName}</TableCell>
+                    <TableCell className="font-medium text-ink">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: r.categoryColor }} />
+                        {r.categoryName}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-right">{formatCurrency(r.budget)}</TableCell>
                     <TableCell className={cn('text-right', r.over && 'text-danger')}>{formatCurrency(r.realizado)}</TableCell>
                     <TableCell className="text-right">{(r.pct * 100).toFixed(1)}%</TableCell>
@@ -99,7 +104,7 @@ export default function MetasOrcamentos() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-muted-ink hover:text-danger"
+                          className="h-7 w-7 text-danger"
                           onClick={() => deleteBudget.mutate(r.budgetId!)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -117,9 +122,7 @@ export default function MetasOrcamentos() {
       {/* Metas financeiras — não tem tela própria no Figma (só orçamento por
           categoria), mantidas abaixo para não perder funcionalidade real. */}
       <div className="space-y-3">
-        <p className="flex items-center gap-1.5 text-kicker uppercase text-muted-ink-2">
-          <Target className="h-3.5 w-3.5" /> Metas financeiras
-        </p>
+        <p className="text-kicker uppercase text-muted-ink-2">Metas financeiras</p>
         {goalsLoading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {[1, 2, 3].map((i) => <Skeleton key={i} className="h-32 w-full" />)}
