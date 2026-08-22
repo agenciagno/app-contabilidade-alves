@@ -13,7 +13,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
-  AlertTriangle, FileText, TrendingUp, TrendingDown, Landmark,
+  AlertTriangle, TrendingUp, TrendingDown, Landmark,
   Filter, Search, X, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import { format, parseISO, isWithinInterval, startOfYear } from 'date-fns';
@@ -690,14 +690,21 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
             <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Data de Vencimento</span>
           )}
           <div className="flex items-center gap-2">
-            {/* Sem ícone de calendário — Figma mostra só os inputs, texto "até" entre eles (21/08/2026). */}
+            {/*
+              Sem ícone de calendário — Figma mostra só os inputs, texto "até"
+              entre eles. Continua sendo <input type="date"> de verdade (sem
+              popover novo, só a apresentação mudou), mas o indicador nativo
+              do navegador (ícone de calendário do Chrome) é escondido via
+              ::-webkit-calendar-picker-indicator — senão ele reaparece
+              sozinho mesmo sem o ícone que a gente desenha (21/08/2026).
+            */}
             <div className="flex items-center gap-1.5">
               <Input
                 type="date"
                 value={globalStartDate}
                 onChange={e => setGlobalStartDate(e.target.value)}
                 max="9999-12-31"
-                className="h-8 text-xs w-[140px]"
+                className="h-8 text-xs w-[140px] [&::-webkit-calendar-picker-indicator]:hidden"
               />
               <span className="text-xs text-muted-foreground">até</span>
               <Input
@@ -705,7 +712,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                 value={globalEndDate}
                 onChange={e => setGlobalEndDate(e.target.value)}
                 max="9999-12-31"
-                className="h-8 text-xs w-[140px]"
+                className="h-8 text-xs w-[140px] [&::-webkit-calendar-picker-indicator]:hidden"
               />
             </div>
             {(globalStartDate !== defaultStart || globalEndDate !== defaultEnd) && (
@@ -716,8 +723,8 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => setReportOpen(true)}>
-            <FileText className="w-4 h-4" />
+          {/* Sem ícone — Figma mostra só o texto (21/08/2026). */}
+          <Button variant="outline" size="sm" onClick={() => setReportOpen(true)}>
             Gerar Relatório
           </Button>
         </div>
