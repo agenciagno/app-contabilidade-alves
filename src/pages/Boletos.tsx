@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { format, addMonths, subMonths, startOfMonth, parseISO, isBefore, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  AlertCircle, Zap, Mail, MessageCircle, Printer,
-  FileX, MoreHorizontal, Eye, Send, CheckSquare, Download, RefreshCw, Loader2,
-  Search, CalendarIcon, X, Copy, SlidersHorizontal,
+  AlertCircle, Plus, Mail, MessageCircle, Printer,
+  FileX, MoreHorizontal, Eye, Send, CheckSquare, Download, Loader2,
+  X, Copy, SlidersHorizontal,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,7 +24,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PageHeader, StatCardRow, DsBadge } from '@/components/ds';
+import { PageHeader, DsBadge, SearchField } from '@/components/ds';
 import { useBoletoControls, type BoletoWithContact } from '@/hooks/useBoletoControls';
 import { BoletoGenerationDialog } from '@/components/financeiro/BoletoGenerationDialog';
 import { IndividualBoletoDialog } from '@/components/financeiro/IndividualBoletoDialog';
@@ -195,185 +195,188 @@ export default function Boletos() {
         subtitle={`Painel da automação de cobrança · ${kpis.total} boleto${kpis.total === 1 ? '' : 's'} no mês.`}
         actions={
           <>
-            <button
-              type="button"
-              onClick={handleSync}
-              disabled={syncing}
-              className="inline-flex items-center gap-1.5 text-ui text-muted-ink transition-colors hover:text-ink disabled:opacity-60"
-            >
-              {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              {syncing
-                ? `Sincronizando… ${syncProgress.done}/${syncProgress.total || '…'}`
-                : 'atualizar'}
-            </button>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => setSingleOpen(true)}
-            >
-              <Zap className="h-4 w-4" />
+            {/* Sem ícone — Figma mostra só o texto nos 3 botões, exceto o "+" do primário (22/08/2026). */}
+            <Button variant="outline" onClick={handleSync} disabled={syncing}>
+              {syncing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {syncing ? `Sincronizando… ${syncProgress.done}/${syncProgress.total || '…'}` : 'Atualizar'}
+            </Button>
+            <Button variant="outline" onClick={() => setSingleOpen(true)}>
               Boleto avulso
             </Button>
-            <Button
-              className="gap-2"
-              onClick={() => setGenerateOpen(true)}
-            >
-              <Zap className="h-4 w-4" />
+            <Button className="gap-2" onClick={() => setGenerateOpen(true)}>
+              <Plus className="h-4 w-4" />
               Gerar lote
             </Button>
           </>
         }
       />
 
-      <StatCardRow
-        items={[
-          { label: 'Boletos gerados', value: kpis.total, hint: 'no mês' },
-          {
-            label: 'Pendentes',
-            value: kpis.pendentes,
-            hint: 'aguardando pagamento',
-            emphasis: kpis.pendentes > 0 ? 'warm' : 'none',
-          },
-          { label: 'Vencidos', value: kpis.vencidos, hint: 'em atraso' },
-          {
-            label: 'Liquidados',
-            value: kpis.liquidados,
-            hint: kpis.estimado ? `${fmtBRL(kpis.totalPago)} (estimado)` : fmtBRL(kpis.totalPago),
-          },
-        ]}
-      />
+      {/*
+        Estrutura mudou de KPIs em linha + tabela full-width pra coluna lateral
+        fixa (300px) + área principal — o Figma usa uma disposição diferente da
+        anterior, não é só repintar (22/08/2026). Empilha em telas estreitas.
+      */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        {/* Coluna lateral */}
+        <div className="flex w-full shrink-0 flex-col gap-4 lg:w-[300px]">
+          {/* Stats — lista vertical num card só, não StatCardRow (o Figma não usa cards separados aqui) */}
+          <div className="divide-y divide-line-2 rounded-lg border border-line bg-paper">
+            <div className="flex items-center justify-between p-4">
+              <span className="text-body text-muted-ink">Boletos gerados</span>
+              <span className="text-h3-section text-ink">{kpis.total}</span>
+            </div>
+            <div className="flex items-center justify-between p-4">
+              <span className="text-body text-muted-ink">Pendentes</span>
+              <span className={cn('text-h3-section', kpis.pendentes > 0 ? 'text-warn' : 'text-ink')}>{kpis.pendentes}</span>
+            </div>
+            <div className="flex items-center justify-between p-4">
+              <span className="text-body text-muted-ink">Vencidos</span>
+              <span className="text-h3-section text-ink">{kpis.vencidos}</span>
+            </div>
+            <div className="flex items-center justify-between p-4">
+              <span className="text-body text-muted-ink">Liquidados</span>
+              <div className="text-right">
+                <div className="text-h3-section text-ink">{fmtBRL(kpis.totalPago)}</div>
+                {kpis.estimado && <div className="text-meta text-muted-ink-2">estimado</div>}
+              </div>
+            </div>
+          </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[240px] flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-ink-2" />
-          <Input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Buscar por cliente ou nosso número…"
-            className="h-10 border-line bg-paper pl-9 text-ui"
-          />
+          {/* Filtros */}
+          <div className="flex flex-col gap-3 rounded-lg border border-line bg-paper p-4">
+            <p className="text-kicker uppercase text-muted-ink-2">Filtros</p>
+
+            <SearchField
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Buscar cliente…"
+              wrapperClassName="w-full"
+            />
+
+            <Select value={vencimentoMonth} onValueChange={(v) => { setVencimentoMonth(v); setPage(1); }}>
+              <SelectTrigger className="h-9 w-full border-line bg-paper text-ui">
+                <SelectValue placeholder="Mês de vencimento" />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map(m => (
+                  <SelectItem key={m} value={m}>
+                    {format(parseISO(m), "MMMM 'de' yyyy", { locale: ptBR })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={(v: any) => { setStatusFilter(v); setPage(1); }}>
+              <SelectTrigger className="h-9 w-full border-line bg-paper text-ui">
+                <span className="text-muted-ink">Status:</span>&nbsp;<SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Todos</SelectItem>
+                <SelectItem value="PENDENTE">Pendente</SelectItem>
+                <SelectItem value="PAGO">Pago</SelectItem>
+                <SelectItem value="VENCIDO">Vencido</SelectItem>
+                <SelectItem value="FILA_IMPRESSAO">Fila de Impressão</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={canalFilter} onValueChange={(v: any) => { setCanalFilter(v); setPage(1); }}>
+              <SelectTrigger className="h-9 w-full border-line bg-paper text-ui">
+                <span className="text-muted-ink">Canal:</span>&nbsp;<SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Todos</SelectItem>
+                <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                <SelectItem value="email">E-mail</SelectItem>
+                <SelectItem value="impresso">Impresso</SelectItem>
+                <SelectItem value="whatsapp_email">WhatsApp + E-mail</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Mais filtros — faixa de valor + data de pagamento, sem slot no Figma mas
+                continuam funcionais (nada de real foi descartado, ver FiscalTasks.tsx). */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-9 w-full items-center justify-between gap-1.5 rounded-sm border border-line bg-paper px-3 text-ui text-muted-ink transition-colors hover:bg-bg-2"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    Mais filtros
+                  </span>
+                  {(valorMin || valorMax || pagamentoStart || pagamentoEnd) && (
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-action" />
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 space-y-3 p-3" align="start">
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-ink px-1">Faixa de valor</p>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number" inputMode="decimal" step="0.01"
+                      value={valorMin}
+                      onChange={(e) => { setValorMin(e.target.value); setPage(1); }}
+                      placeholder="Valor mín."
+                      className="h-9 border-line bg-paper text-ui"
+                    />
+                    <span className="text-muted-ink text-sm">–</span>
+                    <Input
+                      type="number" inputMode="decimal" step="0.01"
+                      value={valorMax}
+                      onChange={(e) => { setValorMax(e.target.value); setPage(1); }}
+                      placeholder="Valor máx."
+                      className="h-9 border-line bg-paper text-ui"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 border-t border-line pt-3">
+                  <p className="text-xs text-muted-ink px-1">Data de pagamento</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-ink-2 px-1">De</p>
+                      <CalendarPicker
+                        mode="single"
+                        selected={pagamentoStart ?? undefined}
+                        onSelect={(d) => { setPagamentoStart(d ?? null); setPage(1); }}
+                        initialFocus
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-ink-2 px-1">Até</p>
+                      <CalendarPicker
+                        mode="single"
+                        selected={pagamentoEnd ?? undefined}
+                        onSelect={(d) => { setPagamentoEnd(d ?? null); setPage(1); }}
+                      />
+                    </div>
+                  </div>
+                  {(pagamentoStart || pagamentoEnd) && (
+                    <Button
+                      variant="ghost" size="sm" className="w-full gap-1.5"
+                      onClick={() => { setPagamentoStart(null); setPagamentoEnd(null); setPage(1); }}
+                    >
+                      <X className="h-3.5 w-3.5" /> Limpar período
+                    </Button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {hasExtraFilters && (
+              <Button variant="ghost" size="sm" onClick={clearExtraFilters} className="gap-1.5 text-muted-ink">
+                <X className="h-3.5 w-3.5" /> Limpar filtros
+              </Button>
+            )}
+          </div>
         </div>
 
-        <Select value={vencimentoMonth} onValueChange={(v) => { setVencimentoMonth(v); setPage(1); }}>
-          <SelectTrigger className="h-9 w-[180px] border-line bg-paper text-ui">
-            <SelectValue placeholder="Mês de vencimento" />
-          </SelectTrigger>
-          <SelectContent>
-            {monthOptions.map(m => (
-              <SelectItem key={m} value={m}>
-                {format(parseISO(m), "MMMM 'de' yyyy", { locale: ptBR })}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={statusFilter} onValueChange={(v: any) => { setStatusFilter(v); setPage(1); }}>
-          <SelectTrigger className="h-9 w-[170px] border-line bg-paper text-ui">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">Todos os status</SelectItem>
-            <SelectItem value="PENDENTE">Pendente</SelectItem>
-            <SelectItem value="PAGO">Pago</SelectItem>
-            <SelectItem value="VENCIDO">Vencido</SelectItem>
-            <SelectItem value="FILA_IMPRESSAO">Fila de Impressão</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={canalFilter} onValueChange={(v: any) => { setCanalFilter(v); setPage(1); }}>
-          <SelectTrigger className="h-9 w-[170px] border-line bg-paper text-ui">
-            <SelectValue placeholder="Canal" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">Todos os canais</SelectItem>
-            <SelectItem value="whatsapp">WhatsApp</SelectItem>
-            <SelectItem value="email">E-mail</SelectItem>
-            <SelectItem value="impresso">Impresso</SelectItem>
-            <SelectItem value="whatsapp_email">WhatsApp + E-mail</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Mais filtros — faixa de valor + data de pagamento, sem slot no Figma mas
-            continuam funcionais (nada de real foi descartado, ver FiscalTasks.tsx). */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className="flex h-9 shrink-0 items-center gap-1.5 rounded-sm border border-line bg-paper px-3 text-ui text-muted-ink transition-colors hover:bg-bg-2"
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Mais filtros
-              {(valorMin || valorMax || pagamentoStart || pagamentoEnd) && (
-                <span className="h-1.5 w-1.5 rounded-full bg-action" />
-              )}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80 space-y-3 p-3" align="start">
-            <div className="space-y-1.5">
-              <p className="text-xs text-muted-ink px-1">Faixa de valor</p>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  type="number" inputMode="decimal" step="0.01"
-                  value={valorMin}
-                  onChange={(e) => { setValorMin(e.target.value); setPage(1); }}
-                  placeholder="Valor mín."
-                  className="h-9 border-line bg-paper text-ui"
-                />
-                <span className="text-muted-ink text-sm">–</span>
-                <Input
-                  type="number" inputMode="decimal" step="0.01"
-                  value={valorMax}
-                  onChange={(e) => { setValorMax(e.target.value); setPage(1); }}
-                  placeholder="Valor máx."
-                  className="h-9 border-line bg-paper text-ui"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5 border-t border-line pt-3">
-              <p className="text-xs text-muted-ink px-1">Data de pagamento</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-ink-2 px-1">De</p>
-                  <CalendarPicker
-                    mode="single"
-                    selected={pagamentoStart ?? undefined}
-                    onSelect={(d) => { setPagamentoStart(d ?? null); setPage(1); }}
-                    initialFocus
-                  />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-ink-2 px-1">Até</p>
-                  <CalendarPicker
-                    mode="single"
-                    selected={pagamentoEnd ?? undefined}
-                    onSelect={(d) => { setPagamentoEnd(d ?? null); setPage(1); }}
-                  />
-                </div>
-              </div>
-              {(pagamentoStart || pagamentoEnd) && (
-                <Button
-                  variant="ghost" size="sm" className="w-full gap-1.5"
-                  onClick={() => { setPagamentoStart(null); setPagamentoEnd(null); setPage(1); }}
-                >
-                  <X className="h-3.5 w-3.5" /> Limpar período
-                </Button>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        {hasExtraFilters && (
-          <Button variant="ghost" size="sm" onClick={clearExtraFilters} className="gap-1.5 text-muted-ink">
-            <X className="h-3.5 w-3.5" /> Limpar filtros
-          </Button>
-        )}
-      </div>
-
-      {/* Tabela */}
-      <div className="overflow-hidden rounded-lg border border-line bg-paper">
-        <Table>
+        {/* Área principal */}
+        <div className="min-w-0 flex-1 space-y-4">
+          {/* Tabela */}
+          <div className="overflow-hidden rounded-lg border border-line bg-paper">
+            <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Cliente</TableHead>
@@ -468,24 +471,25 @@ export default function Boletos() {
                 )}
               </TableBody>
             </Table>
-      </div>
-
-      {/* Paginação */}
-      <div className="flex items-center justify-between text-meta text-muted-ink">
-        <span>
-          {pageRows.length} de {filtered.length} boleto{filtered.length === 1 ? '' : 's'} · ordenado por vencimento
-        </span>
-        {totalPages > 1 && (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}>
-              Anterior
-            </Button>
-            <span className="px-3 py-1.5">{safePage} / {totalPages}</span>
-            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}>
-              Próxima
-            </Button>
           </div>
-        )}
+
+          {/* Paginação — contador embutido no botão "Próxima", não como texto solo entre os 2 botões (22/08/2026) */}
+          <div className="flex items-center justify-between text-meta text-muted-ink">
+            <span>
+              {pageRows.length} de {filtered.length} boleto{filtered.length === 1 ? '' : 's'} · ordenado por vencimento
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}>
+                  Anterior
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}>
+                  Próxima ({safePage}/{totalPages})
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Dialog: detalhes do boleto */}
