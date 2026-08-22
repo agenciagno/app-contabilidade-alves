@@ -1,12 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2, Tag, TrendingUp, TrendingDown, CornerDownRight } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useCategories, Category, CategoryScope } from '@/hooks/useCategories';
 import { CategoryFormDialog } from '@/components/categories/CategoryFormDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { PageHeader, tabsListClass, tabsTriggerClass } from '@/components/ds';
+import { PageHeader, tabsListClass, tabsTriggerClass, SearchField } from '@/components/ds';
 import { cn } from '@/lib/utils';
 
 interface CategoriesViewProps {
@@ -31,6 +31,9 @@ interface CategoriesViewProps {
   };
 }
 
+// Compartilhado por /financeiro/categorias (Eventos Contábeis, scope "interno") e
+// /financeiro/categorias-clientes (scope "cliente") — mudança visual aqui vale pras
+// duas rotas de propósito, mesmo componente/dado, só rótulos diferem (22/08/2026).
 export function CategoriesView({
   scope,
   kicker,
@@ -50,9 +53,19 @@ export function CategoriesView({
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'receita' | 'despesa'>('receita');
+  const [search, setSearch] = useState('');
 
-  const receitaCategories = useMemo(() => categories.filter(c => c.type === 'receita'), [categories]);
-  const despesaCategories = useMemo(() => categories.filter(c => c.type === 'despesa'), [categories]);
+  const receitaCategories = categories.filter(c => c.type === 'receita');
+  const despesaCategories = categories.filter(c => c.type === 'despesa');
+
+  // Busca por texto (nova, 22/08/2026 — a tela não tinha nenhuma antes). Filtra o
+  // nome de macro e sub igual; mesmo padrão instantâneo (sem debounce) já usado
+  // no filtro client-side de outras telas do Financeiro.
+  const filterBySearch = (items: Category[]) => {
+    const term = search.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter(c => c.name.toLowerCase().includes(term));
+  };
 
   const handleSubmit = (data: { name: string; type: 'receita' | 'despesa'; color: string; icon: string; parent_id?: string | null }) => {
     if (editingCategory) {
@@ -75,31 +88,35 @@ export function CategoriesView({
     return categories.find(c => c.id === parentId)?.name || null;
   };
 
-  const CategoryCard = ({ category, isSub }: { category: Category; isSub?: boolean }) => {
+  // Linha da lista — era um card individual por evento (borda própria, gap entre
+  // eles); no Figma é 1 linha dentro de uma lista só, hairline entre elas. Macro
+  // ganha o quadradinho com a cor real da categoria (era um IconBox genérico com
+  // ícone de tag fixo, não usava category.color); sub perde o ícone de seta, só
+  // indenta. Ícones de ação reaproveitados de Lançamentos (mesmo tamanho/cor).
+  const CategoryRow = ({ category, isSub }: { category: Category; isSub?: boolean }) => {
     const parentName = getParentName(category.parent_id);
     return (
-      <div className={`flex items-center justify-between rounded-md border border-line bg-bg p-4 transition-colors hover:border-ink/20 ${isSub ? 'ml-8' : ''}`}>
-        <div className="flex items-center gap-3">
-          {isSub ? (
-            <CornerDownRight className="h-4 w-4 shrink-0 text-muted-ink" />
-          ) : (
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-tint">
-              <Tag className="h-4 w-4 text-brand" />
-            </div>
+      <div className={cn('flex items-center justify-between gap-3 px-4 py-3', isSub && 'pl-14')}>
+        <div className="flex min-w-0 items-center gap-3">
+          {!isSub && (
+            <span
+              className="h-7 w-7 shrink-0 rounded-md"
+              style={{ backgroundColor: category.color || 'var(--bg-2)' }}
+            />
           )}
-          <div className="flex flex-col">
-            <span className="text-ui-strong text-ink">{category.name}</span>
+          <div className="flex min-w-0 flex-col">
+            <span className={cn('truncate text-body text-ink', !isSub && 'font-semibold')}>{category.name}</span>
             {parentName && (
-              <span className="text-meta text-muted-ink">{subOfLabel} {parentName}</span>
+              <span className="truncate text-meta text-muted-ink">{subOfLabel} {parentName}</span>
             )}
           </div>
         </div>
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={() => handleEdit(category)}>
-            <Pencil className="w-4 h-4" />
+        <div className="flex shrink-0 gap-0.5">
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEdit(category)}>
+            <Pencil className="h-3 w-3 text-muted-foreground" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setDeleteId(category.id)}>
-            <Trash2 className="w-4 h-4 text-destructive" />
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDeleteId(category.id)}>
+            <Trash2 className="h-3 w-3 text-destructive" />
           </Button>
         </div>
       </div>
@@ -107,33 +124,32 @@ export function CategoriesView({
   };
 
   const renderHierarchicalList = (items: Category[]) => {
-    const macros = items.filter(c => !c.parent_id).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-    const subs = items.filter(c => !!c.parent_id);
+    const filtered = filterBySearch(items);
+    const macros = filtered.filter(c => !c.parent_id).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    const subs = filtered.filter(c => !!c.parent_id);
     const macroIds = new Set(macros.map(m => m.id));
     const orphanSubs = subs.filter(s => !macroIds.has(s.parent_id!));
 
-    if (items.length === 0) {
-      return <p className="text-muted-foreground text-center py-8">{emptyLabel}</p>;
+    if (filtered.length === 0) {
+      return (
+        <p className="py-8 text-center text-body text-muted-ink">
+          {search.trim() ? 'Nenhum resultado para a busca.' : emptyLabel}
+        </p>
+      );
     }
 
     return (
-      <div className="space-y-2">
+      <div className="divide-y divide-line-2">
         {macros.map(macro => {
           const children = subs.filter(s => s.parent_id === macro.id).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
           return (
-            <div key={macro.id}>
-              <CategoryCard category={macro} />
-              {children.map(child => (
-                <div key={child.id} className="mt-1">
-                  <CategoryCard category={child} isSub />
-                </div>
-              ))}
+            <div key={macro.id} className="divide-y divide-line-2">
+              <CategoryRow category={macro} />
+              {children.map(child => <CategoryRow key={child.id} category={child} isSub />)}
             </div>
           );
         })}
-        {orphanSubs.length > 0 && orphanSubs.map(cat => (
-          <CategoryCard key={cat.id} category={cat} />
-        ))}
+        {orphanSubs.map(cat => <CategoryRow key={cat.id} category={cat} />)}
       </div>
     );
   };
@@ -164,28 +180,36 @@ export function CategoriesView({
         }
       />
 
-      <div className="rounded-lg border border-line bg-paper p-5">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'receita' | 'despesa')}>
-          <TabsList className={cn(tabsListClass, 'mb-4')}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'receita' | 'despesa')}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <TabsList className={tabsListClass}>
             <TabsTrigger value="receita" className={tabsTriggerClass}>
-              <TrendingUp className="h-[15px] w-[15px]" strokeWidth={1.75} />
-              {revenueTabLabel}
-              <span className="text-muted-ink">({receitaCategories.length})</span>
+              {revenueTabLabel} <span className="text-muted-ink">({receitaCategories.length})</span>
             </TabsTrigger>
             <TabsTrigger value="despesa" className={tabsTriggerClass}>
-              <TrendingDown className="h-[15px] w-[15px]" strokeWidth={1.75} />
-              {expenseTabLabel}
-              <span className="text-muted-ink">({despesaCategories.length})</span>
+              {expenseTabLabel} <span className="text-muted-ink">({despesaCategories.length})</span>
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="receita">
+
+          <SearchField
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar evento contábil..."
+            wrapperClassName="w-full sm:w-72"
+          />
+        </div>
+
+        <TabsContent value="receita" className="mt-4">
+          <div className="overflow-hidden rounded-lg border border-line bg-paper">
             {renderHierarchicalList(receitaCategories)}
-          </TabsContent>
-          <TabsContent value="despesa">
+          </div>
+        </TabsContent>
+        <TabsContent value="despesa" className="mt-4">
+          <div className="overflow-hidden rounded-lg border border-line bg-paper">
             {renderHierarchicalList(despesaCategories)}
-          </TabsContent>
-        </Tabs>
-      </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <CategoryFormDialog
         open={dialogOpen}
