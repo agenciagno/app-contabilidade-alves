@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Building2, TrendingUp, TrendingDown, Calendar, FileBarChart2 } from 'lucide-react';
+import { Building2, FileBarChart2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BankReportModal } from './BankReportModal';
 import { Bank } from '@/hooks/useBanks';
@@ -8,9 +8,10 @@ import { useContacts } from '@/hooks/useContacts';
 import { useCategories } from '@/hooks/useCategories';
 import { useBankTransactions } from '@/hooks/useBankTransactions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DateField } from '@/components/ds';
 
 interface BankDetailSheetProps {
   bank: Bank | null;
@@ -96,24 +97,24 @@ export function BankDetailSheet({ bank, open, onOpenChange }: BankDetailSheetPro
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-5xl p-0 flex flex-col overflow-hidden">
         {/* Header */}
-        <SheetHeader className="p-6 pb-4 border-b border-border/50 bg-muted/30 flex-shrink-0">
-          <div className="flex items-start gap-4">
+        <SheetHeader className="flex-shrink-0 space-y-0">
+          <div className="p-6 pb-4 bg-bg-2 border-b border-line flex items-start gap-4">
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: bank.color + '20' }}
+              style={{ backgroundColor: bank.color + '40' }}
             >
               <Building2 className="w-7 h-7" style={{ color: bank.color }} />
             </div>
             <div className="flex-1 min-w-0">
-              <SheetTitle className="text-xl font-bold text-foreground truncate">{bank.name}</SheetTitle>
+              <SheetTitle className="text-xl font-bold text-ink truncate">{bank.name}</SheetTitle>
               {(bank.bank_code || bank.agency || bank.account_number) && (
-                <p className="text-sm text-muted-foreground mt-0.5">
+                <p className="text-sm text-muted-ink mt-0.5">
                   {[bank.bank_code, bank.agency && `Ag: ${bank.agency}`, bank.account_number && `Cc: ${bank.account_number}`]
                     .filter(Boolean)
                     .join(' • ')}
                 </p>
               )}
-              <p className={`text-h3-section mt-2 ${closingBalance >= 0 ? 'text-ok' : 'text-destructive'}`}>
+              <p className={`text-h3-section mt-2 ${closingBalance >= 0 ? 'text-ok' : 'text-danger'}`}>
                 {formatCurrency(closingBalance)}
               </p>
             </div>
@@ -124,75 +125,61 @@ export function BankDetailSheet({ bank, open, onOpenChange }: BankDetailSheetPro
           </div>
 
           {/* Summary cards */}
-          <div className="grid grid-cols-3 gap-3 mt-4">
-            <div className="bg-background rounded-lg p-3 border border-border/50">
-              <p className="text-xs text-muted-foreground">Saldo Inicial do Período</p>
-              <p className="font-semibold text-sm mt-1">{formatCurrency(openingBalance)}</p>
+          <div className="grid grid-cols-3 gap-3 px-6 py-4">
+            <div className="bg-bg rounded-lg p-3">
+              <p className="text-kicker uppercase text-muted-ink">Saldo Inicial do Período</p>
+              <p className="font-semibold text-sm text-ink mt-1">{formatCurrency(openingBalance)}</p>
             </div>
-            <div className="bg-background rounded-lg p-3 border border-border/50">
-              <div className="flex items-center gap-1">
-                <TrendingUp className="w-3 h-3 text-ok" />
-                <p className="text-xs text-muted-foreground">Entradas</p>
-              </div>
+            <div className="bg-bg rounded-lg p-3">
+              <p className="text-kicker uppercase text-muted-ink">Entradas</p>
               <p className="font-semibold text-sm text-ok mt-1">+{formatCurrency(totalIncome)}</p>
             </div>
-            <div className="bg-background rounded-lg p-3 border border-border/50">
-              <div className="flex items-center gap-1">
-                <TrendingDown className="w-3 h-3 text-destructive" />
-                <p className="text-xs text-muted-foreground">Saídas</p>
-              </div>
-              <p className="font-semibold text-sm text-destructive mt-1">-{formatCurrency(totalExpense)}</p>
+            <div className="bg-bg rounded-lg p-3">
+              <p className="text-kicker uppercase text-muted-ink">Saídas</p>
+              <p className="font-semibold text-sm text-danger mt-1">-{formatCurrency(totalExpense)}</p>
             </div>
           </div>
         </SheetHeader>
 
         {/* Filters */}
-        <div className="px-6 py-4 border-b border-border/50 flex-shrink-0">
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-              <Input
-                type="date"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                className="pl-9 text-sm"
-                min="1900-01-01" max="9999-12-31"
-              />
+        <div className="px-6 py-4 border-b border-line flex-shrink-0">
+          <div className="grid grid-cols-4 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-ink-2">Data Início</Label>
+              <DateField value={startDate} onChange={setStartDate} min="1900-01-01" max="9999-12-31" />
             </div>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-              <Input
-                type="date"
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-                className="pl-9 text-sm"
-                min="1900-01-01" max="9999-12-31"
-              />
+            <div className="space-y-1.5">
+              <Label className="text-ink-2">Data Fim</Label>
+              <DateField value={endDate} onChange={setEndDate} min="1900-01-01" max="9999-12-31" />
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Select value={contactId} onValueChange={setContactId}>
-              <SelectTrigger className="text-sm">
-                <SelectValue placeholder="Todos os clientes/fornecedores" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {contacts.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger className="text-sm">
-                <SelectValue placeholder="Todos os eventos contábeis" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {categories.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="space-y-1.5">
+              <Label className="text-ink-2">Cliente/Fornecedor</Label>
+              <Select value={contactId} onValueChange={setContactId}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Todos os clientes/fornecedores" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {contacts.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-ink-2">Evento Contábil</Label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Todos os eventos contábeis" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {categories.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -203,38 +190,38 @@ export function BankDetailSheet({ bank, open, onOpenChange }: BankDetailSheetPro
               {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="overflow-hidden rounded-lg border border-line">
               {/* Closing balance (top, since newest first) */}
               {rows.length > 0 && (
-                <div className="flex items-center justify-between px-3 py-2 bg-primary/5 rounded-lg border-2 border-primary/20">
-                  <span className="text-xs text-muted-foreground italic font-bold">Saldo Final do Período</span>
-                  <span className="text-xs font-bold">{formatCurrency(closingBalance)}</span>
+                <div className="flex items-center justify-between px-3 py-2.5 bg-bg-2">
+                  <span className="text-xs text-ink font-bold">Saldo Final do Período</span>
+                  <span className="text-xs font-bold text-ink">{formatCurrency(closingBalance)}</span>
                 </div>
               )}
 
               {dayGroups.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8 text-sm">
+                <div className="text-center text-muted-ink py-8 text-sm">
                   Nenhuma movimentação encontrada neste período
                 </div>
               ) : (
                 dayGroups.map((group) => (
-                  <div key={group.dateRaw} className="border border-border/50 rounded-lg overflow-hidden">
+                  <div key={group.dateRaw} className="border-t border-line-2">
                     {/* Day header */}
-                    <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border/30">
-                      <span className="text-xs font-semibold text-foreground">{group.dateLabel}</span>
-                      <span className={`text-xs font-bold ${group.dayBalance >= 0 ? 'text-ok' : 'text-destructive'}`}>
+                    <div className="flex items-center justify-between px-3 py-2 bg-bg-2">
+                      <span className="text-xs font-semibold text-ink">{group.dateLabel}</span>
+                      <span className={`text-xs font-bold ${group.dayBalance >= 0 ? 'text-ok' : 'text-danger'}`}>
                         Saldo {formatCurrency(group.dayBalance)}
                       </span>
                     </div>
                     {/* Day transactions */}
-                    <div className="divide-y divide-border/30">
+                    <div className="divide-y divide-line-2">
                       {group.rows.map((row: any) => (
-                        <div key={row.id} className="flex items-center gap-3 px-3 py-2 hover:bg-muted/20 transition-colors">
+                        <div key={row.id} className="flex items-center gap-3 px-3 py-2 hover:bg-bg-2 transition-colors">
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-foreground truncate">{row.description}</p>
+                            <p className="text-xs font-medium text-ink truncate">{row.description}</p>
                             <div className="flex items-center gap-2 mt-0.5">
                               {row.contact_name && (
-                                <span className="text-[11px] text-muted-foreground truncate">{row.contact_name}</span>
+                                <span className="text-[11px] text-muted-ink truncate">{row.contact_name}</span>
                               )}
                               {row.category_name && (
                                 <Badge variant="secondary" className="text-[10px] font-normal px-1.5 py-0">{row.category_name}</Badge>
@@ -242,10 +229,10 @@ export function BankDetailSheet({ bank, open, onOpenChange }: BankDetailSheetPro
                             </div>
                           </div>
                           <div className="text-right flex-shrink-0">
-                            <p className={`text-xs font-semibold ${row.type === 'receita' ? 'text-ok' : 'text-destructive'}`}>
+                            <p className={`text-xs font-semibold ${row.type === 'receita' ? 'text-ok' : 'text-danger'}`}>
                               {row.type === 'receita' ? '+' : '-'}{formatCurrency(row.amount)}
                             </p>
-                            <p className="text-[11px] text-muted-foreground">{formatCurrency(row.running_balance)}</p>
+                            <p className="text-[11px] text-muted-ink">{formatCurrency(row.running_balance)}</p>
                           </div>
                         </div>
                       ))}
@@ -255,9 +242,9 @@ export function BankDetailSheet({ bank, open, onOpenChange }: BankDetailSheetPro
               )}
 
               {/* Opening balance (bottom, since newest first) */}
-              <div className="flex items-center justify-between px-3 py-2 bg-muted/40 rounded-lg">
-                <span className="text-xs text-muted-foreground italic">Saldo Inicial do Período</span>
-                <span className="text-xs font-semibold">{formatCurrency(openingBalance)}</span>
+              <div className="flex items-center justify-between px-3 py-2.5 border-t border-line-2">
+                <span className="text-xs text-muted-ink italic">Saldo Inicial do Período</span>
+                <span className="text-xs font-semibold text-ink">{formatCurrency(openingBalance)}</span>
               </div>
             </div>
           )}
