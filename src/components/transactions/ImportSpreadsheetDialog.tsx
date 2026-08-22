@@ -429,7 +429,7 @@ export function ImportSpreadsheetDialog({ open, onOpenChange, banks, categories,
       <DialogContent className={step === 3 ? 'sm:max-w-4xl' : 'sm:max-w-lg'}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5 text-primary" />
+            <FileSpreadsheet className="w-5 h-5 text-action" />
             Importar Planilha
           </DialogTitle>
           <DialogDescription>{stepDescription}</DialogDescription>
@@ -444,9 +444,9 @@ export function ImportSpreadsheetDialog({ open, onOpenChange, banks, categories,
           ].map((s, i) => (
             <div key={s.num} className="flex items-center gap-1.5 flex-shrink-0">
               {i > 0 && <div className="w-8 h-px bg-border flex-shrink-0" />}
-              <div className={`flex items-center gap-1.5 text-sm font-medium ${step === s.num ? 'text-primary' : step > s.num ? 'text-primary' : 'text-muted-foreground'}`}>
+              <div className={`flex items-center gap-1.5 text-sm font-medium ${step === s.num ? 'text-action' : step > s.num ? 'text-action' : 'text-muted-ink'}`}>
                 <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                  step > s.num ? 'bg-primary text-primary-foreground' : step === s.num ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                  step > s.num ? 'bg-action text-on-action' : step === s.num ? 'bg-action text-on-action' : 'bg-bg-2 text-muted-ink'
                 }`}>
                   {step > s.num ? <CheckCircle2 className="w-4 h-4" /> : s.num}
                 </span>
@@ -458,8 +458,8 @@ export function ImportSpreadsheetDialog({ open, onOpenChange, banks, categories,
 
         {step === 1 && (
           <div className="space-y-4">
-            <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">Como importar:</p>
+            <div className="bg-bg-2 rounded-lg p-4 space-y-2 text-sm text-muted-ink">
+              <p className="font-medium text-ink">Como importar:</p>
               <ol className="list-decimal list-inside space-y-1">
                 <li>Baixe o modelo em Excel</li>
                 <li>Cole seus dados respeitando as colunas</li>
@@ -482,24 +482,24 @@ export function ImportSpreadsheetDialog({ open, onOpenChange, banks, categories,
           <div className="space-y-4">
             {isProcessing ? (
               <div className="flex flex-col items-center justify-center py-12 gap-3">
-                <Loader2 className="w-10 h-10 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground font-medium">Processando planilha...</p>
+                <Loader2 className="w-10 h-10 animate-spin text-action" />
+                <p className="text-sm text-muted-ink font-medium">Processando planilha...</p>
               </div>
             ) : (
               <>
                 <div
                   className={`border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors ${
-                    isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                    isDragging ? 'border-action bg-action-tint' : 'border-line hover:border-action/50'
                   }`}
                   onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                   onDragLeave={() => setIsDragging(false)}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-                  <p className="font-medium text-foreground">Arraste e solte seu arquivo aqui</p>
-                  <p className="text-sm text-muted-foreground mt-1">ou clique para selecionar</p>
-                  <p className="text-xs text-muted-foreground mt-2">Formatos aceitos: .xlsx, .xls</p>
+                  <Upload className="w-10 h-10 mx-auto text-muted-ink mb-3" />
+                  <p className="font-medium text-ink">Arraste e solte seu arquivo aqui</p>
+                  <p className="text-sm text-muted-ink mt-1">ou clique para selecionar</p>
+                  <p className="text-xs text-muted-ink mt-2">Formatos aceitos: .xlsx, .xls</p>
                 </div>
                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
                 <div className="flex justify-between">
@@ -516,13 +516,13 @@ export function ImportSpreadsheetDialog({ open, onOpenChange, banks, categories,
           <div className="space-y-4">
             {isProcessing ? (
               <div className="flex flex-col items-center justify-center py-12 gap-3">
-                <Loader2 className="w-10 h-10 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground font-medium">Importando lançamentos...</p>
+                <Loader2 className="w-10 h-10 animate-spin text-action" />
+                <p className="text-sm text-muted-ink font-medium">Importando lançamentos...</p>
               </div>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground">
-                  <strong className="text-foreground">{parsedData.length}</strong> lançamento(s) encontrado(s)
+                <p className="text-sm text-muted-ink">
+                  <strong className="text-ink">{parsedData.length}</strong> lançamento(s) encontrado(s)
                   {skippedRows.length > 0 && (
                     <span className="ml-2 text-destructive">
                       • {skippedRows.length} linha(s) ignorada(s)
@@ -538,10 +538,10 @@ export function ImportSpreadsheetDialog({ open, onOpenChange, banks, categories,
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <ScrollArea className="h-[120px] border border-destructive/30 rounded-md mt-2 p-3 bg-destructive/5">
-                        <ul className="space-y-1 text-xs text-muted-foreground">
+                        <ul className="space-y-1 text-xs text-muted-ink">
                           {skippedRows.map((s, i) => (
                             <li key={i}>
-                              <span className="font-medium text-foreground">Linha {s.rowNumber}:</span> {s.reason}
+                              <span className="font-medium text-ink">Linha {s.rowNumber}:</span> {s.reason}
                             </li>
                           ))}
                         </ul>
