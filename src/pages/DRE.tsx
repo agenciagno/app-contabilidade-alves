@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { CalendarDays, X, FileText, GitCompare, Info } from 'lucide-react';
+import { X } from 'lucide-react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useDREData, DRESectionRow, DRECalculatedRow, DRERowResult } from '@/hooks/useDREData';
@@ -72,22 +72,22 @@ function CalculatedRow({ row }: { row: DRECalculatedRow }) {
     <TableRow className={cn(
       'font-bold',
       isFinal
-        ? 'bg-primary text-white'
+        ? 'bg-primary text-primary-foreground hover:bg-primary'
         : 'bg-muted/50 dark:bg-muted/30',
     )}>
       <TableCell className="pl-4">
         <span className={cn(
-          isFinal ? 'text-white' : 'text-foreground',
+          isFinal ? 'text-primary-foreground' : 'text-foreground',
           'uppercase text-sm tracking-wide'
         )}>
           {row.label}
         </span>
       </TableCell>
-      <TableCell className={cn('text-right', isFinal && 'text-white')}>{formatCurrency(row.previsto)}</TableCell>
-      <TableCell className={cn('text-right', isFinal && 'text-white')}>{formatCurrency(row.realizado)}</TableCell>
-      <TableCell className={cn('text-right', isFinal ? 'text-white' : valueColor(row.rxp))}>{formatCurrency(row.rxp)}</TableCell>
-      <TableCell className={cn('text-right', isFinal && 'text-white')}>{formatPerc(row.percPrevisto)}</TableCell>
-      <TableCell className={cn('text-right', isFinal && 'text-white')}>{formatPerc(row.percRealizado)}</TableCell>
+      <TableCell className={cn('text-right', isFinal && 'text-primary-foreground')}>{formatCurrency(row.previsto)}</TableCell>
+      <TableCell className={cn('text-right', isFinal && 'text-primary-foreground')}>{formatCurrency(row.realizado)}</TableCell>
+      <TableCell className={cn('text-right', isFinal ? 'text-primary-foreground' : valueColor(row.rxp))}>{formatCurrency(row.rxp)}</TableCell>
+      <TableCell className={cn('text-right', isFinal && 'text-primary-foreground')}>{formatPerc(row.percPrevisto)}</TableCell>
+      <TableCell className={cn('text-right', isFinal && 'text-primary-foreground')}>{formatPerc(row.percRealizado)}</TableCell>
     </TableRow>
   );
 }
@@ -128,20 +128,17 @@ export default function DRE() {
         actions={
           <>
             <div className="flex items-center gap-1.5">
-              <CalendarDays className="h-4 w-4 text-muted-ink" />
-              <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-9 w-[150px] border-line bg-paper text-ui" />
+              <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-9 w-[150px] border-line bg-paper text-ui [&::-webkit-calendar-picker-indicator]:hidden" />
               <span className="text-meta text-muted-ink">até</span>
-              <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-9 w-[150px] border-line bg-paper text-ui" />
+              <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-9 w-[150px] border-line bg-paper text-ui [&::-webkit-calendar-picker-indicator]:hidden" />
               <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handleClear} title="Limpar filtro">
                 <X className="h-4 w-4" />
               </Button>
             </div>
             <Button variant="outline" onClick={() => setConciliationOpen(true)}>
-              <GitCompare className="h-4 w-4" />
               Conciliação
             </Button>
             <Button onClick={() => setReportOpen(true)}>
-              <FileText className="h-4 w-4" />
               Gerar relatório
             </Button>
           </>
@@ -165,19 +162,16 @@ export default function DRE() {
               <TableRow>
                 <TableHead className="w-[34%]">Evento Contábil</TableHead>
                 <TableHead className="text-right w-[14%]">
-                  <span className="inline-flex items-center gap-1 justify-end">
-                    Previsto (R$)
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs text-xs">
-                          Inclui transações pagas cuja data prevista está no período. Use "Conciliação" para detalhar.
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help underline decoration-dotted underline-offset-4">Previsto (R$)</span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs text-xs">
+                        Inclui transações pagas cuja data prevista está no período. Use "Conciliação" para detalhar.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </TableHead>
                 <TableHead className="text-right w-[14%]">Realizado (R$)</TableHead>
                 <TableHead className="text-right w-[14%]">RXP (R$)</TableHead>
