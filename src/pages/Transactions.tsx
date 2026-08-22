@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   Plus, Upload, Pencil, Trash2, TrendingUp, TrendingDown, Receipt,
-  Download, FileSpreadsheet, FileText, AlertTriangle, Landmark,
+  Download, FileSpreadsheet, FileText, AlertTriangle,
   BarChart3, CalendarCheck, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   Building2, CheckCircle2, Search, Filter, X, ArrowUpDown, CircleDollarSign, ArrowLeftRight
 } from 'lucide-react';
@@ -39,7 +39,7 @@ import {
   startOfMonth, endOfMonth, isWithinInterval, parseISO, format
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { PageHeader, StatCardRow } from '@/components/ds';
+import { PageHeader, StatCardRow, SearchField } from '@/components/ds';
 
 /** Métrica secundária em linha — sem card, para não competir com os indicadores. */
 function ResumoInline({ label, valor, negativo }: { label: string; valor: string; negativo?: boolean }) {
@@ -264,8 +264,6 @@ function CategoryMultiFilter({
   const [search, setSearch] = useState('');
   const [temp, setTemp] = useState<string[]>([]);
 
-  const isActive = selected.length > 0;
-
   const filtered = search
     ? categories.filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
     : categories;
@@ -290,21 +288,21 @@ function CategoryMultiFilter({
   const displaySelected = open ? temp : selected;
   const displayActive = displaySelected.length > 0;
 
+  // Rótulo do chip: "Todos" vazio, nome quando só 1 selecionado, contador quando mais.
+  const chipLabel = selected.length === 0
+    ? 'Todos'
+    : selected.length === 1
+      ? (categories.find(c => c.id === selected[0])?.name ?? '1 selecionado')
+      : `${selected.length} selecionados`;
+
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <Button variant={isActive ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8 relative">
-              <Receipt className="w-4 h-4" />
-              {isActive && (
-                <Badge variant="secondary" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[9px] font-bold">{selected.length}</Badge>
-              )}
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Evento Contábil</TooltipContent>
-      </Tooltip>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-sm text-xs font-normal">
+          <span className="text-muted-foreground">Evento:</span> {chipLabel}
+          <ChevronDown className="w-3 h-3 opacity-60" />
+        </Button>
+      </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="start" onOpenAutoFocus={e => e.preventDefault()}>
         <div className="p-2 border-b border-border/40">
           <div className="relative">
@@ -642,7 +640,6 @@ export default function Transactions() {
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [bankFilter, setBankFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
   const [columnFilters, setColumnFilters] = useState<ColumnFilters>({});
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -843,12 +840,20 @@ export default function Transactions() {
   })) as ReportTransaction[];
 
 
+  // Rótulo dos chips Conta/Tipo do toolbar — mesmo dado dos Popovers, só texto
+  // pra exibir no chip (Evento é calculado dentro do próprio CategoryMultiFilter).
+  const selectedBankLabel = bankFilter === 'all' ? 'Todas' : bankFilter === IS_EMPTY ? '(Vazio)' : (banks.find(b => b.id === bankFilter)?.name ?? 'Todas');
+  const selectedTypeLabel = typeFilter === 'all' ? 'Todos' : typeFilter === IS_EMPTY ? '(Vazio)' : typeFilter === 'receita' ? 'Receita' : 'Despesa';
+
   return (
-    <div className="space-y-4 min-w-0 max-w-full">
+    <div className="min-w-0 max-w-full">
+      {/*
+        Sem subtitle — o Figma não repete "N transações · R$ X em atraso" aqui,
+        essa informação já vive nos StatCards logo abaixo (21/08/2026).
+      */}
       <PageHeader
         kicker="~/financeiro · lançamentos"
         title="Lançamentos."
-        subtitle={`${totalCount.toLocaleString('pt-BR')} transações · ${formatCurrency(biMetrics.receitasEmAtraso + biMetrics.contasEmAtraso)} em atraso.`}
         actions={
           <>
             <DropdownMenu>
@@ -877,6 +882,13 @@ export default function Transactions() {
         }
       />
 
+      {/*
+        mt-6 (24px): mesmo espaçamento título→primeira linha de cards já
+        aplicado no Financeiro > Dashboard — vira padrão fixo entre PageHeader
+        e o conteúdo da tela, daqui pra frente (21/08/2026). O resto da tela
+        mantém o ritmo space-y-4 de sempre, só esse primeiro salto mudou.
+      */}
+      <div className="mt-6 space-y-4">
       {/*
         Indicadores numerados (decisão 06). O protótipo mostra 4 na Lançamentos —
         os operacionais. Os 3 analíticos que existiam aqui (capital de giro, lucro
@@ -918,36 +930,26 @@ export default function Transactions() {
 
       {/* ── Toolbar ── */}
       <TooltipProvider delayDuration={200}>
-        <div className="flex items-center gap-1 flex-wrap min-w-0">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant={searchOpen ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8" onClick={() => { setSearchOpen(!searchOpen); if (searchOpen) setSearchTerm(''); }}>
-                <Search className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Pesquisar</TooltipContent>
-          </Tooltip>
-          {searchOpen && (
-            <Input
-              autoFocus
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Pesquisar..."
-              className="h-8 w-32 sm:w-48 text-xs"
-            />
-          )}
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          {/*
+            Campo de busca completo, sempre visível (era ícone que abria um
+            input pequeno ao clicar) — igual ao Figma. Mesma lógica de busca
+            de sempre (searchTerm), só a apresentação mudou (21/08/2026).
+          */}
+          <SearchField
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Buscar por cliente, evento contábil..."
+            wrapperClassName="h-8 flex-1 min-w-[220px] max-w-sm"
+          />
 
           <Popover>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <PopoverTrigger asChild>
-                  <Button variant={bankFilter !== 'all' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8">
-                    <Landmark className="w-4 h-4" />
-                  </Button>
-                </PopoverTrigger>
-              </TooltipTrigger>
-              <TooltipContent>Conta Bancária</TooltipContent>
-            </Tooltip>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-sm text-xs font-normal shrink-0">
+                <span className="text-muted-foreground">Conta:</span> {selectedBankLabel}
+                <ChevronDown className="w-3 h-3 opacity-60" />
+              </Button>
+            </PopoverTrigger>
             <PopoverContent className="w-48 p-2" align="start">
               <div className="space-y-1 max-h-60 overflow-auto">
                 <button onClick={() => setBankFilter('all')} className={`w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted ${bankFilter === 'all' ? 'bg-primary/10 text-primary font-medium' : ''}`}>Todos</button>
@@ -971,16 +973,12 @@ export default function Transactions() {
           />
 
           <Popover>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <PopoverTrigger asChild>
-                  <Button variant={typeFilter !== 'all' ? 'secondary' : 'ghost'} size="icon" className="h-8 w-8">
-                    {typeFilter === 'receita' ? <TrendingUp className="w-4 h-4 text-ok" /> : typeFilter === 'despesa' ? <TrendingDown className="w-4 h-4 text-danger" /> : <TrendingUp className="w-4 h-4" />}
-                  </Button>
-                </PopoverTrigger>
-              </TooltipTrigger>
-              <TooltipContent>Tipo</TooltipContent>
-            </Tooltip>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 rounded-sm text-xs font-normal shrink-0">
+                <span className="text-muted-foreground">Tipo:</span> {selectedTypeLabel}
+                <ChevronDown className="w-3 h-3 opacity-60" />
+              </Button>
+            </PopoverTrigger>
             <PopoverContent className="w-36 p-2" align="start">
               <div className="space-y-1">
                 <button onClick={() => setTypeFilter('all')} className={`w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted ${typeFilter === 'all' ? 'bg-primary/10 text-primary font-medium' : ''}`}>Todos</button>
@@ -1175,9 +1173,10 @@ export default function Transactions() {
                             : '—'}
                         </div>
                         <div className="flex gap-1.5 justify-center">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted" onClick={() => handleEdit(transaction)}><Pencil className="w-4 h-4 text-muted-foreground" /></Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-ok/10" onClick={() => handleSettle(transaction)}><CircleDollarSign className="w-4 h-4 text-ok" /></Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-destructive/10" onClick={() => setDeleteId(transaction.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                          {/* Ícones 12-15% menores (w-4→w-3.5) que o resto do sistema, mesmo asset — pedido Figma 21/08/2026. */}
+                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted" onClick={() => handleEdit(transaction)}><Pencil className="w-3.5 h-3.5 text-muted-foreground" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-ok/10" onClick={() => handleSettle(transaction)}><CircleDollarSign className="w-3.5 h-3.5 text-ok" /></Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-destructive/10" onClick={() => setDeleteId(transaction.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
                         </div>
                       </div>
                     );
@@ -1277,6 +1276,7 @@ export default function Transactions() {
         onSubmit={(data: TransferInput) => createTransfer.mutate(data, { onSuccess: () => setTransferOpen(false) })}
         isLoading={createTransfer.isPending}
       />
+      </div>
     </div>
   );
 }
