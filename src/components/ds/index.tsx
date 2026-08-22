@@ -433,11 +433,14 @@ export const segmentedListClass =
   'h-auto w-auto justify-start gap-1 rounded-md border border-line bg-bg-2 p-1';
 
 export const segmentedTriggerClass =
-  'h-[34px] rounded-sm px-3 text-nav text-muted-ink ' +
-  // bg-paper funciona no claro (branco contra o bg-2 do trilho), mas no
-  // escuro paper e bg-2 são quase idênticos — achado no Figma DS 18/08/2026.
-  // dark:bg-bg-3 dá ao item ativo um degrau de luz que o trilho não tem.
-  'data-[state=active]:bg-paper dark:data-[state=active]:bg-bg-3 data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-sc-sm';
+  'h-[34px] rounded-sm px-3 text-nav text-muted-ink transition-colors ' +
+  // A aba selecionada usa --action (o mesmo azul do CTA/checkbox/calendário)
+  // com texto branco fixo — pedido direto do Gabriel pra todo toggle
+  // segmentado dentro de modal (22/08/2026: #1d6fd8 claro / #5b9cf5 escuro,
+  // que já são os valores reais de --action). Texto branco fixo, não
+  // --on-action — aquele viraria tinta escura no escuro, e aqui o pedido foi
+  // "letra branca" nos dois modos.
+  'data-[state=active]:bg-action data-[state=active]:text-white data-[state=active]:font-semibold data-[state=active]:shadow-sc-sm';
 
 /* ────────────────── Faixa de métricas (R4) ───────────────────
    Diferente da StatCardRow: aqui os indicadores dividem UM card, separados

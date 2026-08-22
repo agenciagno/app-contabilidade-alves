@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { DateField } from '@/components/ds';
+import { DateField, segmentedListClass, segmentedTriggerClass } from '@/components/ds';
 import { Transaction, TransactionInsert } from '@/hooks/useTransactions';
 import { Category, useCategories, CategoryInsert } from '@/hooks/useCategories';
 import { Bank, useBanks, BankInsert } from '@/hooks/useBanks';
@@ -505,11 +505,11 @@ export function TransactionFormDialog({
           <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
             {/* Type Toggle */}
             <Tabs value={type} onValueChange={(v) => !structuralDisabled && setType(v as 'receita' | 'despesa')}>
-              <TabsList className={`w-full h-10 ${structuralDisabled ? 'opacity-60 pointer-events-none' : ''}`}>
-                <TabsTrigger value="receita" className="flex-1 gap-1.5 h-8" disabled={structuralDisabled}>
+              <TabsList className={cn(segmentedListClass, 'w-full h-11', structuralDisabled && 'opacity-60 pointer-events-none')}>
+                <TabsTrigger value="receita" className={cn(segmentedTriggerClass, 'flex-1 h-9 gap-1.5')} disabled={structuralDisabled}>
                   <TrendingUp className="w-4 h-4" /> Receita
                 </TabsTrigger>
-                <TabsTrigger value="despesa" className="flex-1 gap-1.5 h-8" disabled={structuralDisabled}>
+                <TabsTrigger value="despesa" className={cn(segmentedTriggerClass, 'flex-1 h-9 gap-1.5')} disabled={structuralDisabled}>
                   <TrendingDown className="w-4 h-4" /> Despesa
                 </TabsTrigger>
               </TabsList>
@@ -518,9 +518,9 @@ export function TransactionFormDialog({
             {/* Payment Condition Toggle — only for new transactions */}
             {!isEditing && !isSettleMode && (
               <Tabs value={paymentCondition} onValueChange={handlePaymentConditionChange}>
-                <TabsList className="w-full h-10">
-                  <TabsTrigger value="a_vista" className="flex-1 h-8">À Vista</TabsTrigger>
-                  <TabsTrigger value="a_prazo" className="flex-1 h-8">À Prazo</TabsTrigger>
+                <TabsList className={segmentedListClass}>
+                  <TabsTrigger value="a_vista" className={segmentedTriggerClass}>À Vista</TabsTrigger>
+                  <TabsTrigger value="a_prazo" className={segmentedTriggerClass}>À Prazo</TabsTrigger>
                 </TabsList>
               </Tabs>
             )}
@@ -528,7 +528,7 @@ export function TransactionFormDialog({
             {/* Row 1: Cliente | Valor | Valor Recebido/Pago */}
             <div className={`grid grid-cols-1 ${isAPrazo ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-3`}>
               <div className="space-y-1.5">
-                <Label className="text-muted-ink">Cliente/Fornecedor <span className="text-destructive">*</span></Label>
+                <Label className="text-ink-2">Cliente/Fornecedor <span className="text-destructive">*</span></Label>
                 {isInternalCompany ? (
                   <Select value={contactId} onValueChange={handleContactChange} disabled={structuralDisabled}>
                     <SelectTrigger className={structuralDisabled ? 'opacity-60 cursor-not-allowed' : ''}>
@@ -564,12 +564,12 @@ export function TransactionFormDialog({
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label className="text-muted-ink">Valor (R$) {!isAVista && <span className="text-destructive">*</span>}</Label>
+                <Label className="text-ink-2">Valor (R$) {!isAVista && <span className="text-destructive">*</span>}</Label>
                 <Input value={amount} onChange={handleAmountChange} placeholder="0,00" className="font-semibold" disabled={isSettleMode} />
               </div>
               {!isAPrazo && (
                 <div className="space-y-1.5">
-                  <Label className="text-muted-ink">
+                  <Label className="text-ink-2">
                     {type === 'receita' ? 'Valor Recebido' : 'Valor Pago'}
                     {(isSettleMode || isAVista) && <span className="text-destructive"> *</span>}
                   </Label>
@@ -581,7 +581,7 @@ export function TransactionFormDialog({
             {/* Row 2: Evento Contábil | Conta/Banco */}
 <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-muted-ink">Evento Contábil <span className="text-destructive">*</span></Label>
+                <Label className="text-ink-2">Evento Contábil <span className="text-destructive">*</span></Label>
                 <Select value={categoryId} onValueChange={handleCategoryChange} disabled={structuralDisabled}>
                   <SelectTrigger className={structuralDisabled ? 'opacity-60 cursor-not-allowed' : !categoryId ? 'border-muted-foreground/30' : ''}>
                     <SelectValue placeholder="Selecione..." />
@@ -602,7 +602,7 @@ export function TransactionFormDialog({
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label className="text-muted-ink">
+                <Label className="text-ink-2">
                   Conta/Banco
                   {(isSettleMode || isAVista) && <span className="text-destructive"> *</span>}
                 </Label>
@@ -630,11 +630,11 @@ export function TransactionFormDialog({
             {/* Row 3: Datas — Linha 1: Emissão | Vencimento */}
 <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-muted-ink">Emissão <span className="text-destructive">*</span></Label>
+                <Label className="text-ink-2">Emissão <span className="text-destructive">*</span></Label>
                 <DateField value={issueDate} onChange={setIssueDate} disabled={isSettleMode} min="1900-01-01" max="9999-12-31" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-muted-ink">Vencimento {(!isAVista || isRecurring) && <span className="text-destructive">*</span>}</Label>
+                <Label className="text-ink-2">Vencimento {(!isAVista || isRecurring) && <span className="text-destructive">*</span>}</Label>
                 <DateField value={dueDate} onChange={setDueDate} disabled={isSettleMode} min="1900-01-01" max="9999-12-31" />
               </div>
             </div>
@@ -642,7 +642,7 @@ export function TransactionFormDialog({
             {/* Row 4: Datas — Linha 2: Prevista | Pagamento */}
 <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-muted-ink">Prevista {!isAVista && <span className="text-destructive">*</span>}</Label>
+                <Label className="text-ink-2">Prevista {!isAVista && <span className="text-destructive">*</span>}</Label>
                 <DateField
                   value={isAVista ? '' : expectedDate}
                   onChange={setExpectedDate}
@@ -658,7 +658,7 @@ export function TransactionFormDialog({
               </div>
               {!isAPrazo && (
                 <div className="space-y-1.5">
-                  <Label className="text-muted-ink">
+                  <Label className="text-ink-2">
                     Pagamento
                     {(isSettleMode || isAVista) && <span className="text-destructive"> *</span>}
                   </Label>
