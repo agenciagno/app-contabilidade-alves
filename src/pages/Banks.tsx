@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2, Building2, FileBarChart2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { Plus, Pencil, Trash2, Building2, Landmark } from 'lucide-react';
 import { useBanks, Bank } from '@/hooks/useBanks';
 import { useBankTransactions } from '@/hooks/useBankTransactions';
 import { BankFormDialog } from '@/components/banks/BankFormDialog';
@@ -11,7 +10,7 @@ import { BankReportModal } from '@/components/banks/BankReportModal';
 import { BankBalanceDiagnosticPanel } from '@/components/banks/BankBalanceDiagnosticPanel';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PageHeader, StatCard, DsBadge } from '@/components/ds';
+import { PageHeader, StatCard } from '@/components/ds';
 import { cn } from '@/lib/utils';
 
 function formatCurrency(value: number) {
@@ -83,15 +82,18 @@ export default function Banks() {
   const firstOfYear = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
   const todayStr = today.toISOString().split('T')[0];
 
-  const BankCard = ({ bank }: {bank: Bank;}) => {
+  // Linha compacta (era card grande em grid) — Figma usa 1 lista dentro de 1
+  // card na coluna lateral, não cards separados. O badge visível/oculta e o
+  // rodapé "atualizado em" saíram da linha (sem slot nesse formato compacto,
+  // continuam editáveis no BankFormDialog); editar/excluir seguem existindo,
+  // só que aparecem no hover — igual ao comportamento que a badge tinha antes
+  // (22/08/2026).
+  const BankRow = ({ bank }: { bank: Bank }) => {
     const banksList = [{ id: bank.id, initial_balance: bank.initial_balance, is_active: bank.is_active }];
     const { closingBalance } = useBankTransactions(
       { bankId: bank.id, startDate: firstOfYear, endDate: todayStr },
       banksList
     );
-
-    const infoParts = [bank.agency && `Ag. ${bank.agency}`, bank.account_number && `CC ${bank.account_number}`].filter(Boolean) as string[];
-    const infoLine = infoParts.length > 0 ? infoParts.join(' · ') : 'controle manual';
 
     return (
       <div
@@ -104,41 +106,30 @@ export default function Banks() {
             handleBankCardClick(bank);
           }
         }}
-        className="group flex cursor-pointer flex-col overflow-hidden rounded-lg border border-line bg-paper text-left transition-colors hover:border-ink/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="group relative flex cursor-pointer items-center gap-3 p-4 text-left transition-colors hover:bg-bg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
-        <div className="flex flex-col gap-3 p-[18px]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <div
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md [&_svg]:h-5 [&_svg]:w-5"
-                style={{ backgroundColor: bank.color + '20', color: bank.color }}>
-                <Building2 strokeWidth={1.75} />
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-h4-card text-ink">{bank.name}</p>
-                <p className="truncate text-meta text-muted-ink-2">{infoLine}</p>
-              </div>
-            </div>
-            <div className="relative flex h-[22px] shrink-0 items-center">
-              <DsBadge tone={bank.is_invisible ? 'neutral' : 'ok'} className="transition-opacity group-hover:opacity-0">
-                {bank.is_invisible ? 'oculta' : 'visível'}
-              </DsBadge>
-              <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleEdit(bank, e)}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleDeleteClick(bank.id, e)}>
-                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                </Button>
-              </div>
-            </div>
-          </div>
-          <p className={cn('text-metric-xl', closingBalance >= 0 ? 'text-ink' : 'text-danger')}>
-            {formatCurrency(closingBalance)}
-          </p>
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md [&_svg]:h-4 [&_svg]:w-4"
+          style={{ backgroundColor: bank.color + '20', color: bank.color }}
+        >
+          <Landmark strokeWidth={1.75} />
         </div>
-        <div className="border-t border-line-2 px-[18px] py-[11px]">
-          <p className="truncate text-meta text-muted-ink-2">atualizado em {format(new Date(bank.updated_at), 'dd/MM')}</p>
+        <span className="min-w-0 flex-1 truncate text-body text-ink">{bank.name}</span>
+        <span
+          className={cn(
+            'shrink-0 font-mono text-body tabular-nums transition-opacity group-hover:opacity-0',
+            closingBalance >= 0 ? 'text-ink' : 'text-danger',
+          )}
+        >
+          {formatCurrency(closingBalance)}
+        </span>
+        <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleEdit(bank, e)}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleDeleteClick(bank.id, e)}>
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+          </Button>
         </div>
       </div>
     );
@@ -179,8 +170,8 @@ export default function Banks() {
         subtitle="Saldos por banco e visibilidade no fluxo de caixa."
         actions={
           <>
-            <Button variant="outline" className="gap-2" onClick={() => setReportOpen(true)}>
-              <FileBarChart2 className="w-4 h-4" />
+            {/* Sem ícone — mesmo padrão já achado no Figma de Pagar/Receber e Boletos (22/08/2026). */}
+            <Button variant="outline" onClick={() => setReportOpen(true)}>
               Gerar Relatório
             </Button>
             <Button className="gap-2" onClick={() => {setEditingBank(null);setDialogOpen(true);}}>
@@ -191,43 +182,55 @@ export default function Banks() {
         }
       />
 
-      {/* Total Balance */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Saldo total em contas ativas" value={formatCurrency(totalBalance)} />
-      </div>
+      {/*
+        Estrutura mudou de grid de cards + painel sob demanda pra 2 colunas
+        fixas sempre visíveis: contas à esquerda (320px), Extrato Unificado
+        sempre aberto à direita — o Figma usa uma disposição diferente da
+        anterior, não é só repintar (22/08/2026). Empilha em telas estreitas.
+      */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        {/* Coluna lateral — contas */}
+        <div className="flex w-full shrink-0 flex-col gap-4 lg:w-[320px]">
+          <StatCard
+            label="Saldo total em contas ativas"
+            value={formatCurrency(totalBalance)}
+            hint={`${activeBanks.length} conta${activeBanks.length === 1 ? '' : 's'} ativa${activeBanks.length === 1 ? '' : 's'}`}
+          />
 
-      {/* Active Banks */}
-      {activeBanks.length > 0 &&
-      <div>
-          <h2 className="mb-4 text-ui-strong text-ink">Contas Ativas ({activeBanks.length})</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {activeBanks.map((bank) => <BankCard key={bank.id} bank={bank} />)}
-          </div>
+          {activeBanks.length > 0 && (
+            <div>
+              <h2 className="mb-2 text-ui-strong text-ink">Contas Ativas ({activeBanks.length})</h2>
+              <div className="divide-y divide-line-2 overflow-hidden rounded-lg border border-line bg-paper">
+                {activeBanks.map((bank) => <BankRow key={bank.id} bank={bank} />)}
+              </div>
+            </div>
+          )}
+
+          {inactiveBanks.length > 0 && (
+            <div>
+              <h2 className="mb-2 text-ui-strong text-muted-ink">Contas Inativas ({inactiveBanks.length})</h2>
+              <div className="divide-y divide-line-2 overflow-hidden rounded-lg border border-line bg-paper">
+                {inactiveBanks.map((bank) => <BankRow key={bank.id} bank={bank} />)}
+              </div>
+            </div>
+          )}
+
+          {banks.length === 0 && (
+            <div className="rounded-lg border border-line bg-paper py-16 text-center text-muted-ink">
+              <Building2 className="mx-auto mb-4 h-12 w-12 opacity-50" />
+              <p>Nenhuma conta cadastrada</p>
+              <p className="mt-1 text-meta">Clique em "Nova conta" para adicionar sua primeira conta</p>
+            </div>
+          )}
         </div>
-      }
 
-      {/* Inactive Banks */}
-      {inactiveBanks.length > 0 &&
-      <div>
-          <h2 className="mb-4 text-ui-strong text-muted-ink">Contas Inativas ({inactiveBanks.length})</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {inactiveBanks.map((bank) => <BankCard key={bank.id} bank={bank} />)}
-          </div>
+        {/* Área principal — Extrato Unificado, sempre aberto */}
+        <div className="min-w-0 flex-1">
+          {banks.length > 0 && <UnifiedStatementAccordion banks={banks} />}
         </div>
-      }
-
-      {banks.length === 0 &&
-      <div className="rounded-lg border border-line bg-paper py-16 text-center text-muted-ink">
-          <Building2 className="mx-auto mb-4 h-12 w-12 opacity-50" />
-          <p>Nenhuma conta cadastrada</p>
-          <p className="mt-1 text-meta">Clique em "Nova conta" para adicionar sua primeira conta</p>
       </div>
-      }
 
       <BankBalanceDiagnosticPanel />
-
-      {/* Unified Statement Accordion */}
-      {banks.length > 0 && <UnifiedStatementAccordion banks={banks} />}
 
       {/* Dialogs */}
       <BankFormDialog
