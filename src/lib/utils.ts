@@ -98,6 +98,32 @@ export function isValidDateString(value: string): boolean {
   return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
+// Máscara de data: digitação livre de números vira dd/mm/aaaa (Correção 2, 22/08/2026 —
+// campo de data do sistema passa a ter texto digitável, não só o seletor visual).
+export function maskDateInput(value: string): string {
+  const d = value.replace(/\D/g, '').slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+}
+
+// dd/mm/aaaa digitado (completo e válido) → ISO yyyy-mm-dd. Incompleto/inválido = null.
+export function parseDateInputToISO(display: string): string | null {
+  const m = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  const iso = `${yyyy}-${mm}-${dd}`;
+  return isValidDateString(iso) ? iso : null;
+}
+
+// ISO yyyy-mm-dd → dd/mm/aaaa pra exibição no campo de texto.
+export function isoToDisplayDate(iso: string): string {
+  const m = (iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const [, yyyy, mm, dd] = m;
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 // Máscara adaptiva para telefone: fixo (XX) XXXX-XXXX (10 dígitos) ou celular (XX) XXXXX-XXXX (11 dígitos)
 export function maskPhone(value: string): string {
   const d = (value || '').replace(/\D/g, '').slice(0, 11);

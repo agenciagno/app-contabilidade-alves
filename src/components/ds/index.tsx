@@ -7,8 +7,12 @@
  */
 import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
-import { Search } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Search, CalendarDays } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn, maskDateInput, parseDateInputToISO, isoToDisplayDate } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 /* ─────────────────────────── Badge ───────────────────────────
    Pill 22px · pad 3/8 · dot 6px · texto SC/badge (10.5 Medium) */
@@ -142,6 +146,78 @@ export const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
   ),
 );
 SearchField.displayName = 'SearchField';
+
+/* ────────────────────────── DateField ──────────────────────────
+   Correção 2 (22/08/2026): campo de data único do sistema — texto
+   digitável dd/mm/aaaa + ícone que abre o seletor visual (Calendar,
+   já com locale PT-BR e data selecionada em --action). Os dois
+   caminhos escrevem no mesmo valor ISO (yyyy-mm-dd). */
+
+export interface DateFieldProps {
+  /** ISO yyyy-mm-dd, ou '' vazio. */
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  /** ISO yyyy-mm-dd — desabilita dias fora do intervalo no seletor visual. */
+  min?: string;
+  max?: string;
+  className?: string;
+}
+
+export function DateField({ value, onChange, placeholder = 'dd/mm/aaaa', disabled, min, max, className }: DateFieldProps) {
+  const [text, setText] = React.useState(() => isoToDisplayDate(value));
+  const [open, setOpen] = React.useState(false);
+
+  React.useEffect(() => { setText(isoToDisplayDate(value)); }, [value]);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = maskDateInput(e.target.value);
+    setText(masked);
+    if (masked === '') { onChange(''); return; }
+    const iso = parseDateInputToISO(masked);
+    if (iso) onChange(iso);
+  };
+
+  const selected = value ? new Date(`${value}T00:00:00`) : undefined;
+
+  return (
+    <div className={cn('relative', className)}>
+      <Input
+        value={text}
+        onChange={handleTextChange}
+        placeholder={placeholder}
+        disabled={disabled}
+        inputMode="numeric"
+        className="pr-9"
+      />
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            disabled={disabled}
+            aria-label="Abrir calendário"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-ink hover:text-ink disabled:pointer-events-none disabled:opacity-50"
+          >
+            <CalendarDays className="h-4 w-4" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="end">
+          <Calendar
+            mode="single"
+            selected={selected}
+            onSelect={(d) => { if (d) { onChange(format(d, 'yyyy-MM-dd')); setOpen(false); } }}
+            disabled={(d) => {
+              const iso = format(d, 'yyyy-MM-dd');
+              return (!!min && iso < min) || (!!max && iso > max);
+            }}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
 
 /* ─────────────────────── Navegação lateral ───────────────────
    NavItem 220×36 r8 (ativo em accent/tint desde 10/08/2026) · NavGroup idem

@@ -39,7 +39,7 @@ import {
   startOfMonth, endOfMonth, isWithinInterval, parseISO, format
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { PageHeader, StatCardRow, SearchField } from '@/components/ds';
+import { PageHeader, StatCardRow, SearchField, DateField } from '@/components/ds';
 
 /** Métrica secundária em linha — sem card, para não competir com os indicadores. */
 function ResumoInline({ label, valor, negativo }: { label: string; valor: string; negativo?: boolean }) {
@@ -128,11 +128,11 @@ function DateColumnFilter({ value, onChange, sortField, currentSortField, curren
       </label>
       <div className="space-y-1">
         <label className="text-xs text-muted-foreground">De</label>
-        <Input type="date" value={start} onChange={e => setStart(e.target.value)} max="9999-12-31" className="h-8 text-xs" />
+        <DateField value={start} onChange={setStart} className="[&_input]:h-8 [&_input]:text-xs" />
       </div>
       <div className="space-y-1">
         <label className="text-xs text-muted-foreground">Até</label>
-        <Input type="date" value={end} onChange={e => setEnd(e.target.value)} max="9999-12-31" className="h-8 text-xs" />
+        <DateField value={end} onChange={setEnd} className="[&_input]:h-8 [&_input]:text-xs" />
       </div>
       <div className="flex gap-1">
         <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={clear}>Limpar</Button>
