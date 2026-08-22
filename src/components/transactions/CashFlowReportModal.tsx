@@ -4,13 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { DateField, segmentedListClass, segmentedTriggerClass } from '@/components/ds';
 import { cn } from '@/lib/utils';
-import { FileText, Table2, Image, TrendingUp, TrendingDown, Building2, Wallet, X, Printer, ChevronDown, Search } from 'lucide-react';
+import { FileText, X, ChevronDown, Search } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
 import { format, parseISO, isWithinInterval } from 'date-fns';
 import jsPDF from 'jspdf';
@@ -152,8 +152,14 @@ export function CashFlowReportModal({
       setMonthlyPeriodEnd('');
       setMonthlyGroupBy('evento');
     }
+    // Só reseta na transição fechado→aberto. `initialCategoryIds`/`initialContactIds`
+    // não entram nas deps de propósito — são arrays novos a cada render do pai (ex.:
+    // `columnFilters.contactIds || []` em CashFlowTab.tsx), e depender deles aqui fazia
+    // esse efeito disparar de novo a qualquer re-render externo enquanto o modal já
+    // estava aberto, jogando a aba de volta pra "Relatório" sem o usuário tocar em nada
+    // — achado ao vivo nesta sessão (22/08/2026), não um comportamento do Figma.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialStartDate, initialEndDate, initialCategoryIds, initialContactIds]);
+  }, [open]);
 
   const today = new Date();
 
@@ -1115,49 +1121,40 @@ export function CashFlowReportModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto print-visible">
+      <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto print-visible">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" />
+            <FileText className="w-5 h-5 text-action" />
             {isReceivables ? 'Relatório de A Receber' : 'Relatório de Contas a Pagar/Receber'}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {/* Mode toggle */}
-          <div className="flex justify-center">
-            <ToggleGroup
-              type="single"
-              value={mode}
-              onValueChange={(v) => v && setMode(v as 'report' | 'monthly')}
-              className="bg-muted/50 rounded-md p-1"
-            >
-              <ToggleGroupItem value="report" className="px-4 data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                Relatório
-              </ToggleGroupItem>
-              <ToggleGroupItem value="monthly" className="px-4 data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                Consulta Mensal
-              </ToggleGroupItem>
-            </ToggleGroup>
-          </div>
+          <Tabs value={mode} onValueChange={(v) => setMode(v as 'report' | 'monthly')}>
+            <TabsList className={cn(segmentedListClass, 'w-full h-11')}>
+              <TabsTrigger value="report" className={cn(segmentedTriggerClass, 'flex-1 h-9')}>Relatório</TabsTrigger>
+              <TabsTrigger value="monthly" className={cn(segmentedTriggerClass, 'flex-1 h-9')}>Consulta Mensal</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           {mode === 'report' && (<>
 
           {/* Period with clear button */}
           <div>
-            <Label className="text-sm font-semibold mb-1 block">Período</Label>
+            <Label className="text-kicker uppercase text-muted-ink mb-2 block">Período</Label>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Data Início</Label>
-                <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} min="1900-01-01" max="9999-12-31" />
+                <Label className="text-ink-2">Data Início</Label>
+                <DateField value={startDate} onChange={setStartDate} min="1900-01-01" max="9999-12-31" />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Data Fim</Label>
+                <Label className="text-ink-2">Data Fim</Label>
                 <div className="relative flex gap-1">
-                  <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} min="1900-01-01" max="9999-12-31" className="flex-1" />
+                  <DateField value={endDate} onChange={setEndDate} min="1900-01-01" max="9999-12-31" className="flex-1" />
                   {(startDate || endDate) && (
                     <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0 no-print" onClick={clearDates} title="Limpar datas (Acumulado Geral)">
-                      <X className="w-4 h-4 text-muted-foreground" />
+                      <X className="w-4 h-4 text-muted-ink" />
                     </Button>
                   )}
                 </div>
@@ -1168,7 +1165,7 @@ export function CashFlowReportModal({
           {/* Category + Contact + Type */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <Label className="text-sm font-semibold mb-1 block">Evento Contábil</Label>
+              <Label className="text-ink-2 mb-2 block">Evento Contábil</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-between font-normal">
@@ -1177,9 +1174,9 @@ export function CashFlowReportModal({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <div className="p-2 border-b space-y-2">
+                  <div className="p-2 border-b border-line-2 space-y-2">
                     <div className="relative">
-                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-ink" />
                       <Input
                         value={categorySearch}
                         onChange={(e) => setCategorySearch(e.target.value)}
@@ -1190,7 +1187,7 @@ export function CashFlowReportModal({
                     <button
                       type="button"
                       onClick={() => setCategoryIds(new Set())}
-                      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-bg-2 text-left"
                     >
                       <Checkbox checked={categoryIds.size === 0} />
                       <span>Todos</span>
@@ -1203,7 +1200,7 @@ export function CashFlowReportModal({
                         const q = norm(categorySearch.trim());
                         const filtered = q ? subCategories.filter(c => norm(c.name).includes(q)) : subCategories;
                         if (filtered.length === 0) {
-                          return <div className="px-2 py-4 text-sm text-muted-foreground text-center">Nenhum evento encontrado</div>;
+                          return <div className="px-2 py-4 text-sm text-muted-ink text-center">Nenhum evento encontrado</div>;
                         }
                         return filtered.map(cat => {
                           const checked = categoryIds.has(cat.id);
@@ -1218,7 +1215,7 @@ export function CashFlowReportModal({
                                   return next;
                                 });
                               }}
-                              className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                              className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-bg-2 text-left"
                             >
                               <Checkbox checked={checked} />
                               <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat.color || '#3B82F6' }} />
@@ -1233,7 +1230,7 @@ export function CashFlowReportModal({
               </Popover>
             </div>
             <div>
-              <Label className="text-sm font-semibold mb-1 block">Cliente/Fornecedor</Label>
+              <Label className="text-ink-2 mb-2 block">Cliente/Fornecedor</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-between font-normal">
@@ -1242,9 +1239,9 @@ export function CashFlowReportModal({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <div className="p-2 border-b space-y-2">
+                  <div className="p-2 border-b border-line-2 space-y-2">
                     <div className="relative">
-                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-ink" />
                       <Input
                         value={contactSearch}
                         onChange={(e) => setContactSearch(e.target.value)}
@@ -1255,7 +1252,7 @@ export function CashFlowReportModal({
                     <button
                       type="button"
                       onClick={() => setContactIds(new Set())}
-                      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-bg-2 text-left"
                     >
                       <Checkbox checked={contactIds.size === 0} />
                       <span>Todos</span>
@@ -1268,7 +1265,7 @@ export function CashFlowReportModal({
                         const q = norm(contactSearch.trim());
                         const filtered = q ? contacts.filter(c => norm(c.name).includes(q)) : contacts;
                         if (filtered.length === 0) {
-                          return <div className="px-2 py-4 text-sm text-muted-foreground text-center">Nenhum cliente/fornecedor encontrado</div>;
+                          return <div className="px-2 py-4 text-sm text-muted-ink text-center">Nenhum cliente/fornecedor encontrado</div>;
                         }
                         return filtered.map(ct => {
                           const checked = contactIds.has(ct.id);
@@ -1283,7 +1280,7 @@ export function CashFlowReportModal({
                                   return next;
                                 });
                               }}
-                              className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                              className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-bg-2 text-left"
                             >
                               <Checkbox checked={checked} />
                               <span className="truncate">{ct.name}</span>
@@ -1298,7 +1295,7 @@ export function CashFlowReportModal({
             </div>
             {!isReceivables && (
             <div>
-              <Label className="text-sm font-semibold mb-1 block">Tipo</Label>
+              <Label className="text-ink-2 mb-2 block">Tipo</Label>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
                 <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
@@ -1311,42 +1308,42 @@ export function CashFlowReportModal({
             )}
           </div>
 
-          <Separator className="my-2" />
-
-          {/* Preview Summary — 4 cards matching main screen */}
+          {/* Preview Summary — 4 cards matching main screen. Segue o tema (claro/escuro)
+              a partir do redesign do modal Relatório Pagar/Receber (22/08/2026) — o
+              Figma passou a mostrar esse card se adaptando, diferente da exceção
+              "sempre branco, é print" registrada antes pros modais de relatório. */}
           <div>
-            <Label className="text-xs font-semibold mb-1 block">Preview do Resumo</Label>
+            <Label className="text-kicker uppercase text-muted-ink mb-2 block">Preview do Resumo</Label>
             <div
               ref={summaryRef}
-              className="bg-white rounded-lg border border-gray-200 p-3 space-y-2 print-visible"
-              style={{ fontFamily: 'sans-serif' }}
+              className="rounded-lg border border-line bg-paper p-3 space-y-2 print-visible"
             >
               <div>
-                <h3 className="font-bold text-gray-900 text-sm">{isReceivables ? 'Relatório de A Receber' : 'Relatório de Contas a Pagar/Receber'}</h3>
-                <p className="text-[10px] text-gray-500">Período: {periodLabel}</p>
+                <h3 className="font-bold text-ink text-sm">{isReceivables ? 'Relatório de A Receber' : 'Relatório de Contas a Pagar/Receber'}</h3>
+                <p className="text-[10px] text-muted-ink">Período: {periodLabel}</p>
               </div>
               <div className={`grid ${isReceivables ? 'grid-cols-3' : 'grid-cols-4'} gap-1.5`}>
-                <div className="bg-blue-50 rounded p-1.5 border-l-2 border-l-blue-500">
-                  <p className="text-[9px] text-blue-700">Capital de Giro</p>
-                  <p className={`font-bold text-[11px] ${kpis.capitalDeGiro >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatCurrency(kpis.capitalDeGiro)}</p>
+                <div className="bg-action-tint rounded p-1.5 border-l-2 border-l-action">
+                  <p className="text-[9px] text-action">Capital de Giro</p>
+                  <p className={`font-bold text-[11px] ${kpis.capitalDeGiro >= 0 ? 'text-action' : 'text-danger'}`}>{formatCurrency(kpis.capitalDeGiro)}</p>
                 </div>
-                <div className="bg-green-50 rounded p-1.5 border-l-2 border-l-green-500">
-                  <p className="text-[9px] text-green-700">Entradas</p>
-                  <p className="font-bold text-green-700 text-[11px]">{formatCurrency(kpis.entradas)}</p>
+                <div className="bg-ok-soft rounded p-1.5 border-l-2 border-l-ok">
+                  <p className="text-[9px] text-ok">Entradas</p>
+                  <p className="font-bold text-ok text-[11px]">{formatCurrency(kpis.entradas)}</p>
                 </div>
                 {!isReceivables && (
-                  <div className="bg-red-50 rounded p-1.5 border-l-2 border-l-red-500">
-                    <p className="text-[9px] text-red-700">Saídas</p>
-                    <p className="font-bold text-red-700 text-[11px]">{formatCurrency(kpis.saidas)}</p>
+                  <div className="bg-danger-soft rounded p-1.5 border-l-2 border-l-danger">
+                    <p className="text-[9px] text-danger">Saídas</p>
+                    <p className="font-bold text-danger text-[11px]">{formatCurrency(kpis.saidas)}</p>
                   </div>
                 )}
-                <div className="bg-gray-50 rounded p-1.5 border-l-2 border-l-gray-400">
-                  <p className="text-[9px] text-gray-600">Saldos Atuais</p>
-                  <p className="font-bold text-gray-800 text-[11px]">{formatCurrency(kpis.totalBankBalance)}</p>
+                <div className="bg-bg-2 rounded p-1.5 border-l-2 border-l-muted-ink-2">
+                  <p className="text-[9px] text-muted-ink">Saldos Atuais</p>
+                  <p className="font-bold text-ink text-[11px]">{formatCurrency(kpis.totalBankBalance)}</p>
                 </div>
               </div>
-              <div className="border-t border-gray-100 pt-1.5">
-                <p className="text-[10px] text-gray-400">
+              <div className="border-t border-line-2 pt-1.5">
+                <p className="text-[10px] text-muted-ink-2">
                   {filteredRows.length} lançamentos • Gerado em {pad2(today.getDate())}/{pad2(today.getMonth() + 1)}/{today.getFullYear()}
                 </p>
               </div>
@@ -1358,49 +1355,18 @@ export function CashFlowReportModal({
             <div className="space-y-4">
               {/* Filtrar por: Meses do Ano ou Período Personalizado */}
               <div>
-                <Label className="text-sm font-semibold mb-2 block">Filtrar por</Label>
-                <ToggleGroup
-                  type="single"
-                  value={monthlyFilterMode}
-                  onValueChange={(v) => v && setMonthlyFilterMode(v as 'months' | 'period')}
-                  className="bg-muted/50 rounded-md p-1 w-full"
-                >
-                  <ToggleGroupItem value="months" className="flex-1 px-4 data-[state=on]:bg-background data-[state=on]:shadow-sm text-xs">
-                    Meses do Ano
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="period" className="flex-1 px-4 data-[state=on]:bg-background data-[state=on]:shadow-sm text-xs">
-                    Período Personalizado
-                  </ToggleGroupItem>
-                </ToggleGroup>
+                <Label className="text-kicker uppercase text-muted-ink mb-2 block">Filtrar por</Label>
+                <Tabs value={monthlyFilterMode} onValueChange={(v) => setMonthlyFilterMode(v as 'months' | 'period')}>
+                  <TabsList className={cn(segmentedListClass, 'w-full h-11')}>
+                    <TabsTrigger value="months" className={cn(segmentedTriggerClass, 'flex-1 h-9')}>Meses do Ano</TabsTrigger>
+                    <TabsTrigger value="period" className={cn(segmentedTriggerClass, 'flex-1 h-9')}>Período Personalizado</TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
 
-              {monthlyFilterMode === 'months' && (
-              /* Year pills */
+              {/* Status pills — ordem do Figma: Status vem antes de Ano (22/08/2026) */}
               <div>
-                <Label className="text-sm font-semibold mb-2 block">Ano</Label>
-                <div className="flex flex-wrap gap-2">
-                  {availableYears.map(y => (
-                    <Button
-                      key={y}
-                      type="button"
-                      variant={monthlyYear === y ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => {
-                        setMonthlyYear(y);
-                        setMonthlyMonths(autoFillMonths(monthlyStatus, y));
-                      }}
-                      className="h-8 px-3"
-                    >
-                      {y}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              )}
-
-              {/* Status pills */}
-              <div>
-                <Label className="text-sm font-semibold mb-2 block">Status</Label>
+                <Label className="text-kicker uppercase text-muted-ink mb-2 block">Status</Label>
                 <div className="flex flex-wrap gap-2">
                   {([
                     { v: 'paid', l: 'Pago/Recebido' },
@@ -1423,10 +1389,34 @@ export function CashFlowReportModal({
                 </div>
               </div>
 
+              {monthlyFilterMode === 'months' && (
+              /* Year pills */
+              <div>
+                <Label className="text-kicker uppercase text-muted-ink mb-2 block">Ano</Label>
+                <div className="flex flex-wrap gap-2">
+                  {availableYears.map(y => (
+                    <Button
+                      key={y}
+                      type="button"
+                      variant={monthlyYear === y ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setMonthlyYear(y);
+                        setMonthlyMonths(autoFillMonths(monthlyStatus, y));
+                      }}
+                      className="h-8 px-3"
+                    >
+                      {y}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              )}
+
               {monthlyFilterMode === 'months' ? (
               /* Months pills */
               <div>
-                <Label className="text-sm font-semibold mb-2 block">Meses</Label>
+                <Label className="text-kicker uppercase text-muted-ink mb-2 block">Meses</Label>
                 <div className="flex flex-wrap gap-2">
                   {MONTHS_PT.map((label, idx) => (
                     <Button
@@ -1445,27 +1435,39 @@ export function CashFlowReportModal({
               ) : (
               /* Período personalizado */
               <div>
-                <Label className="text-sm font-semibold mb-2 block">Período</Label>
+                <Label className="text-kicker uppercase text-muted-ink mb-2 block">Período</Label>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Data Início</Label>
-                    <Input type="date" value={monthlyPeriodStart} onChange={e => setMonthlyPeriodStart(e.target.value)} min="1900-01-01" max="9999-12-31" />
+                    <Label className="text-ink-2">Data Início</Label>
+                    <DateField value={monthlyPeriodStart} onChange={setMonthlyPeriodStart} min="1900-01-01" max="9999-12-31" />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Data Fim</Label>
-                    <Input type="date" value={monthlyPeriodEnd} onChange={e => setMonthlyPeriodEnd(e.target.value)} min="1900-01-01" max="9999-12-31" />
+                    <Label className="text-ink-2">Data Fim</Label>
+                    <DateField value={monthlyPeriodEnd} onChange={setMonthlyPeriodEnd} min="1900-01-01" max="9999-12-31" />
                   </div>
                 </div>
                 {(!monthlyPeriodStart || !monthlyPeriodEnd) && (
-                  <p className="text-xs text-muted-foreground mt-1.5">Selecione as duas datas para gerar a consulta.</p>
+                  <p className="text-xs text-muted-ink mt-1.5">Selecione as duas datas para gerar a consulta.</p>
                 )}
               </div>
               )}
 
+              {/* Agrupar por: Evento Contábil ou Cliente/Fornecedor — ordem do Figma:
+                  vem antes do filtro pré-agregação (22/08/2026) */}
+              <div>
+                <Label className="text-kicker uppercase text-muted-ink mb-2 block">Agrupar por</Label>
+                <Tabs value={monthlyGroupBy} onValueChange={(v) => setMonthlyGroupBy(v as 'evento' | 'cliente')}>
+                  <TabsList className={cn(segmentedListClass, 'w-full h-11')}>
+                    <TabsTrigger value="evento" className={cn(segmentedTriggerClass, 'flex-1 h-9')}>Evento Contábil</TabsTrigger>
+                    <TabsTrigger value="cliente" className={cn(segmentedTriggerClass, 'flex-1 h-9')}>Cliente/Fornecedor</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
               {/* Filtro pré-agregação: dinâmico conforme o Agrupar por */}
               {monthlyGroupBy === 'evento' ? (
               <div>
-                <Label className="text-sm font-semibold mb-2 block">Evento Contábil</Label>
+                <Label className="text-kicker uppercase text-muted-ink mb-2 block">Evento Contábil</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-between font-normal">
@@ -1480,9 +1482,9 @@ export function CashFlowReportModal({
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <div className="p-2 border-b space-y-2">
+                    <div className="p-2 border-b border-line-2 space-y-2">
                       <div className="relative">
-                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-ink" />
                         <Input
                           value={monthlyCategorySearch}
                           onChange={(e) => setMonthlyCategorySearch(e.target.value)}
@@ -1493,7 +1495,7 @@ export function CashFlowReportModal({
                       <button
                         type="button"
                         onClick={() => setMonthlySelectedCategories(new Set())}
-                        className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                        className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-bg-2 text-left"
                       >
                         <Checkbox checked={monthlySelectedCategories.size === 0} />
                         <span>Todas as categorias</span>
@@ -1506,7 +1508,7 @@ export function CashFlowReportModal({
                           const q = norm(monthlyCategorySearch.trim());
                           const filtered = q ? subCategories.filter(c => norm(c.name).includes(q)) : subCategories;
                           if (filtered.length === 0) {
-                            return <div className="px-2 py-4 text-sm text-muted-foreground text-center">Nenhum evento encontrado</div>;
+                            return <div className="px-2 py-4 text-sm text-muted-ink text-center">Nenhum evento encontrado</div>;
                           }
                           return filtered.map(cat => {
                             const checked = monthlySelectedCategories.has(cat.id);
@@ -1521,7 +1523,7 @@ export function CashFlowReportModal({
                                     return next;
                                   });
                                 }}
-                                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-bg-2 text-left"
                               >
                                 <Checkbox checked={checked} />
                                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat.color || '#3B82F6' }} />
@@ -1537,7 +1539,7 @@ export function CashFlowReportModal({
               </div>
               ) : (
               <div>
-                <Label className="text-sm font-semibold mb-2 block">Cliente/Fornecedor</Label>
+                <Label className="text-kicker uppercase text-muted-ink mb-2 block">Cliente/Fornecedor</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-between font-normal">
@@ -1552,9 +1554,9 @@ export function CashFlowReportModal({
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <div className="p-2 border-b space-y-2">
+                    <div className="p-2 border-b border-line-2 space-y-2">
                       <div className="relative">
-                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-ink" />
                         <Input
                           value={monthlyContactSearch}
                           onChange={(e) => setMonthlyContactSearch(e.target.value)}
@@ -1565,7 +1567,7 @@ export function CashFlowReportModal({
                       <button
                         type="button"
                         onClick={() => setMonthlySelectedContacts(new Set())}
-                        className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                        className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-bg-2 text-left"
                       >
                         <Checkbox checked={monthlySelectedContacts.size === 0} />
                         <span>Todos os clientes/fornecedores</span>
@@ -1578,7 +1580,7 @@ export function CashFlowReportModal({
                           const q = norm(monthlyContactSearch.trim());
                           const filtered = q ? contacts.filter(c => norm(c.name).includes(q)) : contacts;
                           if (filtered.length === 0) {
-                            return <div className="px-2 py-4 text-sm text-muted-foreground text-center">Nenhum cliente/fornecedor encontrado</div>;
+                            return <div className="px-2 py-4 text-sm text-muted-ink text-center">Nenhum cliente/fornecedor encontrado</div>;
                           }
                           return filtered.map(ct => {
                             const checked = monthlySelectedContacts.has(ct.id);
@@ -1593,7 +1595,7 @@ export function CashFlowReportModal({
                                     return next;
                                   });
                                 }}
-                                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                                className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-bg-2 text-left"
                               >
                                 <Checkbox checked={checked} />
                                 <span className="truncate">{ct.name}</span>
@@ -1608,55 +1610,30 @@ export function CashFlowReportModal({
               </div>
               )}
 
-              {/* Agrupar por: Evento Contábil ou Cliente/Fornecedor */}
-              <div>
-                <Label className="text-sm font-semibold mb-2 block">Agrupar por</Label>
-                <ToggleGroup
-                  type="single"
-                  value={monthlyGroupBy}
-                  onValueChange={(v) => v && setMonthlyGroupBy(v as 'evento' | 'cliente')}
-                  className="bg-muted/50 rounded-md p-1 w-full"
-                >
-                  <ToggleGroupItem value="evento" className="flex-1 px-4 data-[state=on]:bg-background data-[state=on]:shadow-sm text-xs">
-                    Evento Contábil
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="cliente" className="flex-1 px-4 data-[state=on]:bg-background data-[state=on]:shadow-sm text-xs">
-                    Cliente/Fornecedor
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-
               {/* Version toggle */}
               <div>
-                <Label className="text-sm font-semibold mb-2 block">Versão do Relatório</Label>
-                <ToggleGroup
-                  type="single"
-                  value={monthlyVersion}
-                  onValueChange={(v) => v && setMonthlyVersion(v as 'resumida' | 'completa')}
-                  className="bg-muted/50 rounded-md p-1 w-full"
-                >
-                  <ToggleGroupItem value="resumida" className="flex-1 px-4 data-[state=on]:bg-background data-[state=on]:shadow-sm text-xs">
-                    Versão Resumida
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="completa" className="flex-1 px-4 data-[state=on]:bg-background data-[state=on]:shadow-sm text-xs">
-                    Versão Completa
-                  </ToggleGroupItem>
-                </ToggleGroup>
+                <Label className="text-kicker uppercase text-muted-ink mb-2 block">Versão do Relatório</Label>
+                <Tabs value={monthlyVersion} onValueChange={(v) => setMonthlyVersion(v as 'resumida' | 'completa')}>
+                  <TabsList className={cn(segmentedListClass, 'w-full h-11')}>
+                    <TabsTrigger value="resumida" className={cn(segmentedTriggerClass, 'flex-1 h-9')}>Versão Resumida</TabsTrigger>
+                    <TabsTrigger value="completa" className={cn(segmentedTriggerClass, 'flex-1 h-9')}>Versão Completa</TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
 
               {/* Preview summary */}
-              <div className="rounded-lg border bg-muted/30 p-3 text-xs space-y-1">
+              <div className="rounded-lg border border-line bg-bg-2 p-3 text-xs space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{monthlyGroupBy === 'cliente' ? 'Clientes/Fornecedores' : 'Eventos'} com valor:</span>
-                  <span className="font-semibold">{monthlyMatrix.events.length}</span>
+                  <span className="text-muted-ink">{monthlyGroupBy === 'cliente' ? 'Clientes/Fornecedores' : 'Eventos'} com valor:</span>
+                  <span className="font-semibold text-ink">{monthlyMatrix.events.length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">{monthlyFilterMode === 'period' ? 'Meses no período' : 'Meses selecionados'}:</span>
-                  <span className="font-semibold">{activeColumns.length}</span>
+                  <span className="text-muted-ink">{monthlyFilterMode === 'period' ? 'Meses no período' : 'Meses selecionados'}:</span>
+                  <span className="font-semibold text-ink">{activeColumns.length}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total geral:</span>
-                  <span className={cn('font-semibold', monthlyMatrix.grand >= 0 ? 'text-green-600' : 'text-red-600')}>
+                  <span className="text-muted-ink">Total geral:</span>
+                  <span className={cn('font-semibold', monthlyMatrix.grand >= 0 ? 'text-ok' : 'text-danger')}>
                     {formatCurrency(monthlyMatrix.grand)}
                   </span>
                 </div>
@@ -1664,28 +1641,27 @@ export function CashFlowReportModal({
             </div>
           )}
 
-          <Separator className="my-2" />
-
-          {/* Export buttons */}
+          {/* Export buttons — pills preenchidas sem ícone, igual ao Figma (22/08/2026):
+              a biblioteca de ícones do protótipo não cobre PDF/XLS/CSV/Imagem/Imprimir. */}
           <div>
-            <Label className="text-xs font-semibold mb-1.5 block">Exportar</Label>
+            <Label className="text-kicker uppercase text-muted-ink mb-2 block">Exportar</Label>
             <div className={cn('grid gap-2', mode === 'monthly' ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-5')}>
-              <Button variant="outline" className="flex items-center gap-1.5 h-8 text-xs no-print" onClick={handleExportPDF}>
-                <FileText className="w-3.5 h-3.5 text-red-500" /> PDF
+              <Button variant="secondary" className="h-9 text-xs border-transparent bg-bg-2 hover:bg-bg-3 no-print" onClick={handleExportPDF}>
+                PDF
               </Button>
-              <Button variant="outline" className="flex items-center gap-1.5 h-8 text-xs no-print" onClick={handleExportXLS}>
-                <Table2 className="w-3.5 h-3.5 text-green-600" /> XLS
+              <Button variant="secondary" className="h-9 text-xs border-transparent bg-bg-2 hover:bg-bg-3 no-print" onClick={handleExportXLS}>
+                XLS
               </Button>
-              <Button variant="outline" className="flex items-center gap-1.5 h-8 text-xs no-print" onClick={handleExportCSV}>
-                <Table2 className="w-3.5 h-3.5 text-green-600" /> CSV
+              <Button variant="secondary" className="h-9 text-xs border-transparent bg-bg-2 hover:bg-bg-3 no-print" onClick={handleExportCSV}>
+                CSV
               </Button>
               {mode === 'report' && (
                 <>
-                  <Button variant="outline" className="flex items-center gap-1.5 h-8 text-xs no-print" onClick={exportImage}>
-                    <Image className="w-3.5 h-3.5 text-purple-500" /> Imagem
+                  <Button variant="secondary" className="h-9 text-xs border-transparent bg-bg-2 hover:bg-bg-3 no-print" onClick={exportImage}>
+                    Imagem
                   </Button>
-                  <Button variant="outline" className="flex items-center gap-1.5 h-8 text-xs no-print" onClick={handlePrint}>
-                    <Printer className="w-3.5 h-3.5 text-muted-foreground" /> Imprimir
+                  <Button variant="secondary" className="h-9 text-xs border-transparent bg-bg-2 hover:bg-bg-3 no-print" onClick={handlePrint}>
+                    Imprimir
                   </Button>
                 </>
               )}
