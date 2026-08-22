@@ -30,7 +30,7 @@ function valueColor(value: number) {
 function SectionRow({ row }: { row: DRESectionRow }) {
   return (
     <>
-      <TableRow className="hover:bg-ok/10 bg-ok/5 font-semibold dre-section-row">
+      <TableRow className="bg-ok-soft hover:bg-ok-soft font-semibold dre-section-row">
         <TableCell className="pl-4">
           <div className="flex items-center gap-2">
             <span style={{ color: 'var(--dre-section-color)' }}>{row.macroName}</span>
@@ -68,26 +68,23 @@ function CalculatedRow({ row }: { row: DRECalculatedRow }) {
   const isLucro = row.key.startsWith('lucro');
   const isFinal = row.key === 'lucro_liquido' || row.key === 'fluxo_caixa';
 
+  const finalStyle = isFinal ? { backgroundColor: 'var(--dre-final-bg)', color: 'var(--dre-final-fg)' } : undefined;
+
   return (
-    <TableRow className={cn(
-      'font-bold',
-      isFinal
-        ? 'bg-primary text-primary-foreground hover:bg-primary'
-        : 'bg-muted/50 dark:bg-muted/30',
-    )}>
+    <TableRow
+      className={cn('font-bold', !isFinal && 'bg-muted/50 dark:bg-muted/30')}
+      style={finalStyle}
+    >
       <TableCell className="pl-4">
-        <span className={cn(
-          isFinal ? 'text-primary-foreground' : 'text-foreground',
-          'uppercase text-sm tracking-wide'
-        )}>
+        <span className={cn(!isFinal && 'text-foreground', 'uppercase text-sm tracking-wide')}>
           {row.label}
         </span>
       </TableCell>
-      <TableCell className={cn('text-right', isFinal && 'text-primary-foreground')}>{formatCurrency(row.previsto)}</TableCell>
-      <TableCell className={cn('text-right', isFinal && 'text-primary-foreground')}>{formatCurrency(row.realizado)}</TableCell>
-      <TableCell className={cn('text-right', isFinal ? 'text-primary-foreground' : valueColor(row.rxp))}>{formatCurrency(row.rxp)}</TableCell>
-      <TableCell className={cn('text-right', isFinal && 'text-primary-foreground')}>{formatPerc(row.percPrevisto)}</TableCell>
-      <TableCell className={cn('text-right', isFinal && 'text-primary-foreground')}>{formatPerc(row.percRealizado)}</TableCell>
+      <TableCell className="text-right">{formatCurrency(row.previsto)}</TableCell>
+      <TableCell className="text-right">{formatCurrency(row.realizado)}</TableCell>
+      <TableCell className={cn('text-right', !isFinal && valueColor(row.rxp))}>{formatCurrency(row.rxp)}</TableCell>
+      <TableCell className="text-right">{formatPerc(row.percPrevisto)}</TableCell>
+      <TableCell className="text-right">{formatPerc(row.percRealizado)}</TableCell>
     </TableRow>
   );
 }
@@ -155,7 +152,7 @@ export default function DRE() {
       />
 
       {/* DRE Table */}
-      <Card className="bg-card border-border/50">
+      <Card className="overflow-hidden bg-card border-border/50">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

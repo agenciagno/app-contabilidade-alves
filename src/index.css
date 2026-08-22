@@ -590,3 +590,12 @@ h1, h2 {
 .dark {
   --dre-section-color: #34D172;
 }
+
+/* Linhas finais do DRE (Lucro/Prejuízo Líquido, Saldo em Conta Corrente) — igual ao
+   --chart-anchor, é um azul fixo que NÃO inverte com o tema (Figma usa o mesmo tom nos
+   dois modos, achado 22/08/2026). Não usar --primary aqui: esse token inverte pra
+   quase-branco no escuro e apagava o texto branco fixo. */
+:root, .dark {
+  --dre-final-bg: #1d6fd8;
+  --dre-final-fg: #ffffff;
+}
