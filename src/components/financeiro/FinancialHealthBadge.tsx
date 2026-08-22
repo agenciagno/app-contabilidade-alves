@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { HeartPulse, ShieldCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertTriangle, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DsAlert } from '@/components/ds';
 import { useCashFlowForecast } from '@/hooks/useCashFlowForecast';
 import { useInadimplentContacts } from '@/hooks/useInadimplentContacts';
 import { useActiveCompany } from '@/contexts/CompanyContext';
@@ -11,9 +13,16 @@ const formatCurrency = (v: number) =>
 
 type Health = 'saudavel' | 'atencao' | 'critico';
 
-// Selo único de saúde financeira: combina tendência de caixa (item 1),
+interface FinancialHealthBadgeProps {
+  /** annualMetrics.lucroPrevisto — já calculado em Dashboard.tsx, sem query nova. */
+  lucroPrevisto: number;
+  /** summary.saldoBancario — idem. */
+  saldoBancario: number;
+}
+
+// Faixa de saúde financeira: combina tendência de caixa (item 1),
 // inadimplência de recebíveis e margem (receita - despesa realizada do mês).
-export function FinancialHealthBadge() {
+export function FinancialHealthBadge({ lucroPrevisto, saldoBancario }: FinancialHealthBadgeProps) {
   const { firstNegativeDate, lowestProjected, currentBalance, isLoading: cashLoading } = useCashFlowForecast(30);
   const { count: inadCount, totalAmount: inadTotal, isLoading: inadLoading } = useInadimplentContacts();
   const { activeCompanyId } = useActiveCompany();
@@ -82,37 +91,37 @@ export function FinancialHealthBadge() {
   const health: Health = redCount > 0 ? 'critico' : yellowCount > 0 ? 'atencao' : 'saudavel';
 
   const config = {
-    saudavel: { label: 'Saudável', Icon: ShieldCheck, cls: 'bg-ok/15 text-ok border-ok/30' },
-    atencao: { label: 'Atenção', Icon: AlertTriangle, cls: 'bg-warn/15 text-warn border-warn/30' },
-    critico: { label: 'Crítico', Icon: ShieldAlert, cls: 'bg-destructive/15 text-destructive border-destructive/30' },
+    saudavel: { label: 'Saudável', Icon: ShieldCheck, tone: 'ok' as const },
+    atencao: { label: 'Atenção', Icon: AlertTriangle, tone: 'warn' as const },
+    critico: { label: 'Crítico', Icon: ShieldAlert, tone: 'danger' as const },
   }[health];
 
   if (isLoading) {
     return (
-      <div className="inline-flex items-center gap-2 rounded-full border border-border/40 bg-muted/40 px-3 py-1.5 text-sm text-muted-foreground">
-        <HeartPulse className="h-4 w-4 animate-pulse" /> Avaliando saúde…
-      </div>
+      <div className="h-[68px] w-full animate-pulse rounded-md border border-line bg-bg-2" />
     );
   }
 
-  const { label, Icon, cls } = config;
+  const { label, Icon, tone } = config;
 
   return (
-    <TooltipProvider delayDuration={150}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold cursor-default ${cls}`}>
-            <HeartPulse className="h-4 w-4" />
-            Saúde financeira: {label}
-            <Icon className="h-4 w-4" />
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-xs">
-          <ul className="space-y-1 text-xs">
-            {reasons.map((r, i) => <li key={i}>• {r}</li>)}
-          </ul>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <DsAlert
+      tone={tone}
+      icon={<Icon />}
+      title={`Saúde financeira: ${label}`}
+      description={`Lucro previsto de ${formatCurrency(lucroPrevisto)} no mês · saldo bancário de ${formatCurrency(saldoBancario)} nos bancos visíveis.`}
+      action={
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="shrink-0">Ver detalhes</Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80">
+            <ul className="space-y-1.5 text-body-sm text-ink">
+              {reasons.map((r, i) => <li key={i}>• {r}</li>)}
+            </ul>
+          </PopoverContent>
+        </Popover>
+      }
+    />
   );
 }

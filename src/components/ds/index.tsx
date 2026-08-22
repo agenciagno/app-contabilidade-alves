@@ -249,22 +249,36 @@ export interface StatCardProps
     VariantProps<typeof statCard> {
   /** Índice ordinal exibido antes do rótulo — "01", "02"… */
   index?: string;
+  /** Ícone exibido no lugar do índice (Dashboard Financeiro, 21/08/2026) — não usar os dois juntos. */
+  icon?: React.ReactNode;
   label: string;
   value: React.ReactNode;
   hint?: React.ReactNode;
+  /** 0–100. Ausente esconde a barra. Mesmo desenho de `MetricaFaixa`. */
+  progresso?: number;
+  tom?: 'ok' | 'warn' | 'danger' | 'brand';
 }
 
-export function StatCard({ index, label, value, hint, emphasis, className, ...props }: StatCardProps) {
+export function StatCard({ index, icon, label, value, hint, progresso, tom, emphasis, className, ...props }: StatCardProps) {
   return (
     <div className={cn(statCard({ emphasis }), className)} {...props}>
-      <div className="flex items-center gap-[7px]">
+      <div className="flex items-center gap-[7px] [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:text-muted-ink-2">
         {index && <span className="text-kicker font-bold uppercase text-ink">{index}</span>}
+        {icon}
         <span className={cn('text-kicker uppercase', emphasis === 'warm' ? 'text-warn' : 'text-muted-ink')}>
           {label}
         </span>
       </div>
       <p className="text-metric-xl text-ink">{value}</p>
       {hint && <p className="text-meta text-muted-ink">{hint}</p>}
+      {progresso !== undefined && (
+        <div className="h-1 w-full overflow-hidden rounded-pill bg-bg-3">
+          <div
+            className={cn('h-full rounded-pill', barraTom[tom ?? 'brand'])}
+            style={{ width: `${Math.max(0, Math.min(100, progresso))}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -407,6 +421,7 @@ export function MetricaFaixa({ items, className }: { items: MetricaFaixaItem[]; 
 
 const alertTone = {
   info: 'border-brand bg-brand-tint text-brand',
+  ok: 'border-ok bg-ok-soft text-ok',
   warn: 'border-warn bg-warn-soft text-warn',
   danger: 'border-danger bg-danger-soft text-danger',
 } as const;

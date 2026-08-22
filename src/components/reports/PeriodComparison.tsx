@@ -1,5 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Minus, AlertCircle } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface PeriodData {
   receitas: number;
@@ -23,31 +24,50 @@ const calculateVariation = (current: number, previous: number) => {
 };
 
 const getVariationIcon = (variation: number, isExpense = false) => {
-  if (Math.abs(variation) < 0.1) return <Minus className="h-4 w-4 text-muted-foreground" />;
+  if (Math.abs(variation) < 0.1) return <Minus className="h-3.5 w-3.5 text-muted-ink" />;
   if (variation > 0) {
     return isExpense ? (
-      <TrendingUp className="h-4 w-4 text-danger" />
+      <TrendingUp className="h-3.5 w-3.5 text-danger" />
     ) : (
-      <TrendingUp className="h-4 w-4 text-ok" />
+      <TrendingUp className="h-3.5 w-3.5 text-ok" />
     );
   }
   return isExpense ? (
-    <TrendingDown className="h-4 w-4 text-ok" />
+    <TrendingDown className="h-3.5 w-3.5 text-ok" />
   ) : (
-    <TrendingDown className="h-4 w-4 text-danger" />
+    <TrendingDown className="h-3.5 w-3.5 text-danger" />
   );
 };
 
 const getVariationColor = (variation: number, isExpense = false) => {
-  if (Math.abs(variation) < 0.1) return 'text-muted-foreground';
+  if (Math.abs(variation) < 0.1) return 'text-muted-ink';
   if (variation > 0) {
     return isExpense ? 'text-danger' : 'text-ok';
   }
   return isExpense ? 'text-ok' : 'text-danger';
 };
 
-const hasData = (period: PeriodData) => 
+const hasData = (period: PeriodData) =>
   period.receitas > 0 || period.despesas > 0;
+
+// Linha label+valor de uma seção (Este Mês/Mês Anterior) — cai pra
+// "— sem lançamento" quando aquele período específico não tem dado
+// (mesmo critério de `hasData` já usado no resto do componente).
+function Row({ label, value, empty, tone }: { label: string; value: string; empty: boolean; tone?: 'ok' | 'danger' }) {
+  return (
+    <div>
+      <p className="text-meta text-muted-ink">{label}</p>
+      <p
+        className={cn(
+          'text-body font-semibold',
+          empty ? 'text-muted-ink-2' : tone === 'ok' ? 'text-ok' : tone === 'danger' ? 'text-danger' : 'text-ink',
+        )}
+      >
+        {empty ? '— sem lançamento' : value}
+      </p>
+    </div>
+  );
+}
 
 export function PeriodComparison({
   currentPeriod,
@@ -62,122 +82,53 @@ export function PeriodComparison({
   const hasPreviousData = hasData(previousPeriod);
   const hasCurrentData = hasData(currentPeriod);
 
+  const variations = [
+    { label: 'Receitas', variation: receitasVariation, isExpense: false },
+    { label: 'Despesas', variation: despesasVariation, isExpense: true },
+    { label: 'Saldo', variation: saldoVariation, isExpense: false },
+  ];
+
   return (
-    <Card className="bg-card border-border/50">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-primary" />
-          Comparativo de Períodos
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {!hasCurrentData && !hasPreviousData ? (
-          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-            <AlertCircle className="h-10 w-10 mb-3 opacity-50" />
-            <p className="text-sm font-medium">Sem dados para comparação</p>
-            <p className="text-xs">Adicione transações para ver o comparativo</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Current Period */}
-            <div className="p-4 rounded-lg bg-muted/50 border border-border/50">
-              <h4 className="text-sm font-medium text-muted-foreground mb-3">{currentLabel}</h4>
-              <div className="space-y-2">
-                <div>
-                  <span className="text-xs text-muted-foreground">Receitas</span>
-                  <p className="text-lg font-semibold text-ok">
-                    {formatCurrency(currentPeriod.receitas)}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground">Despesas</span>
-                  <p className="text-lg font-semibold text-danger">
-                    {formatCurrency(currentPeriod.despesas)}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground">Saldo</span>
-                  <p className={`text-lg font-semibold ${currentPeriod.saldo >= 0 ? 'text-primary' : 'text-warn'}`}>
-                    {formatCurrency(currentPeriod.saldo)}
-                  </p>
+    <Card className="flex h-full flex-col gap-5 p-5">
+      <h3 className="text-h4-card text-ink">Comparativo de Períodos</h3>
+
+      <div className="flex flex-col gap-3">
+        <p className="text-meta uppercase text-muted-ink-2">{currentLabel}</p>
+        <Row label="Receitas" value={formatCurrency(currentPeriod.receitas)} empty={!hasCurrentData} tone="ok" />
+        <Row label="Despesas" value={formatCurrency(currentPeriod.despesas)} empty={!hasCurrentData} tone="danger" />
+        <Row label="Saldo" value={formatCurrency(currentPeriod.saldo)} empty={!hasCurrentData} />
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <p className="text-meta uppercase text-muted-ink-2">{previousLabel}</p>
+        <Row label="Receitas" value={formatCurrency(previousPeriod.receitas)} empty={!hasPreviousData} tone="ok" />
+        <Row label="Despesas" value={formatCurrency(previousPeriod.despesas)} empty={!hasPreviousData} tone="danger" />
+        <Row label="Saldo" value={formatCurrency(previousPeriod.saldo)} empty={!hasPreviousData} />
+      </div>
+
+      {/* Variação: fundo recuado (--bg, o token de fundo de página usado como
+          "superfície recuada" dentro do card — mesmo padrão do Figma). */}
+      <div className="rounded-md bg-bg p-4">
+        <p className="mb-3 text-meta uppercase text-muted-ink-2">Variação</p>
+        {hasPreviousData ? (
+          <div className="grid grid-cols-3 gap-3">
+            {variations.map((v) => (
+              <div key={v.label}>
+                <p className="text-meta text-muted-ink">{v.label}</p>
+                <div className="mt-1 flex items-center gap-1">
+                  {getVariationIcon(v.variation, v.isExpense)}
+                  <span className={cn('text-body-sm font-semibold', getVariationColor(v.variation, v.isExpense))}>
+                    {v.variation >= 0 ? '+' : ''}
+                    {v.variation.toFixed(1)}%
+                  </span>
                 </div>
               </div>
-            </div>
-
-            {/* Previous Period */}
-            <div className="p-4 rounded-lg bg-muted/30 border border-border/30">
-              <h4 className="text-sm font-medium text-muted-foreground mb-3">{previousLabel}</h4>
-              {hasPreviousData ? (
-                <div className="space-y-2">
-                  <div>
-                    <span className="text-xs text-muted-foreground">Receitas</span>
-                    <p className="text-lg font-semibold text-ok/70">
-                      {formatCurrency(previousPeriod.receitas)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs text-muted-foreground">Despesas</span>
-                    <p className="text-lg font-semibold text-danger/70">
-                      {formatCurrency(previousPeriod.despesas)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs text-muted-foreground">Saldo</span>
-                    <p className={`text-lg font-semibold ${previousPeriod.saldo >= 0 ? 'text-primary/70' : 'text-warn/70'}`}>
-                      {formatCurrency(previousPeriod.saldo)}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full py-4 text-muted-foreground">
-                  <AlertCircle className="h-6 w-6 mb-2 opacity-50" />
-                  <p className="text-xs text-center">Sem dados no período anterior</p>
-                </div>
-              )}
-            </div>
-
-            {/* Variations */}
-            <div className="p-4 rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 md:col-span-2">
-              <h4 className="text-sm font-medium text-muted-foreground mb-3">Variação</h4>
-              {hasPreviousData ? (
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <span className="text-xs text-muted-foreground block mb-1">Receitas</span>
-                    <div className="flex items-center justify-center gap-1">
-                      {getVariationIcon(receitasVariation)}
-                      <span className={`text-lg font-bold ${getVariationColor(receitasVariation)}`}>
-                        {receitasVariation >= 0 ? '+' : ''}{receitasVariation.toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <span className="text-xs text-muted-foreground block mb-1">Despesas</span>
-                    <div className="flex items-center justify-center gap-1">
-                      {getVariationIcon(despesasVariation, true)}
-                      <span className={`text-lg font-bold ${getVariationColor(despesasVariation, true)}`}>
-                        {despesasVariation >= 0 ? '+' : ''}{despesasVariation.toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <span className="text-xs text-muted-foreground block mb-1">Saldo</span>
-                    <div className="flex items-center justify-center gap-1">
-                      {getVariationIcon(saldoVariation)}
-                      <span className={`text-lg font-bold ${getVariationColor(saldoVariation)}`}>
-                        {saldoVariation >= 0 ? '+' : ''}{saldoVariation.toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                  Variação disponível quando houver dados no período anterior
-                </div>
-              )}
-            </div>
+            ))}
           </div>
+        ) : (
+          <p className="text-meta text-muted-ink">Variação disponível quando houver dados no período anterior.</p>
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 }

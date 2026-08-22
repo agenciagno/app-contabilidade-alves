@@ -2,25 +2,17 @@ import { useMemo, useState } from 'react';
 import {
   TrendingUp,
   TrendingDown,
-  FileText,
-  Download,
-  FileSpreadsheet,
+  Landmark,
+  BarChart3,
   SlidersHorizontal,
   ChevronUp,
   ChevronDown,
-  Landmark,
-  BarChart3,
-  CalendarCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { HeaderCalendar } from '@/components/layout/HeaderCalendar';
-import { HeaderCalculator } from '@/components/layout/HeaderCalculator';
-import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDashboardSummary, useAnnualMetrics, useMonthlyEvolution, useCategoryBreakdown } from '@/hooks/useRpcDashboard';
 import { useBanks } from '@/hooks/useBanks';
 import { useActiveCompany } from '@/contexts/CompanyContext';
@@ -31,22 +23,15 @@ import {
   ChartTooltip,
 } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, ResponsiveContainer, Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
-import { format, parseISO, startOfMonth, endOfMonth, subMonths, isWithinInterval } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useNavigate } from 'react-router-dom';
-import { DashboardWidgetsConfig, useDashboardWidgets } from '@/components/dashboard/DashboardWidgets';
+import { useDashboardWidgets } from '@/components/dashboard/DashboardWidgets';
 import { UnifiedFilterBox, PeriodFilter, getDateRangeFromPeriod } from '@/components/filters/UnifiedFilterBox';
-import { exportToCSV, exportToPDF, useReportData, processReportData } from '@/hooks/useReportData';
+import { useReportData, processReportData } from '@/hooks/useReportData';
 import { PeriodComparison } from '@/components/reports/PeriodComparison';
 import { BudgetTracker } from '@/components/financeiro/BudgetTracker';
 import { FinancialHealthBadge } from '@/components/financeiro/FinancialHealthBadge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { PageHeader, MetricaFaixa } from '@/components/ds';
+import { StatCard } from '@/components/ds';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -55,19 +40,46 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
+// Paleta categórica dos donuts (21/08/2026) — antes eram cores HSL soltas
+// sem token. --chart-anchor é o único token novo (ver src/index.css); os
+// outros 4 passos já vinham da família --action, segura nos dois modos.
 const CHART_COLORS = [
-  'hsl(142.1 76.2% 36.3%)',
-  'hsl(221.2 83.2% 53.3%)',
-  'hsl(262.1 83.3% 57.8%)',
-  'hsl(24.6 95% 53.1%)',
-  'hsl(346.8 77.2% 49.8%)',
+  'var(--chart-anchor)',
+  'var(--action-hover)',
+  'var(--action)',
+  'var(--action-soft)',
+  'var(--muted-ink)',
 ];
 
+interface ChartDatum {
+  name: string;
+  value: number;
+  color: string;
+}
+
+// Legenda lateral dos donuts (dot + nome + %) — o Figma tirou o rótulo de
+// dentro da fatia e colocou como lista ao lado.
+function ChartLegend({ data }: { data: ChartDatum[] }) {
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+  return (
+    <ul className="min-w-0 flex-1 space-y-2.5">
+      {data.map((d) => (
+        <li key={d.name} className="flex items-center justify-between gap-3 text-body-sm">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: d.color }} />
+            <span className="truncate text-ink">{d.name}</span>
+          </span>
+          <span className="shrink-0 text-muted-ink">{total > 0 ? Math.round((d.value / total) * 100) : 0}%</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function Dashboard() {
-  const navigate = useNavigate();
   const now = new Date();
 
-  const { widgets, toggleWidget, isWidgetEnabled } = useDashboardWidgets();
+  const { isWidgetEnabled } = useDashboardWidgets();
 
   // Filter states - Default to 'all' (limpo)
   const [period, setPeriod] = useState<PeriodFilter>('all');
@@ -206,7 +218,7 @@ export default function Dashboard() {
   }, [monthlyRpc]);
 
   // Category chart data (expenses) — colors looked up from categories list
-  const categoryChartData = useMemo(() => {
+  const categoryChartData = useMemo<ChartDatum[]>(() => {
     const rows = categoryRpc ?? [];
     return rows.map((r, idx) => {
       const cat = r.category_id ? categories.find(c => c.id === r.category_id) : null;
@@ -220,7 +232,7 @@ export default function Dashboard() {
 
 
   // Revenue category chart data (via RPC)
-  const revenueCategoryChartData = useMemo(() => {
+  const revenueCategoryChartData = useMemo<ChartDatum[]>(() => {
     const rows = revenueCategoryRpc ?? [];
     return rows.map((r, idx) => {
       const cat = r.category_id ? categories.find(c => c.id === r.category_id) : null;
@@ -249,134 +261,14 @@ export default function Dashboard() {
 
   const isLoading = loadingBanks || loadingSummary || loadingAnnual || loadingMonthly || loadingCategory;
 
-  // Lazy fetch for exports — only runs when user clicks export
-  const fetchExportData = async () => {
-    let query = supabase
-      .from('transactions')
-      .select('*, category:categories(id, name, color), bank:banks(id, name, color), contact:contacts(id, name, type)')
-      .eq('company_id', activeCompanyId!)
-      .is('deleted_at', null)
-      .eq('is_transfer', false)
-      .order('date', { ascending: false });
-
-    if (selectedBankId !== 'all') query = query.eq('bank_id', selectedBankId);
-    if (categoryFilter !== 'all') query = query.eq('category_id', categoryFilter);
-    if (contactFilter !== 'all') query = query.eq('contact_id', contactFilter);
-    if (paymentStatusFilter === 'paid') query = query.eq('is_paid', true);
-    if (paymentStatusFilter === 'pending') query = query.eq('is_paid', false);
-
-    const { data, error } = await query;
-    if (error || !data) {
-      toast.error('Erro ao carregar dados para exportação');
-      return [] as any[];
-    }
-
-    // Date filter (COALESCE date/due_date/issue_date) — applied client-side after fetch
-    const dateRange = getDateRange();
-    const filtered = dateRange
-      ? data.filter((t: any) => {
-          const d = t.date || t.due_date || t.issue_date;
-          if (!d) return false;
-          const txDate = parseISO(d);
-          return isWithinInterval(txDate, { start: dateRange.start, end: dateRange.end });
-        })
-      : data;
-
-    return filtered.map((t: any) => ({
-      id: t.id,
-      description: t.description,
-      amount: Number(t.amount),
-      type: t.type,
-      date: t.date,
-      is_paid: t.is_paid,
-      category: t.category ? { id: t.category.id, name: t.category.name, color: t.category.color || '' } : null,
-      bank: t.bank ? { id: t.bank.id, name: t.bank.name, color: t.bank.color || '' } : null,
-      contact: t.contact ? { id: t.contact.id, name: t.contact.name, type: t.contact.type } : null,
-    }));
-  };
-
-  // Export handlers
-  const handleExportCSV = async () => {
-    const reportData = await fetchExportData();
-    if (reportData.length === 0) {
-      toast.error('Nenhuma transação para exportar');
-      return;
-    }
-    exportToCSV(reportData);
-  };
-
-  const handleExportPDF = async () => {
-    const reportData = await fetchExportData();
-    if (reportData.length === 0) {
-      toast.error('Nenhuma transação para exportar');
-      return;
-    }
-    const totals = {
-      receitas: Number((dashboardSummary as any)?.total_receitas ?? 0),
-      despesas: Number((dashboardSummary as any)?.total_despesas ?? 0),
-    };
-    const dateRange = getDateRange();
-    exportToPDF(reportData, totals, dateRange?.start, dateRange?.end);
-  };
-
-  // Period label for display
-  const periodLabel = useMemo(() => {
-    const dateRange = getDateRange();
-    if (dateRange) {
-      return `${format(dateRange.start, "dd/MM/yyyy")} - ${format(dateRange.end, "dd/MM/yyyy")}`;
-    }
-    return 'Visão Geral';
-  }, [period, customStartDate, customEndDate]);
-
   return (
     <div className="space-y-7">
       {/* Header */}
-      <div className="flex items-center justify-between py-4 flex-wrap gap-4">
+      <div className="flex items-start justify-between gap-4 py-4 flex-wrap">
         <div className="min-w-0">
           <p className="text-kicker uppercase text-muted-ink-2">~/financeiro · {annualMetrics.year}</p>
           <h1 className="mt-1 text-display text-ink">Dashboard.</h1>
-          <p className="mt-1 text-body text-muted-ink">Visão geral do escritório · {periodLabel}</p>
-          <div className="mt-2">
-            <FinancialHealthBadge />
-          </div>
         </div>
-        <div className="flex gap-2">
-          {/*
-            Calendário e calculadora saíram do header global (decisão 05) e vivem
-            aqui: o calendário lê lançamentos por dia, então o lugar dele é junto
-            dos números do Financeiro.
-          */}
-          <HeaderCalendar />
-          <HeaderCalculator />
-          <DashboardWidgetsConfig widgets={widgets} onToggle={toggleWidget} />
-          {/* Export Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Download className="w-4 h-4" />
-                Exportar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleExportCSV} className="gap-2">
-                <FileSpreadsheet className="w-4 h-4" />
-                Exportar CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportPDF} className="gap-2">
-                <FileText className="w-4 h-4" />
-                Exportar PDF
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="outline" size="sm" onClick={() => navigate('/relatorios')}>
-            <FileText className="w-4 h-4 mr-2" />
-            Relatórios
-          </Button>
-        </div>
-      </div>
-
-      {/* Collapsible Filters */}
-      <div className="flex items-center justify-end">
         <Button variant="outline" className="gap-2 relative" onClick={() => setFiltersOpen((v) => !v)}>
           <SlidersHorizontal className="w-4 h-4" />
           Filtros Avançados
@@ -416,215 +308,174 @@ export default function Dashboard() {
         </CollapsibleContent>
       </Collapsible>
 
-      {/*
-        Faixa de indicadores da R4: os quatro números dividem UM card, separados
-        por hairline, com barra de proporção embaixo. Antes eram 3 cards soltos
-        e "Lucro realizado" só aparecia lá embaixo, na faixa anual.
-      */}
-      <MetricaFaixa
-        items={[
-          {
-            label: 'Receitas recebidas',
-            icon: <TrendingUp />,
-            valor: formatCurrency(summary.receitasPagas),
-            hint: `a receber: ${formatCurrency(summary.aReceber)}`,
-            progresso: summary.receitasPagas + summary.aReceber > 0
-              ? (summary.receitasPagas / (summary.receitasPagas + summary.aReceber)) * 100
-              : 0,
-            tom: 'ok',
-          },
-          {
-            label: 'Contas pagas',
-            icon: <TrendingDown />,
-            valor: formatCurrency(summary.despesasPagas),
-            hint: `a pagar: ${formatCurrency(summary.aPagar)}`,
-            progresso: summary.despesasPagas + summary.aPagar > 0
-              ? (summary.despesasPagas / (summary.despesasPagas + summary.aPagar)) * 100
-              : 0,
-            tom: 'danger',
-          },
-          {
-            label: 'Saldo bancário',
-            icon: <Landmark />,
-            valor: formatCurrency(summary.saldoBancario),
-            hint: 'total dos bancos visíveis',
-          },
-          {
-            label: 'Lucro realizado',
-            icon: <BarChart3 />,
-            valor: formatCurrency(annualMetrics.lucroRealizado),
-            hint: `previsto: ${formatCurrency(annualMetrics.lucroPrevisto)}`,
-            tom: annualMetrics.lucroRealizado >= 0 ? 'ok' : 'danger',
-          },
-        ]}
-      />
+      <FinancialHealthBadge lucroPrevisto={annualMetrics.lucroPrevisto} saldoBancario={summary.saldoBancario} />
 
-      {/* Annual Ticker Cards - 4 columns */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        <Card className="shadow-[inset_3px_0_0_0_theme(colors.emerald.500)]">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1.5">
-              <BarChart3 className="w-3.5 h-3.5 text-ok shrink-0" />
-              <p className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground font-medium">Lucro Previsto — {annualMetrics.year}</p>
-            </div>
-            <p className={`text-lg font-bold ${annualMetrics.lucroPrevisto >= 0 ? 'text-ok' : 'text-destructive'}`}>
-              {formatCurrency(annualMetrics.lucroPrevisto)}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-1">Receitas − Despesas (ano)</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-[inset_3px_0_0_0_theme(colors.amber.500)]">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1.5">
-              <CalendarCheck className="w-3.5 h-3.5 text-warn shrink-0" />
-              <p className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground font-medium">Lucro Realizado — {annualMetrics.year}</p>
-            </div>
-            <p className={`text-lg font-bold ${annualMetrics.lucroRealizado >= 0 ? 'text-ok' : 'text-destructive'}`}>
-              {formatCurrency(annualMetrics.lucroRealizado)}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-1">Realizado no ano corrente</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-[inset_3px_0_0_0_theme(colors.emerald.600)]">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1.5">
-              <TrendingUp className="w-3.5 h-3.5 text-ok shrink-0" />
-              <p className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground font-medium">Receitas Acumuladas — {annualMetrics.year}</p>
-            </div>
-            <p className="text-lg font-bold text-ok">
-              {formatCurrency(annualMetrics.receitasAcumuladas)}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-1">Receitas já realizadas</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-[inset_3px_0_0_0_hsl(var(--destructive))]">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-1.5">
-              <TrendingDown className="w-3.5 h-3.5 text-destructive shrink-0" />
-              <p className="text-[11px] uppercase tracking-[0.05em] text-muted-foreground font-medium">Despesas Acumuladas — {annualMetrics.year}</p>
-            </div>
-            <p className="text-lg font-bold text-destructive">
-              {formatCurrency(annualMetrics.despesasAcumuladas)}
-            </p>
-            <p className="text-[11px] text-muted-foreground mt-1">Despesas já realizadas</p>
-          </CardContent>
-        </Card>
+      {/* 4 StatCards separados, cada um com barra de progresso (Figma 21/08/2026) */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          icon={<TrendingUp />}
+          label="Receitas recebidas"
+          value={formatCurrency(summary.receitasPagas)}
+          hint={`a receber: ${formatCurrency(summary.aReceber)}`}
+          progresso={summary.receitasPagas + summary.aReceber > 0
+            ? (summary.receitasPagas / (summary.receitasPagas + summary.aReceber)) * 100
+            : 0}
+          tom="ok"
+        />
+        <StatCard
+          icon={<TrendingDown />}
+          label="Contas pagas"
+          value={formatCurrency(summary.despesasPagas)}
+          hint={`a pagar: ${formatCurrency(summary.aPagar)}`}
+          progresso={summary.despesasPagas + summary.aPagar > 0
+            ? (summary.despesasPagas / (summary.despesasPagas + summary.aPagar)) * 100
+            : 0}
+          tom="danger"
+        />
+        <StatCard
+          icon={<Landmark />}
+          label="Saldo bancário"
+          value={formatCurrency(summary.saldoBancario)}
+          hint="total dos bancos visíveis"
+        />
+        <StatCard
+          icon={<BarChart3 />}
+          label="Lucro realizado"
+          value={formatCurrency(annualMetrics.lucroRealizado)}
+          hint={`previsto: ${formatCurrency(annualMetrics.lucroPrevisto)}`}
+          tom={annualMetrics.lucroRealizado >= 0 ? 'ok' : 'danger'}
+        />
       </div>
 
+      {/* Evolução Mensal + Comparativo de Períodos lado a lado (Figma 21/08/2026) */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+        {isWidgetEnabled('evolution') && (
+          <Card className="border-border/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Evolução Mensal</CardTitle>
+            </CardHeader>
+            <CardContent className="h-80">
+              {isLoading ? (
+                <Skeleton className="h-full w-full" />
+              ) : monthlyEvolution.some(d => d.receitas > 0 || d.despesas > 0) ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={monthlyEvolution} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorReceitas" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(142.1 76.2% 36.3%)" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(142.1 76.2% 36.3%)" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorDespesas" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(0 84.2% 60.2%)" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(0 84.2% 60.2%)" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis
+                      dataKey="month"
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                    />
+                    <YAxis
+                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                      tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                    />
+                    <ChartTooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="receitas"
+                      stroke="hsl(142.1 76.2% 36.3%)"
+                      fillOpacity={1}
+                      fill="url(#colorReceitas)"
+                      name="Receitas"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="despesas"
+                      stroke="hsl(0 84.2% 60.2%)"
+                      fillOpacity={1}
+                      fill="url(#colorDespesas)"
+                      name="Despesas"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  Sem dados para exibir
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Monthly Evolution - Full Width & Larger */}
-      {isWidgetEnabled('evolution') && (
-        <Card className="border-border/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Evolução Mensal</CardTitle>
-          </CardHeader>
-          <CardContent className="h-80">
-            {isLoading ? (
-              <Skeleton className="h-full w-full" />
-            ) : monthlyEvolution.some(d => d.receitas > 0 || d.despesas > 0) ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyEvolution} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorReceitas" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(142.1 76.2% 36.3%)" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(142.1 76.2% 36.3%)" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorDespesas" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(0 84.2% 60.2%)" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(0 84.2% 60.2%)" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="month" 
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                  />
-                  <YAxis 
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                  />
-                  <ChartTooltip 
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="receitas" 
-                    stroke="hsl(142.1 76.2% 36.3%)" 
-                    fillOpacity={1} 
-                    fill="url(#colorReceitas)" 
-                    name="Receitas"
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="despesas" 
-                    stroke="hsl(0 84.2% 60.2%)" 
-                    fillOpacity={1} 
-                    fill="url(#colorDespesas)" 
-                    name="Despesas"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                Sem dados para exibir
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+        {isWidgetEnabled('periodComparison') && (
+          <PeriodComparison
+            currentPeriod={{
+              receitas: thisMonthData.totals.receitas,
+              despesas: thisMonthData.totals.despesas,
+              saldo: thisMonthData.totals.receitas - thisMonthData.totals.despesas,
+            }}
+            previousPeriod={{
+              receitas: lastMonthData.totals.receitas,
+              despesas: lastMonthData.totals.despesas,
+              saldo: lastMonthData.totals.receitas - lastMonthData.totals.despesas,
+            }}
+          />
+        )}
+      </div>
 
-      {/* Category Charts Row */}
+      {/* Category Charts Row — donut + legenda lateral (dot + nome + %) */}
       {(isWidgetEnabled('revenueCategoryChart') || isWidgetEnabled('categoryChart')) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Revenue Category Pie Chart */}
           {isWidgetEnabled('revenueCategoryChart') && (
             <Card className="border-border/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Receitas por Evento Contábil</CardTitle>
               </CardHeader>
-              <CardContent className="h-64">
+              <CardContent>
                 {isLoading ? (
-                  <Skeleton className="h-full w-full" />
+                  <Skeleton className="h-52 w-full" />
                 ) : revenueCategoryChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={revenueCategoryChartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {revenueCategoryChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip 
-                        formatter={(value: number) => formatCurrency(value)}
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="flex flex-col items-center gap-6 sm:flex-row">
+                    <div className="h-40 w-40 shrink-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={revenueCategoryChartData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={2}
+                            dataKey="value"
+                          >
+                            {revenueCategoryChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <ChartTooltip
+                            formatter={(value: number) => formatCurrency(value)}
+                            contentStyle={{
+                              backgroundColor: 'hsl(var(--card))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px',
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <ChartLegend data={revenueCategoryChartData} />
+                  </div>
                 ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <div className="flex items-center justify-center h-52 text-muted-foreground">
                     Sem receitas categorizadas
                   </div>
                 )}
@@ -632,45 +483,47 @@ export default function Dashboard() {
             </Card>
           )}
 
-          {/* Expense Category Pie Chart */}
           {isWidgetEnabled('categoryChart') && (
             <Card className="border-border/30">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Despesas por Evento Contábil</CardTitle>
               </CardHeader>
-              <CardContent className="h-64">
+              <CardContent>
                 {isLoading ? (
-                  <Skeleton className="h-full w-full" />
+                  <Skeleton className="h-52 w-full" />
                 ) : categoryChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categoryChartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {categoryChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip 
-                        formatter={(value: number) => formatCurrency(value)}
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="flex flex-col items-center gap-6 sm:flex-row">
+                    <div className="h-40 w-40 shrink-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={categoryChartData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={2}
+                            dataKey="value"
+                          >
+                            {categoryChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <ChartTooltip
+                            formatter={(value: number) => formatCurrency(value)}
+                            contentStyle={{
+                              backgroundColor: 'hsl(var(--card))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px',
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <ChartLegend data={categoryChartData} />
+                  </div>
                 ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <div className="flex items-center justify-center h-52 text-muted-foreground">
                     Sem despesas categorizadas
                   </div>
                 )}
@@ -678,22 +531,6 @@ export default function Dashboard() {
             </Card>
           )}
         </div>
-      )}
-
-      {/* Period Comparison */}
-      {isWidgetEnabled('periodComparison') && (
-        <PeriodComparison
-          currentPeriod={{
-            receitas: thisMonthData.totals.receitas,
-            despesas: thisMonthData.totals.despesas,
-            saldo: thisMonthData.totals.receitas - thisMonthData.totals.despesas,
-          }}
-          previousPeriod={{
-            receitas: lastMonthData.totals.receitas,
-            despesas: lastMonthData.totals.despesas,
-            saldo: lastMonthData.totals.receitas - lastMonthData.totals.despesas,
-          }}
-        />
       )}
 
       {/* Orçamento por categoria (meta x realizado) */}

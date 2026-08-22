@@ -30,9 +30,11 @@
     --space-12: 48px;
     --space-20: 80px;
 
-    /* surface/* — cinza-azul derivado do navy (10/08/2026), não zinc puro */
+    /* surface/* — cinza-azul derivado do navy (10/08/2026), não zinc puro.
+       --bg trocado pra cinza quente #F7F7F5 em 19/08/2026 (pedido Gabriel,
+       aplicado primeiro no Figma) — só o modo claro, o escuro não muda. */
     --paper: #ffffff;
-    --bg: #f4f6f8;
+    --bg: #f7f7f5;
     --bg-2: #edf0f4;
     --bg-3: #e2e7ee;
 
@@ -75,6 +77,14 @@
     --action-tint: #eaf2fd;
     --action-soft: #c9ddf8;
     --on-action: #ffffff;
+
+    /* Âncora da paleta de gráfico categórico (donuts do Dashboard Financeiro,
+       19/08/2026). Não é --brand-ink: aquele é um token de TEXTO que inverte
+       de propósito (escuro no claro, claro no escuro) — usado como cor de
+       fatia, isso quebrava a paleta no escuro (a fatia âncora virava a mais
+       clara). --chart-anchor fixa o valor final já corrigido no Figma: navy
+       estável nos dois modos, sem religar em token de texto. */
+    --chart-anchor: #1a2c3e;
 
     /* status/* */
     --ok: #1a9f63;
@@ -237,6 +247,10 @@
     --action-tint: #16273d;
     --action-soft: #1e3a5f;
     --on-action: #0a1522;
+
+    /* Ver comentário no :root — mesmo valor final já corrigido no Figma
+       (era brand-ink, texto que inverte; virou um tom estável de âncora). */
+    --chart-anchor: #16273d;
 
     --ok: #1a9f63;
     --warn: #d97706;

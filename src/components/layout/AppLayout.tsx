@@ -149,7 +149,15 @@ export function AppLayout({ children }: AppLayoutProps) {
         <AppHeader />
         <div className="flex flex-1 min-h-0 w-full md:overflow-hidden">
           <AppSidebar />
-          <SidebarInset className="flex-1 min-w-0 md:h-full md:overflow-y-auto md:overflow-x-hidden">
+          {/*
+            md:min-h-0 anula o `min-h-svh` que o SidebarInset traz de fábrica
+            (shadcn, pensado pra shell de 1 fileira só). Sem isso o container
+            nunca fica mais baixo que a viewport inteira, estoura o flex pai
+            (que é `overflow-hidden` no desktop) e o excesso é cortado em vez
+            de rolado — é a causa do último card aparecer cortado no rodapé
+            em toda tela do sistema (achado 21/08/2026).
+          */}
+          <SidebarInset className="flex-1 min-w-0 md:h-full md:min-h-0 md:overflow-y-auto md:overflow-x-hidden">
             <DevEnvironmentBanner />
             <ViewAsClientBanner />
             {/* pb extra no mobile: a bottom nav é fixa e cobriria o fim da página */}
