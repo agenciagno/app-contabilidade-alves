@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DateField } from '@/components/ds';
 import { Transaction, TransactionInsert } from '@/hooks/useTransactions';
 import { Category, useCategories, CategoryInsert } from '@/hooks/useCategories';
 import { Bank, useBanks, BankInsert } from '@/hooks/useBanks';
@@ -28,7 +27,7 @@ import { BankFormDialog } from '@/components/banks/BankFormDialog';
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
 import { PartyFormDialog } from '@/components/parties/PartyFormDialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TrendingUp, TrendingDown, User, Plus, AlertTriangle, CalendarIcon, Repeat, History } from 'lucide-react';
+import { TrendingUp, TrendingDown, User, Plus, AlertTriangle, Repeat, History } from 'lucide-react';
 import { addBusinessDays } from '@/lib/business-days';
 import { isValidDateString } from '@/lib/utils';
 import { generateInstallments, calculateSummary } from '@/hooks/useInstallments';
@@ -499,19 +498,19 @@ export function TransactionFormDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-         <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto bg-[rgba(22,22,26,0.85)] backdrop-blur-[24px] border-white/[0.08] rounded-2xl p-5">
-          <DialogHeader className="pb-1">
-            <DialogTitle className="text-base">{dialogTitle}</DialogTitle>
+         <DialogContent className="sm:max-w-[720px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{dialogTitle}</DialogTitle>
           </DialogHeader>
-          <form ref={formRef} onSubmit={handleSubmit} className="space-y-3">
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
             {/* Type Toggle */}
             <Tabs value={type} onValueChange={(v) => !structuralDisabled && setType(v as 'receita' | 'despesa')}>
-              <TabsList className={`w-full h-9 ${structuralDisabled ? 'opacity-60 pointer-events-none' : ''}`}>
-                <TabsTrigger value="receita" className="flex-1 gap-1.5 text-xs h-7" disabled={structuralDisabled}>
-                  <TrendingUp className="w-3.5 h-3.5" /> Receita
+              <TabsList className={`w-full h-10 ${structuralDisabled ? 'opacity-60 pointer-events-none' : ''}`}>
+                <TabsTrigger value="receita" className="flex-1 gap-1.5 h-8" disabled={structuralDisabled}>
+                  <TrendingUp className="w-4 h-4" /> Receita
                 </TabsTrigger>
-                <TabsTrigger value="despesa" className="flex-1 gap-1.5 text-xs h-7" disabled={structuralDisabled}>
-                  <TrendingDown className="w-3.5 h-3.5" /> Despesa
+                <TabsTrigger value="despesa" className="flex-1 gap-1.5 h-8" disabled={structuralDisabled}>
+                  <TrendingDown className="w-4 h-4" /> Despesa
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -519,45 +518,45 @@ export function TransactionFormDialog({
             {/* Payment Condition Toggle — only for new transactions */}
             {!isEditing && !isSettleMode && (
               <Tabs value={paymentCondition} onValueChange={handlePaymentConditionChange}>
-                <TabsList className="w-full h-8">
-                  <TabsTrigger value="a_vista" className="flex-1 text-xs h-6">À Vista</TabsTrigger>
-                  <TabsTrigger value="a_prazo" className="flex-1 text-xs h-6">À Prazo</TabsTrigger>
+                <TabsList className="w-full h-10">
+                  <TabsTrigger value="a_vista" className="flex-1 h-8">À Vista</TabsTrigger>
+                  <TabsTrigger value="a_prazo" className="flex-1 h-8">À Prazo</TabsTrigger>
                 </TabsList>
               </Tabs>
             )}
 
             {/* Row 1: Cliente | Valor | Valor Recebido/Pago */}
-            <div className={`grid grid-cols-1 ${isAPrazo ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-2`}>
+            <div className={`grid grid-cols-1 ${isAPrazo ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-3`}>
               <div className="space-y-1.5">
-                <Label className="text-xs">Cliente/Fornecedor <span className="text-destructive">*</span></Label>
+                <Label className="text-muted-ink">Cliente/Fornecedor <span className="text-destructive">*</span></Label>
                 {isInternalCompany ? (
                   <Select value={contactId} onValueChange={handleContactChange} disabled={structuralDisabled}>
-                    <SelectTrigger className={`h-8 text-xs ${structuralDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                    <SelectTrigger className={structuralDisabled ? 'opacity-60 cursor-not-allowed' : ''}>
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__new__" className="text-primary font-medium text-xs">
-                        <div className="flex items-center gap-1"><Plus className="w-3 h-3" /> Novo</div>
+                      <SelectItem value="__new__" className="text-primary font-medium">
+                        <div className="flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Novo</div>
                       </SelectItem>
                       {filteredContacts.map(c => (
-                        <SelectItem key={c.id} value={c.id} className="text-xs">
-                          <div className="flex items-center gap-1"><User className="w-3 h-3 text-muted-foreground" />{c.name}</div>
+                        <SelectItem key={c.id} value={c.id}>
+                          <div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-muted-foreground" />{c.name}</div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 ) : (
                   <Select value={partyId} onValueChange={handlePartyChange} disabled={structuralDisabled}>
-                    <SelectTrigger className={`h-8 text-xs ${structuralDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                    <SelectTrigger className={structuralDisabled ? 'opacity-60 cursor-not-allowed' : ''}>
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__new__" className="text-primary font-medium text-xs">
-                        <div className="flex items-center gap-1"><Plus className="w-3 h-3" /> Novo</div>
+                      <SelectItem value="__new__" className="text-primary font-medium">
+                        <div className="flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Novo</div>
                       </SelectItem>
                       {activeParties.map(p => (
-                        <SelectItem key={p.id} value={p.id} className="text-xs">
-                          <div className="flex items-center gap-1"><User className="w-3 h-3 text-muted-foreground" />{p.nome}</div>
+                        <SelectItem key={p.id} value={p.id}>
+                          <div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-muted-foreground" />{p.nome}</div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -565,59 +564,59 @@ export function TransactionFormDialog({
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Valor (R$) {!isAVista && <span className="text-destructive">*</span>}</Label>
-                <Input value={amount} onChange={handleAmountChange} placeholder="0,00" className="h-8 text-sm font-semibold" disabled={isSettleMode} />
+                <Label className="text-muted-ink">Valor (R$) {!isAVista && <span className="text-destructive">*</span>}</Label>
+                <Input value={amount} onChange={handleAmountChange} placeholder="0,00" className="font-semibold" disabled={isSettleMode} />
               </div>
               {!isAPrazo && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs">
+                  <Label className="text-muted-ink">
                     {type === 'receita' ? 'Valor Recebido' : 'Valor Pago'}
                     {(isSettleMode || isAVista) && <span className="text-destructive"> *</span>}
                   </Label>
-                  <Input value={paidAmount} onChange={handlePaidAmountChange} placeholder="0,00" className="h-8 text-sm" disabled={isEditing && !isSettleMode} />
+                  <Input value={paidAmount} onChange={handlePaidAmountChange} placeholder="0,00" disabled={isEditing && !isSettleMode} />
                 </div>
               )}
             </div>
 
             {/* Row 2: Evento Contábil | Conta/Banco */}
-<div className="grid grid-cols-2 gap-2">
+<div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Evento Contábil <span className="text-destructive">*</span></Label>
+                <Label className="text-muted-ink">Evento Contábil <span className="text-destructive">*</span></Label>
                 <Select value={categoryId} onValueChange={handleCategoryChange} disabled={structuralDisabled}>
-                  <SelectTrigger className={`h-8 text-xs ${structuralDisabled ? 'opacity-60 cursor-not-allowed' : !categoryId ? 'border-muted-foreground/30' : ''}`}>
+                  <SelectTrigger className={structuralDisabled ? 'opacity-60 cursor-not-allowed' : !categoryId ? 'border-muted-foreground/30' : ''}>
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__new__" className="text-primary font-medium text-xs">
-                      <div className="flex items-center gap-1"><Plus className="w-3 h-3" /> Novo</div>
+                    <SelectItem value="__new__" className="text-primary font-medium">
+                      <div className="flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Novo</div>
                     </SelectItem>
                     {filteredCategories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.id} className="text-xs">{cat.name}</SelectItem>
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {categoryWasSuggested && categoryId === suggestedCategoryId && (
-                  <p className="text-[10px] text-muted-foreground leading-tight">
+                  <p className="text-[11px] text-muted-foreground leading-tight">
                     Sugerido pelo histórico desta contraparte — você pode alterar.
                   </p>
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">
+                <Label className="text-muted-ink">
                   Conta/Banco
                   {(isSettleMode || isAVista) && <span className="text-destructive"> *</span>}
                 </Label>
                 <Select value={bankId} onValueChange={handleBankChange}>
-                  <SelectTrigger className={`h-8 text-xs ${!bankId ? 'border-muted-foreground/30' : ''}`}>
+                  <SelectTrigger className={!bankId ? 'border-muted-foreground/30' : ''}>
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__new__" className="text-primary font-medium text-xs">
-                      <div className="flex items-center gap-1"><Plus className="w-3 h-3" /> Novo</div>
+                    <SelectItem value="__new__" className="text-primary font-medium">
+                      <div className="flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Novo</div>
                     </SelectItem>
                     {activeBanks.map(bank => (
-                      <SelectItem key={bank.id} value={bank.id} className="text-xs">
-                        <div className="flex items-center gap-1">
+                      <SelectItem key={bank.id} value={bank.id}>
+                        <div className="flex items-center gap-1.5">
                           <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: bank.color }} />
                           {bank.name}
                         </div>
@@ -629,43 +628,41 @@ export function TransactionFormDialog({
             </div>
 
             {/* Row 3: Datas — Linha 1: Emissão | Vencimento */}
-<div className="grid grid-cols-2 gap-2">
+<div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Emissão <span className="text-destructive">*</span></Label>
-                <Input type="date" value={issueDate} onChange={e => setIssueDate(e.target.value)} className="h-8 text-xs" disabled={isSettleMode} min="1900-01-01" max="9999-12-31" />
+                <Label className="text-muted-ink">Emissão <span className="text-destructive">*</span></Label>
+                <DateField value={issueDate} onChange={setIssueDate} disabled={isSettleMode} min="1900-01-01" max="9999-12-31" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Vencimento {(!isAVista || isRecurring) && <span className="text-destructive">*</span>}</Label>
-                <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="h-8 text-xs" disabled={isSettleMode} min="1900-01-01" max="9999-12-31" />
+                <Label className="text-muted-ink">Vencimento {(!isAVista || isRecurring) && <span className="text-destructive">*</span>}</Label>
+                <DateField value={dueDate} onChange={setDueDate} disabled={isSettleMode} min="1900-01-01" max="9999-12-31" />
               </div>
             </div>
 
             {/* Row 4: Datas — Linha 2: Prevista | Pagamento */}
-<div className="grid grid-cols-2 gap-2">
+<div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Prevista {!isAVista && <span className="text-destructive">*</span>}</Label>
-                <Input
-                  type="date"
+                <Label className="text-muted-ink">Prevista {!isAVista && <span className="text-destructive">*</span>}</Label>
+                <DateField
                   value={isAVista ? '' : expectedDate}
-                  onChange={e => setExpectedDate(e.target.value)}
-                  className="h-8 text-xs"
+                  onChange={setExpectedDate}
                   disabled={isSettleMode || isAVista}
                   min="1900-01-01"
                   max="9999-12-31"
                 />
                 {isAVista && (
-                  <p className="text-[10px] text-muted-foreground leading-tight">
+                  <p className="text-[11px] text-muted-foreground leading-tight">
                     Transações À Vista não compõem o Previsto da DRE — apenas o Realizado.
                   </p>
                 )}
               </div>
               {!isAPrazo && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs">
+                  <Label className="text-muted-ink">
                     Pagamento
                     {(isSettleMode || isAVista) && <span className="text-destructive"> *</span>}
                   </Label>
-                  <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-8 text-xs" disabled={isEditing && !isSettleMode} min="1900-01-01" max="9999-12-31" />
+                  <DateField value={date} onChange={setDate} disabled={isEditing && !isSettleMode} min="1900-01-01" max="9999-12-31" />
                 </div>
               )}
             </div>
@@ -731,30 +728,13 @@ export function TransactionFormDialog({
                           Data Final
                         </Label>
                         {endMode === 'data_final' && (
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "h-7 text-xs w-40 justify-start font-normal",
-                                  !endDate && "text-muted-foreground"
-                                )}
-                              >
-                                <CalendarIcon className="w-3 h-3 mr-1" />
-                                {endDate ? format(endDate, 'dd/MM/yyyy') : 'Selecione...'}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={endDate}
-                                onSelect={setEndDate}
-                                disabled={(d) => endDateMinDate ? d < endDateMinDate : false}
-                                initialFocus
-                                className={cn("p-3 pointer-events-auto")}
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <div className="w-40">
+                            <DateField
+                              value={endDate ? format(endDate, 'yyyy-MM-dd') : ''}
+                              onChange={(iso) => setEndDate(iso ? new Date(`${iso}T00:00:00`) : undefined)}
+                              min={endDateMinDate ? format(endDateMinDate, 'yyyy-MM-dd') : undefined}
+                            />
+                          </div>
                         )}
                       </div>
                     </RadioGroup>
@@ -827,30 +807,27 @@ export function TransactionFormDialog({
               </div>
             )}
 
-            {/* Row 5: Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-1">
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)} className="h-8 text-xs px-4">
-                  Cancelar
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              {isSettleMode ? (
+                <Button type="submit" disabled={isSaving || !isFormValid} className="px-6">
+                  {isSaving ? 'Salvando...' : 'Liquidar'}
                 </Button>
-                {isSettleMode ? (
-                  <Button type="submit" size="sm" disabled={isSaving || !isFormValid} className="h-8 text-xs px-6">
-                    {isSaving ? 'Salvando...' : 'Liquidar'}
+              ) : (
+                <>
+                  <Button type="button" variant="secondary" disabled={isSaving || !isFormValid}
+                    onClick={() => { saveActionRef.current = 'continue'; formRef.current?.requestSubmit(); }}>
+                    {isSaving ? 'Salvando...' : 'Salvar'}
                   </Button>
-                ) : (
-                  <>
-                    <Button type="button" size="sm" variant="secondary" disabled={isSaving || !isFormValid} className="h-8 text-xs px-4"
-                      onClick={() => { saveActionRef.current = 'continue'; formRef.current?.requestSubmit(); }}>
-                      {isSaving ? 'Salvando...' : 'Salvar'}
-                    </Button>
-                    <Button type="button" size="sm" disabled={isSaving || !isFormValid} className="h-8 text-xs px-4"
-                      onClick={() => { saveActionRef.current = 'close'; formRef.current?.requestSubmit(); }}>
-                      {isSaving ? 'Salvando...' : 'Salvar e Fechar'}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
+                  <Button type="button" disabled={isSaving || !isFormValid}
+                    onClick={() => { saveActionRef.current = 'close'; formRef.current?.requestSubmit(); }}>
+                    {isSaving ? 'Salvando...' : 'Salvar e Fechar'}
+                  </Button>
+                </>
+              )}
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
