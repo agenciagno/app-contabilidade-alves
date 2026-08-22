@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import {
-  Loader2, AlertTriangle, CheckCircle2, XCircle, Zap, ChevronLeft, CalendarIcon,
+  Loader2, AlertTriangle, CheckCircle2, XCircle, Zap, ChevronLeft,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -12,9 +12,7 @@ import { Input } from '@/components/ui/input';
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarPicker } from '@/components/ui/calendar';
-import { cn } from '@/lib/utils';
+import { DateField } from '@/components/ds';
 import type { PreviewItem, PreviewResponse } from '@/hooks/useBoletoControls';
 
 type Step = 'loading' | 'pick' | 'form' | 'result';
@@ -105,7 +103,7 @@ export function IndividualBoletoDialog({
       <DialogContent className="max-w-lg flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-primary" />
+            <Zap className="h-5 w-5 text-action" />
             Boleto avulso
           </DialogTitle>
           {step === 'pick' && (
@@ -117,7 +115,7 @@ export function IndividualBoletoDialog({
 
         {/* LOADING */}
         {step === 'loading' && (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-ink">
             <Loader2 className="h-8 w-8 animate-spin" />
             <span>Carregando clientes…</span>
           </div>
@@ -126,13 +124,13 @@ export function IndividualBoletoDialog({
         {/* PICK */}
         {step === 'pick' && (
           loadError ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-2 text-destructive">
+            <div className="flex flex-col items-center justify-center py-12 gap-2 text-danger">
               <AlertTriangle className="h-8 w-8" />
               <span className="font-medium">Não foi possível carregar</span>
-              <span className="text-sm text-muted-foreground">{loadError}</span>
+              <span className="text-sm text-muted-ink">{loadError}</span>
             </div>
           ) : (
-            <Command className="border rounded-md">
+            <Command className="border border-line rounded-lg">
               <CommandInput placeholder="Nome ou CPF/CNPJ..." />
               <CommandList className="max-h-[50vh]">
                 <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
@@ -145,11 +143,11 @@ export function IndividualBoletoDialog({
                       className="flex items-center gap-2"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="font-medium truncate">{i.name}</div>
-                        <div className="text-xs text-muted-foreground">{i.document || 'sem documento'}</div>
+                        <div className="font-medium truncate text-ink">{i.name}</div>
+                        <div className="text-xs text-muted-ink">{i.document || 'sem documento'}</div>
                       </div>
                       {i.missing_fields.length > 0 && (
-                        <Badge className="shrink-0 bg-destructive/15 text-destructive border-destructive/30">
+                        <Badge variant="destructive" className="shrink-0">
                           Dados incompletos
                         </Badge>
                       )}
@@ -167,18 +165,18 @@ export function IndividualBoletoDialog({
             <button
               type="button"
               onClick={() => setStep('pick')}
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+              className="text-xs text-muted-ink hover:text-ink flex items-center gap-1"
             >
               <ChevronLeft className="h-3.5 w-3.5" /> Trocar cliente
             </button>
 
-            <div className="rounded-md border p-3 bg-muted/30">
-              <p className="font-medium">{selectedItem.name}</p>
-              <p className="text-xs text-muted-foreground">{selectedItem.document || 'sem documento'}</p>
+            <div className="rounded-md bg-bg-2 p-3">
+              <p className="font-medium text-ink">{selectedItem.name}</p>
+              <p className="text-xs text-muted-ink">{selectedItem.document || 'sem documento'}</p>
             </div>
 
             {selectedItem.missing_fields.length > 0 ? (
-              <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md p-3">
+              <div className="flex items-start gap-2 text-sm text-danger bg-danger-soft border border-danger rounded-md p-3">
                 <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                 <span>
                   Dados incompletos no cadastro: {selectedItem.missing_fields.join(', ')}. Complete o cadastro do
@@ -188,7 +186,7 @@ export function IndividualBoletoDialog({
             ) : (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Valor</label>
+                  <label className="text-sm font-medium text-ink-2">Valor</label>
                   <Input
                     type="number" inputMode="decimal" step="0.01" min="0.01"
                     value={valor}
@@ -197,32 +195,17 @@ export function IndividualBoletoDialog({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Vencimento</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn('w-full justify-start font-normal gap-2', !vencimento && 'text-muted-foreground')}
-                      >
-                        <CalendarIcon className="h-4 w-4" />
-                        {vencimento ? format(vencimento, 'dd/MM/yyyy') : 'Selecione'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarPicker
-                        mode="single"
-                        selected={vencimento ?? undefined}
-                        onSelect={(d) => setVencimento(d ?? null)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <label className="text-sm font-medium text-ink-2">Vencimento</label>
+                  <DateField
+                    value={vencimento ? format(vencimento, 'yyyy-MM-dd') : ''}
+                    onChange={(iso) => setVencimento(iso ? new Date(`${iso}T00:00:00`) : null)}
+                  />
                 </div>
               </div>
             )}
 
             {valor && Number(valor.replace(',', '.')) > 0 && (
-              <p className="text-xs text-muted-foreground">Valor do boleto: {fmtBRL(Number(valor.replace(',', '.')))}</p>
+              <p className="text-xs text-muted-ink">Valor do boleto: {fmtBRL(Number(valor.replace(',', '.')))}</p>
             )}
 
             <DialogFooter>
@@ -240,15 +223,15 @@ export function IndividualBoletoDialog({
           <>
             {error ? (
               <div className="flex flex-col items-center py-8 gap-2 text-center">
-                <XCircle className="h-8 w-8 text-destructive" />
-                <p className="font-medium">Não foi possível gerar</p>
-                <p className="text-sm text-muted-foreground">{error}</p>
+                <XCircle className="h-8 w-8 text-danger" />
+                <p className="font-medium text-ink">Não foi possível gerar</p>
+                <p className="text-sm text-muted-ink">{error}</p>
               </div>
             ) : (
               <div className="flex flex-col items-center py-8 gap-2 text-center">
                 <CheckCircle2 className="h-8 w-8 text-success" />
-                <p className="font-medium">Boleto gerado</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="font-medium text-ink">Boleto gerado</p>
+                <p className="text-sm text-muted-ink">
                   {result?.name}{result?.nossoNumero ? ` · nosso número ${result.nossoNumero}` : ''}
                 </p>
               </div>
