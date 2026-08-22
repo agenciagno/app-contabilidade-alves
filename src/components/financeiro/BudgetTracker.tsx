@@ -21,7 +21,7 @@ export function BudgetTracker() {
   const [addOpen, setAddOpen] = useState(false);
 
   return (
-    <Card className="border-border/30">
+    <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">

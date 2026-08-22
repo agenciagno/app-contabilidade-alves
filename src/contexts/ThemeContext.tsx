@@ -16,14 +16,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (stored === 'light' || stored === 'dark' || stored === 'system') {
       return stored;
     }
-    return 'dark';
+    // Padrão pra todo usuário novo (sem preferência salva ainda) é claro,
+    // não a preferência do sistema (decisão Gabriel, 21/08/2026).
+    return 'light';
   });
 
   const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window !== 'undefined') {
       return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
-    return 'dark';
+    return 'light';
   });
 
   const resolvedTheme = theme === 'system' ? systemTheme : theme;

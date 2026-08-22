@@ -217,32 +217,28 @@ export default function Dashboard() {
     });
   }, [monthlyRpc]);
 
-  // Category chart data (expenses) — colors looked up from categories list
+  // Category chart data (expenses) — paleta sempre tokenizada por posição,
+  // igual ao Figma (21/08/2026: cor customizada da categoria descontinuada
+  // aqui, era ela que fazia a tela destoar do protótipo).
   const categoryChartData = useMemo<ChartDatum[]>(() => {
     const rows = categoryRpc ?? [];
-    return rows.map((r, idx) => {
-      const cat = r.category_id ? categories.find(c => c.id === r.category_id) : null;
-      return {
-        name: r.category_name || 'Sem categoria',
-        value: Number(r.total) || 0,
-        color: cat?.color || CHART_COLORS[idx % CHART_COLORS.length],
-      };
-    });
-  }, [categoryRpc, categories]);
+    return rows.map((r, idx) => ({
+      name: r.category_name || 'Sem categoria',
+      value: Number(r.total) || 0,
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+    }));
+  }, [categoryRpc]);
 
 
   // Revenue category chart data (via RPC)
   const revenueCategoryChartData = useMemo<ChartDatum[]>(() => {
     const rows = revenueCategoryRpc ?? [];
-    return rows.map((r, idx) => {
-      const cat = r.category_id ? categories.find(c => c.id === r.category_id) : null;
-      return {
-        name: r.category_name || 'Sem categoria',
-        value: Number(r.total) || 0,
-        color: cat?.color || CHART_COLORS[idx % CHART_COLORS.length],
-      };
-    });
-  }, [revenueCategoryRpc, categories]);
+    return rows.map((r, idx) => ({
+      name: r.category_name || 'Sem categoria',
+      value: Number(r.total) || 0,
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+    }));
+  }, [revenueCategoryRpc]);
 
   // Period comparison data
   const thisMonthStart = startOfMonth(now);
@@ -263,52 +259,57 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-7">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 py-4 flex-wrap">
-        <div className="min-w-0">
-          <p className="text-kicker uppercase text-muted-ink-2">~/financeiro · {annualMetrics.year}</p>
-          <h1 className="mt-1 text-display text-ink">Dashboard.</h1>
+      {/* Header + filtros + banner: gap local de space-y-6 (24px, um degrau
+          abaixo do space-y-7 do resto da página) — pedido do Gabriel pra
+          aproximar o título do card de saúde financeira (21/08/2026). */}
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 py-4 flex-wrap">
+          <div className="min-w-0">
+            <p className="text-kicker uppercase text-muted-ink-2">~/financeiro · {annualMetrics.year}</p>
+            <h1 className="mt-1 text-display text-ink">Dashboard.</h1>
+          </div>
+          <Button variant="outline" className="gap-2 relative" onClick={() => setFiltersOpen((v) => !v)}>
+            <SlidersHorizontal className="w-4 h-4" />
+            Filtros Avançados
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                {activeFilterCount}
+              </span>
+            )}
+            {filtersOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </Button>
         </div>
-        <Button variant="outline" className="gap-2 relative" onClick={() => setFiltersOpen((v) => !v)}>
-          <SlidersHorizontal className="w-4 h-4" />
-          Filtros Avançados
-          {activeFilterCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
-              {activeFilterCount}
-            </span>
-          )}
-          {filtersOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-        </Button>
+
+        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <CollapsibleContent>
+            <UnifiedFilterBox
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              period={period}
+              onPeriodChange={setPeriod}
+              customStartDate={customStartDate}
+              customEndDate={customEndDate}
+              onCustomStartDateChange={setCustomStartDate}
+              onCustomEndDateChange={setCustomEndDate}
+              bankId={selectedBankId}
+              onBankChange={setSelectedBankId}
+              banks={banks}
+              categoryId={categoryFilter}
+              onCategoryChange={setCategoryFilter}
+              categories={categories}
+              paymentStatus={paymentStatusFilter}
+              onPaymentStatusChange={setPaymentStatusFilter}
+              contactId={contactFilter}
+              onContactChange={setContactFilter}
+              contacts={contacts}
+              onClearFilters={handleClearFilters}
+            />
+          </CollapsibleContent>
+        </Collapsible>
+
+        <FinancialHealthBadge lucroPrevisto={annualMetrics.lucroPrevisto} saldoBancario={summary.saldoBancario} />
       </div>
-
-      <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-        <CollapsibleContent>
-          <UnifiedFilterBox
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            period={period}
-            onPeriodChange={setPeriod}
-            customStartDate={customStartDate}
-            customEndDate={customEndDate}
-            onCustomStartDateChange={setCustomStartDate}
-            onCustomEndDateChange={setCustomEndDate}
-            bankId={selectedBankId}
-            onBankChange={setSelectedBankId}
-            banks={banks}
-            categoryId={categoryFilter}
-            onCategoryChange={setCategoryFilter}
-            categories={categories}
-            paymentStatus={paymentStatusFilter}
-            onPaymentStatusChange={setPaymentStatusFilter}
-            contactId={contactFilter}
-            onContactChange={setContactFilter}
-            contacts={contacts}
-            onClearFilters={handleClearFilters}
-          />
-        </CollapsibleContent>
-      </Collapsible>
-
-      <FinancialHealthBadge lucroPrevisto={annualMetrics.lucroPrevisto} saldoBancario={summary.saldoBancario} />
 
       {/* 4 StatCards separados, cada um com barra de progresso (Figma 21/08/2026) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -350,7 +351,7 @@ export default function Dashboard() {
       {/* Evolução Mensal + Comparativo de Períodos lado a lado (Figma 21/08/2026) */}
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
         {isWidgetEnabled('evolution') && (
-          <Card className="border-border/30">
+          <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Evolução Mensal</CardTitle>
             </CardHeader>
@@ -436,7 +437,7 @@ export default function Dashboard() {
       {(isWidgetEnabled('revenueCategoryChart') || isWidgetEnabled('categoryChart')) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {isWidgetEnabled('revenueCategoryChart') && (
-            <Card className="border-border/30">
+            <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Receitas por Evento Contábil</CardTitle>
               </CardHeader>
@@ -484,7 +485,7 @@ export default function Dashboard() {
           )}
 
           {isWidgetEnabled('categoryChart') && (
-            <Card className="border-border/30">
+            <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Despesas por Evento Contábil</CardTitle>
               </CardHeader>

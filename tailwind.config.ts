@@ -23,7 +23,9 @@ export default {
       fontSize: {
         // Ramp SC/* do Figma — [tamanho, { lineHeight, letterSpacing }]
         'display':    ['36px',   { lineHeight: '37.8px', letterSpacing: '-1.26px', fontWeight: '500' }],
-        'metric-xl':  ['30px',   { lineHeight: '33px',   letterSpacing: '-0.9px',  fontWeight: '500' }],
+        // Bold (não Medium) desde 21/08/2026 — pedido direto do Gabriel pra
+        // todo número de indicador (StatCard/MetricaFaixa), virou padrão.
+        'metric-xl':  ['30px',   { lineHeight: '33px',   letterSpacing: '-0.9px',  fontWeight: '700' }],
         'h2-hero':    ['25px',   { lineHeight: '28.75px',letterSpacing: '-0.5px',  fontWeight: '700' }],
         'h3-section': ['20px',   { lineHeight: '30px',   letterSpacing: '-0.4px',  fontWeight: '500' }],
         'h4-card':    ['16px',   { lineHeight: '24px',   letterSpacing: '-0.24px', fontWeight: '600' }],
