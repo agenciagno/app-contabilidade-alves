@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Plus, Search, Users } from 'lucide-react';
+import { Plus, Search, Users, LayoutGrid, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   Table,
   TableBody,
@@ -14,10 +15,12 @@ import {
 } from '@/components/ui/table';
 import { useParties, type Party, type PartyInput, type PartyTipo } from '@/hooks/useParties';
 import { PartyFormDialog } from '@/components/parties/PartyFormDialog';
+import { PartyCard } from '@/components/parties/PartyCard';
 import { PageHeader, DsBadge, IconBox } from '@/components/ds';
 
 type TipoFilter = 'todos' | PartyTipo;
 type AtivoFilter = 'todos' | 'ativo' | 'inativo';
+type ViewMode = 'card' | 'list';
 
 const tipoLabel: Record<PartyTipo, string> = {
   cliente: 'Cliente',
@@ -44,6 +47,7 @@ export default function PartiesPage() {
   const [ativoFilter, setAtivoFilter] = useState<AtivoFilter>('todos');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Party | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   const filtered = useMemo(() => {
     const list = parties ?? [];
@@ -86,7 +90,7 @@ export default function PartiesPage() {
         subtitle={`Contrapartes usadas nos lançamentos · ${parties?.length ?? 0} cadastradas.`}
         actions={
           <Button onClick={openNew} className="gap-2">
-            <Plus className="h-4 w-4" /> Nova contraparte
+            <Plus className="h-4 w-4" /> Novo contato
           </Button>
         }
       />
@@ -124,78 +128,111 @@ export default function PartiesPage() {
             <SelectItem value="inativo">Inativos</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Toggle Lista/Cards — mesmo padrão de Contacts.tsx (23/08/2026). */}
+        <ToggleGroup
+          type="single"
+          value={viewMode}
+          onValueChange={(v) => v && setViewMode(v as ViewMode)}
+          className="ml-auto gap-0.5 rounded-md border border-line bg-bg-2 p-1"
+        >
+          <ToggleGroupItem value="card" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Visualização em cards">
+            <LayoutGrid className="h-[15px] w-[15px]" strokeWidth={1.75} />
+          </ToggleGroupItem>
+          <ToggleGroupItem value="list" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Visualização em lista">
+            <List className="h-[15px] w-[15px]" strokeWidth={1.75} />
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
-      <div className="rounded-lg border border-line bg-paper">
-        {isLoading ? (
-          <div className="p-6 space-y-3">
+      {isLoading ? (
+        viewMode === 'card' ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-[190px] w-full rounded-lg" />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-line bg-paper p-6 space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-10 w-full" />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 p-12 text-center">
-            <IconBox tone="neutral" icon={<Users strokeWidth={1.75} />} />
-            <div>
-              <p className="text-ui-strong text-ink">Nenhum registro encontrado</p>
-              <p className="text-meta text-muted-ink">
-                {parties?.length ? 'Ajuste os filtros ou crie um novo.' : 'Cadastre seu primeiro cliente ou fornecedor.'}
-              </p>
-            </div>
-            <Button onClick={openNew} variant="outline" className="gap-2">
-              <Plus className="h-4 w-4" /> Nova contraparte
-            </Button>
+        )
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-line bg-paper p-12 text-center">
+          <IconBox tone="neutral" icon={<Users strokeWidth={1.75} />} />
+          <div>
+            <p className="text-ui-strong text-ink">Nenhum registro encontrado</p>
+            <p className="text-meta text-muted-ink">
+              {parties?.length ? 'Ajuste os filtros ou crie um novo.' : 'Cadastre seu primeiro cliente ou fornecedor.'}
+            </p>
           </div>
-        ) : (
-          <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Documento</TableHead>
-                  <TableHead>Contato</TableHead>
-                  <TableHead className="w-[120px]">Ativo</TableHead>
-                  <TableHead className="w-[80px] text-right">Ações</TableHead>
+          <Button onClick={openNew} variant="outline" className="gap-2">
+            <Plus className="h-4 w-4" /> Novo contato
+          </Button>
+        </div>
+      ) : viewMode === 'card' ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((p) => (
+            <PartyCard
+              key={p.id}
+              party={p}
+              subtitle={partySubtitle(p)}
+              onEdit={() => openEdit(p)}
+              onToggleActive={() => toggleActive.mutate({ id: p.id, is_active: !p.is_active })}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-line bg-paper">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Documento</TableHead>
+                <TableHead>Contato</TableHead>
+                <TableHead className="w-[120px]">Ativo</TableHead>
+                <TableHead className="w-[80px] text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell>
+                    <p className="font-medium text-ink">{p.display_name || p.nome}</p>
+                    <p className="text-meta text-muted-ink">{partySubtitle(p)}</p>
+                  </TableCell>
+                  <TableCell className="text-ink">{tipoLabel[p.tipo]}</TableCell>
+                  <TableCell className="font-mono text-mono-sm text-muted-ink">{p.documento || '—'}</TableCell>
+                  <TableCell className="text-ink">{p.email || p.telefone || '—'}</TableCell>
+                  <TableCell>
+                    <button
+                      type="button"
+                      onClick={() => toggleActive.mutate({ id: p.id, is_active: !p.is_active })}
+                      title={p.is_active ? 'Clique para desativar' : 'Clique para ativar'}
+                      className="cursor-pointer"
+                    >
+                      <DsBadge tone={p.is_active ? 'ok' : 'neutral'}>
+                        {p.is_active ? 'ativo' : 'inativo'}
+                      </DsBadge>
+                    </button>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>
+                      Editar
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <p className="font-medium text-ink">{p.display_name || p.nome}</p>
-                      <p className="text-meta text-muted-ink">{partySubtitle(p)}</p>
-                    </TableCell>
-                    <TableCell className="text-ink">{tipoLabel[p.tipo]}</TableCell>
-                    <TableCell className="font-mono text-mono-sm text-muted-ink">{p.documento || '—'}</TableCell>
-                    <TableCell className="text-ink">{p.email || p.telefone || '—'}</TableCell>
-                    <TableCell>
-                      <button
-                        type="button"
-                        onClick={() => toggleActive.mutate({ id: p.id, is_active: !p.is_active })}
-                        title={p.is_active ? 'Clique para desativar' : 'Clique para ativar'}
-                        className="cursor-pointer"
-                      >
-                        <DsBadge tone={p.is_active ? 'ok' : 'neutral'}>
-                          {p.is_active ? 'ativo' : 'inativo'}
-                        </DsBadge>
-                      </button>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>
-                        Editar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <div className="border-t border-line px-5 py-3 text-meta text-muted-ink">
-              {filtered.length} de {parties?.length ?? 0} contrapartes
-            </div>
-          </>
-        )}
-      </div>
+              ))}
+            </TableBody>
+          </Table>
+          <div className="border-t border-line px-5 py-3 text-meta text-muted-ink">
+            {filtered.length} de {parties?.length ?? 0} contrapartes
+          </div>
+        </div>
+      )}
 
       <PartyFormDialog
         open={dialogOpen}
