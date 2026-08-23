@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useFinancialGoals } from '@/hooks/useFinancialGoals';
 import { useBudgets } from '@/hooks/useBudgets';
-import { segmentedListClass, segmentedTriggerClass } from '@/components/ds';
+import { segmentedListClass, segmentedTriggerClass, DateField } from '@/components/ds';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -118,21 +118,17 @@ export function AddGoalOrBudgetDialog({ open, onOpenChange, monthYear }: Props) 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Data de início *</Label>
-                  <Input
-                    type="date"
+                  <DateField
                     value={goalForm.startDate}
-                    onChange={(e) => setGoalForm((f) => ({ ...f, startDate: e.target.value }))}
-                    required
+                    onChange={(v) => setGoalForm((f) => ({ ...f, startDate: v }))}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Data final *</Label>
-                  <Input
-                    type="date"
+                  <DateField
                     value={goalForm.endDate}
-                    onChange={(e) => setGoalForm((f) => ({ ...f, endDate: e.target.value }))}
+                    onChange={(v) => setGoalForm((f) => ({ ...f, endDate: v }))}
                     min={goalForm.startDate || undefined}
-                    required
                   />
                 </div>
               </div>

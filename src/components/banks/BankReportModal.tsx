@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { FileText, Table2, Download, Image, ChevronDown, Search, X } from 'lucide-react';
+import { DateField } from '@/components/ds';
 import { Bank } from '@/hooks/useBanks';
 import { useCategories } from '@/hooks/useCategories';
 import { useContacts } from '@/hooks/useContacts';
@@ -596,11 +597,11 @@ ${transactions}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Data Início</Label>
-                <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} min="1900-01-01" max="9999-12-31" />
+                <DateField value={startDate} onChange={setStartDate} min="1900-01-01" max="9999-12-31" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Data Fim</Label>
-                <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} min="1900-01-01" max="9999-12-31" />
+                <DateField value={endDate} onChange={setEndDate} min="1900-01-01" max="9999-12-31" />
               </div>
             </div>
           </div>
