@@ -83,9 +83,9 @@ export function CategoriesView({
   const handleNewCategory = () => { setEditingCategory(null); setDialogOpen(true); };
   const handleDelete = () => { if (deleteId) deleteCategory.mutate(deleteId, { onSuccess: () => setDeleteId(null) }); };
 
-  const getParentName = (parentId: string | null) => {
+  const getParent = (parentId: string | null) => {
     if (!parentId) return null;
-    return categories.find(c => c.id === parentId)?.name || null;
+    return categories.find(c => c.id === parentId) || null;
   };
 
   // Linha da lista — era um card individual por evento (borda própria, gap entre
@@ -94,20 +94,28 @@ export function CategoriesView({
   // ícone de tag fixo, não usava category.color); sub perde o ícone de seta, só
   // indenta. Ícones de ação reaproveitados de Lançamentos (mesmo tamanho/cor).
   const CategoryRow = ({ category, isSub }: { category: Category; isSub?: boolean }) => {
-    const parentName = getParentName(category.parent_id);
+    const parent = getParent(category.parent_id);
     return (
       <div className={cn('flex items-center justify-between gap-3 px-4 py-3', isSub && 'pl-14')}>
         <div className="flex min-w-0 items-center gap-3">
-          {!isSub && (
+          {!isSub ? (
             <span
               className="h-7 w-7 shrink-0 rounded-md"
               style={{ backgroundColor: category.color || 'var(--bg-2)' }}
             />
+          ) : (
+            // Bolinha com a cor do macro pai — único vínculo visual de cor entre
+            // sub-evento e macro hoje (antes era só recuo + legenda em texto,
+            // fácil de perder numa lista longa) (23/08/2026).
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: parent?.color || 'var(--bg-2)' }}
+            />
           )}
           <div className="flex min-w-0 flex-col">
             <span className={cn('truncate text-body text-ink', !isSub && 'font-semibold')}>{category.name}</span>
-            {parentName && (
-              <span className="truncate text-meta text-muted-ink">{subOfLabel} {parentName}</span>
+            {parent && (
+              <span className="truncate text-meta text-muted-ink">{subOfLabel} {parent.name}</span>
             )}
           </div>
         </div>
