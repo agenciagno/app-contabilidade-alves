@@ -5,7 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import {
   AlertCircle, Plus, Mail, MessageCircle, Printer,
   FileX, MoreHorizontal, Eye, Send, CheckSquare, Download, Loader2,
-  X, Copy, SlidersHorizontal,
+  X, Copy, SlidersHorizontal, ListChecks, CalendarDays,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,17 +17,18 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarPicker } from '@/components/ui/calendar';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PageHeader, DsBadge, SearchField } from '@/components/ds';
+import { PageHeader, DsBadge, SearchField, DateField } from '@/components/ds';
 import { useBoletoControls, type BoletoWithContact } from '@/hooks/useBoletoControls';
 import { BoletoGenerationDialog } from '@/components/financeiro/BoletoGenerationDialog';
 import { IndividualBoletoDialog } from '@/components/financeiro/IndividualBoletoDialog';
+import { BoletoCalendarView } from '@/components/financeiro/BoletoCalendarView';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -86,9 +87,10 @@ export default function Boletos() {
   const [search, setSearch] = useState('');
   const [valorMin, setValorMin] = useState('');
   const [valorMax, setValorMax] = useState('');
-  const [pagamentoStart, setPagamentoStart] = useState<Date | null>(null);
-  const [pagamentoEnd, setPagamentoEnd] = useState<Date | null>(null);
+  const [pagamentoStart, setPagamentoStart] = useState('');
+  const [pagamentoEnd, setPagamentoEnd] = useState('');
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [detailsOf, setDetailsOf] = useState<BoletoWithContact | null>(null);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [singleOpen, setSingleOpen] = useState(false);
@@ -169,8 +171,8 @@ export default function Boletos() {
       if (min != null && !Number.isNaN(min) && !(b.valor != null && b.valor >= min)) return false;
       if (max != null && !Number.isNaN(max) && !(b.valor != null && b.valor <= max)) return false;
 
-      if (pagamentoStart && (!b.data_pagamento || parseISO(b.data_pagamento) < pagamentoStart)) return false;
-      if (pagamentoEnd && (!b.data_pagamento || parseISO(b.data_pagamento) > pagamentoEnd)) return false;
+      if (pagamentoStart && (!b.data_pagamento || b.data_pagamento < pagamentoStart)) return false;
+      if (pagamentoEnd && (!b.data_pagamento || b.data_pagamento > pagamentoEnd)) return false;
 
       return true;
     });
@@ -179,7 +181,7 @@ export default function Boletos() {
   const hasExtraFilters = !!search || !!valorMin || !!valorMax || !!pagamentoStart || !!pagamentoEnd;
   const clearExtraFilters = () => {
     setSearch(''); setValorMin(''); setValorMax('');
-    setPagamentoStart(null); setPagamentoEnd(null);
+    setPagamentoStart(''); setPagamentoEnd('');
     setPage(1);
   };
 
@@ -217,8 +219,11 @@ export default function Boletos() {
         anterior, não é só repintar (22/08/2026). Empilha em telas estreitas.
       */}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        {/* Coluna lateral */}
-        <div className="flex w-full shrink-0 flex-col gap-4 lg:w-[300px]">
+        {/* Coluna lateral — lg:sticky trava no topo enquanto a tabela rola
+            (só no breakpoint lg:, onde o layout é lado a lado; items-start
+            no container pai já impede a coluna de esticar pra altura da
+            tabela, pré-requisito pro sticky funcionar) (22/08/2026). */}
+        <div className="flex w-full shrink-0 flex-col gap-4 lg:sticky lg:top-8 lg:w-[300px]">
           {/* Stats — lista vertical num card só, não StatCardRow (o Figma não usa cards separados aqui) */}
           <div className="divide-y divide-line-2 rounded-lg border border-line bg-paper">
             <div className="flex items-center justify-between p-4">
@@ -333,29 +338,34 @@ export default function Boletos() {
 
                 <div className="space-y-1.5 border-t border-line pt-3">
                   <p className="text-xs text-muted-ink px-1">Data de pagamento</p>
+                  {/*
+                    Antes: 2 <Calendar> sempre abertos lado a lado num grid de
+                    2 colunas dentro de um Popover de 320px — cada calendário
+                    precisa de ~280px pra caber sem espremer, daí os números
+                    embolados/sobrepostos. Troca pro DateField (texto + ícone
+                    que abre 1 calendário por vez), já o padrão em todo o
+                    resto do sistema (22/08/2026).
+                  */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <p className="text-xs text-muted-ink-2 px-1">De</p>
-                      <CalendarPicker
-                        mode="single"
-                        selected={pagamentoStart ?? undefined}
-                        onSelect={(d) => { setPagamentoStart(d ?? null); setPage(1); }}
-                        initialFocus
+                      <DateField
+                        value={pagamentoStart}
+                        onChange={(v) => { setPagamentoStart(v); setPage(1); }}
                       />
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs text-muted-ink-2 px-1">Até</p>
-                      <CalendarPicker
-                        mode="single"
-                        selected={pagamentoEnd ?? undefined}
-                        onSelect={(d) => { setPagamentoEnd(d ?? null); setPage(1); }}
+                      <DateField
+                        value={pagamentoEnd}
+                        onChange={(v) => { setPagamentoEnd(v); setPage(1); }}
                       />
                     </div>
                   </div>
                   {(pagamentoStart || pagamentoEnd) && (
                     <Button
                       variant="ghost" size="sm" className="w-full gap-1.5"
-                      onClick={() => { setPagamentoStart(null); setPagamentoEnd(null); setPage(1); }}
+                      onClick={() => { setPagamentoStart(''); setPagamentoEnd(''); setPage(1); }}
                     >
                       <X className="h-3.5 w-3.5" /> Limpar período
                     </Button>
@@ -374,6 +384,27 @@ export default function Boletos() {
 
         {/* Área principal */}
         <div className="min-w-0 flex-1 space-y-4">
+          {/* Toggle Lista/Calendário — mesma lógica de src/pages/FiscalTasks.tsx (22/08/2026). */}
+          <div className="flex justify-end">
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              onValueChange={v => v && setViewMode(v as 'list' | 'calendar')}
+              className="gap-0.5 rounded-md border border-line bg-bg-2 p-1"
+            >
+              <ToggleGroupItem value="list" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Lista">
+                <ListChecks className="h-[15px] w-[15px]" strokeWidth={1.75} />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="calendar" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Calendário">
+                <CalendarDays className="h-[15px] w-[15px]" strokeWidth={1.75} />
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+
+          {viewMode === 'calendar' ? (
+            <BoletoCalendarView boletos={filtered} isOverdue={isOverdue} onBoletoClick={setDetailsOf} />
+          ) : (
+          <>
           {/* Tabela */}
           <div className="overflow-hidden rounded-lg border border-line bg-paper">
             <Table>
@@ -489,6 +520,8 @@ export default function Boletos() {
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
       </div>
 
