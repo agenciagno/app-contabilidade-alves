@@ -1007,6 +1007,7 @@ export type Database = {
           billing_cycle: string
           billing_day: number | null
           cnpj: string
+          contact_id: string | null
           contract_start: string | null
           created_at: string
           email: string | null
@@ -1027,6 +1028,7 @@ export type Database = {
           billing_cycle?: string
           billing_day?: number | null
           cnpj: string
+          contact_id?: string | null
           contract_start?: string | null
           created_at?: string
           email?: string | null
@@ -1047,6 +1049,7 @@ export type Database = {
           billing_cycle?: string
           billing_day?: number | null
           cnpj?: string
+          contact_id?: string | null
           contract_start?: string | null
           created_at?: string
           email?: string | null
@@ -1063,7 +1066,22 @@ export type Database = {
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "companies_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companies_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
       }
       contact_documents: {
         Row: {

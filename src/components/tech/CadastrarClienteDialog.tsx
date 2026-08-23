@@ -1,6 +1,6 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Search, Copy, Check, AlertCircle, Ban } from 'lucide-react';
+import { Loader2, Search, Copy, Check, Link2, Ban } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,11 +45,13 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
   const documentType = getDocumentType(document);
   const clean = cleanDocument(document);
 
-  // Aviso: documento já é contato da base contábil da CA. Não bloqueia — é informativo.
+  // Documento já é contato da base contábil da CA? Se sim, vincula o tenant a esse
+  // contato (companies.contact_id) e reaproveita os dados dele — mais confiável que
+  // a Receita, e é a base pro futuro switch "área interna × área externa" do cliente.
   const { data: existingContacts } = useQuery({
     queryKey: ['contacts-document-check-provisionar'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('contacts').select('id, name, document');
+      const { data, error } = await supabase.from('contacts').select('id, name, document, phone, email');
       if (error) throw error;
       return data ?? [];
     },
@@ -67,6 +69,20 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
     if (clean.length !== 11 && clean.length !== 14) return null;
     return tenants?.find((t) => cleanDocument(t.cnpj || '') === clean) ?? null;
   }, [clean, tenants]);
+
+  // Preenche a partir do contato só o que ainda está vazio — nunca sobrescreve o
+  // que o operador já digitou.
+  useEffect(() => {
+    if (!matchedContact || duplicatedTenant) return;
+    if (documentType === 'CPF') {
+      setAdminName((prev) => prev || matchedContact.name);
+    } else {
+      setName((prev) => prev || matchedContact.name);
+      if (matchedContact.email) setCompanyEmail((prev) => prev || matchedContact.email!);
+    }
+    if (matchedContact.phone) setPhone((prev) => prev || maskPhone(matchedContact.phone!));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchedContact, duplicatedTenant, documentType]);
 
   const reset = () => {
     setDocument(''); setName(''); setPhone(''); setCompanyEmail('');
@@ -119,6 +135,7 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
           email: documentType === 'CPF' || !companyEmail.trim() ? undefined : normalizeEmail(companyEmail),
           admin_email: email,
           admin_name: adminName.trim(),
+          contact_id: matchedContact?.id,
         },
       });
 
@@ -252,11 +269,11 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
               )}
 
               {!duplicatedTenant && matchedContact && (
-                <div className="flex items-start gap-2 rounded-md border border-warn/30 bg-warn/10 p-2.5 text-xs text-warn dark:text-warn">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2 rounded-md border border-ok/30 bg-ok/10 p-2.5 text-xs text-ok">
+                  <Link2 className="h-4 w-4 shrink-0 mt-0.5" />
                   <span>
-                    Esse documento já está na base contábil da CA como <strong>{matchedContact.name}</strong>.
-                    Isso não impede o cadastro como cliente do sistema.
+                    Esse documento já é cliente contábil da CA: <strong>{matchedContact.name}</strong>. Os dados
+                    dele preenchem o formulário e o cadastro fica vinculado a esse contato.
                   </span>
                 </div>
               )}
