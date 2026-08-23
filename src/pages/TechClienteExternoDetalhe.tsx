@@ -498,7 +498,18 @@ function AbaUsuarios({
     setCreds(null); setCopiado(false);
   };
 
+  // Re-busca o plano antes de abrir os dois pickers de módulo: se o operador
+  // salvou a aba Módulos há pouco (ou em outra aba/sessão), o `cliente` em memória
+  // pode estar um passo atrás — sem isso o picker oferecia só o plano de quando a
+  // página abriu, escondendo módulo que já tinha sido liberado.
+  const abrirAdicionar = () => {
+    resetForm();
+    onChanged();
+    setAddOpen(true);
+  };
+
   const abrirEditarModulos = (u: TenantUserRow) => {
+    onChanged();
     setModulosTarget(u);
     setModulosSelecionados(u.allowed_modules ?? []);
   };
@@ -673,7 +684,7 @@ function AbaUsuarios({
         <Button
           size="sm"
           disabled={cheio}
-          onClick={() => { resetForm(); setAddOpen(true); }}
+          onClick={abrirAdicionar}
           title={cheio ? 'Limite de usuários do plano atingido' : undefined}
         >
           <UserPlus className="w-4 h-4 mr-2" /> Adicionar
