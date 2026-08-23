@@ -55,7 +55,10 @@ export function ModuleGuard({
   const moduleKeysToCheck = [moduleName, ...(LEGACY_MODULE_ALIASES[moduleName] ?? [])];
   const userHasModule = moduleKeysToCheck.some((k) => allowedModules.includes(k));
   const planHasModule = moduleKeysToCheck.some((k) => planModules.includes(k));
-  let hasAccess = planHasModule && userHasModule;
+  // Admin do tenant segue o plano sem depender de allowed_modules sincronizado —
+  // mesma regra que o submódulo logo abaixo já aplicava. Sem isso, a rota
+  // bloqueava mesmo depois do menu (AppSidebar) já mostrar o item.
+  let hasAccess = planHasModule && (isAdmin || userHasModule);
 
   // Sub-module gating — mirror AppSidebar's subEnabledByPlan + user allowed check.
   if (hasAccess && subModule) {

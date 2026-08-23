@@ -489,8 +489,20 @@ function AbaUsuarios({
   const [modulosTarget, setModulosTarget] = useState<TenantUserRow | null>(null);
   const [modulosSelecionados, setModulosSelecionados] = useState<string[]>([]);
   const [salvandoModulos, setSalvandoModulos] = useState(false);
+  // Plano usado pelos dois pickers. Não confia no `cliente` da lista em memória
+  // (cache que só atualiza com invalidate + refetch assíncrono, e na prática
+  // ficava um passo atrás) — busca direto no banco toda vez que um picker abre.
+  const [planoAtual, setPlanoAtual] = useState<string[]>(cliente.plan_modules ?? []);
 
   const cheio = cliente.max_users != null && usuarios.length >= cliente.max_users;
+
+  const buscarPlanoAtual = async () => {
+    const { data, error } = await supabase.from('companies').select('plan_modules').eq('id', cliente.id).single();
+    if (error) { toast.error('Falha ao buscar módulos do plano.'); return cliente.plan_modules ?? []; }
+    const fresh = (data?.plan_modules as string[] | null) ?? [];
+    setPlanoAtual(fresh);
+    return fresh;
+  };
 
   const resetForm = () => {
     setNovoNome(''); setNovoEmail(''); setNovoPapel('colaborador');
@@ -498,18 +510,15 @@ function AbaUsuarios({
     setCreds(null); setCopiado(false);
   };
 
-  // Re-busca o plano antes de abrir os dois pickers de módulo: se o operador
-  // salvou a aba Módulos há pouco (ou em outra aba/sessão), o `cliente` em memória
-  // pode estar um passo atrás — sem isso o picker oferecia só o plano de quando a
-  // página abriu, escondendo módulo que já tinha sido liberado.
-  const abrirAdicionar = () => {
+  const abrirAdicionar = async () => {
     resetForm();
-    onChanged();
+    const fresh = await buscarPlanoAtual();
+    setNovoModulos(fresh);
     setAddOpen(true);
   };
 
-  const abrirEditarModulos = (u: TenantUserRow) => {
-    onChanged();
+  const abrirEditarModulos = async (u: TenantUserRow) => {
+    await buscarPlanoAtual();
     setModulosTarget(u);
     setModulosSelecionados(u.allowed_modules ?? []);
   };
@@ -841,7 +850,7 @@ function AbaUsuarios({
                 </p>
                 <div className="rounded-md border border-border p-3 max-h-[280px] overflow-y-auto">
                   <ModulosPickerTree
-                    planModules={cliente.plan_modules ?? []}
+                    planModules={planoAtual}
                     selecionados={novoModulos}
                     onToggle={(key, checked, filhos) => {
                       setNovoModulos((prev) => {
@@ -923,7 +932,7 @@ function AbaUsuarios({
           </DialogHeader>
           <div className="rounded-md border border-border p-3 max-h-[50vh] overflow-y-auto">
             <ModulosPickerTree
-              planModules={cliente.plan_modules ?? []}
+              planModules={planoAtual}
               selecionados={modulosSelecionados}
               onToggle={(key, checked, filhos) => {
                 setModulosSelecionados((prev) => {

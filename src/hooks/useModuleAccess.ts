@@ -68,6 +68,11 @@ export function useModuleAccess() {
     const keys = [moduleKey, ...(LEGACY_MODULE_ALIASES[moduleKey] ?? [])];
     const planOk = keys.some((k) => planModules.includes(k));
     if (preview) return planOk; // preview simula admin do tenant: plano decide
+    // Admin do tenant vê tudo que o plano libera, sem depender de allowed_modules
+    // dele estar sincronizado — mesma regra que já valia só pra submódulo
+    // (isSubItemVisible). Sem isso, marcar módulo novo no plano não aparecia pro
+    // admin até alguém também editar o allowed_modules dele à mão.
+    if (actingAdmin) return planOk;
     const userOk = keys.some((k) => allowedModules.includes(k));
     return planOk && userOk;
   };
