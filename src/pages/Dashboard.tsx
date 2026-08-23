@@ -4,21 +4,14 @@ import {
   TrendingDown,
   Landmark,
   BarChart3,
-  SlidersHorizontal,
-  ChevronUp,
-  ChevronDown,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDashboardSummary, useAnnualMetrics, useMonthlyEvolution, useCategoryBreakdown } from '@/hooks/useRpcDashboard';
 import { useBanks } from '@/hooks/useBanks';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { useRecurringTransactions } from '@/hooks/useRecurringTransactions';
-import { useContacts } from '@/hooks/useContacts';
-import { useCategories } from '@/hooks/useCategories';
 import {
   ChartTooltip,
 } from '@/components/ui/chart';
@@ -26,7 +19,6 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Area, AreaChart, CartesianGri
 import { format, parseISO, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useDashboardWidgets } from '@/components/dashboard/DashboardWidgets';
-import { UnifiedFilterBox, PeriodFilter, getDateRangeFromPeriod } from '@/components/filters/UnifiedFilterBox';
 import { useReportData, processReportData } from '@/hooks/useReportData';
 import { PeriodComparison } from '@/components/reports/PeriodComparison';
 import { BudgetTracker } from '@/components/financeiro/BudgetTracker';
@@ -81,66 +73,20 @@ export default function Dashboard() {
 
   const { isWidgetEnabled } = useDashboardWidgets();
 
-  // Filter states - Default to 'all' (limpo)
-  const [period, setPeriod] = useState<PeriodFilter>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBankId, setSelectedBankId] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [contactFilter, setContactFilter] = useState('all');
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
-  const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
-  const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-
   const queryClient = useQueryClient();
   const { activeCompanyId } = useActiveCompany();
   const { banks, isLoading: loadingBanks } = useBanks();
   const { recurringTransactions } = useRecurringTransactions();
-  const { contacts } = useContacts();
-  const { categories } = useCategories();
 
-  // Get date range for filtering
-  const getDateRange = (): { start: Date; end: Date } | null => {
-    if (period === 'custom' && customStartDate && customEndDate) {
-      return { start: customStartDate, end: customEndDate };
-    }
-    return getDateRangeFromPeriod(period);
-  };
-
-  // Clear all filters - limpa para estado padrão 'all'
-  const handleClearFilters = () => {
-    setPeriod('all');
-    setSearchTerm('');
-    setSelectedBankId('all');
-    setCategoryFilter('all');
-    setContactFilter('all');
-    setPaymentStatusFilter('all');
-    setCustomStartDate(null);
-    setCustomEndDate(null);
-  };
-
-
-  // ---- RPC-backed metrics (replaces previous useMemo aggregations) ----
-  // Date range for the summary RPC (when no period filter, use a wide-open range)
-  const _summaryRange = useMemo(() => {
-    const r = getDateRange();
-    return {
-      start: r ? format(r.start, 'yyyy-MM-dd') : '1900-01-01',
-      end:   r ? format(r.end,   'yyyy-MM-dd') : '2999-12-31',
-    };
-  }, [period, customStartDate, customEndDate]);
-
-  const _summaryFilters = useMemo(() => ({
-    bankId: selectedBankId !== 'all' ? selectedBankId : undefined,
-    categoryId: categoryFilter !== 'all' ? categoryFilter : undefined,
-    contactId: contactFilter !== 'all' ? contactFilter : undefined,
-    paymentStatus: paymentStatusFilter !== 'all' ? paymentStatusFilter : undefined,
-  }), [selectedBankId, categoryFilter, contactFilter, paymentStatusFilter]);
+  // ---- RPC-backed metrics ----
+  // Sem filtro avançado nesta tela (removido 22/08/2026) — sempre o período
+  // aberto (todo o histórico), sem recorte de banco/categoria/contato/status.
+  const SUMMARY_START = '1900-01-01';
+  const SUMMARY_END = '2999-12-31';
 
   const { data: dashboardSummary, isLoading: loadingSummary } = useDashboardSummary(
-    _summaryRange.start,
-    _summaryRange.end,
-    _summaryFilters,
+    SUMMARY_START,
+    SUMMARY_END,
   );
 
   const currentYear = now.getFullYear();
@@ -148,23 +94,15 @@ export default function Dashboard() {
   const { data: monthlyRpc, isLoading: loadingMonthly } = useMonthlyEvolution(6);
   const { data: categoryRpc, isLoading: loadingCategory } = useCategoryBreakdown(
     'despesa',
-    _summaryRange.start,
-    _summaryRange.end,
+    SUMMARY_START,
+    SUMMARY_END,
     5,
-    {
-      bankId: _summaryFilters.bankId,
-      contactId: _summaryFilters.contactId,
-    },
   );
   const { data: revenueCategoryRpc } = useCategoryBreakdown(
     'receita',
-    _summaryRange.start,
-    _summaryRange.end,
+    SUMMARY_START,
+    SUMMARY_END,
     5,
-    {
-      bankId: _summaryFilters.bankId,
-      contactId: _summaryFilters.contactId,
-    },
   );
 
   // Adapt RPC snake_case → camelCase consumed by JSX (interface unchanged)
@@ -180,18 +118,6 @@ export default function Dashboard() {
       saldoBancario,
     };
   }, [dashboardSummary, banks]);
-
-  // Active filter count for badge
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (selectedBankId !== 'all') count++;
-    if (categoryFilter !== 'all') count++;
-    if (contactFilter !== 'all') count++;
-    if (paymentStatusFilter !== 'all') count++;
-    if (searchTerm) count++;
-    if (period !== 'all') count++;
-    return count;
-  }, [selectedBankId, categoryFilter, contactFilter, paymentStatusFilter, searchTerm, period]);
 
   const annualMetrics = useMemo(() => ({
     lucroPrevisto: Number(annualRpc?.lucro_previsto ?? 0),
@@ -269,44 +195,7 @@ export default function Dashboard() {
             <p className="text-kicker uppercase text-muted-ink-2">~/financeiro · {annualMetrics.year}</p>
             <h1 className="mt-1 text-display text-ink">Dashboard.</h1>
           </div>
-          <Button variant="outline" className="gap-2 relative" onClick={() => setFiltersOpen((v) => !v)}>
-            <SlidersHorizontal className="w-4 h-4" />
-            Filtros Avançados
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                {activeFilterCount}
-              </span>
-            )}
-            {filtersOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </Button>
         </div>
-
-        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-          <CollapsibleContent>
-            <UnifiedFilterBox
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              period={period}
-              onPeriodChange={setPeriod}
-              customStartDate={customStartDate}
-              customEndDate={customEndDate}
-              onCustomStartDateChange={setCustomStartDate}
-              onCustomEndDateChange={setCustomEndDate}
-              bankId={selectedBankId}
-              onBankChange={setSelectedBankId}
-              banks={banks}
-              categoryId={categoryFilter}
-              onCategoryChange={setCategoryFilter}
-              categories={categories}
-              paymentStatus={paymentStatusFilter}
-              onPaymentStatusChange={setPaymentStatusFilter}
-              contactId={contactFilter}
-              onContactChange={setContactFilter}
-              contacts={contacts}
-              onClearFilters={handleClearFilters}
-            />
-          </CollapsibleContent>
-        </Collapsible>
 
         <FinancialHealthBadge lucroPrevisto={annualMetrics.lucroPrevisto} saldoBancario={summary.saldoBancario} />
       </div>
