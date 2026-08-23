@@ -228,6 +228,7 @@ export function CategoriesView({
         isLoading={createCategory.isPending || updateCategory.isPending}
         defaultType={activeTab}
         labels={formLabels}
+        scope={scope}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>

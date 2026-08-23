@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import { Category } from '@/hooks/useCategories';
+import { Category, CategoryScope } from '@/hooks/useCategories';
 import { segmentedListClass, segmentedTriggerClass } from '@/components/ds';
 import { cn } from '@/lib/utils';
 
@@ -40,9 +40,11 @@ interface CategoryFormDialogProps {
   isLoading?: boolean;
   defaultType?: 'receita' | 'despesa';
   labels?: Partial<CategoryFormDialogLabels>;
+  /** DRE é conceito interno — o campo "Exibir na DRE?" só faz sentido pro scope 'interno'. */
+  scope: CategoryScope;
 }
 
-export function CategoryFormDialog({ open, onOpenChange, category, categories = [], onSubmit, isLoading, defaultType = 'receita', labels }: CategoryFormDialogProps) {
+export function CategoryFormDialog({ open, onOpenChange, category, categories = [], onSubmit, isLoading, defaultType = 'receita', labels, scope }: CategoryFormDialogProps) {
   const l = { ...DEFAULT_LABELS, ...labels };
   const [name, setName] = useState('');
   const [type, setType] = useState<'receita' | 'despesa'>(defaultType);
@@ -129,15 +131,17 @@ export function CategoryFormDialog({ open, onOpenChange, category, categories = 
             </p>
           </div>
 
-          <div className="flex items-center justify-between py-2">
-            <div className="space-y-0.5">
-              <Label htmlFor="show-in-dre">Exibir na DRE?</Label>
-              <p className="text-xs text-muted-foreground">
-                Desmarque para movimentações que afetam o saldo do banco, mas não são receitas/despesas operacionais (ex: Transferências, Aportes de Sócios).
-              </p>
+          {scope !== 'cliente' && (
+            <div className="flex items-center justify-between py-2">
+              <div className="space-y-0.5">
+                <Label htmlFor="show-in-dre">Exibir na DRE?</Label>
+                <p className="text-xs text-muted-foreground">
+                  Desmarque para movimentações que afetam o saldo do banco, mas não são receitas/despesas operacionais (ex: Transferências, Aportes de Sócios).
+                </p>
+              </div>
+              <Switch id="show-in-dre" checked={showInDre} onCheckedChange={setShowInDre} />
             </div>
-            <Switch id="show-in-dre" checked={showInDre} onCheckedChange={setShowInDre} />
-          </div>
+          )}
 
           <div className="flex gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
