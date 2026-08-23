@@ -189,8 +189,12 @@ export default function Banks() {
         anterior, não é só repintar (22/08/2026). Empilha em telas estreitas.
       */}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        {/* Coluna lateral — contas */}
-        <div className="flex w-full shrink-0 flex-col gap-4 lg:w-[320px]">
+        {/* Coluna lateral — contas — lg:sticky trava no topo enquanto a
+            área principal rola (só no breakpoint lg:, mesmo ajuste de
+            Boletos.tsx; se a lista de contas ficar muito longa a coluna pode
+            ultrapassar a viewport, mas hoje a lista de bancos ativos raramente
+            é longa — ajuste futuro se acontecer na prática) (22/08/2026). */}
+        <div className="flex w-full shrink-0 flex-col gap-4 lg:sticky lg:top-8 lg:w-[320px]">
           <StatCard
             label="Saldo total em contas ativas"
             value={formatCurrency(totalBalance)}
