@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Transaction } from '@/hooks/useTransactions';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
@@ -221,6 +221,11 @@ export function useServerTransactions(page: number, filters: ServerFilters) {
 
       return { rows, count: count ?? 0 };
     },
+    // Mantém a página anterior na tela enquanto a próxima carrega (troca de
+    // filtro/busca/ordenação/página) — sem isso, cada mudança de filtro vira
+    // uma queryKey nova sem cache, isLoading volta a true e a tela inteira
+    // pisca pro skeleton de primeira carga (achado 22/08/2026, ver Transactions.tsx).
+    placeholderData: keepPreviousData,
     staleTime: 1000 * 30,
     gcTime: 1000 * 60 * 5,
   });

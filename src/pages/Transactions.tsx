@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useTransactions, Transaction, TransactionInsert } from '@/hooks/useTransactions';
 import { useServerTransactions, useTransactionKPIs, useDistinctTransactionValues, PAGE_SIZE, ServerFilters, IS_EMPTY } from '@/hooks/useServerTransactions';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
 import { useCategories } from '@/hooks/useCategories';
 import { useBanks } from '@/hooks/useBanks';
@@ -641,6 +642,10 @@ export default function Transactions() {
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [bankFilter, setBankFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  // Campo digitado fica instantâneo (SearchField abaixo usa searchTerm puro);
+  // só o valor que dispara a query do servidor espera 300ms parado (padrão já
+  // documentado em 04-design-system.md §7.2, nunca aplicado aqui — 22/08/2026).
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
   const [columnFilters, setColumnFilters] = useState<ColumnFilters>({});
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -665,12 +670,12 @@ export default function Transactions() {
     type: typeFilter,
     categoryIds: categoryFilters.length > 0 ? categoryFilters : undefined,
     bankId: bankFilter,
-    searchTerm: searchTerm || undefined,
+    searchTerm: debouncedSearchTerm || undefined,
     invisibleBankIds: invisibleBankIds.length > 0 ? invisibleBankIds : undefined,
     columnFilters,
     sortField,
     sortOrder,
-  }), [typeFilter, categoryFilters, bankFilter, searchTerm, invisibleBankIds, columnFilters, sortField, sortOrder]);
+  }), [typeFilter, categoryFilters, bankFilter, debouncedSearchTerm, invisibleBankIds, columnFilters, sortField, sortOrder]);
 
   // Server-side paginated data
   const { transactions, totalCount, totalPages, isLoading, isFetching } = useServerTransactions(currentPage, serverFilters);
@@ -822,7 +827,12 @@ export default function Transactions() {
 
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
-  if (isLoading) {
+  // Só a primeira carga real (sem dado nenhum ainda) troca a tela inteira —
+  // qualquer busca/filtro depois disso já tem `placeholderData` mantendo a
+  // página anterior visível, então isLoading não deveria disparar de novo;
+  // o `transactions.length === 0` aqui é só um cinto de segurança contra
+  // esse gate voltar a cobrir a tela (achado do bug de busca, 22/08/2026).
+  if (isLoading && transactions.length === 0) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-10 w-64" />
