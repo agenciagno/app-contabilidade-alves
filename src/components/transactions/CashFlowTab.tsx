@@ -12,14 +12,16 @@ import {
 } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   AlertTriangle, TrendingUp, TrendingDown, Landmark,
-  Filter, Search, X, ChevronUp, ChevronDown,
+  Filter, Search, X, ChevronUp, ChevronDown, ListChecks, CalendarDays,
 } from 'lucide-react';
 import { format, parseISO, isWithinInterval, startOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { calcularEncargosAtraso } from '@/lib/financial-utils';
 import { CashFlowReportModal } from './CashFlowReportModal';
+import { TransactionCalendarView } from './TransactionCalendarView';
 import { IconBox } from '@/components/ds';
 import type { Transaction } from '@/hooks/useTransactions';
 import type { Bank } from '@/hooks/useBanks';
@@ -445,6 +447,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
 
   const [reportOpen, setReportOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; row: any | null }>({ open: false, row: null });
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
 
   // Global date filter — defaults to Jan 1 of current year → today
   const today = new Date();
@@ -681,6 +684,24 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
   const receitaAmounts = useMemo(() => finalFiltered.filter(t => t.type === 'receita').map(t => Number(t.amount)), [finalFiltered]);
   const despesaAmounts = useMemo(() => finalFiltered.filter(t => t.type === 'despesa').map(t => Number(t.amount)), [finalFiltered]);
 
+  // Mesma ação do clique no badge de Status da tabela (marcar pago, com modal
+  // de confirmação quando há juros/multa) — reaproveitada pelo clique no
+  // modo Calendário, pra não duplicar a lógica (22/08/2026).
+  const handleRowClick = (row: (typeof rows)[number]) => {
+    if (!row.is_paid && row.hasJuros) {
+      setConfirmModal({ open: true, row });
+    } else {
+      togglePaid.mutate({ id: row.id, is_paid: !row.is_paid });
+    }
+  };
+
+  const calendarItems = useMemo(() => rows.map(row => ({
+    id: row.id,
+    dateKey: isReceivables ? row.due_date : (row.expected_date || row.due_date),
+    label: row.contact?.name ?? row.description,
+    type: row.type as 'receita' | 'despesa',
+  })), [rows, isReceivables]);
+
   return (
     <div className="space-y-4">
       {/*
@@ -729,6 +750,20 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            {/* Toggle Lista/Calendário — mesma lógica de src/pages/FiscalTasks.tsx (22/08/2026). */}
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              onValueChange={v => v && setViewMode(v as 'list' | 'calendar')}
+              className="gap-0.5 rounded-md border border-line bg-bg-2 p-1"
+            >
+              <ToggleGroupItem value="list" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Lista">
+                <ListChecks className="h-[15px] w-[15px]" strokeWidth={1.75} />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="calendar" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Calendário">
+                <CalendarDays className="h-[15px] w-[15px]" strokeWidth={1.75} />
+              </ToggleGroupItem>
+            </ToggleGroup>
             {/* Sem ícone — Figma mostra só o texto (21/08/2026). */}
             <Button variant="outline" size="sm" onClick={() => setReportOpen(true)}>
               Gerar Relatório
@@ -806,7 +841,13 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
         </Card>
       </div>
 
-      {/* Data Grid */}
+      {/* Data Grid / Calendário */}
+      {viewMode === 'calendar' ? (
+        <TransactionCalendarView items={calendarItems} onItemClick={id => {
+          const row = rows.find(r => r.id === id);
+          if (row) handleRowClick(row);
+        }} />
+      ) : (
       <Card className="bg-card">
         <CardContent className="p-0">
           <TooltipProvider>
@@ -978,13 +1019,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                       {/* Status */}
                       <TableCell className="text-center">
                         <button
-                          onClick={() => {
-                            if (!row.is_paid && row.hasJuros) {
-                              setConfirmModal({ open: true, row });
-                            } else {
-                              togglePaid.mutate({ id: row.id, is_paid: !row.is_paid });
-                            }
-                          }}
+                          onClick={() => handleRowClick(row)}
                           className="cursor-pointer"
                         >
                           {row.status === 'pago' ? (
@@ -1012,6 +1047,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
           </TooltipProvider>
         </CardContent>
       </Card>
+      )}
 
       {/* Modal de Confirmação de Pagamento */}
       <Dialog open={confirmModal.open} onOpenChange={(open) => !open && setConfirmModal({ open: false, row: null })}>
