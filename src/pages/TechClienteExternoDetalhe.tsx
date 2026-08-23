@@ -5,7 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   ArrowLeft, Loader2, Trash2, UserPlus, KeyRound, Copy, Check, Ban, ShieldCheck,
-  Mail, RefreshCw, Plus,
+  Mail, RefreshCw, Plus, Settings2,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -38,8 +38,12 @@ import {
 import { formatDoc, brl, dateBR, competenciaBR, BILLING_CYCLE_LABEL } from '@/lib/tenant-format';
 import { PUBLIC_APP_URL } from '@/lib/environment';
 
-/** Sempre habilitados: sem eles o cliente não consegue nem entrar nem se configurar. */
-const MODULOS_FIXOS = ['home', 'configuracoes'];
+/**
+ * Sempre habilitado: sem ele o cliente não consegue nem se configurar.
+ * "Início" deixou de ser fixo (pedido de Gabriel, 23/08) — agora dá pra desmarcar
+ * como qualquer outro módulo; quem ficar sem nenhum módulo visível cai em /sem-acesso.
+ */
+const MODULOS_FIXOS = ['configuracoes'];
 
 export default function TechClienteExternoDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -472,6 +476,7 @@ function AbaUsuarios({
   const [novoNome, setNovoNome] = useState('');
   const [novoEmail, setNovoEmail] = useState('');
   const [novoPapel, setNovoPapel] = useState<'admin' | 'colaborador'>('colaborador');
+  const [novoModulos, setNovoModulos] = useState<string[]>(cliente.plan_modules ?? []);
   const [criando, setCriando] = useState(false);
   const [creds, setCreds] = useState<{ email: string; password: string } | null>(null);
   const [copiado, setCopiado] = useState(false);
@@ -481,11 +486,21 @@ function AbaUsuarios({
   const [deleteTarget, setDeleteTarget] = useState<TenantUserRow | null>(null);
   const [processando, setProcessando] = useState(false);
 
+  const [modulosTarget, setModulosTarget] = useState<TenantUserRow | null>(null);
+  const [modulosSelecionados, setModulosSelecionados] = useState<string[]>([]);
+  const [salvandoModulos, setSalvandoModulos] = useState(false);
+
   const cheio = cliente.max_users != null && usuarios.length >= cliente.max_users;
 
   const resetForm = () => {
     setNovoNome(''); setNovoEmail(''); setNovoPapel('colaborador');
+    setNovoModulos(cliente.plan_modules ?? []);
     setCreds(null); setCopiado(false);
+  };
+
+  const abrirEditarModulos = (u: TenantUserRow) => {
+    setModulosTarget(u);
+    setModulosSelecionados(u.allowed_modules ?? []);
   };
 
   const criarUsuario = async () => {
@@ -496,7 +511,10 @@ function AbaUsuarios({
     try {
       const email = normalizeEmail(novoEmail);
       const { data, error } = await supabase.functions.invoke('create-tenant-user', {
-        body: { company_id: cliente.id, email, name: novoNome.trim(), role: novoPapel },
+        body: {
+          company_id: cliente.id, email, name: novoNome.trim(), role: novoPapel,
+          allowed_modules: novoModulos,
+        },
       });
       if (error) {
         // Status != 2xx (ex.: 409 do limite de plano) chega aqui com a mensagem no corpo.
@@ -566,6 +584,31 @@ function AbaUsuarios({
       toast.error(err instanceof Error ? err.message : 'Falha ao enviar e-mail.');
     } finally {
       setAcao(null);
+    }
+  };
+
+  const salvarModulosUsuario = async () => {
+    if (!modulosTarget) return;
+    setSalvandoModulos(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-update-user', {
+        body: {
+          userId: modulosTarget.user_id,
+          fullName: modulosTarget.full_name || modulosTarget.email || 'Usuário',
+          role: modulosTarget.role || 'colaborador',
+          statusActive: modulosTarget.status_active ?? true,
+          allowedModules: modulosSelecionados,
+        },
+      });
+      if (error) throw new Error(error.message || 'Falha ao salvar módulos.');
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success('Módulos do usuário atualizados.');
+      onChanged();
+      setModulosTarget(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao salvar módulos.');
+    } finally {
+      setSalvandoModulos(false);
     }
   };
 
@@ -685,7 +728,7 @@ function AbaUsuarios({
                             {acao === `senha-${u.user_id}`
                               ? <Loader2 className="w-3 h-3 mr-2 animate-spin" />
                               : <KeyRound className="w-3 h-3 mr-2" />}
-                            Reemitir senha
+                            Resetar senha
                           </Button>
                           <Button
                             size="sm" variant="outline"
@@ -696,7 +739,15 @@ function AbaUsuarios({
                             {acao === `email-${u.user_id}`
                               ? <Loader2 className="w-3 h-3 mr-2 animate-spin" />
                               : <Mail className="w-3 h-3 mr-2" />}
-                            E-mail
+                            Enviar redefinição por email
+                          </Button>
+                          <Button
+                            size="sm" variant="outline"
+                            onClick={() => abrirEditarModulos(u)}
+                            title="Controla o que este usuário enxerga, dentro do plano do cliente"
+                          >
+                            <Settings2 className="w-3 h-3 mr-2" />
+                            Módulos
                           </Button>
                           <Button
                             size="sm"
@@ -732,6 +783,10 @@ function AbaUsuarios({
           {creds ? (
             <div className="space-y-3 py-2">
               <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Link de acesso</Label>
+                <div className="p-3 rounded-md bg-muted font-mono text-sm break-all">{PUBLIC_APP_URL}</div>
+              </div>
+              <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">E-mail</Label>
                 <div className="p-3 rounded-md bg-muted font-mono text-sm break-all">{creds.email}</div>
               </div>
@@ -743,7 +798,7 @@ function AbaUsuarios({
               <DialogFooter className="gap-2 sm:gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => copiar(`E-mail: ${creds.email} | Senha provisória: ${creds.password}`)}
+                  onClick={() => copiar(`Acesso: ${PUBLIC_APP_URL} | E-mail: ${creds.email} | Senha provisória: ${creds.password}`)}
                 >
                   {copiado ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
                   Copiar credenciais
@@ -767,6 +822,26 @@ function AbaUsuarios({
                     <SelectItem value="colaborador">Colaborador</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Módulos que este usuário vê</Label>
+                <p className="text-xs text-muted-foreground">
+                  Só aparece o que o plano de {cliente.name} já contratou.
+                </p>
+                <div className="rounded-md border border-border p-3 max-h-[280px] overflow-y-auto">
+                  <ModulosPickerTree
+                    planModules={cliente.plan_modules ?? []}
+                    selecionados={novoModulos}
+                    onToggle={(key, checked, filhos) => {
+                      setNovoModulos((prev) => {
+                        const set = new Set(prev);
+                        if (checked) set.add(key);
+                        else { set.delete(key); (filhos ?? []).forEach((f) => set.delete(f)); }
+                        return Array.from(set);
+                      });
+                    }}
+                  />
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => { setAddOpen(false); resetForm(); }} disabled={criando}>
@@ -826,7 +901,96 @@ function AbaUsuarios({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!modulosTarget} onOpenChange={(o) => !o && setModulosTarget(null)}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Módulos de {modulosTarget?.full_name ?? modulosTarget?.email}</DialogTitle>
+            <DialogDescription>
+              O que este usuário enxerga, dentro do que o plano de {cliente.name} já contratou.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border border-border p-3 max-h-[50vh] overflow-y-auto">
+            <ModulosPickerTree
+              planModules={cliente.plan_modules ?? []}
+              selecionados={modulosSelecionados}
+              onToggle={(key, checked, filhos) => {
+                setModulosSelecionados((prev) => {
+                  const set = new Set(prev);
+                  if (checked) set.add(key);
+                  else { set.delete(key); (filhos ?? []).forEach((f) => set.delete(f)); }
+                  return Array.from(set);
+                });
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModulosTarget(null)} disabled={salvandoModulos}>
+              Cancelar
+            </Button>
+            <Button onClick={salvarModulosUsuario} disabled={salvandoModulos}>
+              {salvandoModulos && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Salvar módulos
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
+  );
+}
+
+/**
+ * Árvore de checkboxes de módulo × submódulo, reaproveitada na criação de
+ * usuário e na edição posterior. Só oferece o que o plano do tenant contratou
+ * (`planModules`) — não faz sentido liberar pro usuário um módulo que o cliente
+ * nem comprou.
+ */
+function ModulosPickerTree({
+  planModules, selecionados, onToggle,
+}: {
+  planModules: string[];
+  selecionados: string[];
+  onToggle: (key: string, checked: boolean, filhos?: string[]) => void;
+}) {
+  const modulosDoPlano = MODULE_TREE.filter(
+    (mod) => moduleAllowsAudience(mod.key, 'external') && planModules.includes(mod.key),
+  );
+
+  if (modulosDoPlano.length === 0) {
+    return <p className="text-sm text-muted-foreground">O plano deste cliente ainda não tem módulo contratado.</p>;
+  }
+
+  return (
+    <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+      {modulosDoPlano.map((mod) => {
+        const filhosVisiveis = (mod.children ?? []).filter(
+          (c) => moduleAllowsAudience(c.key, 'external') && planModules.includes(c.key),
+        );
+        const filhos = filhosVisiveis.map((c) => c.key);
+        const marcado = selecionados.includes(mod.key);
+        return (
+          <div key={mod.key} className="space-y-1.5">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox checked={marcado} onCheckedChange={(v) => onToggle(mod.key, v === true, filhos)} />
+              <span className="text-sm font-medium">{mod.label}</span>
+            </label>
+            {marcado && filhosVisiveis.length > 0 && (
+              <div className="ml-6 space-y-1.5 border-l border-border pl-3">
+                {filhosVisiveis.map((filho) => (
+                  <label key={filho.key} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={selecionados.includes(filho.key)}
+                      onCheckedChange={(v) => onToggle(filho.key, v === true)}
+                    />
+                    <span className="text-xs text-muted-foreground">{filho.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

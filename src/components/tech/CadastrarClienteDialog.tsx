@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { maskCPFCNPJ, maskPhone, unmaskPhone, getDocumentType } from '@/lib/utils';
 import { EmailField, isValidEmail, normalizeEmail } from './EmailField';
 import { useInvalidateTenants, useTenants } from '@/hooks/useTenants';
+import { PUBLIC_APP_URL } from '@/lib/environment';
 
 function cleanDocument(v: string): string {
   return v.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
@@ -98,8 +99,12 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
     e.preventDefault();
     if (clean.length !== 11 && clean.length !== 14) return toast.error('CPF/CNPJ inválido.');
     if (duplicatedTenant) return toast.error(`Esse documento já é o cliente externo "${duplicatedTenant.name}".`);
-    if (!name.trim()) return toast.error('Informe o nome da empresa.');
-    if (companyEmail.trim() && !isValidEmail(companyEmail)) return toast.error('E-mail da empresa inválido.');
+    // CPF é pessoa física: não existe "empresa" — o registro do tenant usa o
+    // próprio nome do admin, sem campo separado pra digitar de novo.
+    if (documentType !== 'CPF') {
+      if (!name.trim()) return toast.error('Informe o nome da empresa.');
+      if (companyEmail.trim() && !isValidEmail(companyEmail)) return toast.error('E-mail da empresa inválido.');
+    }
     if (!adminName.trim()) return toast.error('Informe o nome do admin.');
     if (!isValidEmail(adminEmail)) return toast.error('E-mail do admin inválido.');
 
@@ -109,9 +114,9 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
       const { data, error } = await supabase.functions.invoke('provision-tenant', {
         body: {
           cnpj: clean,
-          name: name.trim(),
+          name: documentType === 'CPF' ? adminName.trim() : name.trim(),
           phone: unmaskPhone(phone) || null,
-          email: companyEmail.trim() ? normalizeEmail(companyEmail) : undefined,
+          email: documentType === 'CPF' || !companyEmail.trim() ? undefined : normalizeEmail(companyEmail),
           admin_email: email,
           admin_name: adminName.trim(),
         },
@@ -145,7 +150,9 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
   const handleCopy = async () => {
     if (!created) return;
     try {
-      await navigator.clipboard.writeText(`E-mail: ${created.email} | Senha provisória: ${created.password}`);
+      await navigator.clipboard.writeText(
+        `Acesso: ${PUBLIC_APP_URL} | E-mail: ${created.email} | Senha provisória: ${created.password}`,
+      );
       setCopied(true);
       toast.success('Credenciais copiadas.');
     } catch {
@@ -183,6 +190,10 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
 
         {created ? (
           <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Link de acesso</Label>
+              <div className="p-3 rounded-md bg-muted font-mono text-sm break-all">{PUBLIC_APP_URL}</div>
+            </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">E-mail</Label>
               <div className="p-3 rounded-md bg-muted font-mono text-sm break-all">{created.email}</div>
@@ -251,12 +262,14 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome da empresa *</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} required />
-            </div>
+            {documentType !== 'CPF' && (
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome da empresa *</Label>
+                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={200} required />
+              </div>
+            )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className={documentType === 'CPF' ? 'grid grid-cols-1 gap-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-3'}>
               <div className="space-y-2">
                 <Label htmlFor="phone">Telefone</Label>
                 <Input
@@ -266,13 +279,15 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
                   placeholder="(00) 00000-0000"
                 />
               </div>
-              <EmailField
-                id="company-email"
-                label="E-mail da empresa"
-                value={companyEmail}
-                onChange={setCompanyEmail}
-                placeholder="contato@empresa.com.br"
-              />
+              {documentType !== 'CPF' && (
+                <EmailField
+                  id="company-email"
+                  label="E-mail da empresa"
+                  value={companyEmail}
+                  onChange={setCompanyEmail}
+                  placeholder="contato@empresa.com.br"
+                />
+              )}
             </div>
 
             <div className="pt-4 border-t space-y-4">

@@ -39,6 +39,8 @@ export interface TenantUserRow {
   force_password_change: boolean | null;
   password_changed_at: string | null;
   created_at: string;
+  /** O que este usuário enxerga — recorte dentro do que o plano do tenant contratou. */
+  allowed_modules: string[] | null;
 }
 
 export interface TenantInvoiceRow {
@@ -97,7 +99,7 @@ export function useTenantUsers() {
       const { data, error } = await supabase
         .from('profiles')
         .select(
-          'user_id, company_id, full_name, email, role, status, status_active, force_password_change, password_changed_at, created_at',
+          'user_id, company_id, full_name, email, role, status, status_active, force_password_change, password_changed_at, created_at, allowed_modules',
         )
         .order('created_at', { ascending: true });
       if (error) throw error;
