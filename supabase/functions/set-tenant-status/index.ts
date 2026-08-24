@@ -1,5 +1,5 @@
-// Suspende ou reativa um cliente externo (tenant).
-// Diferente do update direto na tabela: ao suspender, derruba as sessões abertas.
+// Suspende, inativa ou reativa um cliente externo (tenant).
+// Diferente do update direto na tabela: ao suspender/inativar, derruba as sessões abertas.
 // O gate de `companies.status` só roda no login — sem isso, quem já está dentro continua.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@3';
@@ -12,8 +12,14 @@ const cors = {
 
 const BodySchema = z.object({
   company_id: z.string().uuid(),
-  status: z.enum(['active', 'suspended']),
+  status: z.enum(['active', 'suspended', 'inactive']),
 });
+
+const ACTION_LABEL: Record<string, string> = {
+  suspended: 'suspender_cliente',
+  inactive: 'inativar_cliente',
+  active: 'reativar_cliente',
+};
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -37,7 +43,7 @@ Deno.serve(async (req) => {
       .from('profiles').select('is_super_admin, role, company_id, full_name')
       .eq('user_id', user.id).single();
     if (!caller || (!caller.is_super_admin && caller.role !== 'super_admin')) {
-      return json({ error: 'Apenas super admin (GNO) pode suspender ou reativar cliente.' }, 403);
+      return json({ error: 'Apenas super admin (GNO) pode alterar o status do cliente.' }, 403);
     }
 
     const parsed = BodySchema.safeParse(await req.json().catch(() => null));
@@ -47,14 +53,14 @@ Deno.serve(async (req) => {
     const { data: company } = await admin
       .from('companies').select('id, name, is_internal').eq('id', company_id).single();
     if (!company) return json({ error: 'Cliente não encontrado.' }, 404);
-    if (company.is_internal) return json({ error: 'A matriz da CA não pode ser suspensa.' }, 400);
+    if (company.is_internal) return json({ error: 'A matriz da CA não pode ter o status alterado.' }, 400);
 
     const { error: upErr } = await admin.from('companies').update({ status }).eq('id', company_id);
     if (upErr) throw new Error('Falha ao atualizar status: ' + upErr.message);
 
-    // Ao suspender, apaga as sessões ativas — o app escuta o DELETE em realtime e desloga.
+    // Ao suspender/inativar, apaga as sessões ativas — o app escuta o DELETE em realtime e desloga.
     let revoked = 0;
-    if (status === 'suspended') {
+    if (status === 'suspended' || status === 'inactive') {
       const { data: users } = await admin.from('profiles').select('user_id').eq('company_id', company_id);
       const ids = (users ?? []).map((u) => u.user_id);
       if (ids.length) {
@@ -64,18 +70,22 @@ Deno.serve(async (req) => {
       }
     }
 
+    const DETAILS: Record<string, string> = {
+      suspended: `Cliente suspenso. ${revoked} sessão(ões) encerrada(s).`,
+      inactive: `Cliente inativado. ${revoked} sessão(ões) encerrada(s).`,
+      active: 'Cliente reativado.',
+    };
+
     if (caller.company_id) {
       await admin.from('global_logs').insert({
         company_id: caller.company_id,
         user_id: user.id,
         user_name: caller.full_name,
-        action: status === 'suspended' ? 'suspender_cliente' : 'reativar_cliente',
+        action: ACTION_LABEL[status],
         module: 'clientes_externos',
         entity_id: company_id,
         entity_name: company.name,
-        details: status === 'suspended'
-          ? `Cliente suspenso. ${revoked} sessão(ões) encerrada(s).`
-          : 'Cliente reativado.',
+        details: DETAILS[status],
       });
     }
 

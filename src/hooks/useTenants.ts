@@ -43,6 +43,14 @@ export interface TenantUserRow {
   allowed_modules: string[] | null;
 }
 
+export interface TenantPlanRow {
+  id: string;
+  name: string;
+  price: number;
+  billing_cycle: string;
+  created_at: string;
+}
+
 export interface TenantInvoiceRow {
   id: string;
   company_id: string;
@@ -70,6 +78,7 @@ export function invoiceState(inv: Pick<TenantInvoiceRow, 'status' | 'vencimento'
 export const TENANTS_KEY = ['clientes-externos', 'companies'] as const;
 export const TENANT_USERS_KEY = ['clientes-externos', 'profiles'] as const;
 export const TENANT_INVOICES_KEY = ['clientes-externos', 'invoices'] as const;
+export const TENANT_PLANS_KEY = ['clientes-externos', 'plans'] as const;
 
 export function useTenants() {
   const { isSuperAdmin } = useUserRole();
@@ -125,6 +134,23 @@ export function useTenantInvoices(companyId?: string) {
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as TenantInvoiceRow[];
+    },
+    enabled: !!isSuperAdmin,
+  });
+}
+
+export function useTenantPlans() {
+  const { isSuperAdmin } = useUserRole();
+
+  return useQuery({
+    queryKey: TENANT_PLANS_KEY,
+    queryFn: async (): Promise<TenantPlanRow[]> => {
+      const { data, error } = await supabase
+        .from('tenant_plans')
+        .select('id, name, price, billing_cycle, created_at')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as TenantPlanRow[];
     },
     enabled: !!isSuperAdmin,
   });

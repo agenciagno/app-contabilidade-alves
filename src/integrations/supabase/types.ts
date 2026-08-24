@@ -3686,6 +3686,33 @@ export type Database = {
           },
         ]
       }
+      tenant_plans: {
+        Row: {
+          billing_cycle: string
+          created_at: string
+          id: string
+          name: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          billing_cycle?: string
+          created_at?: string
+          id?: string
+          name: string
+          price: number
+          updated_at?: string
+        }
+        Update: {
+          billing_cycle?: string
+          created_at?: string
+          id?: string
+          name?: string
+          price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       transaction_attachments: {
         Row: {
           company_id: string

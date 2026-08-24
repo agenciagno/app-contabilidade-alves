@@ -182,7 +182,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .select('status')
             .eq('id', profile.company_id)
             .maybeSingle();
-          if ((companyRow as any)?.status === 'suspended') {
+          const companyStatus = (companyRow as any)?.status;
+          if (companyStatus === 'suspended' || companyStatus === 'inactive') {
             await supabase.auth.signOut();
             const err = new Error('O acesso desta empresa está suspenso. Fale com o suporte.');
             (err as any).code = 'COMPANY_SUSPENDED';

@@ -5,7 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   ArrowLeft, Loader2, Trash2, UserPlus, KeyRound, Copy, Check, Ban, ShieldCheck,
-  Mail, RefreshCw, Plus, Settings2,
+  Mail, RefreshCw, Plus, Settings2, Archive,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -31,7 +31,7 @@ import { DsBadge, tabsListClass, tabsTriggerClass } from '@/components/ds';
 import { EmailField, isValidEmail, normalizeEmail } from '@/components/tech/EmailField';
 import { ModulosPickerTree, toggleModuloKey } from '@/components/tech/ModulosPickerTree';
 import {
-  useTenants, useTenantUsers, useTenantInvoices, useInvalidateTenants,
+  useTenants, useTenantUsers, useTenantInvoices, useTenantPlans, useInvalidateTenants,
   invoiceState, type TenantUserRow, type TenantInvoiceRow,
 } from '@/hooks/useTenants';
 import { formatDoc, brl, dateBR, competenciaBR, BILLING_CYCLE_LABEL } from '@/lib/tenant-format';
@@ -84,6 +84,7 @@ export default function TechClienteExternoDetalhe() {
   }
 
   const ativo = cliente.status === 'active';
+  const inativo = cliente.status === 'inactive';
 
   return (
     <div className="space-y-6">
@@ -100,7 +101,11 @@ export default function TechClienteExternoDetalhe() {
       </nav>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-md ${ativo ? 'bg-ok-soft text-ok' : 'bg-danger-soft text-danger'}`}>
+        <div
+          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-md ${
+            ativo ? 'bg-ok-soft text-ok' : inativo ? 'bg-bg-2 text-muted-ink' : 'bg-danger-soft text-danger'
+          }`}
+        >
           <ShieldCheck className="h-5 w-5" strokeWidth={1.75} />
         </div>
         <div className="min-w-0 flex-1">
@@ -108,7 +113,9 @@ export default function TechClienteExternoDetalhe() {
           <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
             <span className="font-mono text-mono-sm text-muted-ink">{formatDoc(cliente.cnpj)}</span>
             {cliente.plan_name && <span className="text-meta text-muted-ink-2">Plano {cliente.plan_name}</span>}
-            <DsBadge tone={ativo ? 'ok' : 'danger'}>{ativo ? 'ativo' : 'suspenso'}</DsBadge>
+            <DsBadge tone={ativo ? 'ok' : inativo ? 'neutral' : 'danger'}>
+              {ativo ? 'ativo' : inativo ? 'inativo' : 'suspenso'}
+            </DsBadge>
             {cliente.is_internal && <DsBadge tone="info">matriz (CA)</DsBadge>}
           </div>
         </div>
@@ -155,6 +162,7 @@ function AbaGeral({
   onChanged: () => void;
 }) {
   const navigate = useNavigate();
+  const { data: planos } = useTenantPlans();
   const [planName, setPlanName] = useState(cliente.plan_name ?? '');
   const [planPrice, setPlanPrice] = useState(cliente.plan_price != null ? String(cliente.plan_price) : '');
   const [cycle, setCycle] = useState(cliente.billing_cycle ?? 'mensal');
@@ -164,7 +172,7 @@ function AbaGeral({
   const [notes, setNotes] = useState(cliente.notes ?? '');
   const [saving, setSaving] = useState(false);
 
-  const [statusTarget, setStatusTarget] = useState<'active' | 'suspended' | null>(null);
+  const [statusTarget, setStatusTarget] = useState<'active' | 'suspended' | 'inactive' | null>(null);
   const [changingStatus, setChangingStatus] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -236,11 +244,12 @@ function AbaGeral({
       if (error) throw new Error(error.message || 'Falha ao alterar status.');
       const payload = data as { error?: string; sessions_revoked?: number } | null;
       if (payload?.error) throw new Error(payload.error);
-      toast.success(
-        statusTarget === 'suspended'
-          ? `Cliente suspenso. ${payload?.sessions_revoked ?? 0} sessão(ões) encerrada(s).`
-          : 'Cliente reativado.',
-      );
+      const MSG: Record<string, string> = {
+        suspended: `Cliente suspenso. ${payload?.sessions_revoked ?? 0} sessão(ões) encerrada(s).`,
+        inactive: `Cliente inativado. ${payload?.sessions_revoked ?? 0} sessão(ões) encerrada(s).`,
+        active: 'Cliente reativado.',
+      };
+      toast.success(MSG[statusTarget]);
       onChanged();
       setStatusTarget(null);
     } catch (err) {
@@ -269,6 +278,7 @@ function AbaGeral({
   };
 
   const ativo = cliente.status === 'active';
+  const suspenso = cliente.status === 'suspended';
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -298,13 +308,31 @@ function AbaGeral({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="plan-name">Plano</Label>
-              <Input
-                id="plan-name"
-                value={planName}
-                onChange={(e) => setPlanName(e.target.value)}
-                placeholder="Ex.: Financeiro Essencial"
-                maxLength={120}
-              />
+              <Select
+                value={planName || undefined}
+                onValueChange={(v) => {
+                  setPlanName(v);
+                  const p = planos?.find((pl) => pl.name === v);
+                  if (p) {
+                    setPlanPrice(String(p.price));
+                    setCycle(p.billing_cycle);
+                  }
+                }}
+              >
+                <SelectTrigger id="plan-name">
+                  <SelectValue placeholder={planos?.length ? 'Selecione um plano' : 'Nenhum plano cadastrado'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(planos ?? []).map((p) => (
+                    <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!planos?.length && (
+                <p className="text-xs text-muted-foreground">
+                  Cadastre planos na aba "Planos" da listagem de clientes externos.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="plan-price">Valor (R$)</Label>
@@ -380,14 +408,24 @@ function AbaGeral({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          <Button
-            variant={ativo ? 'outline' : 'default'}
-            onClick={() => setStatusTarget(ativo ? 'suspended' : 'active')}
-            disabled={cliente.is_internal}
-          >
-            {ativo ? <Ban className="w-4 h-4 mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
-            {ativo ? 'Suspender cliente' : 'Reativar cliente'}
-          </Button>
+          {ativo && (
+            <Button variant="outline" onClick={() => setStatusTarget('suspended')} disabled={cliente.is_internal}>
+              <Ban className="w-4 h-4 mr-2" />
+              Suspender cliente
+            </Button>
+          )}
+          {(ativo || suspenso) && (
+            <Button variant="outline" onClick={() => setStatusTarget('inactive')} disabled={cliente.is_internal}>
+              <Archive className="w-4 h-4 mr-2" />
+              Inativar cliente
+            </Button>
+          )}
+          {!ativo && (
+            <Button variant="default" onClick={() => setStatusTarget('active')} disabled={cliente.is_internal}>
+              <ShieldCheck className="w-4 h-4 mr-2" />
+              Reativar cliente
+            </Button>
+          )}
           <Button
             variant="destructive"
             onClick={() => { setDeleteInput(''); setDeleteOpen(true); }}
@@ -403,12 +441,17 @@ function AbaGeral({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {statusTarget === 'suspended' ? 'Suspender cliente?' : 'Reativar cliente?'}
+              {statusTarget === 'suspended' && 'Suspender cliente?'}
+              {statusTarget === 'inactive' && 'Inativar cliente?'}
+              {statusTarget === 'active' && 'Reativar cliente?'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {statusTarget === 'suspended'
-                ? `Os usuários de "${cliente.name}" são desconectados agora e não conseguem mais entrar.`
-                : `Reativar o acesso de "${cliente.name}"?`}
+              {statusTarget === 'suspended' &&
+                `Os usuários de "${cliente.name}" são desconectados agora e não conseguem mais entrar. Use para algo temporário (ex.: inadimplência) — dá pra reativar depois.`}
+              {statusTarget === 'inactive' &&
+                `"${cliente.name}" deixa de ser cliente do sistema. Os usuários são desconectados agora; dados e faturas continuam guardados e o acesso pode ser reativado depois, se precisar.`}
+              {statusTarget === 'active' &&
+                `Reativar o acesso de "${cliente.name}"?`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
