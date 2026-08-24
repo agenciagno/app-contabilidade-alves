@@ -202,7 +202,7 @@ export function CategoriesView({
           <SearchField
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar evento contábil..."
+            placeholder={scope === 'cliente' ? 'Buscar categoria...' : 'Buscar evento contábil...'}
             wrapperClassName="w-full sm:w-72"
           />
         </div>

@@ -8,9 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { useCategories, CategoryInsert } from '@/hooks/useCategories';
+import { useCategories, CategoryInsert, CLIENT_CATEGORY_LABELS } from '@/hooks/useCategories';
 import { useBanks, BankInsert } from '@/hooks/useBanks';
 import { useContacts, ContactInsert } from '@/hooks/useContacts';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 import { RecurringTransaction, RecurringTransactionInsert } from '@/hooks/useRecurringTransactions';
 import { WeekDaysSelector } from './WeekDaysSelector';
 import { CategoryFormDialog } from '@/components/categories/CategoryFormDialog';
@@ -38,6 +39,7 @@ export function RecurringFormDialog({
   const { categories, createCategory } = useCategories();
   const { banks, createBank } = useBanks();
   const { contacts, createContact } = useContacts();
+  const { isInternalCompany } = useActiveCompany();
   
   const [formData, setFormData] = useState<RecurringTransactionInsert>({
     description: '',
@@ -263,7 +265,9 @@ export function RecurringFormDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="category">Evento Contábil <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="category">
+                    {isInternalCompany ? 'Evento Contábil' : 'Categoria'} <span className="text-destructive">*</span>
+                  </Label>
                   <Select
                     value={formData.category_id || 'none'}
                     onValueChange={(value) => {
@@ -482,6 +486,8 @@ export function RecurringFormDialog({
         onOpenChange={setCategoryDialogOpen}
         onSubmit={handleCategoryCreate}
         isLoading={createCategory.isPending}
+        scope={isInternalCompany ? 'interno' : 'cliente'}
+        labels={isInternalCompany ? undefined : CLIENT_CATEGORY_LABELS}
       />
 
       <ContactFormDialog

@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DateField, segmentedListClass, segmentedTriggerClass } from '@/components/ds';
 import { Transaction, TransactionInsert } from '@/hooks/useTransactions';
-import { Category, useCategories, CategoryInsert } from '@/hooks/useCategories';
+import { Category, useCategories, CategoryInsert, CLIENT_CATEGORY_LABELS } from '@/hooks/useCategories';
 import { Bank, useBanks, BankInsert } from '@/hooks/useBanks';
 import { Contact, useContacts, ContactInsert } from '@/hooks/useContacts';
 import { useParties, PartyInput } from '@/hooks/useParties';
@@ -59,6 +59,7 @@ function parseCurrencyInput(value: string): number {
   const numbers = value.replace(/\D/g, '');
   return parseInt(numbers || '0', 10) / 100;
 }
+
 
 export function TransactionFormDialog({
   open, onOpenChange, transaction, categories, banks, contacts, onSubmit, onBulkSubmit, isLoading, defaultType = 'receita', mode = 'edit', resetKey,
@@ -636,7 +637,9 @@ export function TransactionFormDialog({
             {/* Row 2: Evento Contábil | Conta/Banco */}
 <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-ink-2">Evento Contábil <span className="text-destructive">*</span></Label>
+                <Label className="text-ink-2">
+                  {isInternalCompany ? 'Evento Contábil' : 'Categoria'} <span className="text-destructive">*</span>
+                </Label>
                 <Select value={categoryId} onValueChange={handleCategoryChange} disabled={structuralDisabled}>
                   <SelectTrigger className={structuralDisabled ? 'opacity-60 cursor-not-allowed' : !categoryId ? 'border-muted-foreground/30' : ''}>
                     <SelectValue placeholder="Selecione..." />
@@ -865,7 +868,14 @@ export function TransactionFormDialog({
         </DialogContent>
       </Dialog>
 
-      <CategoryFormDialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen} onSubmit={handleCreateCategory} isLoading={createCategory.isPending} />
+      <CategoryFormDialog
+        open={categoryDialogOpen}
+        onOpenChange={setCategoryDialogOpen}
+        onSubmit={handleCreateCategory}
+        isLoading={createCategory.isPending}
+        scope={isInternalCompany ? 'interno' : 'cliente'}
+        labels={isInternalCompany ? undefined : CLIENT_CATEGORY_LABELS}
+      />
       <BankFormDialog open={bankDialogOpen} onOpenChange={setBankDialogOpen} onSubmit={handleCreateBank} isLoading={createBank.isPending} />
       <ContactFormDialog open={contactDialogOpen} onOpenChange={setContactDialogOpen} onSubmit={handleCreateContact} isLoading={createContact.isPending} />
       <PartyFormDialog open={partyDialogOpen} onOpenChange={setPartyDialogOpen} onSubmit={handleCreateParty} isLoading={createParty.isPending} />

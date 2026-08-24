@@ -22,6 +22,21 @@ export interface Category {
 export type CategoryInsert = Omit<Category, 'id' | 'created_at' | 'updated_at' | 'parent_id' | 'show_in_dre' | 'scope'> & { parent_id?: string | null; show_in_dre?: boolean };
 export type CategoryUpdate = Partial<Omit<Category, 'id' | 'company_id' | 'created_at' | 'updated_at'>>;
 
+/**
+ * Rótulos do scope 'cliente' pro `CategoryFormDialog` (mesmo texto de
+ * `ClientCategories.tsx`) — fonte única pra quem abre esse dialog fora da tela
+ * Categorias (Lançamentos, Recorrências): cliente não tem DRE nem o conceito
+ * de "evento contábil", então nem o termo nem o toggle fazem sentido pra ele.
+ */
+export const CLIENT_CATEGORY_LABELS = {
+  dialogTitleNew: 'Nova Categoria',
+  dialogTitleEdit: 'Editar Categoria',
+  parentQuestion: 'Pertence a qual Categoria Principal? (Opcional)',
+  parentPlaceholder: 'Nenhuma (esta é uma Categoria Principal)',
+  parentNoneOption: 'Nenhuma (Categoria Principal)',
+  parentHelper: 'Se não selecionar, esta será uma categoria principal. Se selecionar, será uma subcategoria.',
+};
+
 // Eventos Contábeis (scope 'interno', bookkeeping da própria empresa) × Categorias (scope
 // 'cliente', módulo Financeiro vendido a clientes) são isolados mesmo dentro da mesma
 // company_id — decisão de 22/07/2026. Sem override, o scope é resolvido pela mesma regra usada
@@ -33,6 +48,19 @@ export function useCategories(scopeOverride?: CategoryScope) {
   const queryClient = useQueryClient();
   const { activeCompanyId, isInternalCompany } = useActiveCompany();
   const scope: CategoryScope = scopeOverride ?? (isInternalCompany ? 'interno' : 'cliente');
+  // Cliente não tem DRE nem o conceito de "evento contábil" — os toasts usam o
+  // mesmo termo que a tela Categorias já mostra pra ele.
+  const msg = scope === 'cliente'
+    ? {
+        criado: 'Categoria criada com sucesso!', erroCriar: 'Erro ao criar categoria',
+        atualizado: 'Categoria atualizada!', erroAtualizar: 'Erro ao atualizar categoria',
+        excluido: 'Categoria excluída!', erroExcluir: 'Erro ao excluir categoria',
+      }
+    : {
+        criado: 'Evento contábil criado com sucesso!', erroCriar: 'Erro ao criar evento contábil',
+        atualizado: 'Evento contábil atualizado!', erroAtualizar: 'Erro ao atualizar evento contábil',
+        excluido: 'Evento contábil excluído!', erroExcluir: 'Erro ao excluir evento contábil',
+      };
 
   const { data: categories = [], isLoading, error } = useQuery({
     queryKey: ['categories', activeCompanyId, scope],
@@ -67,10 +95,10 @@ export function useCategories(scopeOverride?: CategoryScope) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
-      toast({ title: 'Evento contábil criado com sucesso!' });
+      toast({ title: msg.criado });
     },
     onError: (error: Error) => {
-      toast({ title: 'Erro ao criar evento contábil', description: error.message, variant: 'destructive' });
+      toast({ title: msg.erroCriar, description: error.message, variant: 'destructive' });
     },
   });
 
@@ -88,10 +116,10 @@ export function useCategories(scopeOverride?: CategoryScope) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
-      toast({ title: 'Evento contábil atualizado!' });
+      toast({ title: msg.atualizado });
     },
     onError: (error: Error) => {
-      toast({ title: 'Erro ao atualizar evento contábil', description: error.message, variant: 'destructive' });
+      toast({ title: msg.erroAtualizar, description: error.message, variant: 'destructive' });
     },
   });
 
@@ -112,10 +140,10 @@ export function useCategories(scopeOverride?: CategoryScope) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
-      toast({ title: 'Evento contábil excluído!' });
+      toast({ title: msg.excluido });
     },
     onError: (error: Error) => {
-      toast({ title: 'Erro ao excluir evento contábil', description: error.message, variant: 'destructive' });
+      toast({ title: msg.erroExcluir, description: error.message, variant: 'destructive' });
     },
   });
 
