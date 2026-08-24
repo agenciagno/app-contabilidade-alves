@@ -18,7 +18,7 @@ import { PUBLIC_APP_URL } from '@/lib/environment';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { PageHeader, DsBadge, tabsListClass, tabsTriggerClass } from '@/components/ds';
+import { PageHeader, DsBadge, IconBox, tabsListClass, tabsTriggerClass } from '@/components/ds';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 function parseDeviceInfo(ua: string | null): string {
@@ -215,7 +215,7 @@ export default function MinhaConta() {
   };
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <PageHeader
         kicker="~/conta"
         title="Minha conta."
@@ -240,9 +240,7 @@ export default function MinhaConta() {
       <Card className="bg-card border-border/50">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <User className="w-5 h-5 text-primary" />
-            </div>
+            <IconBox tone="accent" icon={<User strokeWidth={1.75} />} />
             <div>
               <CardTitle>Dados Pessoais</CardTitle>
               <CardDescription>Como você aparece para a equipe</CardDescription>
@@ -312,7 +310,7 @@ export default function MinhaConta() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="email">E-mail</Label>
-                <Input id="email" value={user?.email || ''} disabled className="bg-muted" />
+                <Input id="email" value={user?.email || ''} disabled className="bg-bg-2" />
                 <Link
                   to="/suporte"
                   className="inline-block text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"

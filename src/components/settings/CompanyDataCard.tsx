@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { IconBox } from '@/components/ds';
 
 /**
  * Dados cadastrais da empresa do usuário logado.
@@ -188,9 +189,7 @@ export default function CompanyDataCard() {
     <Card className="bg-card border-border/50">
       <CardHeader>
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Building2 className="w-5 h-5 text-primary" />
-          </div>
+          <IconBox tone="accent" icon={<Building2 strokeWidth={1.75} />} />
           <div>
             <CardTitle>Dados da Empresa</CardTitle>
             <CardDescription>Informações da sua organização</CardDescription>
