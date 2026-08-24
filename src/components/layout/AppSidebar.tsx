@@ -537,10 +537,17 @@ export function AppSidebar() {
           renderizar indentados numa coluna de ícone só (24/08/2026). */}
       <Collapsible open={showLabels && !!openModules[entry.title]} onOpenChange={() => handleToggleModule(entry.title)}>
         <CollapsibleTrigger asChild>
-          {/* NavGroup do DS: aberto ganha o mesmo par ativo/hover dos itens */}
+          {/* NavGroup do DS: aberto ganha o mesmo par ativo/hover dos itens.
+              opacity-100/mt-0 sobrescrevem o group-data-[collapsible=icon]:
+              opacity-0/-mt-8 que o SidebarGroupLabel já vem com de fábrica
+              (pensado pra rótulo de seção tipo "Atalhos", que deve mesmo
+              sumir no colapsado) — aqui é usado como TRIGGER de módulo, um
+              item clicável de verdade, não pode sumir (achado 24/08/2026,
+              é a causa real de "muitos ícones somem no colapsado"). */}
           <SidebarGroupLabel
             className={cn(
               'flex h-8 cursor-pointer items-center justify-between rounded-sm py-0 text-nav-on-surface transition-[background,color] duration-[120ms]',
+              'group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:opacity-100',
               showLabels ? 'pl-3 pr-2.5' : collapsedCenterClass,
               openModules[entry.title] ? navActiveClass : navHoverClass,
             )}
@@ -561,9 +568,12 @@ export function AppSidebar() {
         <CollapsibleContent>
           {/* mt-2 dá respiro entre o item principal e o 1º sub-item (estava
               embolado); a linha vertical azul sutil identifica o grupo de
-              sub-itens (pedido 24/08/2026, exemplo do Cloudflare). */}
+              sub-itens (pedido 24/08/2026, exemplo do Cloudflare). z-10
+              garante que a linha continue visível por cima do fundo azul
+              do hover/ativo do sub-item — sem isso o fundo (pintado depois
+              dela no DOM) cobria a linha embaixo (achado 24/08/2026). */}
           <div className="relative mt-2">
-            <div aria-hidden className="pointer-events-none absolute bottom-1 left-[19px] top-1 w-px bg-[#8ec2fb]/40" />
+            <div aria-hidden className="pointer-events-none absolute bottom-1 left-[19px] top-1 z-10 w-px bg-[#8ec2fb]/40" />
             <SidebarMenu className="gap-0.5">
               {visibleItems(entry).map((item) => (
                 <SidebarMenuItem key={item.title}>
@@ -658,10 +668,16 @@ export function AppSidebar() {
       {/*
         Rodapé (ajuste 24/08/2026): o menu de Perfil (UserMenu) e o item
         Suporte subiram pro header, alinhados à direita — só sobra aqui o
-        toggle de colapsar/expandir, centralizado.
+        toggle de colapsar/expandir. Sem borda-topo (removida a pedido) e
+        alinhado à esquerda no expandido, igual ao resto do menu — só
+        centraliza no colapsado (mesmo critério de todo o resto da lista).
       */}
-      <SidebarFooter className="border-t border-nav-on-surface/15 p-3">
-        <div className="flex justify-center">
+      <SidebarFooter className="p-3">
+        {/* Sem padding extra no expandido: o próprio p-3 do rodapé (12px) +
+            os 8px de centralização interna do botão (32px, ícone 16px) já
+            somam os mesmos 20px do ícone das linhas de menu (px-2 do
+            SidebarContent + px-3 da linha) — conferido via getComputedStyle. */}
+        <div className={showLabels ? '' : 'flex justify-center'}>
           <SidebarTrigger className="h-8 w-8 shrink-0 text-nav-on-surface hover:bg-nav-surface-strong hover:text-nav-on-surface" />
         </div>
       </SidebarFooter>
