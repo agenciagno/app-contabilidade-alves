@@ -8,7 +8,7 @@ import { PageHeader, StatCardRow, DsBadge, type BadgeTone } from '@/components/d
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { invoiceState, type TenantInvoiceRow } from '@/hooks/useTenants';
-import { brl, dateBR, competenciaBR } from '@/lib/tenant-format';
+import { brl, dateBR, competenciaBR, BILLING_CYCLE_LABEL } from '@/lib/tenant-format';
 
 const ESTADO: Record<string, { label: string; tone: BadgeTone }> = {
   paga: { label: 'paga', tone: 'ok' },
@@ -74,6 +74,29 @@ export default function Faturas() {
         title="Faturas."
         subtitle={`Cobranças do escritório · ${total} no histórico.`}
       />
+
+      <div className="rounded-lg border border-line bg-paper px-[22px] py-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <div>
+            <p className="text-meta text-muted-ink-2">Plano contratado</p>
+            <p className="text-ui text-ink">
+              {(company as any)?.plan_name ?? 'Sem plano definido'}
+              {(company as any)?.plan_price != null && (
+                <span className="text-muted-ink">
+                  {' '}· {brl(Number((company as any).plan_price))} / {BILLING_CYCLE_LABEL[(company as any)?.billing_cycle] ?? (company as any)?.billing_cycle}
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-meta text-muted-ink-2">
+            {(company as any)?.billing_day != null && <span>Vencimento dia {(company as any).billing_day}</span>}
+            {(company as any)?.contract_start && <span>Contrato desde {dateBR((company as any).contract_start)}</span>}
+            {(company as any)?.max_users != null && (
+              <span>Até {(company as any).max_users} usuário{(company as any).max_users === 1 ? '' : 's'}</span>
+            )}
+          </div>
+        </div>
+      </div>
 
       <StatCardRow
         items={[

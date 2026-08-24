@@ -10,6 +10,7 @@ const corsHeaders = {
 const BodySchema = z.object({
   userId: z.string().uuid(),
   fullName: z.string().min(2).max(255),
+  email: z.string().email().optional(),
   role: z.string().min(1),
   statusActive: z.boolean(),
   allowedModules: z.array(z.string()),
@@ -55,7 +56,7 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
-    const { userId, fullName, role, statusActive, allowedModules, department } = parsed.data;
+    const { userId, fullName, email, role, statusActive, allowedModules, department } = parsed.data;
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
@@ -98,6 +99,26 @@ Deno.serve(async (req) => {
       }
     }
 
+    const callerIsSuper = !!callerProfile.is_super_admin || callerProfile.role === 'super_admin';
+
+    // Trava de escalonamento: só super admin concede/mantém super_admin em outro usuário
+    // (mesma regra do create-user-v2, replicada aqui pro fluxo de edição).
+    if (role === 'super_admin' && !callerIsSuper) {
+      return new Response(JSON.stringify({ error: 'Apenas super admin pode conceder super_admin.' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Trocar e-mail muda a credencial de login de alguém — só super admin, mesmo que o
+    // caller seja admin da própria empresa (cliente abre chamado em Suporte pra isso).
+    if (email && !callerIsSuper) {
+      return new Response(JSON.stringify({ error: 'Apenas super admin pode alterar e-mail.' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const updatePayload: Record<string, unknown> = {
       full_name: fullName,
       role,
@@ -107,6 +128,17 @@ Deno.serve(async (req) => {
     };
     if (department !== undefined) {
       updatePayload.department = department;
+    }
+
+    if (email) {
+      const { error: authEmailErr } = await admin.auth.admin.updateUserById(userId, { email, email_confirm: true });
+      if (authEmailErr) {
+        return new Response(JSON.stringify({ error: 'Falha ao atualizar e-mail de login: ' + authEmailErr.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      updatePayload.email = email;
     }
 
     const { error: updErr } = await admin

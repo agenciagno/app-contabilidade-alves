@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PUBLIC_APP_URL } from '@/lib/environment';
 import { toast } from 'sonner';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { z } from 'zod';
 import { PasswordStrength, isPasswordStrong } from '@/components/ui/PasswordStrength';
 
@@ -20,7 +25,7 @@ import { DEPARTMENT_OPTIONS } from '@/constants/departments';
 import { ModulosPickerTree, toggleModuloKey } from '@/components/tech/ModulosPickerTree';
 
 
-const ROLE_OPTIONS = [
+const ALL_ROLE_OPTIONS = [
   { value: 'colaborador', label: 'Colaborador' },
   { value: 'admin', label: 'Admin' },
   { value: 'super_admin', label: 'Super Admin' },
@@ -68,6 +73,14 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   const isEditMode = !!editUser;
   const [isLoading, setIsLoading] = useState(false);
   const { addNotification } = useNotifications();
+  const { isSuperAdmin: callerIsSuperAdmin } = useUserRole();
+  // Só o super admin (Gabriel) cadastra outro super admin ou troca e-mail de alguém —
+  // cliente/admin comum nem vê essas opções. Servidor (admin-update-user/create-user-v2)
+  // também trava isso — este filtro é só a UX, não é a fronteira de segurança real.
+  const roleOptions = callerIsSuperAdmin
+    ? ALL_ROLE_OPTIONS
+    : ALL_ROLE_OPTIONS.filter((opt) => opt.value !== 'super_admin');
+  const [confirmEmailOpen, setConfirmEmailOpen] = useState(false);
 
   // Cliente Externo (is_internal = false) nasce com o controle de módulos zerado —
   // Gabriel popula manualmente depois. Empresa interna (CA) mantém admin/super_admin
@@ -195,6 +208,18 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
       }
     }
 
+    // Trocar e-mail muda com o que a pessoa entra no sistema — pede confirmação explícita
+    // antes de mandar pro servidor (o campo só é editável pra super admin, ver acima).
+    if (isEditMode && email !== editUser!.email) {
+      setConfirmEmailOpen(true);
+      return;
+    }
+
+    await performSubmit();
+  };
+
+  const performSubmit = async () => {
+    setConfirmEmailOpen(false);
     setIsLoading(true);
     try {
 
@@ -281,6 +306,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -304,7 +330,8 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
             {errors.fullName && <p className="text-destructive text-sm">{errors.fullName}</p>}
           </div>
 
-          {/* Email */}
+          {/* Email — trocar e-mail de usuário já existente é só super admin;
+              criar um usuário novo com e-mail próprio continua liberado. */}
           <div className="space-y-2">
             <Label htmlFor="email">E-mail *</Label>
             <div className="relative">
@@ -316,8 +343,14 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
                 className="pl-10"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
+                disabled={isEditMode && !callerIsSuperAdmin}
               />
             </div>
+            {isEditMode && !callerIsSuperAdmin && (
+              <p className="text-xs text-muted-foreground">
+                Pra trocar o e-mail, abra um chamado em Suporte.
+              </p>
+            )}
             {errors.email && <p className="text-destructive text-sm">{errors.email}</p>}
           </div>
 
@@ -338,7 +371,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ROLE_OPTIONS.map(opt => (
+                {roleOptions.map(opt => (
                   <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -561,5 +594,25 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
         </form>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={confirmEmailOpen} onOpenChange={setConfirmEmailOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirmar troca de e-mail?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {fullName || 'Este usuário'} vai passar a entrar com <strong>{email}</strong> em vez de{' '}
+            <strong>{editUser?.email}</strong>.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isLoading}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={performSubmit} disabled={isLoading}>
+            {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Confirmar e salvar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   );
 }
