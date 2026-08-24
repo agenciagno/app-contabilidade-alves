@@ -67,9 +67,14 @@ export function ModuleGuard({
     const subKeysToCheck = [subModule, ...(LEGACY_SUBMODULE_ALIASES[subModule] ?? [])];
 
     // Plan-level: if parent has explicit submodules in plan, require this one.
-    // If none are explicit ("grosso", e.g. CA), all submodules are enabled.
+    // If none are explicit ("grosso"), all submodules are enabled — but only for
+    // internal audience (CA's own legacy plan). External tenant is always granular
+    // since the 2-step cadastro: zero children marked means excluded on purpose,
+    // not "not configured yet" (mirrors useModuleAccess.subEnabledByPlan).
     const subEnabledByPlan =
-      explicitInPlan.length === 0 || subKeysToCheck.some((k) => planModules.includes(k));
+      explicitInPlan.length > 0
+        ? subKeysToCheck.some((k) => planModules.includes(k))
+        : audience === 'internal';
     if (!subEnabledByPlan) hasAccess = false;
 
     // User-level: for non-admin users, if any sibling sub-key is set on the user,

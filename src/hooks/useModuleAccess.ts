@@ -77,13 +77,19 @@ export function useModuleAccess() {
     return planOk && userOk;
   };
 
-  // Plano "grosso" (sem nenhum submódulo explícito, caso da CA) habilita todos;
-  // plano com recorte só libera os submódulos contratados.
+  // Plano "grosso" (sem nenhum submódulo explícito) habilita todos os
+  // submódulos do grupo — só vale pra audiência interna (caso legado da
+  // própria CA, que nunca detalhou submódulo em vários grupos). Cliente
+  // externo é sempre plano granular desde o cadastro em 2 etapas: um grupo
+  // sem nenhum filho marcado significa "nenhum mesmo", não "ainda sem
+  // configurar" — sem essa distinção, um grupo com um único filho externo
+  // (ex.: Cadastro → só Equipe) nunca dava pra excluir de verdade, porque
+  // "zero explícito" e "excluído de propósito" eram a mesma coisa pro código.
   const subEnabledByPlan = (parentKey: string, subKey?: string) => {
     if (!subKey) return true;
     const siblings = SUB_MODULES_BY_PARENT[parentKey] ?? [];
     const explicit = siblings.filter((k) => planModules.includes(k));
-    if (explicit.length === 0) return true;
+    if (explicit.length === 0) return audience === 'internal';
     return planModules.includes(subKey);
   };
 
