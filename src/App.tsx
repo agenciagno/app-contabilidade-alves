@@ -47,6 +47,7 @@ const Newsletter = lazy(() => import("@/pages/Newsletter"));
 const CofreGlobal = lazy(() => import("@/pages/CofreGlobal"));
 const TechClientesExternos = lazy(() => import("@/pages/TechClientesExternos"));
 const TechClienteExternoDetalhe = lazy(() => import("@/pages/TechClienteExternoDetalhe"));
+const TechSuporteCanais = lazy(() => import("@/pages/TechSuporteCanais"));
 const TechLGPD = lazy(() => import("@/pages/TechLGPD"));
 const TechAgenteIA = lazy(() => import("@/pages/TechAgenteIA"));
 const CentralNotificacoes = lazy(() => import("@/pages/CentralNotificacoes"));
@@ -134,6 +135,7 @@ const App = () => (
                   continuam checando papel (super admin/admin) por conta própria. */}
               <Route path="/tech/clientes-externos" element={<AppLayout><AudienceGuard audience="external"><TechClientesExternos /></AudienceGuard></AppLayout>} />
               <Route path="/tech/clientes-externos/:id" element={<AppLayout><AudienceGuard audience="external"><TechClienteExternoDetalhe /></AudienceGuard></AppLayout>} />
+              <Route path="/tech/suporte-canais" element={<AppLayout><AudienceGuard audience="external"><TechSuporteCanais /></AudienceGuard></AppLayout>} />
               {/* Rotas antigas: atalho fixado e link salvo continuam funcionando. */}
               <Route path="/admin/provisionar-cliente" element={<Navigate to="/tech/clientes-externos" replace />} />
               <Route path="/tech/operacao" element={<Navigate to="/tech/clientes-externos" replace />} />

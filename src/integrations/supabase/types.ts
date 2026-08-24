@@ -3630,6 +3630,77 @@ export type Database = {
           },
         ]
       }
+      support_tickets: {
+        Row: {
+          assunto: string
+          category: string
+          company_id: string
+          created_at: string
+          descricao: string
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          assunto: string
+          category: string
+          company_id: string
+          created_at?: string
+          descricao: string
+          id?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          assunto?: string
+          category?: string
+          company_id?: string
+          created_at?: string
+          descricao?: string
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_whatsapp_channels: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          phone: string
+          sort_order: number
+          updated_at: string
+          visibility: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          phone: string
+          sort_order?: number
+          updated_at?: string
+          visibility?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          phone?: string
+          sort_order?: number
+          updated_at?: string
+          visibility?: string
+        }
+        Relationships: []
+      }
       tenant_invoices: {
         Row: {
           company_id: string
@@ -3712,6 +3783,54 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      ticket_attachments: {
+        Row: {
+          company_id: string
+          created_at: string
+          file_name: string
+          file_size: number
+          file_type: string | null
+          file_url: string
+          id: string
+          ticket_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          file_name: string
+          file_size: number
+          file_type?: string | null
+          file_url: string
+          id?: string
+          ticket_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          file_name?: string
+          file_size?: number
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_attachments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transaction_attachments: {
         Row: {
