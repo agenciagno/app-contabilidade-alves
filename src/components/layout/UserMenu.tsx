@@ -1,11 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, UserCog, LifeBuoy, Languages, Receipt, ChevronsUpDown, Building, Rocket, Eye } from 'lucide-react';
+import { LogOut, UserCog, LifeBuoy, Languages, Receipt, Eye } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
-import { useCompany } from '@/hooks/useCompany';
 import { useAudience } from '@/hooks/useAudience';
 import { useTenants } from '@/hooks/useTenants';
-import { useViewMode, type ViewMode } from '@/contexts/ViewModeContext';
+import { useViewMode } from '@/contexts/ViewModeContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -22,29 +21,22 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 /**
- * Menu de conta. O gatilho tem duas formas:
- * - `avatar`: só o avatar (usado quando o menu vive no topo).
- * - `bar`: avatar + nome + papel + chevrons, ocupando a largura — é o bloco
- *   "conta" do rodapé da sidebar no Figma (decisão 05, que traz o perfil de
- *   volta para o rodapé).
+ * Menu de conta — gatilho é só o avatar (o bloco "conta" do rodapé antigo
+ * da sidebar foi descontinuado; hoje o menu vive no header, ver
+ * AppHeader.tsx). O switch Sistema Interno/Externo saiu daqui e foi pro
+ * AccountSwitcher (24/08/2026) — junto do cartão de conta, faz mais sentido
+ * lá. "Ver como cliente" (preview de tenant) continua aqui: é outra
+ * feature, só relacionada por também depender de viewMode.
  */
-export function UserMenu({ variant = 'avatar' }: { variant?: 'avatar' | 'bar' }) {
+export function UserMenu() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
-  const { fullName, email, avatarUrl, isAdmin, isSuperAdmin, role } = useUserRole();
-  const { company } = useCompany();
-  const { viewMode, setViewMode, previewTenant, setPreviewTenant } = useViewMode();
+  const { fullName, email, avatarUrl, isAdmin, isSuperAdmin } = useUserRole();
+  const { viewMode, previewTenant, setPreviewTenant } = useViewMode();
   const audience = useAudience();
   // Lista de tenants pro "Ver como cliente" — a query já é gated por super admin.
   const { data: tenants = [] } = useTenants();
   const externalTenants = tenants.filter((t) => !t.is_internal);
-
-  const handleViewModeChange = (value: string) => {
-    setViewMode(value as ViewMode);
-    // Rota interna aberta em modo externo redireciona via ModuleGuard; ir pra
-    // Home ('both') dá aterrissagem previsível nas duas direções.
-    navigate('/');
-  };
 
   // Faturas é do mundo do produto: tenant admin vê sempre; super admin só na
   // visão Sistema Externo (audiência efetiva já resolve os dois casos).
@@ -52,40 +44,18 @@ export function UserMenu({ variant = 'avatar' }: { variant?: 'avatar' | 'bar' })
 
   const initials = (fullName || 'U').substring(0, 2).toUpperCase();
 
-  // O Figma mostra "Sócio · Tech" no rodapé, mas cargo não existe no banco —
-  // uso o papel real em vez de inventar um dado.
-  const roleLabel =
-    role === 'super_admin' ? 'Super admin' : role === 'admin' ? 'Administrador' : 'Colaborador';
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        {variant === 'bar' ? (
-          <button
-            className="flex w-full items-center gap-2.5 rounded-sm border border-line bg-paper px-3 py-2 text-left ring-offset-background transition-colors hover:bg-bg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            aria-label="Menu da conta"
-          >
-            <Avatar className="h-[26px] w-[26px] shrink-0">
-              {avatarUrl && <AvatarImage src={avatarUrl} alt="Avatar" />}
-              <AvatarFallback className="bg-brand-tint text-badge text-brand">{initials}</AvatarFallback>
-            </Avatar>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-ui-strong text-ink">{fullName || 'Usuário'}</span>
-              <span className="truncate text-meta text-muted-ink">{roleLabel}</span>
-            </span>
-            <ChevronsUpDown className="h-[15px] w-[15px] shrink-0 text-muted-ink-2" strokeWidth={1.75} />
-          </button>
-        ) : (
-          <button
-            className="rounded-pill ring-offset-background transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            aria-label="Menu da conta"
-          >
-            <Avatar className="h-8 w-8">
-              {avatarUrl && <AvatarImage src={avatarUrl} alt="Avatar" />}
-              <AvatarFallback className="bg-brand-tint text-badge text-brand">{initials}</AvatarFallback>
-            </Avatar>
-          </button>
-        )}
+        <button
+          className="rounded-pill ring-offset-background transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          aria-label="Menu da conta"
+        >
+          <Avatar className="h-8 w-8">
+            {avatarUrl && <AvatarImage src={avatarUrl} alt="Avatar" />}
+            <AvatarFallback className="bg-brand-tint text-badge text-brand">{initials}</AvatarFallback>
+          </Avatar>
+        </button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-64">
@@ -104,53 +74,35 @@ export function UserMenu({ variant = 'avatar' }: { variant?: 'avatar' | 'bar' })
           </div>
         </DropdownMenuLabel>
 
-        {isSuperAdmin && (
+        {isSuperAdmin && viewMode === 'external' && externalTenants.length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-meta text-muted-ink font-normal">
-              Visualização
-            </DropdownMenuLabel>
-            {/* Seletor Interno/Externo — só super admin. Filtra menu/rotas/busca
-                pela audiência escolhida; não altera permissão real de ninguém. */}
-            <DropdownMenuRadioGroup value={viewMode} onValueChange={handleViewModeChange}>
-              <DropdownMenuRadioItem value="internal" className="gap-2">
-                <Building className="w-4 h-4" strokeWidth={1.75} />
-                Sistema Interno
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem value="external" className="gap-2">
-                <Rocket className="w-4 h-4" strokeWidth={1.75} />
-                Sistema Externo
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-
-            {viewMode === 'external' && externalTenants.length > 0 && (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="gap-2">
-                  <Eye className="w-4 h-4" strokeWidth={1.75} />
-                  {previewTenant ? `Vendo: ${previewTenant.name}` : 'Ver como cliente'}
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="max-w-72">
-                  {/* Preview VISUAL do plano do tenant no menu — dados continuam
-                      sendo os da CA (RLS). Sair pelo banner ou por "Visão padrão". */}
-                  {previewTenant && (
-                    <DropdownMenuItem onClick={() => setPreviewTenant(null)}>
-                      Visão padrão (sair do preview)
-                    </DropdownMenuItem>
-                  )}
-                  {externalTenants.map((t) => (
-                    <DropdownMenuItem
-                      key={t.id}
-                      onClick={() =>
-                        setPreviewTenant({ id: t.id, name: t.name, planModules: t.plan_modules ?? [] })
-                      }
-                      className="truncate"
-                    >
-                      {t.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            )}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="gap-2">
+                <Eye className="w-4 h-4" strokeWidth={1.75} />
+                {previewTenant ? `Vendo: ${previewTenant.name}` : 'Ver como cliente'}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="max-w-72">
+                {/* Preview VISUAL do plano do tenant no menu — dados continuam
+                    sendo os da CA (RLS). Sair pelo banner ou por "Visão padrão". */}
+                {previewTenant && (
+                  <DropdownMenuItem onClick={() => setPreviewTenant(null)}>
+                    Visão padrão (sair do preview)
+                  </DropdownMenuItem>
+                )}
+                {externalTenants.map((t) => (
+                  <DropdownMenuItem
+                    key={t.id}
+                    onClick={() =>
+                      setPreviewTenant({ id: t.id, name: t.name, planModules: t.plan_modules ?? [] })
+                    }
+                    className="truncate"
+                  >
+                    {t.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
           </>
         )}
 
