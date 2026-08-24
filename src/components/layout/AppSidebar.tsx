@@ -43,6 +43,7 @@ import {
   LifeBuoy,
   BookOpen,
   Users,
+  Check,
   type LucideIcon,
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
@@ -64,9 +65,11 @@ import {
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
+  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Collapsible,
   CollapsibleContent,
@@ -447,6 +450,13 @@ export function AppSidebar() {
     togglePin({ title: item.title, url: item.url, icon: item.iconName });
   };
 
+  // Ativo/hover unificado (redesign 24/08/2026): item simples e sub-item de
+  // grupo usavam 2 tratamentos diferentes (action-tint/brand-tint) — agora os
+  // dois (e o trigger do grupo colapsável) usam o mesmo par de tokens
+  // --nav-surface-strong/--nav-on-surface, já que tudo vive sobre --nav-surface.
+  const navActiveClass = 'bg-nav-surface-strong font-semibold text-nav-on-surface';
+  const navHoverClass = 'hover:bg-nav-surface-strong hover:font-semibold hover:text-nav-on-surface';
+
   const renderPinnedItem = (shortcut: PinnedShortcut) => {
     const IconComponent = iconMap[shortcut.icon] || Tags;
     return (
@@ -454,8 +464,8 @@ export function AppSidebar() {
         <SidebarMenuButton asChild tooltip={shortcut.title}>
           <NavLink onClick={handleMobileNav}
             to={shortcut.url}
-            className="group flex h-8 items-center gap-[9px] rounded-sm py-1.5 pl-[34px] pr-3 text-ui text-muted-ink transition-[background,color] duration-[120ms] hover:bg-bg-2 hover:text-ink"
-            activeClassName="bg-brand-tint font-semibold text-brand"
+            className={cn('group flex h-8 items-center gap-[9px] rounded-sm py-1.5 pl-[34px] pr-3 text-ui text-nav-on-surface/80 transition-[background,color] duration-[120ms]', navHoverClass)}
+            activeClassName={navActiveClass}
           >
             <IconComponent className="h-[15px] w-[15px] shrink-0" strokeWidth={1.75} />
             {showLabels && (
@@ -465,7 +475,7 @@ export function AppSidebar() {
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePin(shortcut); }}
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
                 >
-                  <PinOff className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                  <PinOff className="w-3 h-3 text-nav-on-surface/50 hover:text-nav-on-surface" />
                 </button>
               </>
             )}
@@ -478,7 +488,7 @@ export function AppSidebar() {
   const renderSectionDivider = (entry: SectionDivider) => {
     if (!showLabels) {
       return (
-        <Separator key={`sec-${entry.label}`} className="my-2 mx-3 w-auto bg-sidebar-border" />
+        <Separator key={`sec-${entry.label}`} className="my-2 mx-3 w-auto bg-nav-on-surface/15" />
       );
     }
     // Kicker de grupo (decisão 07): a CA tem 17 módulos e precisa escanear por
@@ -486,7 +496,7 @@ export function AppSidebar() {
     return (
       <div
         key={`sec-${entry.label}`}
-        className="px-3 pb-1.5 pt-5 text-kicker uppercase text-muted-ink-2"
+        className="px-3 pb-1.5 pt-5 text-kicker uppercase text-nav-on-surface/60"
       >
         {entry.label}
       </div>
@@ -494,48 +504,42 @@ export function AppSidebar() {
   };
 
   const renderSimpleEntry = (entry: SimpleModule) => (
-    <SidebarGroup key={entry.title}>
-      <SidebarGroupContent>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip={entry.title}>
-              {/* NavItem do DS: 36px, raio 8, ícone 18, SC/nav */}
-              <NavLink onClick={handleMobileNav}
-                to={entry.url}
-                end={entry.url === '/'}
-                className="flex h-9 items-center gap-2.5 rounded-sm px-3 text-nav text-muted-ink transition-[background,color] duration-[120ms] hover:bg-bg-2 hover:text-ink"
-                activeClassName="bg-action-tint font-semibold text-ink"
-              >
-                <entry.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
-                {showLabels && <span className="flex-1 truncate">{entry.title}</span>}
-                {entry.moduleKey === 'configuracoes' && pendingCount > 0 && (
-                  <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-danger px-1.5 text-badge font-medium text-white">
-                    {pendingCount}
-                  </span>
-                )}
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
+    <SidebarMenuItem key={entry.title}>
+      <SidebarMenuButton asChild tooltip={entry.title}>
+        {/* NavItem do DS: 32px, raio 8, ícone 18, SC/nav (densidade 24/08/2026) */}
+        <NavLink onClick={handleMobileNav}
+          to={entry.url}
+          end={entry.url === '/'}
+          className={cn('flex h-8 items-center gap-2.5 rounded-sm px-3 text-nav text-nav-on-surface/80 transition-[background,color] duration-[120ms]', navHoverClass)}
+          activeClassName={navActiveClass}
+        >
+          <entry.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+          {showLabels && <span className="flex-1 truncate">{entry.title}</span>}
+          {entry.moduleKey === 'configuracoes' && pendingCount > 0 && (
+            <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-danger px-1.5 text-badge font-medium text-white">
+              {pendingCount}
+            </span>
+          )}
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 
   const renderCollapsibleEntry = (entry: CollapsibleModule) => (
-    <SidebarGroup key={entry.title}>
+    <SidebarMenuItem key={entry.title}>
       <Collapsible open={openModules[entry.title]} onOpenChange={() => handleToggleModule(entry.title)}>
         <CollapsibleTrigger asChild>
-          {/* NavGroup do DS: aberto ganha fundo --bg e texto em tinta cheia */}
+          {/* NavGroup do DS: aberto ganha o mesmo par ativo/hover dos itens */}
           <SidebarGroupLabel
             className={cn(
-              'flex h-9 cursor-pointer items-center justify-between rounded-sm py-0 pl-3 pr-2.5 transition-[background,color] duration-[120ms]',
-              openModules[entry.title] ? 'bg-bg text-ink' : 'text-muted-ink hover:bg-bg-2 hover:text-ink',
+              'flex h-8 cursor-pointer items-center justify-between rounded-sm py-0 pl-3 pr-2.5 text-nav-on-surface/80 transition-[background,color] duration-[120ms]',
+              openModules[entry.title] ? navActiveClass : navHoverClass,
             )}
           >
             <div className="flex items-center gap-2.5">
               <entry.icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
               {showLabels && (
-                <span className={cn('text-nav', openModules[entry.title] ? 'font-semibold' : 'font-medium')}>
+                <span className={cn('text-nav', openModules[entry.title] && 'font-semibold')}>
                   {entry.title}
                 </span>
               )}
@@ -546,100 +550,166 @@ export function AppSidebar() {
           </SidebarGroupLabel>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {visibleItems(entry).map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  {item.sectionBreak && showLabels && (
-                    <div className="px-3 pt-3 pb-1 text-[10px] uppercase tracking-[0.05em] text-muted-foreground/50 border-t border-sidebar-border/60 mt-1">
-                      {item.sectionBreak}
-                    </div>
-                  )}
-                  {item.sectionBreak && !showLabels && (
-                    <Separator className="my-1.5 mx-2 w-auto bg-sidebar-border/60" />
-                  )}
-                  <SidebarMenuButton asChild tooltip={item.title}>
-                    <NavLink onClick={handleMobileNav}
-                      to={item.url}
-                      className="group flex h-8 items-center gap-[9px] rounded-sm py-1.5 pl-[34px] pr-3 text-ui text-muted-ink transition-[background,color] duration-[120ms] hover:bg-bg-2 hover:text-ink"
-                      activeClassName="bg-brand-tint font-semibold text-brand"
-                    >
-                      <item.icon className="h-[15px] w-[15px] shrink-0" strokeWidth={1.75} />
-                      {showLabels && (
-                        <>
-                          <span className="flex-1 truncate">{item.title}</span>
-                          <button onClick={(e) => handlePinClick(e, item)} className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            {isPinned(item.url) ? <PinOff className="w-3 h-3 text-primary" /> : <Pin className="w-3 h-3 text-muted-foreground hover:text-primary" />}
-                          </button>
-                        </>
-                      )}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
+          <SidebarMenu className="gap-0.5">
+            {visibleItems(entry).map((item) => (
+              <SidebarMenuItem key={item.title}>
+                {item.sectionBreak && showLabels && (
+                  <div className="px-3 pt-3 pb-1 text-[10px] uppercase tracking-[0.05em] text-nav-on-surface/40 border-t border-nav-on-surface/15 mt-1">
+                    {item.sectionBreak}
+                  </div>
+                )}
+                {item.sectionBreak && !showLabels && (
+                  <Separator className="my-1.5 mx-2 w-auto bg-nav-on-surface/15" />
+                )}
+                <SidebarMenuButton asChild tooltip={item.title}>
+                  <NavLink onClick={handleMobileNav}
+                    to={item.url}
+                    className={cn('group flex h-8 items-center gap-[9px] rounded-sm py-1.5 pl-[34px] pr-3 text-ui text-nav-on-surface/80 transition-[background,color] duration-[120ms]', navHoverClass)}
+                    activeClassName={navActiveClass}
+                  >
+                    <item.icon className="h-[15px] w-[15px] shrink-0" strokeWidth={1.75} />
+                    {showLabels && (
+                      <>
+                        <span className="flex-1 truncate">{item.title}</span>
+                        <button onClick={(e) => handlePinClick(e, item)} className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          {isPinned(item.url) ? <PinOff className="w-3 h-3 text-nav-on-surface" /> : <Pin className="w-3 h-3 text-nav-on-surface/50 hover:text-nav-on-surface" />}
+                        </button>
+                      </>
+                    )}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
         </CollapsibleContent>
       </Collapsible>
-    </SidebarGroup>
+    </SidebarMenuItem>
   );
 
-  return (
-    <Sidebar collapsible="icon" className="border-r border-border">
-      {/* Marca+empresa: no desktop mora no AppHeader (§6.2.1) — aqui só sobra
-          pro drawer mobile, onde o header full-width não tem esse bloco. */}
-      <SidebarHeader className="p-3 md:hidden">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-brand">
-            {logoUrl ? (
-              <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
-            ) : (
-              <Building2 className="h-4 w-4 text-on-brand" strokeWidth={1.5} />
-            )}
-          </div>
-          {showLabels && (
-            <div className="flex min-w-0 flex-col">
-              <span className="truncate text-ui-strong text-ink">{companyName}</span>
-              <span className="truncate font-mono text-meta text-muted-ink-2">
-                {companyCnpj || 'CNPJ não informado'}
-              </span>
-            </div>
-          )}
-        </div>
-      </SidebarHeader>
+  // Agrupa entradas visíveis em "corridas" contínuas entre divisores de seção —
+  // cada corrida é UMA SidebarMenu (gap-0.5 = 2px entre linhas, densidade
+  // pedida); o espaço entre seções diferentes vem do padding do kicker, não
+  // precisa de gap extra (24/08/2026).
+  const renderMenuRuns = () => {
+    const output: JSX.Element[] = [];
+    let run: MenuEntry[] = [];
+    const flushRun = () => {
+      if (run.length === 0) return;
+      output.push(
+        <SidebarMenu key={`run-${output.length}`} className="gap-0.5">
+          {run.map((e) => (e.kind === 'simple' ? renderSimpleEntry(e) : renderCollapsibleEntry(e as CollapsibleModule)))}
+        </SidebarMenu>,
+      );
+      run = [];
+    };
+    visibleEntries.forEach((entry) => {
+      if (entry.kind === 'section') {
+        flushRun();
+        output.push(renderSectionDivider(entry));
+      } else {
+        run.push(entry);
+      }
+    });
+    flushRun();
+    return output;
+  };
 
-      <Separator className="bg-line md:hidden" />
+  const companyInitial = (companyName || 'C').charAt(0).toUpperCase();
+
+  return (
+    <Sidebar collapsible="icon">
+      {/* Cartão de conta (redesign 24/08/2026): antes só existia no drawer
+          mobile (o header full-width levava a marca+empresa) — agora mora
+          aqui nos dois, desktop e mobile, e é o gatilho do popover "Conta
+          Ativa". Troca de conta é só affordance visual — multi-tenant real
+          não existe ainda, não tem lógica nenhuma por trás do clique num
+          item além de fechar o popover (o item real já vem marcado). */}
+      <SidebarHeader className="p-2">
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                'flex items-center gap-2.5 rounded-xl bg-nav-surface-strong text-left transition-colors hover:brightness-110',
+                showLabels ? 'w-full px-3 py-3' : 'mx-auto h-9 w-9 justify-center',
+              )}
+            >
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-paper">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="h-full w-full object-contain" />
+                ) : (
+                  <span className="text-ui-strong text-action">{companyInitial}</span>
+                )}
+              </div>
+              {showLabels && (
+                <>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-ui-strong text-nav-on-surface">{companyName}</span>
+                    <span className="truncate font-mono text-meta text-nav-on-surface/70">
+                      {companyCnpj || 'CNPJ não informado'}
+                    </span>
+                  </div>
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-nav-on-surface/70" />
+                </>
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64 p-2">
+            <p className="px-2 pb-1.5 text-kicker uppercase text-muted-ink-2">Conta ativa</p>
+            <div className="flex items-center gap-2 rounded-sm bg-action-tint px-2 py-2 text-ui-strong text-ink">
+              <Check className="h-4 w-4 shrink-0 text-action" />
+              <span className="truncate">{companyName}</span>
+            </div>
+            <div className="my-1.5 border-t border-line" />
+            <div className="cursor-not-allowed px-2 py-1.5 text-ui text-muted-ink-2">
+              Trocar de conta — em breve
+            </div>
+          </PopoverContent>
+        </Popover>
+      </SidebarHeader>
 
       <SidebarContent className="px-2">
         {/* Atalhos Fixados */}
         {pinnedShortcuts.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-muted-foreground text-[11px] uppercase tracking-[0.05em] px-3 py-2 font-medium">
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel className="px-3 py-2 text-[11px] font-medium uppercase tracking-[0.05em] text-nav-on-surface/60">
               <Pin className="w-3 h-3 inline mr-1.5" />
               Atalhos
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="gap-0.5">
                 {pinnedShortcuts.map(renderPinnedItem)}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         )}
 
-        {visibleEntries.map((entry) => {
-          if (entry.kind === 'section') return renderSectionDivider(entry);
-          if (entry.kind === 'simple') return renderSimpleEntry(entry);
-          return renderCollapsibleEntry(entry);
-        })}
+        {renderMenuRuns()}
       </SidebarContent>
 
       {/*
         Bloco "conta" (decisão 05): o perfil volta para o rodapé da sidebar e sai
         do topo. Suporte não some — já existe como item do grupo Administração,
         aqui era duplicata.
+
+        Redesign 24/08/2026: divide a linha com o SidebarTrigger, que saiu do
+        header — UserMenu não muda de estrutura interna (variant="bar" já é
+        w-full), só o container ao redor encolhe de w-full pra flex-1.
       */}
-      <SidebarFooter className="border-t border-line p-3">
-        {showLabels ? <UserMenu variant="bar" /> : <div className="flex justify-center"><UserMenu /></div>}
+      <SidebarFooter className="border-t border-nav-on-surface/15 p-3">
+        {showLabels ? (
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <UserMenu variant="bar" />
+            </div>
+            <SidebarTrigger className="h-8 w-8 shrink-0 text-nav-on-surface hover:bg-nav-surface-strong hover:text-nav-on-surface" />
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <UserMenu />
+            <SidebarTrigger className="h-8 w-8 shrink-0 text-nav-on-surface hover:bg-nav-surface-strong hover:text-nav-on-surface" />
+          </div>
+        )}
       </SidebarFooter>
     </Sidebar>
   );
