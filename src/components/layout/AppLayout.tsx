@@ -157,7 +157,11 @@ export function AppLayout({ children }: AppLayoutProps) {
             de rolado — é a causa do último card aparecer cortado no rodapé
             em toda tela do sistema (achado 21/08/2026).
           */}
-          <SidebarInset className="flex-1 min-w-0 md:h-full md:min-h-0 md:overflow-y-auto md:overflow-x-hidden">
+          {/* Ajuste 24/08/2026: os cantos externos do header/sidebar (topo-
+              esquerda, base-esquerda) voltaram a ser retos — o único raio que
+              sobra é interno, aqui, no encontro entre a coluna da sidebar e a
+              faixa do header. */}
+          <SidebarInset className="flex-1 min-w-0 rounded-tl-[20px] md:h-full md:min-h-0 md:overflow-y-auto md:overflow-x-hidden">
             <DevEnvironmentBanner />
             <ViewAsClientBanner />
             {/* pb extra no mobile: a bottom nav é fixa e cobriria o fim da página */}
