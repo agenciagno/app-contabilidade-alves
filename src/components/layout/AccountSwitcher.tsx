@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, Check, Building, Rocket } from 'lucide-react';
+import { ChevronsUpDown, Check, Building, Rocket } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useViewMode, type ViewMode } from '@/contexts/ViewModeContext';
@@ -16,6 +16,11 @@ import { cn } from '@/lib/utils';
  * visual (empresa atual marcada + "em breve" desabilitado). "Ver como
  * cliente" (preview de tenant específico) continua no UserMenu — é outra
  * feature, só relacionada por também depender de viewMode.
+ *
+ * Ajuste 24/08/2026 (print de referência: Staycloud): sem chip de fundo
+ * escuro próprio — só o hover sutil, igual aos outros botões do header.
+ * O divisor vertical entre Logo e este switch vive no AppHeader.tsx (é a
+ * "barrinha" do print), não aqui.
  */
 export function AccountSwitcher() {
   const navigate = useNavigate();
@@ -36,7 +41,7 @@ export function AccountSwitcher() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-2 rounded-xl bg-nav-surface-strong px-2.5 py-1.5 text-left transition-colors hover:brightness-110"
+          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-white/10"
         >
           <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-paper">
             {logoUrl ? (
@@ -51,7 +56,7 @@ export function AccountSwitcher() {
               {companyCnpj || 'CNPJ não informado'}
             </span>
           </div>
-          <ChevronDown className="h-3 w-3 shrink-0 text-nav-on-surface" />
+          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-nav-on-surface" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-64 p-2">

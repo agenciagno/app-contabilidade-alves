@@ -39,6 +39,13 @@ export function AppHeader() {
               dev
             </span>
           )}
+          {/* Divisor entre marca e switch de conta — formato de referência:
+              Staycloud (print 24/08/2026). Azul fixo (não usa --nav-on-
+              surface): "sutil" precisa ser um azul mais claro que o próprio
+              fundo, senão some no claro (onde o fundo já é --nav-surface
+              azul); mesma cor da linha vertical dos sub-itens da sidebar,
+              pra manter 1 só "azul sutil" no shell inteiro. */}
+          <span aria-hidden className="h-6 w-px bg-[#8ec2fb]/40" />
           <AccountSwitcher />
         </div>
 
