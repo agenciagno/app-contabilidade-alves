@@ -1,5 +1,6 @@
 import { TransactionInsert } from '@/hooks/useTransactions';
 import { format } from 'date-fns';
+import { addBusinessDays } from '@/lib/business-days';
 
 /**
  * Adds N months to a date, preserving the day. If the target month
@@ -36,20 +37,37 @@ function shiftDate(dateStr: string | null | undefined, months: number): string |
  * futuro — inflava o realizado em 12x e produzia linhas pagas com data futura, que ficavam
  * fora do saldo do banco e dentro dos KPIs.
  */
+/**
+ * Prevista de cada parcela, na mesma regra usada no formulário (TransactionFormDialog):
+ * despesa repete o vencimento; receita soma 2 dias úteis. Recalculada por parcela porque
+ * "dias úteis" não é um deslocamento fixo de dias corridos — varia com fim de semana/feriado
+ * a cada mês, então herdar o deslocamento calculado só na 1ª desalinha a Prevista do
+ * Vencimento ao longo da série (achado de Gabriel em 23/08/2026).
+ */
+function computeExpectedDate(dueDateStr: string | null | undefined, type: 'receita' | 'despesa'): string | null | undefined {
+  if (!dueDateStr) return dueDateStr;
+  if (type === 'despesa') return dueDateStr;
+  const d = new Date(dueDateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return dueDateStr;
+  return format(addBusinessDays(d, 2), 'yyyy-MM-dd');
+}
+
 export function generateInstallments(
   basePayload: TransactionInsert,
   count: number
 ): TransactionInsert[] {
   const installments: TransactionInsert[] = [];
-  // "À Vista" não pede Data Prevista no formulário, então ela chega vazia. Sem esse
-  // fallback, as parcelas futuras ficariam invisíveis nas telas que se apoiam nela.
-  const baseExpected = basePayload.expected_date || basePayload.due_date;
   for (let i = 0; i < count; i++) {
     const isFirst = i === 0;
+    const dueDate = shiftDate(basePayload.due_date, i) as string | null;
     installments.push({
       ...basePayload,
-      due_date: shiftDate(basePayload.due_date, i) as string | null,
-      expected_date: shiftDate(baseExpected, i) as string | null,
+      due_date: dueDate,
+      // A 1ª mantém a Prevista exatamente como veio do formulário (default ou ajustada à
+      // mão); as seguintes acompanham o próprio vencimento da parcela.
+      expected_date: isFirst
+        ? (basePayload.expected_date ?? dueDate)
+        : computeExpectedDate(dueDate, basePayload.type),
       // Só a primeira herda a liquidação; as próximas ainda vão acontecer.
       is_paid: isFirst ? basePayload.is_paid : false,
       paid_amount: isFirst ? basePayload.paid_amount : null,

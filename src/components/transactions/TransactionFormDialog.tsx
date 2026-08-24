@@ -70,7 +70,7 @@ export function TransactionFormDialog({
   const formRef = useRef<HTMLFormElement>(null);
 
   const [type, setType] = useState<'receita' | 'despesa'>(defaultType);
-  const [paymentCondition, setPaymentCondition] = useState<'a_vista' | 'a_prazo'>('a_vista');
+  const [paymentCondition, setPaymentCondition] = useState<'a_vista' | 'a_prazo' | 'recorrente'>('a_vista');
   const [amount, setAmount] = useState('');
   const [paidAmount, setPaidAmount] = useState('');
   const [date, setDate] = useState('');
@@ -90,14 +90,19 @@ export function TransactionFormDialog({
   const [pendingPayload, setPendingPayload] = useState<{ data: TransactionInsert; files: File[]; shouldClose: boolean } | null>(null);
 
   // Recurring/installment state
-  const [isRecurring, setIsRecurring] = useState(false);
   const [endMode, setEndMode] = useState<'parcelas' | 'data_final'>('parcelas');
   const [installmentCount, setInstallmentCount] = useState<string>('');
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [firstInstallmentPaid, setFirstInstallmentPaid] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
 
   const isAPrazo = paymentCondition === 'a_prazo' && !isEditing && !isSettleMode;
   const isAVista = paymentCondition === 'a_vista' && !isEditing && !isSettleMode;
+  const isRecorrenteTab = paymentCondition === 'recorrente' && !isEditing && !isSettleMode;
+  // Controla Valor Recebido/Pago + Pagamento: sempre em edição/liquidação/à vista;
+  // em Recorrente, só se a 1ª parcela foi marcada como já paga.
+  const showPaidRow = isEditing || isSettleMode || isAVista || (isRecorrenteTab && firstInstallmentPaid);
+  const paidFieldsRequired = isSettleMode || isAVista || (isRecorrenteTab && firstInstallmentPaid);
 
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
@@ -129,7 +134,7 @@ export function TransactionFormDialog({
   const filteredContacts = contacts.filter(c => c.is_active);
 
   // Calculate installment summary
-  const installmentSummary = isRecurring && dueDate
+  const installmentSummary = isRecorrenteTab && dueDate
     ? calculateSummary(
         dueDate,
         endMode,
@@ -140,7 +145,7 @@ export function TransactionFormDialog({
     : null;
 
   // Recurring validation
-  const isRecurringValid = !isRecurring || (
+  const isRecorrenteValid = !isRecorrenteTab || (
     !!dueDate &&
     (endMode === 'parcelas'
       ? parseInt(installmentCount || '0', 10) >= 2
@@ -180,7 +185,6 @@ export function TransactionFormDialog({
       setPartyId((transaction as { party_id?: string | null }).party_id || '');
       setNotes(transaction.notes || '');
       setPendingFiles([]);
-      setIsRecurring(false);
     } else if (!transaction && open && !resetKey) {
       setType(defaultType);
       setPaymentCondition('a_vista');
@@ -236,21 +240,26 @@ export function TransactionFormDialog({
   };
 
   const resetRecurring = () => {
-    setIsRecurring(false);
     setEndMode('parcelas');
     setInstallmentCount('');
     setEndDate(undefined);
+    setFirstInstallmentPaid(false);
   };
 
   const handlePaymentConditionChange = (v: string) => {
-    setPaymentCondition(v as 'a_vista' | 'a_prazo');
-    if (v === 'a_prazo') {
+    const next = v as 'a_vista' | 'a_prazo' | 'recorrente';
+    setPaymentCondition(next);
+    if (next === 'a_prazo') {
       setPaidAmount('');
       setDate('');
-    } else if (v === 'a_vista') {
+    } else if (next === 'a_vista') {
       // À Vista não compõe Previsto da DRE — limpa data prevista
       setExpectedDate('');
+    } else if (next === 'recorrente') {
+      setPaidAmount('');
+      setDate('');
     }
+    if (next !== 'recorrente') resetRecurring();
   };
 
   const checkYearAndSubmit = (payload: TransactionInsert, files: File[], shouldClose: boolean) => {
@@ -281,7 +290,7 @@ export function TransactionFormDialog({
   };
 
   const executeSubmit = async (payload: TransactionInsert, files: File[], shouldClose: boolean) => {
-    if (isRecurring && !isEditing && !isSettleMode && onBulkSubmit) {
+    if (isRecorrenteTab && onBulkSubmit) {
       const count = installmentSummary?.count || 0;
       if (count < 2) return;
       const installments = generateInstallments(payload, count);
@@ -322,12 +331,12 @@ export function TransactionFormDialog({
     e.preventDefault();
 
     // Recurring validation
-    if (isRecurring && !isEditing && !isSettleMode) {
+    if (isRecorrenteTab) {
       if (!dueDate) {
-        toast({ title: 'Preencha o Vencimento antes de ativar a recorrência.', variant: 'destructive' });
+        toast({ title: 'Preencha o Início da Recorrência antes de continuar.', variant: 'destructive' });
         return;
       }
-      if (!isRecurringValid) {
+      if (!isRecorrenteValid) {
         toast({ title: 'Preencha os campos de recorrência corretamente.', variant: 'destructive' });
         return;
       }
@@ -389,6 +398,30 @@ export function TransactionFormDialog({
         contact_id: contactId || (isEditing ? transaction?.contact_id : null) || null,
         party_id: partyId || null,
         is_paid: false,
+        notes: notes || null,
+      } as TransactionInsert;
+      checkYearAndSubmit(payload, pendingFiles, shouldClose);
+      saveActionRef.current = 'close';
+      return;
+    }
+
+    // Recorrente: monta a 1ª ocorrência (as demais nascem em generateInstallments)
+    if (isRecorrenteTab) {
+      const shouldClose = saveActionRef.current === 'close';
+      const payload = {
+        type,
+        description: autoDescription,
+        amount: parseCurrencyInput(amount),
+        paid_amount: firstInstallmentPaid ? paidAmountValue : null,
+        date: firstInstallmentPaid ? (date || undefined) : undefined,
+        issue_date: issueDate || null,
+        due_date: dueDate || null,
+        expected_date: expectedDate || null,
+        category_id: categoryId || null,
+        bank_id: bankId || null,
+        contact_id: contactId || null,
+        party_id: partyId || null,
+        is_paid: firstInstallmentPaid,
         notes: notes || null,
       } as TransactionInsert;
       checkYearAndSubmit(payload, pendingFiles, shouldClose);
@@ -466,13 +499,15 @@ export function TransactionFormDialog({
 
   // Validation rules per mode
   const hasPartyOrContact = isInternalCompany ? !!contactId : !!partyId;
+  // Em Recorrente só exige Valor Pago/Conta/Pagamento se a 1ª parcela foi marcada como paga.
+  const recorrentePaidOk = !isRecorrenteTab || !firstInstallmentPaid || (parseCurrencyInput(paidAmount) > 0 && !!bankId && !!date);
   const baseFormValid = isSettleMode
     ? parseCurrencyInput(paidAmount) > 0 && !!bankId && !!date
     : isAVista
       ? parseCurrencyInput(paidAmount) > 0 && !!bankId && !!date && !!categoryId && hasPartyOrContact && !!issueDate
-      : parseCurrencyInput(amount) > 0 && !!categoryId && hasPartyOrContact && !!issueDate && !!dueDate && !!expectedDate;
+      : parseCurrencyInput(amount) > 0 && !!categoryId && hasPartyOrContact && !!issueDate && !!dueDate && !!expectedDate && recorrentePaidOk;
 
-  const isFormValid = baseFormValid && isRecurringValid;
+  const isFormValid = baseFormValid && isRecorrenteValid;
 
   // Disabled states
   const structuralDisabled = isSettleMode;
@@ -521,12 +556,30 @@ export function TransactionFormDialog({
                 <TabsList className={segmentedListClass}>
                   <TabsTrigger value="a_vista" className={segmentedTriggerClass}>À Vista</TabsTrigger>
                   <TabsTrigger value="a_prazo" className={segmentedTriggerClass}>À Prazo</TabsTrigger>
+                  <TabsTrigger value="recorrente" className={cn(segmentedTriggerClass, 'gap-1.5')}>
+                    <Repeat className="w-3.5 h-3.5" /> Recorrente
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             )}
 
+            {/* 1ª parcela já paga — só em Recorrente; decide se Valor Recebido/Pago e
+                Pagamento aparecem (mesma regra que À Vista/À Prazo já seguem). */}
+            {isRecorrenteTab && (
+              <div className="flex items-center gap-3 py-1">
+                <Switch
+                  id="first-installment-paid"
+                  checked={firstInstallmentPaid}
+                  onCheckedChange={setFirstInstallmentPaid}
+                />
+                <Label htmlFor="first-installment-paid" className="text-xs cursor-pointer">
+                  1ª parcela já paga
+                </Label>
+              </div>
+            )}
+
             {/* Row 1: Cliente | Valor | Valor Recebido/Pago */}
-            <div className={`grid grid-cols-1 ${isAPrazo ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-3`}>
+            <div className={`grid grid-cols-1 ${showPaidRow ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
               <div className="space-y-1.5">
                 <Label className="text-ink-2">Cliente/Fornecedor <span className="text-destructive">*</span></Label>
                 {isInternalCompany ? (
@@ -564,14 +617,16 @@ export function TransactionFormDialog({
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label className="text-ink-2">Valor (R$) {!isAVista && <span className="text-destructive">*</span>}</Label>
+                <Label className="text-ink-2">
+                  Valor (R$){isRecorrenteTab && <span className="text-muted-foreground font-normal"> — por parcela</span>} {!isAVista && <span className="text-destructive">*</span>}
+                </Label>
                 <Input value={amount} onChange={handleAmountChange} placeholder="0,00" className="font-semibold" disabled={isSettleMode} />
               </div>
-              {!isAPrazo && (
+              {showPaidRow && (
                 <div className="space-y-1.5">
                   <Label className="text-ink-2">
                     {type === 'receita' ? 'Valor Recebido' : 'Valor Pago'}
-                    {(isSettleMode || isAVista) && <span className="text-destructive"> *</span>}
+                    {paidFieldsRequired && <span className="text-destructive"> *</span>}
                   </Label>
                   <Input value={paidAmount} onChange={handlePaidAmountChange} placeholder="0,00" disabled={isEditing && !isSettleMode} />
                 </div>
@@ -604,7 +659,7 @@ export function TransactionFormDialog({
               <div className="space-y-1.5">
                 <Label className="text-ink-2">
                   Conta/Banco
-                  {(isSettleMode || isAVista) && <span className="text-destructive"> *</span>}
+                  {paidFieldsRequired && <span className="text-destructive"> *</span>}
                 </Label>
                 <Select value={bankId} onValueChange={handleBankChange}>
                   <SelectTrigger className={!bankId ? 'border-muted-foreground/30' : ''}>
@@ -634,8 +689,15 @@ export function TransactionFormDialog({
                 <DateField value={issueDate} onChange={setIssueDate} disabled={isSettleMode} min="1900-01-01" max="9999-12-31" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-ink-2">Vencimento {(!isAVista || isRecurring) && <span className="text-destructive">*</span>}</Label>
+                <Label className="text-ink-2">
+                  {isRecorrenteTab ? 'Início da Recorrência' : 'Vencimento'} {!isAVista && <span className="text-destructive">*</span>}
+                </Label>
                 <DateField value={dueDate} onChange={setDueDate} disabled={isSettleMode} min="1900-01-01" max="9999-12-31" />
+                {isRecorrenteTab && (
+                  <p className="text-[11px] text-muted-foreground leading-tight">
+                    Vencimento da 1ª parcela — as seguintes repetem esse dia todo mês.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -656,11 +718,11 @@ export function TransactionFormDialog({
                   </p>
                 )}
               </div>
-              {!isAPrazo && (
+              {showPaidRow && (
                 <div className="space-y-1.5">
                   <Label className="text-ink-2">
                     Pagamento
-                    {(isSettleMode || isAVista) && <span className="text-destructive"> *</span>}
+                    {paidFieldsRequired && <span className="text-destructive"> *</span>}
                   </Label>
                   <DateField value={date} onChange={setDate} disabled={isEditing && !isSettleMode} min="1900-01-01" max="9999-12-31" />
                 </div>
@@ -668,90 +730,61 @@ export function TransactionFormDialog({
             </div>
 
 
-            {/* Recurring Toggle — only for new transactions */}
-            {!isEditing && !isSettleMode && (
-              <>
-                <div className="flex items-center gap-3 py-1">
-                  <Switch
-                    id="recurring-toggle"
-                    checked={isRecurring}
-                    onCheckedChange={(checked) => {
-                      setIsRecurring(checked);
-                      if (!checked) {
-                        setEndMode('parcelas');
-                        setInstallmentCount('');
-                        setEndDate(undefined);
-                      }
-                    }}
-                  />
-                  <Label htmlFor="recurring-toggle" className="text-xs flex items-center gap-1.5 cursor-pointer">
-                    <Repeat className="w-3.5 h-3.5 text-muted-foreground" />
-                    Recorrente / Parcelado
-                  </Label>
-                </div>
-
-                {/* Recurring section with animation */}
-                <div
-                  className={cn(
-                    "overflow-hidden transition-all duration-300 ease-in-out",
-                    isRecurring ? "max-h-[300px] opacity-100" : "max-h-0 opacity-0"
-                  )}
+            {/* Repetição — só na aba Recorrente */}
+            {isRecorrenteTab && (
+              <div className="border rounded-md p-4 bg-muted/30 space-y-3">
+                <RadioGroup
+                  value={endMode}
+                  onValueChange={(v) => setEndMode(v as 'parcelas' | 'data_final')}
+                  className="space-y-3"
                 >
-                  <div className="border rounded-md p-4 bg-muted/30 space-y-3">
-                    <RadioGroup
-                      value={endMode}
-                      onValueChange={(v) => setEndMode(v as 'parcelas' | 'data_final')}
-                      className="space-y-3"
-                    >
-                      {/* Option 1: Quantidade de Parcelas */}
-                      <div className="flex items-center gap-3">
-                        <RadioGroupItem value="parcelas" id="mode-parcelas" />
-                        <Label htmlFor="mode-parcelas" className="text-xs cursor-pointer">
-                          Quantidade de Parcelas
-                        </Label>
-                        {endMode === 'parcelas' && (
-                          <Input
-                            type="number"
-                            min={2}
-                            value={installmentCount}
-                            onChange={(e) => setInstallmentCount(e.target.value)}
-                            placeholder="Nº de parcelas"
-                            className="h-7 text-xs w-32"
-                          />
-                        )}
-                      </div>
-
-                      {/* Option 2: Data Final */}
-                      <div className="flex items-center gap-3">
-                        <RadioGroupItem value="data_final" id="mode-data-final" />
-                        <Label htmlFor="mode-data-final" className="text-xs cursor-pointer">
-                          Data Final
-                        </Label>
-                        {endMode === 'data_final' && (
-                          <div className="w-40">
-                            <DateField
-                              value={endDate ? format(endDate, 'yyyy-MM-dd') : ''}
-                              onChange={(iso) => setEndDate(iso ? new Date(`${iso}T00:00:00`) : undefined)}
-                              min={endDateMinDate ? format(endDateMinDate, 'yyyy-MM-dd') : undefined}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </RadioGroup>
-
-                    {/* Dynamic summary */}
-                    <p className="text-sm text-muted-foreground">
-                      {installmentSummary
-                        ? `${installmentSummary.count} lançamentos de ${amount || '0,00'} · Primeiro em ${installmentSummary.firstDate} · Último em ${installmentSummary.lastDate}`
-                        : '— lançamentos · —'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      O valor se repete em cada mês (não é divisão de um total).
-                      {isAVista ? ' O primeiro entra como liquidado; os demais ficam em aberto.' : ''}
-                    </p>
+                  {/* Option 1: Quantidade de Parcelas */}
+                  <div className="flex items-center gap-3">
+                    <RadioGroupItem value="parcelas" id="mode-parcelas" />
+                    <Label htmlFor="mode-parcelas" className="text-xs cursor-pointer">
+                      Quantidade de Parcelas
+                    </Label>
+                    {endMode === 'parcelas' && (
+                      <Input
+                        type="number"
+                        min={2}
+                        value={installmentCount}
+                        onChange={(e) => setInstallmentCount(e.target.value)}
+                        placeholder="Nº de parcelas"
+                        className="h-7 text-xs w-32"
+                      />
+                    )}
                   </div>
-                </div>
-              </>
+
+                  {/* Option 2: Data Final */}
+                  <div className="flex items-center gap-3">
+                    <RadioGroupItem value="data_final" id="mode-data-final" />
+                    <Label htmlFor="mode-data-final" className="text-xs cursor-pointer">
+                      Data Final
+                    </Label>
+                    {endMode === 'data_final' && (
+                      <div className="w-40">
+                        <DateField
+                          value={endDate ? format(endDate, 'yyyy-MM-dd') : ''}
+                          onChange={(iso) => setEndDate(iso ? new Date(`${iso}T00:00:00`) : undefined)}
+                          min={endDateMinDate ? format(endDateMinDate, 'yyyy-MM-dd') : undefined}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </RadioGroup>
+
+                {/* Dynamic summary */}
+                <p className="text-sm text-muted-foreground">
+                  {installmentSummary
+                    ? `${installmentSummary.count} lançamentos de ${amount || '0,00'} · Início em ${installmentSummary.firstDate} · Último em ${installmentSummary.lastDate}`
+                    : '— lançamentos · —'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  O valor se repete em cada mês (não é divisão de um total).
+                  {firstInstallmentPaid ? ' A 1ª parcela entra como liquidada; as demais ficam em aberto.' : ' Todas as parcelas ficam em aberto, inclusive a 1ª.'}
+                </p>
+              </div>
             )}
 
             {/* Row 4: Anexo | Histórico side by side */}
