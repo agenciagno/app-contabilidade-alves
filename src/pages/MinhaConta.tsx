@@ -388,9 +388,7 @@ export default function MinhaConta() {
           <Card className="bg-card border-border/50">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Monitor className="w-5 h-5 text-primary" />
-                </div>
+                <IconBox tone="accent" icon={<Monitor strokeWidth={1.75} />} />
                 <div>
                   <CardTitle>Sessões ativas</CardTitle>
                   <CardDescription>Dispositivos conectados à sua conta agora.</CardDescription>
