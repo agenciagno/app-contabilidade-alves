@@ -54,6 +54,7 @@ export default function UsersTab({ companyId, currentUserId }: UsersTabProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [editUser, setEditUser] = useState<EditUserData | undefined>(undefined);
+  const [loadingEditUserId, setLoadingEditUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { isSuperAdmin } = useUserRole();
 
@@ -114,17 +115,34 @@ export default function UsersTab({ companyId, currentUserId }: UsersTabProps) {
     setDeleteUserId(userId);
   };
 
-  const handleEdit = (user: Profile) => {
-    setEditUser({
-      userId: user.user_id,
-      fullName: user.full_name || '',
-      email: user.email,
-      role: user.role || 'colaborador',
-      statusActive: user.status_active ?? true,
-      allowedModules: user.allowed_modules ?? [],
-      department: user.department ?? null,
-    });
-    setIsDialogOpen(true);
+  // Não confia no `user` da lista em memória (cache de até 30s, só atualiza com
+  // invalidate + refetch) — um super admin pode ter mexido nos módulos deste usuário
+  // pelo console Tech nesse meio-tempo; sem buscar fresco aqui, salvar reverte
+  // silenciosamente o que ele acabou de fazer.
+  const handleEdit = async (user: Profile) => {
+    setLoadingEditUserId(user.user_id);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email, role, status_active, allowed_modules, department')
+        .eq('user_id', user.user_id)
+        .single();
+      if (error) throw error;
+      setEditUser({
+        userId: data.user_id,
+        fullName: data.full_name || '',
+        email: data.email,
+        role: data.role || 'colaborador',
+        statusActive: data.status_active ?? true,
+        allowedModules: data.allowed_modules ?? [],
+        department: data.department ?? null,
+      });
+      setIsDialogOpen(true);
+    } catch (err: any) {
+      toast.error(err.message || 'Falha ao buscar dados atuais do usuário.');
+    } finally {
+      setLoadingEditUserId(null);
+    }
   };
 
   const handleDialogClose = (open: boolean) => {
@@ -269,10 +287,13 @@ export default function UsersTab({ companyId, currentUserId }: UsersTabProps) {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleEdit(user)}
+                        disabled={loadingEditUserId === user.user_id}
                         className="text-muted-foreground hover:text-primary"
                         title="Editar usuário"
                       >
-                        <Pencil className="w-4 h-4" />
+                        {loadingEditUserId === user.user_id
+                          ? <Loader2 className="w-4 h-4 animate-spin" />
+                          : <Pencil className="w-4 h-4" />}
                       </Button>
                       <Button
                         variant="ghost"

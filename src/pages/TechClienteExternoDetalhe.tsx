@@ -559,10 +559,29 @@ function AbaUsuarios({
     setAddOpen(true);
   };
 
+  // Mesmo motivo do `buscarPlanoAtual`: o cliente pode ter mexido nos próprios módulos
+  // pela Equipe dele (self-service) entre o último fetch da lista e este clique — sem
+  // buscar fresco aqui, salvar module reverte silenciosamente o que o cliente acabou
+  // de fazer (a leitura stale de `u` vira o payload que sobrescreve o banco).
   const abrirEditarModulos = async (u: TenantUserRow) => {
-    await buscarPlanoAtual();
-    setModulosTarget(u);
-    setModulosSelecionados(u.allowed_modules ?? []);
+    setAcao(`modulos-${u.user_id}`);
+    try {
+      const [planoFresco, { data: userFresco, error }] = await Promise.all([
+        buscarPlanoAtual(),
+        supabase
+          .from('profiles')
+          .select('full_name, email, role, status_active, allowed_modules')
+          .eq('user_id', u.user_id)
+          .single(),
+      ]);
+      if (error) throw error;
+      setModulosTarget({ ...u, ...userFresco });
+      setModulosSelecionados((userFresco?.allowed_modules as string[] | null) ?? []);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao buscar dados atuais do usuário.');
+    } finally {
+      setAcao(null);
+    }
   };
 
   const criarUsuario = async () => {
@@ -805,10 +824,13 @@ function AbaUsuarios({
                           </Button>
                           <Button
                             size="sm" variant="outline"
+                            disabled={acao === `modulos-${u.user_id}`}
                             onClick={() => abrirEditarModulos(u)}
                             title="Controla o que este usuário enxerga, dentro do plano do cliente"
                           >
-                            <Settings2 className="w-3 h-3 mr-2" />
+                            {acao === `modulos-${u.user_id}`
+                              ? <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                              : <Settings2 className="w-3 h-3 mr-2" />}
                             Módulos
                           </Button>
                           <Button
