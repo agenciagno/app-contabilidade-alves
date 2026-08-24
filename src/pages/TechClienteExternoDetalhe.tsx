@@ -16,7 +16,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -28,9 +27,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MODULE_TREE, moduleAllowsAudience } from '@/constants/modules';
 import { DsBadge, tabsListClass, tabsTriggerClass } from '@/components/ds';
 import { EmailField, isValidEmail, normalizeEmail } from '@/components/tech/EmailField';
+import { ModulosPickerTree, toggleModuloKey } from '@/components/tech/ModulosPickerTree';
 import {
   useTenants, useTenantUsers, useTenantInvoices, useInvalidateTenants,
   invoiceState, type TenantUserRow, type TenantInvoiceRow,
@@ -852,14 +851,7 @@ function AbaUsuarios({
                   <ModulosPickerTree
                     planModules={planoAtual}
                     selecionados={novoModulos}
-                    onToggle={(key, checked, filhos) => {
-                      setNovoModulos((prev) => {
-                        const set = new Set(prev);
-                        if (checked) set.add(key);
-                        else { set.delete(key); (filhos ?? []).forEach((f) => set.delete(f)); }
-                        return Array.from(set);
-                      });
-                    }}
+                    onToggle={toggleModuloKey(setNovoModulos)}
                   />
                 </div>
               </div>
@@ -934,14 +926,7 @@ function AbaUsuarios({
             <ModulosPickerTree
               planModules={planoAtual}
               selecionados={modulosSelecionados}
-              onToggle={(key, checked, filhos) => {
-                setModulosSelecionados((prev) => {
-                  const set = new Set(prev);
-                  if (checked) set.add(key);
-                  else { set.delete(key); (filhos ?? []).forEach((f) => set.delete(f)); }
-                  return Array.from(set);
-                });
-              }}
+              onToggle={toggleModuloKey(setModulosSelecionados)}
             />
           </div>
           <DialogFooter>
@@ -959,61 +944,6 @@ function AbaUsuarios({
   );
 }
 
-/**
- * Árvore de checkboxes de módulo × submódulo, reaproveitada na criação de
- * usuário e na edição posterior. Só oferece o que o plano do tenant contratou
- * (`planModules`) — não faz sentido liberar pro usuário um módulo que o cliente
- * nem comprou.
- */
-function ModulosPickerTree({
-  planModules, selecionados, onToggle,
-}: {
-  planModules: string[];
-  selecionados: string[];
-  onToggle: (key: string, checked: boolean, filhos?: string[]) => void;
-}) {
-  const modulosDoPlano = MODULE_TREE.filter(
-    (mod) => moduleAllowsAudience(mod.key, 'external') && planModules.includes(mod.key),
-  );
-
-  if (modulosDoPlano.length === 0) {
-    return <p className="text-sm text-muted-foreground">O plano deste cliente ainda não tem módulo contratado.</p>;
-  }
-
-  return (
-    <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-      {modulosDoPlano.map((mod) => {
-        const filhosVisiveis = (mod.children ?? []).filter(
-          (c) => moduleAllowsAudience(c.key, 'external') && planModules.includes(c.key),
-        );
-        const filhos = filhosVisiveis.map((c) => c.key);
-        const marcado = selecionados.includes(mod.key);
-        return (
-          <div key={mod.key} className="space-y-1.5">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox checked={marcado} onCheckedChange={(v) => onToggle(mod.key, v === true, filhos)} />
-              <span className="text-sm font-medium">{mod.label}</span>
-            </label>
-            {marcado && filhosVisiveis.length > 0 && (
-              <div className="ml-6 space-y-1.5 border-l border-border pl-3">
-                {filhosVisiveis.map((filho) => (
-                  <label key={filho.key} className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox
-                      checked={selecionados.includes(filho.key)}
-                      onCheckedChange={(v) => onToggle(filho.key, v === true)}
-                    />
-                    <span className="text-xs text-muted-foreground">{filho.label}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 /* --------------------------------------------------------------------- Módulos */
 
 function AbaModulos({ cliente, onChanged }: { cliente: Cliente; onChanged: () => void }) {
@@ -1021,19 +951,6 @@ function AbaModulos({ cliente, onChanged }: { cliente: Cliente; onChanged: () =>
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => { setSelecionados(cliente.plan_modules ?? []); }, [cliente]);
-
-  const toggle = (key: string, checked: boolean, filhos: string[] = []) => {
-    setSelecionados((prev) => {
-      const set = new Set(prev);
-      if (checked) {
-        set.add(key);
-      } else {
-        set.delete(key);
-        filhos.forEach((f) => set.delete(f));
-      }
-      return Array.from(set);
-    });
-  };
 
   const salvar = async () => {
     setSalvando(true);
@@ -1057,47 +974,10 @@ function AbaModulos({ cliente, onChanged }: { cliente: Cliente; onChanged: () =>
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Módulos contratados</CardTitle>
-        <CardDescription>
-          Define o que o cliente enxerga. Início e Configurações ficam sempre ligados.
-        </CardDescription>
+        <CardDescription>Define o que o cliente enxerga.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
-          {/* Só módulos do produto (audiência externa) — módulo interno da CA
-              (Fiscal, Cadastro interno, etc.) não é oferecível a tenant. */}
-          {MODULE_TREE.filter((mod) => moduleAllowsAudience(mod.key, 'external')).map((mod) => {
-            const fixo = MODULOS_FIXOS.includes(mod.key);
-            const filhosVisiveis = mod.children?.filter((c) => moduleAllowsAudience(c.key, 'external')) ?? [];
-            const filhos = filhosVisiveis.map((c) => c.key);
-            const marcado = fixo || selecionados.includes(mod.key);
-            return (
-              <div key={mod.key} className="space-y-2">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <Checkbox
-                    checked={marcado}
-                    disabled={fixo}
-                    onCheckedChange={(v) => toggle(mod.key, v === true, filhos)}
-                  />
-                  <span className="text-sm font-medium">{mod.label}</span>
-                  {fixo && <span className="text-xs text-muted-foreground">(fixo)</span>}
-                </label>
-                {marcado && filhosVisiveis.length ? (
-                  <div className="ml-7 space-y-2 border-l border-border pl-3">
-                    {filhosVisiveis.map((filho) => (
-                      <label key={filho.key} className="flex items-center gap-3 cursor-pointer">
-                        <Checkbox
-                          checked={selecionados.includes(filho.key)}
-                          onCheckedChange={(v) => toggle(filho.key, v === true)}
-                        />
-                        <span className="text-sm text-muted-foreground">{filho.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
+        <ModulosPickerTree selecionados={selecionados} onToggle={toggleModuloKey(setSelecionados)} />
         <Button onClick={salvar} disabled={salvando}>
           {salvando && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
           Salvar módulos

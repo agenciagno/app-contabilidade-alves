@@ -14,6 +14,8 @@ import { maskCPFCNPJ, maskPhone, unmaskPhone, getDocumentType } from '@/lib/util
 import { EmailField, isValidEmail, normalizeEmail } from './EmailField';
 import { useInvalidateTenants, useTenants } from '@/hooks/useTenants';
 import { PUBLIC_APP_URL } from '@/lib/environment';
+import { EXTERNAL_MODULE_ALL_KEYS } from '@/constants/modules';
+import { ModulosPickerTree, toggleModuloKey } from './ModulosPickerTree';
 
 function cleanDocument(v: string): string {
   return v.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
@@ -30,12 +32,16 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
   const invalidate = useInvalidateTenants();
   const { data: tenants } = useTenants();
 
+  const [step, setStep] = useState<'dados' | 'modulos'>('dados');
   const [document, setDocument] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [companyEmail, setCompanyEmail] = useState('');
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
+  // Pacote padrão pré-marcado — o admin herda exatamente os mesmos módulos da
+  // empresa, os dois vêm desta mesma lista (pedido de Gabriel, 24/08).
+  const [modulosSelecionados, setModulosSelecionados] = useState<string[]>(EXTERNAL_MODULE_ALL_KEYS);
 
   const [lookingUp, setLookingUp] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -87,6 +93,7 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
   const reset = () => {
     setDocument(''); setName(''); setPhone(''); setCompanyEmail('');
     setAdminName(''); setAdminEmail(''); setCreated(null); setCopied(false);
+    setStep('dados'); setModulosSelecionados(EXTERNAL_MODULE_ALL_KEYS);
   };
 
   const handleLookup = async () => {
@@ -111,7 +118,8 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
     }
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  // Etapa 1 → 2: valida os dados e só então mostra o seletor de módulos.
+  const avancar = (e: FormEvent) => {
     e.preventDefault();
     if (clean.length !== 11 && clean.length !== 14) return toast.error('CPF/CNPJ inválido.');
     if (duplicatedTenant) return toast.error(`Esse documento já é o cliente externo "${duplicatedTenant.name}".`);
@@ -123,6 +131,13 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
     }
     if (!adminName.trim()) return toast.error('Informe o nome do admin.');
     if (!isValidEmail(adminEmail)) return toast.error('E-mail do admin inválido.');
+    setStep('modulos');
+  };
+
+  // Etapa 2: cria o tenant com os módulos marcados. A empresa e o admin nascem
+  // com exatamente o mesmo pacote — um array só, sem duplicar a lista.
+  const handleSubmit = async () => {
+    if (modulosSelecionados.length === 0) return toast.error('Marque pelo menos um módulo.');
 
     setSubmitting(true);
     try {
@@ -136,6 +151,7 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
           admin_email: email,
           admin_name: adminName.trim(),
           contact_id: matchedContact?.id,
+          modules: modulosSelecionados,
         },
       });
 
@@ -197,11 +213,15 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
     >
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{created ? 'Cliente provisionado' : 'Cadastrar cliente'}</DialogTitle>
+          <DialogTitle>
+            {created ? 'Cliente provisionado' : step === 'dados' ? 'Cadastrar cliente' : 'Módulos do cliente'}
+          </DialogTitle>
           <DialogDescription>
             {created
               ? 'Copie as credenciais antes de fechar — a senha provisória não é exibida de novo.'
-              : 'Cria o tenant, o plano de contas inicial e o primeiro acesso do admin.'}
+              : step === 'dados'
+                ? 'Etapa 1 de 2 — dados do cliente e do primeiro acesso.'
+                : 'Etapa 2 de 2 — o admin nasce com exatamente estes módulos.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -231,8 +251,8 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
               <Button type="button" onClick={finish}>Abrir cliente</Button>
             </DialogFooter>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-5">
+        ) : step === 'dados' ? (
+          <form onSubmit={avancar} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="document" className="flex items-center">
                 CPF/CNPJ *
@@ -330,15 +350,36 @@ export function CadastrarClienteDialog({ open, onOpenChange, onCreated }: Props)
             </div>
 
             <DialogFooter className="gap-2 sm:gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={submitting || !!duplicatedTenant}>
+              <Button type="submit" disabled={!!duplicatedTenant}>
+                Avançar
+              </Button>
+            </DialogFooter>
+          </form>
+        ) : (
+          <div className="space-y-5">
+            <p className="text-sm text-muted-foreground">
+              Define o que {documentType === 'CPF' ? adminName.trim() : name.trim()} enxerga. O admin nasce
+              com exatamente estes módulos — não precisa configurar separado.
+            </p>
+            <div className="rounded-md border border-border p-3 max-h-[50vh] overflow-y-auto">
+              <ModulosPickerTree
+                selecionados={modulosSelecionados}
+                onToggle={toggleModuloKey(setModulosSelecionados)}
+              />
+            </div>
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button type="button" variant="outline" onClick={() => setStep('dados')} disabled={submitting}>
+                Voltar
+              </Button>
+              <Button type="button" onClick={handleSubmit} disabled={submitting}>
                 {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Cadastrar cliente
               </Button>
             </DialogFooter>
-          </form>
+          </div>
         )}
       </DialogContent>
     </Dialog>

@@ -223,6 +223,40 @@ export const MODULE_LABELS: Record<string, string> = MODULE_TREE.reduce((acc, m)
   return acc;
 }, {} as Record<string, string>);
 
+/**
+ * Árvore de módulos como o cliente externo realmente vê no menu (`AppSidebar`)
+ * — fonte única de todo seletor que deixa marcar/desmarcar módulo de produto
+ * (cadastro de cliente, aba Módulos, controle por usuário). Existe separada de
+ * `MODULE_TREE` porque a posição de alguns itens no menu do produto não é a
+ * mesma da árvore interna: `financeiro_clientes_fornecedores` é filho de
+ * `financeiro` em `MODULE_TREE`, mas no menu do cliente mora dentro de
+ * "Cadastro" — sem isso, o seletor mostrava uma organização diferente da que
+ * o cliente via de verdade. As chaves são as mesmas de `MODULE_TREE` (não
+ * muda gating), só o agrupamento visual é outro.
+ */
+export interface ExternalModuleGroup {
+  key: string;
+  children?: string[];
+}
+export const EXTERNAL_MODULE_GROUPS: ExternalModuleGroup[] = [
+  { key: 'home' },
+  {
+    key: 'financeiro',
+    children: [
+      'financeiro_dashboard', 'financeiro_lancamentos', 'financeiro_pagar_receber',
+      'financeiro_fluxo_caixa', 'financeiro_conta_corrente', 'financeiro_categorias',
+      'financeiro_metas_orcamentos',
+    ],
+  },
+  { key: 'cadastro', children: ['equipe', 'financeiro_clientes_fornecedores'] },
+  { key: 'suporte' },
+];
+
+/** Todas as chaves (pai + filhos) do pacote padrão de produto. */
+export const EXTERNAL_MODULE_ALL_KEYS: string[] = EXTERNAL_MODULE_GROUPS.flatMap(
+  (g) => [g.key, ...(g.children ?? [])],
+);
+
 /** Submódulos por módulo pai — usado nos dois gates (menu e guard). */
 export const SUB_MODULES_BY_PARENT: Record<string, string[]> = MODULE_TREE.reduce((acc, m) => {
   if (m.children?.length) acc[m.key] = m.children.map((c) => c.key);
