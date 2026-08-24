@@ -16,6 +16,8 @@ export interface CashFlowCalendarItem {
 interface TransactionCalendarViewProps {
   items: CashFlowCalendarItem[];
   onItemClick: (id: string) => void;
+  /** Chamado com a data (yyyy-MM-dd) quando o "+N" de um dia é clicado. */
+  onMoreClick: (dateKey: string) => void;
 }
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -23,7 +25,7 @@ const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 // Mesmo padrão visual de src/components/fiscal/TaskCalendarView.tsx (mês em
 // grid 7 colunas, até 3 itens por dia + "+N"), adaptado pra transações
 // (bolinha por tipo receita/despesa em vez de status de tarefa) — 22/08/2026.
-export function TransactionCalendarView({ items, onItemClick }: TransactionCalendarViewProps) {
+export function TransactionCalendarView({ items, onItemClick, onMoreClick }: TransactionCalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const days = useMemo(() => {
@@ -95,7 +97,12 @@ export function TransactionCalendarView({ items, onItemClick }: TransactionCalen
                   </button>
                 ))}
                 {dayItems.length > 3 && (
-                  <span className="text-[10px] text-muted-foreground px-1">+{dayItems.length - 3}</span>
+                  <button
+                    onClick={() => onMoreClick(dateKey)}
+                    className="text-[10px] text-muted-foreground px-1 hover:text-primary hover:underline"
+                  >
+                    +{dayItems.length - 3}
+                  </button>
                 )}
               </div>
             </div>

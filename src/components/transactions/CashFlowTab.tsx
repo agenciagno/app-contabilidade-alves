@@ -12,29 +12,31 @@ import {
 } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   AlertTriangle, TrendingUp, TrendingDown, Landmark,
   Filter, Search, X, ChevronUp, ChevronDown, ListChecks, CalendarDays,
 } from 'lucide-react';
-import { format, parseISO, isWithinInterval, startOfYear } from 'date-fns';
+import { format, parseISO, isWithinInterval, startOfYear, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { calcularEncargosAtraso } from '@/lib/financial-utils';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { CashFlowReportModal } from './CashFlowReportModal';
 import { TransactionCalendarView } from './TransactionCalendarView';
+import { TransactionActionsDialog } from './TransactionActionsDialog';
+import { DayTransactionsDialog } from './DayTransactionsDialog';
+import { TransactionFormDialog } from './TransactionFormDialog';
 import { IconBox } from '@/components/ds';
-import type { Transaction } from '@/hooks/useTransactions';
+import { useTransactions } from '@/hooks/useTransactions';
+import { useTransactionAttachments } from '@/hooks/useTransactionAttachments';
+import type { Transaction, TransactionInsert } from '@/hooks/useTransactions';
+import type { Category } from '@/hooks/useCategories';
 import type { Bank } from '@/hooks/useBanks';
 import type { Contact } from '@/hooks/useContacts';
-
-interface Category {
-  id: string;
-  name: string;
-  color: string | null;
-  type: string;
-  parent_id: string | null;
-}
 
 interface CashFlowTabProps {
   transactions: Transaction[];
@@ -450,10 +452,61 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; row: any | null }>({ open: false, row: null });
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
 
-  // Global date filter — defaults to Jan 1 of current year → today
+  // Clicar numa transação (lista ou calendário) abre a escolha de ação —
+  // mesmas 3 ações de Lançamentos (Editar/Liquidar/Excluir), mesmos diálogos
+  // reaproveitados (24/08/2026). O "+N" do calendário abre a lista do dia
+  // inteiro, com as 3 ações inline em cada linha.
+  const { updateTransaction, deleteTransaction } = useTransactions();
+  const { uploadAttachment } = useTransactionAttachments();
+  const [actionsTarget, setActionsTarget] = useState<(typeof rows)[number] | null>(null);
+  const [moreDateKey, setMoreDateKey] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<'edit' | 'settle'>('edit');
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const openEdit = (row: (typeof rows)[number]) => {
+    setActionsTarget(null);
+    setMoreDateKey(null);
+    setEditingTransaction(row as unknown as Transaction);
+    setDialogMode('edit');
+    setDialogOpen(true);
+  };
+  const openSettle = (row: (typeof rows)[number]) => {
+    setActionsTarget(null);
+    setMoreDateKey(null);
+    setEditingTransaction(row as unknown as Transaction);
+    setDialogMode('settle');
+    setDialogOpen(true);
+  };
+  const openDelete = (row: (typeof rows)[number]) => {
+    setActionsTarget(null);
+    setMoreDateKey(null);
+    setDeleteId(row.id);
+  };
+
+  const handleFormSubmit = async (data: TransactionInsert, pendingFiles?: File[]) => {
+    if (!editingTransaction) return;
+    updateTransaction.mutate({ id: editingTransaction.id, ...data }, {
+      onSuccess: async () => {
+        if (pendingFiles?.length) {
+          for (const file of pendingFiles) await uploadAttachment.mutateAsync({ file, transactionId: editingTransaction.id });
+        }
+        setDialogOpen(false);
+        setEditingTransaction(null);
+      },
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteId) return;
+    deleteTransaction.mutate(deleteId, { onSuccess: () => setDeleteId(null) });
+  };
+
+  // Global date filter — defaults to Jan 1 of current year → last day of the current month.
   const today = new Date();
   const defaultStart = format(startOfYear(today), 'yyyy-MM-dd');
-  const defaultEnd = format(today, 'yyyy-MM-dd');
+  const defaultEnd = format(endOfMonth(today), 'yyyy-MM-dd');
   const [globalStartDate, setGlobalStartDate] = useState(defaultStart);
   const [globalEndDate, setGlobalEndDate] = useState(defaultEnd);
 
@@ -708,6 +761,12 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
     type: row.type as 'receita' | 'despesa',
   })), [rows, isReceivables]);
 
+  // Todas as transações do dia clicado no "+N" (o calendário só mostra 3 por célula).
+  const dayRows = useMemo(() => {
+    if (!moreDateKey) return [];
+    return rows.filter(row => (isReceivables ? row.due_date : (row.expected_date || row.due_date)) === moreDateKey);
+  }, [rows, moreDateKey, isReceivables]);
+
   return (
     <div className="space-y-4">
       {/*
@@ -849,10 +908,14 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
 
       {/* Data Grid / Calendário */}
       {viewMode === 'calendar' ? (
-        <TransactionCalendarView items={calendarItems} onItemClick={id => {
-          const row = rows.find(r => r.id === id);
-          if (row) handleRowClick(row);
-        }} />
+        <TransactionCalendarView
+          items={calendarItems}
+          onItemClick={id => {
+            const row = rows.find(r => r.id === id);
+            if (row) setActionsTarget(row);
+          }}
+          onMoreClick={dateKey => setMoreDateKey(dateKey)}
+        />
       ) : (
       <Card className="bg-card">
         <CardContent className="p-0">
@@ -959,7 +1022,11 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                       </TableCell>
                     </TableRow>
                   ) : rows.map(row => (
-                    <TableRow key={row.id} className="text-xs">
+                    <TableRow
+                      key={row.id}
+                      className="text-xs cursor-pointer hover:bg-muted/40"
+                      onClick={() => setActionsTarget(row)}
+                    >
                       {/* Data Prevista */}
                       {!isReceivables && (
                         <TableCell className="font-mono tabular-nums whitespace-nowrap">{row.expected_date ? formatDate(row.expected_date) : '—'}</TableCell>
@@ -1022,8 +1089,10 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                         {formatCurrency(row.saldoAtual)}
                       </TableCell>
 
-                      {/* Status */}
-                      <TableCell className="text-center">
+                      {/* Status — clique aqui é só o toggle rápido de pago, não abre a
+                          escolha de ação (mesmo padrão de antes); por isso para a
+                          propagação antes de chegar no onClick da linha. */}
+                      <TableCell className="text-center" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => handleRowClick(row)}
                           className="cursor-pointer"
@@ -1106,6 +1175,55 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
         initialContactIds={columnFilters.contactIds || []}
         mode={mode}
       />
+
+      {/* Clicar numa transação (lista ou pílula do calendário) → escolher ação */}
+      <TransactionActionsDialog
+        transaction={actionsTarget}
+        onOpenChange={(open) => !open && setActionsTarget(null)}
+        onEdit={() => actionsTarget && openEdit(actionsTarget)}
+        onSettle={() => actionsTarget && openSettle(actionsTarget)}
+        onDelete={() => actionsTarget && openDelete(actionsTarget)}
+      />
+
+      {/* "+N" do calendário → todas as transações do dia, ações inline */}
+      <DayTransactionsDialog
+        dateKey={moreDateKey}
+        rows={dayRows}
+        onOpenChange={(open) => !open && setMoreDateKey(null)}
+        onEdit={openEdit}
+        onSettle={openSettle}
+        onDelete={openDelete}
+      />
+
+      <TransactionFormDialog
+        open={dialogOpen}
+        onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingTransaction(null); }}
+        transaction={editingTransaction}
+        categories={categories}
+        banks={banks}
+        contacts={contacts}
+        onSubmit={handleFormSubmit}
+        isLoading={updateTransaction.isPending}
+        mode={dialogMode}
+      />
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir transação?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
