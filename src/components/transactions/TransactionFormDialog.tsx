@@ -130,7 +130,13 @@ export function TransactionFormDialog({
   // Evento Contábil: só sub-eventos aparecem no lançamento (macros ficam ocultos aqui,
   // mas seguem visíveis/editáveis na tela de cadastro Eventos Contábeis). Exceção: preserva
   // a categoria já selecionada mesmo se for macro, pra não sumir ao editar lançamento legado.
-  const filteredCategories = categories.filter(c => c.type === type && (c.parent_id !== null || c.id === categoryId));
+  // Interno (Eventos Contábeis) só lista sub-eventos — macro é cabeçalho de
+  // agrupamento. Cliente (Categorias) não força hierarquia: toda categoria do
+  // tipo é selecionável direto, senão quem nunca criou sub-categoria via
+  // dropdown vazio (achado 24/08/2026).
+  const filteredCategories = categories.filter(
+    c => c.type === type && (!isInternalCompany || c.parent_id !== null || c.id === categoryId),
+  );
   const activeBanks = banks.filter(b => b.is_active);
   const filteredContacts = contacts.filter(c => c.is_active);
 

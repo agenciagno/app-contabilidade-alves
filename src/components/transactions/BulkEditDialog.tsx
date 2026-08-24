@@ -14,6 +14,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 import { Loader2, CalendarIcon } from 'lucide-react';
 
 type FieldOption = 'contact_id' | 'category_id' | 'bank_id' | 'due_date' | 'expected_date';
@@ -78,11 +79,13 @@ export function BulkEditDialog({
     }
   };
 
+  const { isInternalCompany } = useActiveCompany();
   const activeContacts = contacts.filter(c => c.is_active);
   const activeBanks = banks.filter(b => b.is_active);
-  // Evento Contábil: só sub-eventos entram na edição em massa (macros seguem visíveis só na
-  // tela de cadastro Eventos Contábeis).
-  const subCategories = categories.filter(c => c.parent_id !== null);
+  // Interno (Eventos Contábeis): só sub-eventos entram na edição em massa (macro
+  // é cabeçalho de agrupamento, some aqui mas segue visível no cadastro).
+  // Cliente (Categorias) não força hierarquia — toda categoria entra.
+  const subCategories = categories.filter(c => !isInternalCompany || c.parent_id !== null);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

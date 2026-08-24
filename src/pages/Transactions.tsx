@@ -15,6 +15,7 @@ import { useServerTransactions, useTransactionKPIs, useDistinctTransactionValues
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
 import { useCategories } from '@/hooks/useCategories';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 import { useBanks } from '@/hooks/useBanks';
 import { useContacts } from '@/hooks/useContacts';
 import { useTransactionAttachments } from '@/hooks/useTransactionAttachments';
@@ -659,6 +660,7 @@ export default function Transactions() {
   } = useTransactions();
 
   const { categories, createCategory } = useCategories();
+  const { isInternalCompany } = useActiveCompany();
   const { banks, createBank } = useBanks();
   const { contacts, createContact } = useContacts();
   const { uploadAttachment } = useTransactionAttachments();
@@ -744,11 +746,15 @@ export default function Transactions() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [contacts]);
 
-  // Category options for the Evento Contábil column filter — só sub-eventos (macros ficam
-  // ocultos aqui, mas seguem visíveis na tela de cadastro Eventos Contábeis).
+  // Category options pro filtro de coluna. Interno (Eventos Contábeis) só lista
+  // sub-eventos — macro é cabeçalho de agrupamento, some visível na tela de
+  // cadastro. Cliente (Categorias) não tem essa hierarquia obrigatória: toda
+  // categoria aparece, senão quem nunca criou sub-categoria via filtro vazio.
   const categoryOptions = useMemo(() => {
-    return categories.filter(c => c.parent_id !== null).map(c => ({ id: c.id, name: c.name, color: c.color || '#3B82F6' }));
-  }, [categories]);
+    return categories
+      .filter(c => !isInternalCompany || c.parent_id !== null)
+      .map(c => ({ id: c.id, name: c.name, color: c.color || '#3B82F6' }));
+  }, [categories, isInternalCompany]);
 
   // Distinct values for NumericMultiFilter (full dataset, fetched only when popover opens)
   const [openAmountFilter, setOpenAmountFilter] = useState<'amount' | 'paid_amount' | null>(null);

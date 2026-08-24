@@ -81,6 +81,7 @@ export function CashFlowReportModal({
 }: CashFlowReportModalProps) {
   const isReceivables = variant === 'receivables';
   const { company } = useCompany();
+  const isInternalCompany = (company as any)?.is_internal === true;
   const summaryRef = useRef<HTMLDivElement>(null);
 
   const [mode, setMode] = useState<'report' | 'monthly'>('report');
@@ -197,9 +198,13 @@ export function CashFlowReportModal({
       .sort((a, b) => (Math.abs(b.receber) + Math.abs(b.pagar)) - (Math.abs(a.receber) + Math.abs(a.pagar)));
   };
 
-  // Evento Contábil: só sub-eventos aparecem nos filtros (macros ficam ocultos aqui, mas
-  // seguem visíveis na tela de cadastro Eventos Contábeis).
-  const subCategories = useMemo(() => categories.filter(c => c.parent_id !== null && c.parent_id !== undefined), [categories]);
+  // Interno (Eventos Contábeis): só sub-eventos aparecem nos filtros (macro é
+  // cabeçalho de agrupamento, some aqui mas segue visível na tela de cadastro).
+  // Cliente (Categorias) não força hierarquia — toda categoria entra.
+  const subCategories = useMemo(
+    () => categories.filter(c => !isInternalCompany || (c.parent_id !== null && c.parent_id !== undefined)),
+    [categories, isInternalCompany],
+  );
 
   const activeBanks = useMemo(() => banks.filter(b => b.is_active), [banks]);
   const totalBankBalance = useMemo(() => activeBanks.reduce((s, b) => s + Number(b.current_balance), 0), [activeBanks]);

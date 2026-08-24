@@ -20,6 +20,7 @@ import {
 import { format, parseISO, isWithinInterval, startOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { calcularEncargosAtraso } from '@/lib/financial-utils';
+import { useActiveCompany } from '@/contexts/CompanyContext';
 import { CashFlowReportModal } from './CashFlowReportModal';
 import { TransactionCalendarView } from './TransactionCalendarView';
 import { IconBox } from '@/components/ds';
@@ -479,9 +480,14 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
     return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
   }, [transactions]);
 
-  // Evento Contábil: filtro da tabela mostra só sub-eventos (macros ficam ocultos aqui, mas
-  // seguem visíveis na tela de cadastro Eventos Contábeis).
-  const subCategories = useMemo(() => categories.filter(c => c.parent_id !== null), [categories]);
+  // Interno (Eventos Contábeis): filtro mostra só sub-eventos (macro é cabeçalho
+  // de agrupamento, some aqui mas segue visível na tela de cadastro). Cliente
+  // (Categorias) não força hierarquia — toda categoria entra.
+  const { isInternalCompany } = useActiveCompany();
+  const subCategories = useMemo(
+    () => categories.filter(c => !isInternalCompany || c.parent_id !== null),
+    [categories, isInternalCompany],
+  );
 
   const uniqueEventOptions = useMemo(() => {
     const set = new Set<string>();
