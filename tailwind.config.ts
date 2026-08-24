@@ -141,6 +141,12 @@ export default {
         'action-soft': 'var(--action-soft)',
         'on-action': 'var(--on-action)',
 
+        // Shell (header + sidebar) — redesign 24/08/2026. Par definido à mão,
+        // não segue a curva de inversão padrão (ver comentário em index.css).
+        'nav-surface': 'var(--nav-surface)',
+        'nav-surface-strong': 'var(--nav-surface-strong)',
+        'nav-on-surface': 'var(--nav-on-surface)',
+
         // Estado de tarefa (Fiscal) — 4 etapas de fluxo, não juízo de valor
         'state-todo': 'var(--state-todo)',
         'state-doing': 'var(--state-doing)',

@@ -78,6 +78,15 @@
     --action-soft: #c9ddf8;
     --on-action: #ffffff;
 
+    /* nav/* — shell (header + sidebar), redesign 24/08/2026. Par definido à
+       mão, pedido explícito do Gabriel ("claro = azul dos botões, escuro =
+       neutro escuro") — ao contrário de todo o resto do design system, NÃO
+       segue a curva de inversão padrão (mesmo tom claro/escuro trocados por
+       variável). --nav-on-surface é fixo #fff nos dois modos de propósito. */
+    --nav-surface: #1d6fd8;
+    --nav-surface-strong: #1a5fba;
+    --nav-on-surface: #ffffff;
+
     /* Âncora da paleta de gráfico categórico (donuts do Dashboard Financeiro,
        19/08/2026). Não é --brand-ink: aquele é um token de TEXTO que inverte
        de propósito (escuro no claro, claro no escuro) — usado como cor de
@@ -254,6 +263,12 @@
     --action-soft: #1e3a5f;
     --on-action: #0a1522;
 
+    /* nav/* — par definido à mão, não inverte pela curva padrão. Ver
+       comentário completo no :root. */
+    --nav-surface: #14171b;
+    --nav-surface-strong: #1e2229;
+    --nav-on-surface: #ffffff;
+
     /* Ver comentário no :root — mesmo valor final já corrigido no Figma
        (era brand-ink, texto que inverte; virou um tom estável de âncora). */
     --chart-anchor: #16273d;
@@ -403,15 +418,6 @@
 }
 
 /* ─── Apple Global Styles ─── */
-
-/* Sidebar surface */
-aside,
-nav[data-sidebar],
-[data-sidebar] {
-  background: var(--apple-mat-sidebar);
-  border-right-color: var(--apple-border-hair);
-}
-
 
 /* Navigation items */
 [data-nav-item] {
