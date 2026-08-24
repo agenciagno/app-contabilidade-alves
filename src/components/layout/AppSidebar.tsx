@@ -70,6 +70,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 /**
@@ -536,35 +537,50 @@ export function AppSidebar() {
       {/* open força fechado quando colapsado — senão os sub-itens tentam
           renderizar indentados numa coluna de ícone só (24/08/2026). */}
       <Collapsible open={showLabels && !!openModules[entry.title]} onOpenChange={() => handleToggleModule(entry.title)}>
-        <CollapsibleTrigger asChild>
-          {/* NavGroup do DS: aberto ganha o mesmo par ativo/hover dos itens.
-              opacity-100/mt-0 sobrescrevem o group-data-[collapsible=icon]:
-              opacity-0/-mt-8 que o SidebarGroupLabel já vem com de fábrica
-              (pensado pra rótulo de seção tipo "Atalhos", que deve mesmo
-              sumir no colapsado) — aqui é usado como TRIGGER de módulo, um
-              item clicável de verdade, não pode sumir (achado 24/08/2026,
-              é a causa real de "muitos ícones somem no colapsado"). */}
-          <SidebarGroupLabel
-            className={cn(
-              'flex h-8 cursor-pointer items-center justify-between rounded-sm py-0 text-nav-on-surface transition-[background,color] duration-[120ms]',
-              'group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:opacity-100',
-              showLabels ? 'pl-3 pr-2.5' : collapsedCenterClass,
-              openModules[entry.title] ? navActiveClass : navHoverClass,
-            )}
-          >
-            <div className="flex items-center gap-2.5">
-              <entry.icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
-              {showLabels && (
-                <span className={cn('text-nav', openModules[entry.title] && 'font-semibold')}>
-                  {entry.title}
-                </span>
-              )}
-            </div>
-            {showLabels && (
-              <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-[120ms]", openModules[entry.title] && "rotate-180")} />
-            )}
-          </SidebarGroupLabel>
-        </CollapsibleTrigger>
+        {/* Tooltip por fora do Collapsible (não dentro dele): Tooltip não é
+            um elemento DOM, então cloná-lo por dentro de um asChild (o que o
+            CollapsibleTrigger faria) quebraria o clique — precisa ser o
+            TooltipTrigger encadeando asChild por cima do CollapsibleTrigger,
+            mesmo padrão que o SidebarMenuButton já usa pros itens simples
+            (achado 24/08/2026: os 6 triggers de módulo eram os únicos itens
+            do menu sem tooltip no colapsado, por não passarem por esse
+            componente). */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <CollapsibleTrigger asChild>
+              {/* NavGroup do DS: aberto ganha o mesmo par ativo/hover dos itens.
+                  opacity-100/mt-0 sobrescrevem o group-data-[collapsible=icon]:
+                  opacity-0/-mt-8 que o SidebarGroupLabel já vem com de fábrica
+                  (pensado pra rótulo de seção tipo "Atalhos", que deve mesmo
+                  sumir no colapsado) — aqui é usado como TRIGGER de módulo, um
+                  item clicável de verdade, não pode sumir (achado 24/08/2026,
+                  é a causa real de "muitos ícones somem no colapsado"). */}
+              <SidebarGroupLabel
+                className={cn(
+                  'flex h-8 cursor-pointer items-center justify-between rounded-sm py-0 text-nav-on-surface transition-[background,color] duration-[120ms]',
+                  'group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:opacity-100',
+                  showLabels ? 'pl-3 pr-2.5' : cn(collapsedCenterClass, 'w-8'),
+                  openModules[entry.title] ? navActiveClass : navHoverClass,
+                )}
+              >
+                <div className="flex items-center gap-2.5">
+                  <entry.icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                  {showLabels && (
+                    <span className={cn('text-nav', openModules[entry.title] && 'font-semibold')}>
+                      {entry.title}
+                    </span>
+                  )}
+                </div>
+                {showLabels && (
+                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-[120ms]", openModules[entry.title] && "rotate-180")} />
+                )}
+              </SidebarGroupLabel>
+            </CollapsibleTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="right" align="center" hidden={state !== 'collapsed' || isMobile}>
+            {entry.title}
+          </TooltipContent>
+        </Tooltip>
         <CollapsibleContent>
           {/* mt-2 dá respiro entre o item principal e o 1º sub-item (estava
               embolado); a linha vertical azul sutil identifica o grupo de
