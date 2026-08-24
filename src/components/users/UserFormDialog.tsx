@@ -17,6 +17,7 @@ import { PasswordStrength, isPasswordStrong } from '@/components/ui/PasswordStre
 
 import { ALL_MODULE_KEYS, MODULE_TREE } from '@/constants/modules';
 import { DEPARTMENT_OPTIONS } from '@/constants/departments';
+import { ModulosPickerTree, toggleModuloKey } from '@/components/tech/ModulosPickerTree';
 
 
 const ROLE_OPTIONS = [
@@ -71,20 +72,23 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   // Cliente Externo (is_internal = false) nasce com o controle de módulos zerado —
   // Gabriel popula manualmente depois. Empresa interna (CA) mantém admin/super_admin
   // com tudo por padrão.
-  const { data: companyIsInternal } = useQuery({
-    queryKey: ['user-form-company-internal', companyId],
+  const { data: companyRow } = useQuery({
+    queryKey: ['user-form-company', companyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('companies')
-        .select('is_internal')
+        .select('is_internal, plan_modules')
         .eq('id', companyId)
         .single();
       if (error) throw error;
-      return (data as any)?.is_internal ?? true;
+      return data as { is_internal: boolean; plan_modules: string[] | null };
     },
     enabled: !!companyId,
   });
-  const isExternalCompany = companyIsInternal === false;
+  const isExternalCompany = companyRow?.is_internal === false;
+  // Cliente Externo só pode marcar/desmarcar dentro do que a empresa dele já contratou —
+  // nunca ver (nem adicionar) módulo interno da CA que nem faz parte do plano.
+  const companyPlanModules = companyRow?.plan_modules ?? [];
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -341,34 +345,48 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
             </Select>
           </div>
 
-          {/* Setor */}
-          <div className="space-y-2">
-            <Label>Setor</Label>
-            <Select value={department || 'none'} onValueChange={v => setDepartment(v === 'none' ? '' : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o setor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Não definido</SelectItem>
-                {DEPARTMENT_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Setor — só faz sentido pra equipe interna da CA */}
+          {!isExternalCompany && (
+            <div className="space-y-2">
+              <Label>Setor</Label>
+              <Select value={department || 'none'} onValueChange={v => setDepartment(v === 'none' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o setor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Não definido</SelectItem>
+                  {DEPARTMENT_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
-          {/* Módulos — Colaborador sempre escolhe; empresa externa, todo mundo escolhe */}
+          {/* Módulos — Colaborador sempre escolhe; empresa externa, todo mundo escolhe.
+              Empresa externa vê só o que a própria empresa contratou (nunca módulo
+              interno da CA, nunca mais do que o plano dela tem) — cliente interno
+              continua vendo a árvore completa do sistema, sem mudança. */}
           {showModulePicker && (
             <div className="space-y-3">
               {isExternalCompany && (
                 <p className="text-xs text-muted-foreground">
-                  Cliente Externo nasce com tudo desmarcado — libere módulo por módulo.
+                  Só aparece o que sua empresa já contratou — nasce tudo desmarcado, libere módulo por módulo.
                 </p>
               )}
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-primary" />
                 <Label className="font-semibold">Módulos de Acesso</Label>
               </div>
+              {isExternalCompany ? (
+                <div className="rounded-lg border border-border p-3 bg-muted/30 max-h-[320px] overflow-y-auto">
+                  <ModulosPickerTree
+                    planModules={companyPlanModules}
+                    selecionados={allowedModules}
+                    onToggle={toggleModuloKey(setAllowedModules)}
+                  />
+                </div>
+              ) : (
               <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/30 max-h-[320px] overflow-y-auto">
                 {MODULE_TREE.map((mod) => {
                   const childKeys = mod.children?.map((c) => c.key) ?? [];
@@ -442,6 +460,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
                   );
                 })}
               </div>
+              )}
             </div>
           )}
 
@@ -467,7 +486,27 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
             </div>
           )}
 
-          {isEditMode && (
+          {isEditMode && isExternalCompany && (
+            <div className="space-y-2 pt-2 border-t">
+              <Label>Redefinir senha</Label>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleSendResetEmail}
+                disabled={sendingResetEmail}
+              >
+                {sendingResetEmail ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4 mr-2" />
+                )}
+                Enviar e-mail de redefinição de senha
+              </Button>
+            </div>
+          )}
+
+          {isEditMode && !isExternalCompany && (
             <div className="space-y-2 pt-2 border-t">
               <Label htmlFor="newPassword">Redefinir senha (opcional)</Label>
               <div className="relative">
