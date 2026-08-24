@@ -88,10 +88,15 @@ export function useCreateTicket() {
         if (metaErr) throw metaErr;
       }
 
-      // TODO(e-mail): disparar aviso pra suporte@contabilidadealves.com.br via API de
-      // e-mail da Hostinger assim que o token da caixa suporte@ estiver configurado como
-      // secret no Supabase. Por ora o chamado só fica registrado no sistema (aparece em
-      // "chamados em atendimento" e, futuramente, em Meus Chamados).
+      // Avisa suporte@ por e-mail. Não bloqueia a criação do chamado — ele já está salvo
+      // no banco e visível em "chamados em atendimento" mesmo se o envio falhar.
+      const { error: emailErr } = await supabase.functions.invoke('send-support-ticket-email', {
+        body: { ticketId: ticket.id },
+      });
+      if (emailErr) {
+        console.error('Falha ao avisar suporte por e-mail:', emailErr);
+      }
+
       return ticket as SupportTicketRow;
     },
     onSuccess: () => {
