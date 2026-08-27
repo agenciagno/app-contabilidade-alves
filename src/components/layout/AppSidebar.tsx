@@ -628,17 +628,18 @@ export function AppSidebar() {
   );
 
   // Agrupa entradas visíveis em "corridas" contínuas entre divisores de seção —
-  // cada corrida é UMA SidebarMenu. gap-[4.06px] = 2px * 1.4 (+40%, 24/08/2026)
-  // * 1.45 (+45% em cima, 25/08/2026) no espaçamento entre itens PRINCIPAIS —
-  // sub-itens continuam gap-0.5/2px, não fazem parte do pedido. Espaço entre
-  // seções diferentes vem do padding do kicker, não precisa de gap extra.
+  // cada corrida é UMA SidebarMenu. gap-[6.496px] = 2px * 1.4 (+40%, 24/08) *
+  // 1.45 (+45%, 25/08) * 1.6 (+60%, 26/08) no espaçamento entre itens
+  // PRINCIPAIS — sub-itens continuam gap-0.5/2px, não fazem parte do pedido.
+  // Espaço entre seções diferentes vem do padding do kicker, não precisa de
+  // gap extra.
   const renderMenuRuns = () => {
     const output: JSX.Element[] = [];
     let run: MenuEntry[] = [];
     const flushRun = () => {
       if (run.length === 0) return;
       output.push(
-        <SidebarMenu key={`run-${output.length}`} className="gap-[4.06px]">
+        <SidebarMenu key={`run-${output.length}`} className="gap-[6.496px]">
           {run.map((e) => (e.kind === 'simple' ? renderSimpleEntry(e) : renderCollapsibleEntry(e as CollapsibleModule)))}
         </SidebarMenu>,
       );
@@ -671,7 +672,7 @@ export function AppSidebar() {
               Atalhos
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="gap-[4.06px]">
+              <SidebarMenu className="gap-[6.496px]">
                 {pinnedShortcuts.map(renderPinnedItem)}
               </SidebarMenu>
             </SidebarGroupContent>
