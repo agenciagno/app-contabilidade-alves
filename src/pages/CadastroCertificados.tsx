@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import {
-  Download, Eye, Loader2, MoreHorizontal, Pencil, Plus, RotateCw, Trash2, Mail,
+  Copy, Download, Eye, Loader2, MoreHorizontal, Pencil, Plus, RotateCw, Trash2, Mail,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -12,7 +12,9 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -52,14 +54,8 @@ export default function CadastroCertificados() {
   const [renovando, setRenovando] = useState<CertificateRow | null>(null);
   const [notificando, setNotificando] = useState<CertificateRow | null>(null);
   const [excluindo, setExcluindo] = useState<CertificateRow | null>(null);
-  const [revelado, setRevelado] = useState<{ id: string; senha: string | null } | null>(null);
+  const [revelado, setRevelado] = useState<{ cert: CertificateRow; senha: string | null } | null>(null);
   const [revelandoId, setRevelandoId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!revelado) return;
-    const t = setTimeout(() => setRevelado(null), 5000);
-    return () => clearTimeout(t);
-  }, [revelado]);
 
   const stats = useMemo(() => {
     const total = certificates.length;
@@ -96,11 +92,23 @@ export default function CadastroCertificados() {
     setRevelandoId(c.id);
     try {
       const senha = await revelar.mutateAsync({ certificate_id: c.id, acao: 'REVELAR' });
-      setRevelado({ id: c.id, senha });
+      setRevelado({ cert: c, senha });
     } catch {
       toast.error('Sem permissão ou senha não cadastrada.');
     } finally {
       setRevelandoId(null);
+    }
+  };
+
+  const handleCopiarSenha = async () => {
+    if (!revelado) return;
+    try {
+      const senha = await revelar.mutateAsync({ certificate_id: revelado.cert.id, acao: 'COPIAR' });
+      if (!senha) { toast.error('Senha não cadastrada.'); return; }
+      await navigator.clipboard.writeText(senha);
+      toast.success('Senha copiada.');
+    } catch {
+      toast.error('Falha ao copiar a senha.');
     }
   };
 
@@ -222,16 +230,9 @@ export default function CadastroCertificados() {
                     <TableCell><DsBadge tone={sv.tone}>{sv.label}</DsBadge></TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
-                        <Popover open={revelado?.id === c.id} onOpenChange={(o) => !o && setRevelado(null)}>
-                          <PopoverTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-8 w-8" title="Ver senha" onClick={() => handleRevelar(c)}>
-                              {revelandoId === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-2 font-mono text-ui" align="end">
-                            {revelado?.senha ?? 'Senha não cadastrada'}
-                          </PopoverContent>
-                        </Popover>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" title="Ver senha" onClick={() => handleRevelar(c)}>
+                          {revelandoId === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                        </Button>
                         <Button size="icon" variant="ghost" className="h-8 w-8" title="Baixar comprovante" disabled={!c.anexo_url} onClick={() => handleBaixar(c)}>
                           <Download className="h-4 w-4" />
                         </Button>
@@ -265,6 +266,26 @@ export default function CadastroCertificados() {
           </Table>
         )}
       </div>
+
+      <Dialog open={!!revelado} onOpenChange={(o) => !o && setRevelado(null)}>
+        <DialogContent className="max-w-[380px] p-0">
+          <DialogHeader className="border-b border-line-2 px-6 py-5">
+            <DialogTitle className="text-[16px]">Senha do certificado</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 px-6 py-5">
+            {revelado && <p className="text-ui text-muted-ink">{titularLabel(revelado.cert)}</p>}
+            <div className="flex h-10 items-center rounded-sm border border-line bg-bg-2 px-3 font-mono text-ui text-ink">
+              {revelado?.senha ?? 'Senha não cadastrada'}
+            </div>
+          </div>
+          <DialogFooter className="border-t border-line-2 px-6 py-4">
+            <Button variant="outline" onClick={() => setRevelado(null)}>Fechar</Button>
+            <Button onClick={handleCopiarSenha} disabled={!revelado?.senha}>
+              <Copy className="mr-2 h-4 w-4" /> Copiar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <CertificateFormDialog open={formOpen} onOpenChange={setFormOpen} certificate={editing} />
       <RenovarCertificadoDialog open={!!renovando} onOpenChange={(o) => !o && setRenovando(null)} certificate={renovando} />
