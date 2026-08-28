@@ -339,6 +339,9 @@ export function ContactCadastroTab({ contactId }: Props) {
             </Field>
           </CardContent>
         </Card>
+
+        {canViewSocios && !isPessoaFisica && <SociosSection contactId={contactId} />}
+
         <div className="flex justify-end">
           <Button onClick={() => saveSection([
             'document', 'name', 'razao_social', 'nome_fantasia', 'display_name', 'porte', 'natureza_juridica',
@@ -351,8 +354,6 @@ export function ContactCadastroTab({ contactId }: Props) {
             Salvar
           </Button>
         </div>
-
-        {canViewSocios && !isPessoaFisica && <SociosSection contactId={contactId} />}
       </TabsContent>
       )}
 
@@ -372,6 +373,34 @@ export function ContactCadastroTab({ contactId }: Props) {
               </Field>
               <Field label="Inscrição Municipal (IM)"><Input value={form.im || ''} onChange={e => set('im', e.target.value)} /></Field>
               <Field label="Inscrição Estadual (IE)"><Input value={form.ie || ''} onChange={e => set('ie', e.target.value)} /></Field>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">CNAE (Receita Federal)</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">CNAE Principal</p>
+                {form.cnae_principal ? (
+                  <CnaeCard cnae={form.cnae_principal} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">—</p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">
+                  CNAEs Secundários ({Array.isArray(form.cnaes_secundarios) ? form.cnaes_secundarios.length : 0})
+                </p>
+                {Array.isArray(form.cnaes_secundarios) && form.cnaes_secundarios.length > 0 ? (
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {form.cnaes_secundarios.map((c: any, i: number) => (
+                      <CnaeCard key={i} cnae={c} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">—</p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -416,34 +445,6 @@ export function ContactCadastroTab({ contactId }: Props) {
                 >
                   Sugerir pelo CNAE
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle className="text-base">CNAE (Receita Federal)</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">CNAE Principal</p>
-                {form.cnae_principal ? (
-                  <CnaeCard cnae={form.cnae_principal} />
-                ) : (
-                  <p className="text-sm text-muted-foreground">—</p>
-                )}
-              </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">
-                  CNAEs Secundários ({Array.isArray(form.cnaes_secundarios) ? form.cnaes_secundarios.length : 0})
-                </p>
-                {Array.isArray(form.cnaes_secundarios) && form.cnaes_secundarios.length > 0 ? (
-                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                    {form.cnaes_secundarios.map((c: any, i: number) => (
-                      <CnaeCard key={i} cnae={c} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">—</p>
-                )}
               </div>
             </CardContent>
           </Card>
