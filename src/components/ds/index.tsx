@@ -190,6 +190,11 @@ export function DateField({ value, onChange, placeholder = 'dd/mm/aaaa', disable
         disabled={disabled}
         inputMode="numeric"
         className="pr-9"
+        // Campo controlado, sem name — evita o navegador tentar
+        // autopreencher com endereço/pagamento quando a tela tem um campo
+        // de senha (achado 28/08/2026, Certificados: "13" aparecia sozinho
+        // em Data de Validade).
+        autoComplete="off"
       />
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>

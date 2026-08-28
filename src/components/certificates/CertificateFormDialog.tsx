@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { format } from 'date-fns';
 import { Check, ChevronDown, Eye, EyeOff, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -70,7 +71,7 @@ export function CertificateFormDialog({ open, onOpenChange, certificate }: Props
       setSocioNome('');
       setModelo('A1');
       setAutoridade('');
-      setDataEmissao('');
+      setDataEmissao(format(new Date(), 'yyyy-MM-dd'));
       setDataValidade('');
       setObservacao('');
     }
@@ -266,7 +267,7 @@ export function CertificateFormDialog({ open, onOpenChange, certificate }: Props
             </div>
             <div className="space-y-1.5">
               <Label className="text-[11.5px] font-medium text-ink-2">Autoridade Certificadora</Label>
-              <Input value={autoridade} onChange={(e) => setAutoridade(e.target.value)} placeholder="Ex.: Serasa Experian" />
+              <Input value={autoridade} onChange={(e) => setAutoridade(e.target.value)} placeholder="Ex.: Serasa Experian" autoComplete="off" />
             </div>
           </div>
 
@@ -290,6 +291,8 @@ export function CertificateFormDialog({ open, onOpenChange, certificate }: Props
                 onChange={(e) => setSenha(e.target.value)}
                 placeholder={isEditing ? 'Deixe em branco para manter a senha atual' : '••••••••'}
                 className="pr-9"
+                autoComplete="new-password"
+                name="certificado-senha"
               />
               <button type="button" onClick={() => setMostrarSenha((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-ink hover:text-ink">
                 {mostrarSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -304,11 +307,11 @@ export function CertificateFormDialog({ open, onOpenChange, certificate }: Props
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-[11.5px] font-medium text-ink-2">Anexo (comprovante)</Label>
-            <input ref={fileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <Label className="block text-[11.5px] font-medium text-ink-2">Faça upload do arquivo .pfx</Label>
+            <input ref={fileRef} type="file" accept=".pfx,.p12,.pdf,.png,.jpg,.jpeg,.webp" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
             <Button type="button" variant="outline" onClick={() => fileRef.current?.click()}>
               <Upload className="mr-2 h-4 w-4" />
-              {file ? file.name : certificate?.anexo_file_name || 'Anexar comprovante'}
+              {file ? file.name : certificate?.anexo_file_name || 'Anexar arquivo'}
             </Button>
           </div>
         </div>
