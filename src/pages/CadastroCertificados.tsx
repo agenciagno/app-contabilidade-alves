@@ -333,6 +333,7 @@ export default function CadastroCertificados() {
             <AlertDialogAction
               onClick={handleExcluir}
               disabled={!excluindo || deleteInput.trim() !== titularLabel(excluindo)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Excluir
             </AlertDialogAction>
