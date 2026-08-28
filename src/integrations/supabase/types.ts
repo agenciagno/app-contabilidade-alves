@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -563,6 +563,183 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      certificate_client_notifications: {
+        Row: {
+          canal: string
+          certificate_id: string
+          company_id: string
+          destino: string | null
+          enviado_em: string
+          enviado_por: string | null
+          id: string
+          mensagem: string | null
+        }
+        Insert: {
+          canal: string
+          certificate_id: string
+          company_id: string
+          destino?: string | null
+          enviado_em?: string
+          enviado_por?: string | null
+          id?: string
+          mensagem?: string | null
+        }
+        Update: {
+          canal?: string
+          certificate_id?: string
+          company_id?: string
+          destino?: string | null
+          enviado_em?: string
+          enviado_por?: string | null
+          id?: string
+          mensagem?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificate_client_notifications_certificate_id_fkey"
+            columns: ["certificate_id"]
+            isOneToOne: false
+            referencedRelation: "certificates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_client_notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificate_client_notifications_enviado_por_fkey"
+            columns: ["enviado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      certificates: {
+        Row: {
+          anexo_file_name: string | null
+          anexo_size: number | null
+          anexo_url: string | null
+          autoridade_certificadora: string | null
+          company_id: string
+          contact_id: string
+          created_at: string
+          data_emissao: string | null
+          data_validade: string
+          id: string
+          last_alert_days: number | null
+          modelo: string
+          observacao: string | null
+          partner_id: string | null
+          renewal_task_id: string | null
+          renewed_from_id: string | null
+          responsavel_renovacao: string | null
+          senha_encrypted: string | null
+          status: string
+          tipo_pessoa: string
+          updated_at: string
+        }
+        Insert: {
+          anexo_file_name?: string | null
+          anexo_size?: number | null
+          anexo_url?: string | null
+          autoridade_certificadora?: string | null
+          company_id: string
+          contact_id: string
+          created_at?: string
+          data_emissao?: string | null
+          data_validade: string
+          id?: string
+          last_alert_days?: number | null
+          modelo: string
+          observacao?: string | null
+          partner_id?: string | null
+          renewal_task_id?: string | null
+          renewed_from_id?: string | null
+          responsavel_renovacao?: string | null
+          senha_encrypted?: string | null
+          status?: string
+          tipo_pessoa: string
+          updated_at?: string
+        }
+        Update: {
+          anexo_file_name?: string | null
+          anexo_size?: number | null
+          anexo_url?: string | null
+          autoridade_certificadora?: string | null
+          company_id?: string
+          contact_id?: string
+          created_at?: string
+          data_emissao?: string | null
+          data_validade?: string
+          id?: string
+          last_alert_days?: number | null
+          modelo?: string
+          observacao?: string | null
+          partner_id?: string | null
+          renewal_task_id?: string | null
+          renewed_from_id?: string | null
+          responsavel_renovacao?: string | null
+          senha_encrypted?: string | null
+          status?: string
+          tipo_pessoa?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificates_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificates_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+          {
+            foreignKeyName: "certificates_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "contact_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificates_renewal_task_id_fkey"
+            columns: ["renewal_task_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificates_renewed_from_id_fkey"
+            columns: ["renewed_from_id"]
+            isOneToOne: false
+            referencedRelation: "certificates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificates_responsavel_renovacao_fkey"
+            columns: ["responsavel_renovacao"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

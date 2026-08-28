@@ -57,6 +57,7 @@ const Suporte = lazy(() => import("@/pages/Suporte"));
 const Faturas = lazy(() => import("@/pages/Faturas"));
 const Equipe = lazy(() => import("@/pages/Equipe"));
 const ReformaTributariaCalculadora = lazy(() => import("@/pages/ReformaTributariaCalculadora"));
+const CadastroCertificados = lazy(() => import("@/pages/CadastroCertificados"));
 
 const RouteFallback = () => (
   <div className="flex h-screen w-full items-center justify-center">
@@ -177,7 +178,7 @@ const App = () => (
 
               {/* Cadastro */}
               <Route path="/cadastros/procuracoes" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="cadastros_procuracoes"><EmBreve moduleKey="cadastros_procuracoes" /></ModuleGuard></AppLayout>} />
-              <Route path="/cadastros/certificados" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="cadastros_certificados"><EmBreve moduleKey="cadastros_certificados" /></ModuleGuard></AppLayout>} />
+              <Route path="/cadastros/certificados" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="cadastros_certificados"><CadastroCertificados /></ModuleGuard></AppLayout>} />
               <Route path="/cadastros/alvaras" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="cadastros_alvaras"><EmBreve moduleKey="cadastros_alvaras" /></ModuleGuard></AppLayout>} />
               <Route path="/cadastros/equipe" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="equipe"><Equipe /></ModuleGuard></AppLayout>} />
 
