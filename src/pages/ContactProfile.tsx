@@ -6,13 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, User, DollarSign, FileText, ClipboardList, Download, History, KeyRound, Building2 } from 'lucide-react';
+import { ArrowLeft, User, DollarSign, ClipboardList, Download, History, KeyRound, Building2, Landmark, Users } from 'lucide-react';
 import { useContacts } from '@/hooks/useContacts';
 import { useContactTransactions, useContactFinancialStatus } from '@/hooks/useContactTransactions';
 import { useContactDocuments, DOCUMENT_CATEGORIES } from '@/hooks/useContactDocuments';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { ContactFinancialTab } from '@/components/contacts/ContactFinancialTab';
-import { ContactDocumentsTab } from '@/components/contacts/ContactDocumentsTab';
 import { generateContactReport } from '@/components/contacts/ContactReportPDF';
 import { AcessosTab } from '@/components/contacts/AcessosTab';
 import { ContactCadastroTab } from '@/components/contacts/cadastro/ContactCadastroTab';
@@ -38,15 +37,15 @@ export default function ContactProfile() {
   const { isModuleVisible, isSubItemVisible } = useModuleAccess();
   const canViewSub = (subKey: string) =>
     isModuleVisible('perfil_cliente') && isSubItemVisible('perfil_cliente', subKey);
-  const canViewIdentificacaoGroup = canViewSub('perfil_cliente_identificacao')
-    || canViewSub('perfil_cliente_fiscal')
-    || canViewSub('perfil_cliente_operacional')
-    || canViewSub('perfil_cliente_socios');
-  const canViewAcessos = canViewSub('perfil_cliente_acessos');
-  const canViewDocumentos = canViewSub('perfil_cliente_documentos');
-  const canViewFinanceiro = canViewSub('perfil_cliente_financeiro');
-  const canViewLogs = canViewSub('perfil_cliente_logs');
   const contact = contacts.find(c => c.id === id);
+  const isPessoaFisica = getDocumentType(contact?.document) === 'CPF';
+  const canViewCadastro = canViewSub('perfil_cliente_identificacao');
+  const canViewFiscal = !isPessoaFisica && canViewSub('perfil_cliente_fiscal');
+  const canViewPessoal = canViewSub('perfil_cliente_pessoal');
+  const canViewAcessos = canViewSub('perfil_cliente_acessos');
+  const canViewFinanceiro = canViewSub('perfil_cliente_financeiro');
+  const canViewOperacional = canViewSub('perfil_cliente_operacional');
+  const canViewLogs = canViewSub('perfil_cliente_logs');
   const { isInadimplente } = useContactFinancialStatus(id, transactions);
 
   useEffect(() => {
@@ -111,20 +110,24 @@ export default function ContactProfile() {
     );
   }
 
-  const visibleTabCount = (canViewIdentificacaoGroup ? 1 : 0) + (canViewAcessos ? 1 : 0)
-    + (canViewDocumentos ? 1 : 0) + (canViewFinanceiro ? 1 : 0) + (canViewLogs ? 1 : 0);
+  const visibleTabCount = (canViewCadastro ? 1 : 0) + (canViewFiscal ? 1 : 0) + (canViewPessoal ? 1 : 0)
+    + (canViewAcessos ? 1 : 0) + (canViewFinanceiro ? 1 : 0) + (canViewOperacional ? 1 : 0) + (canViewLogs ? 1 : 0);
   const GRID_COLS_CLASS: Record<number, string> = {
     1: 'grid-cols-1',
     2: 'grid-cols-2 md:grid-cols-2',
     3: 'grid-cols-2 md:grid-cols-3',
     4: 'grid-cols-2 md:grid-cols-4',
     5: 'grid-cols-2 md:grid-cols-5',
+    6: 'grid-cols-2 md:grid-cols-6',
+    7: 'grid-cols-2 md:grid-cols-7',
   };
   const tabsColsClass = GRID_COLS_CLASS[visibleTabCount] ?? 'grid-cols-1';
-  const defaultProfileTab = canViewIdentificacaoGroup ? 'cadastro'
+  const defaultProfileTab = canViewCadastro ? 'cadastro'
+    : canViewFiscal ? 'fiscal'
+    : canViewPessoal ? 'pessoal'
     : canViewAcessos ? 'acessos'
-    : canViewDocumentos ? 'documentos'
     : canViewFinanceiro ? 'financeiro'
+    : canViewOperacional ? 'operacional'
     : canViewLogs ? 'logs'
     : 'cadastro';
 
@@ -193,10 +196,22 @@ export default function ContactProfile() {
       ) : (
       <Tabs defaultValue={defaultProfileTab} className="w-full">
         <TabsList className={`w-full grid ${tabsColsClass} gap-1 h-auto`}>
-          {canViewIdentificacaoGroup && (
+          {canViewCadastro && (
             <TabsTrigger value="cadastro" className="flex items-center gap-1.5">
               <ClipboardList className="h-4 w-4" />
               <span className="hidden sm:inline">Cadastro</span>
+            </TabsTrigger>
+          )}
+          {canViewFiscal && (
+            <TabsTrigger value="fiscal" className="flex items-center gap-1.5">
+              <Landmark className="h-4 w-4" />
+              <span className="hidden sm:inline">Dpto. Fiscal</span>
+            </TabsTrigger>
+          )}
+          {canViewPessoal && (
+            <TabsTrigger value="pessoal" className="flex items-center gap-1.5">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Dpto Pessoal</span>
             </TabsTrigger>
           )}
           {canViewAcessos && (
@@ -205,16 +220,16 @@ export default function ContactProfile() {
               <span className="hidden sm:inline">Acessos</span>
             </TabsTrigger>
           )}
-          {canViewDocumentos && (
-            <TabsTrigger value="documentos" className="flex items-center gap-1.5">
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Documentos</span>
-            </TabsTrigger>
-          )}
           {canViewFinanceiro && (
             <TabsTrigger value="financeiro" className="flex items-center gap-1.5">
               <DollarSign className="h-4 w-4" />
               <span className="hidden sm:inline">Financeiro</span>
+            </TabsTrigger>
+          )}
+          {canViewOperacional && (
+            <TabsTrigger value="operacional" className="flex items-center gap-1.5">
+              <User className="h-4 w-4" />
+              <span className="hidden sm:inline">Operacional</span>
             </TabsTrigger>
           )}
           {canViewLogs && (
@@ -225,11 +240,7 @@ export default function ContactProfile() {
           )}
         </TabsList>
 
-        {canViewIdentificacaoGroup && (
-          <TabsContent value="cadastro" className="mt-6">
-            <ContactCadastroTab contactId={contact.id} />
-          </TabsContent>
-        )}
+        <ContactCadastroTab contactId={contact.id} />
 
         {canViewAcessos && (
           <TabsContent value="acessos" className="mt-6">
@@ -237,15 +248,9 @@ export default function ContactProfile() {
           </TabsContent>
         )}
 
-        {canViewDocumentos && (
-          <TabsContent value="documentos" className="mt-6">
-            <ContactDocumentsTab contactId={contact.id} />
-          </TabsContent>
-        )}
-
         {canViewFinanceiro && (
           <TabsContent value="financeiro" className="mt-6">
-            <ContactFinancialTab contactId={contact.id} contactName={contact.name} />
+            <ContactFinancialTab contactId={contact.id} contactName={contact.name} contact={contact} />
           </TabsContent>
         )}
 

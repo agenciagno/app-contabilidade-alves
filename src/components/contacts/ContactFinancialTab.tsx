@@ -21,17 +21,20 @@ import { TrendingUp, Clock, ArrowUpDown, AlertTriangle } from 'lucide-react';
 import { useContactTransactions } from '@/hooks/useContactTransactions';
 import { useBanks } from '@/hooks/useBanks';
 import { ContactContractsCard } from './ContactContractsCard';
+import { ContactBillingCard } from './ContactBillingCard';
+import { Contact } from '@/hooks/useContacts';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface ContactFinancialTabProps {
   contactId: string;
   contactName: string;
+  contact: Contact;
 }
 
 type SortOrder = 'newest' | 'oldest';
 
-export function ContactFinancialTab({ contactId, contactName }: ContactFinancialTabProps) {
+export function ContactFinancialTab({ contactId, contactName, contact }: ContactFinancialTabProps) {
   const { banks } = useBanks();
   const invisibleBankIds = useMemo(() => banks.filter(b => b.is_invisible).map(b => b.id), [banks]);
   const { data: transactions, isLoading } = useContactTransactions(contactId, invisibleBankIds);
@@ -210,6 +213,9 @@ export function ContactFinancialTab({ contactId, contactName }: ContactFinancial
           )}
         </CardContent>
       </Card>
+
+      {/* Configurações de Cobrança */}
+      <ContactBillingCard contact={contact} />
     </div>
   );
 }

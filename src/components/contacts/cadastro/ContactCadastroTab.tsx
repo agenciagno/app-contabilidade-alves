@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, Search, Info, Save, UserPlus, Pencil, LogOut, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, Search, Info, Save, UserPlus, Pencil, LogOut, Trash2, AlertTriangle, Clock } from 'lucide-react';
 import { useSuperPerfil } from '@/hooks/useSuperPerfil';
 import { useContactPartners } from '@/hooks/useContactPartners';
 import { useContacts } from '@/hooks/useContacts';
@@ -29,7 +29,6 @@ import { useContactDependencies } from '@/hooks/useContactDependencies';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ContactBillingCard } from '../ContactBillingCard';
 import { ContactObligationsSelector } from '@/components/fiscal/ContactObligationsSelector';
 import { useCompany } from '@/hooks/useCompany';
 import { maskPhone, maskCPF, maskCPFCNPJ, getDocumentType } from '@/lib/utils';
@@ -117,20 +116,9 @@ export function ContactCadastroTab({ contactId }: Props) {
     isModuleVisible('perfil_cliente') && isSubItemVisible('perfil_cliente', subKey);
   const canViewIdentificacao = canViewSub('perfil_cliente_identificacao');
   const canViewFiscalTab = !isPessoaFisica && canViewSub('perfil_cliente_fiscal');
+  const canViewPessoal = canViewSub('perfil_cliente_pessoal');
   const canViewOperacional = canViewSub('perfil_cliente_operacional');
   const canViewSocios = !isPessoaFisica && canViewSub('perfil_cliente_socios');
-  const visibleCadastroTabs = [canViewIdentificacao, canViewFiscalTab, canViewSocios, canViewOperacional].filter(Boolean).length;
-  const CADASTRO_GRID_COLS: Record<number, string> = {
-    1: 'grid-cols-1',
-    2: 'grid-cols-2',
-    3: 'grid-cols-2 md:grid-cols-3',
-    4: 'grid-cols-2 md:grid-cols-4',
-  };
-  const defaultCadastroTab = canViewIdentificacao ? 'identificacao'
-    : canViewFiscalTab ? 'fiscal'
-    : canViewSocios ? 'socios'
-    : canViewOperacional ? 'operacional'
-    : 'identificacao';
 
   const saveSection = (keys: string[]) => {
     const payload: Record<string, any> = {};
@@ -224,26 +212,11 @@ export function ContactCadastroTab({ contactId }: Props) {
 
   if (isLoading) return <Skeleton className="h-[400px] w-full" />;
 
-  if (visibleCadastroTabs === 0) {
-    return (
-      <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-        Sem permissão para ver o cadastro deste cliente.
-      </div>
-    );
-  }
-
   return (
-    <Tabs defaultValue={defaultCadastroTab} className="w-full">
-      <TabsList className={`w-full grid gap-1 ${CADASTRO_GRID_COLS[visibleCadastroTabs]}`}>
-        {canViewIdentificacao && <TabsTrigger value="identificacao">Identificação</TabsTrigger>}
-        {canViewFiscalTab && <TabsTrigger value="fiscal">Fiscal</TabsTrigger>}
-        {canViewSocios && <TabsTrigger value="socios">Sócios</TabsTrigger>}
-        {canViewOperacional && <TabsTrigger value="operacional">Operacional</TabsTrigger>}
-      </TabsList>
-
-      {/* IDENTIFICAÇÃO & CONTATOS */}
+    <>
+      {/* CADASTRO (Identificação & Contatos + Endereço + Sócios) */}
       {canViewIdentificacao && (
-      <TabsContent value="identificacao" className="mt-6 space-y-4">
+      <TabsContent value="cadastro" className="mt-6 space-y-4">
         <Card>
           <CardHeader><CardTitle className="text-base">Identificação & Contatos</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -301,15 +274,6 @@ export function ContactCadastroTab({ contactId }: Props) {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Tipo de Estabelecimento">
-                  <Select value={form.tipo_estabelecimento || ''} onValueChange={v => set('tipo_estabelecimento', v)}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Matriz">Matriz</SelectItem>
-                      <SelectItem value="Filial">Filial</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
                 <Field label="Representante Legal">
                   <Input value={form.representative_legal || ''} onChange={e => set('representative_legal', e.target.value)} />
                 </Field>
@@ -336,9 +300,6 @@ export function ContactCadastroTab({ contactId }: Props) {
                 onChange={e => set('whatsapp', maskPhone(e.target.value))}
                 placeholder="(XX) XXXXX-XXXX"
               />
-            </Field>
-            <Field label="Segundo E-mail">
-              <Input type="email" value={form.segundo_email_contato || ''} onChange={e => set('segundo_email_contato', e.target.value)} />
             </Field>
             <div className="md:col-span-2">
               <Field label="Observações Gerais">
@@ -383,17 +344,19 @@ export function ContactCadastroTab({ contactId }: Props) {
             'document', 'name', 'razao_social', 'nome_fantasia', 'display_name', 'porte', 'natureza_juridica',
             'data_abertura_receita', 'situacao_cadastral', 'email', 'phone', 'whatsapp', 'notes',
             'cnae_principal', 'cnaes_secundarios',
-            'tipo_estabelecimento', 'representative_legal', 'segundo_email_contato',
+            'representative_legal',
             'cep', 'address', 'address_number', 'complemento', 'neighborhood', 'city', 'state',
           ])} disabled={updateSuperPerfil.isPending}>
             {updateSuperPerfil.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Salvar
           </Button>
         </div>
+
+        {canViewSocios && !isPessoaFisica && <SociosSection contactId={contactId} />}
       </TabsContent>
       )}
 
-      {/* FISCAL (só PJ) */}
+      {/* DPTO. FISCAL (só PJ) */}
       {canViewFiscalTab && (
         <TabsContent value="fiscal" className="mt-6 space-y-4">
           <Card>
@@ -505,10 +468,22 @@ export function ContactCadastroTab({ contactId }: Props) {
         </TabsContent>
       )}
 
-      {/* SÓCIOS */}
-      {canViewSocios && (
-        <TabsContent value="socios" className="mt-6">
-          <SociosSection contactId={contactId} />
+      {/* DPTO PESSOAL — em breve */}
+      {canViewPessoal && (
+        <TabsContent value="pessoal" className="mt-6">
+          <div className="flex min-h-[360px] items-center justify-center rounded-lg border border-dashed">
+            <div className="max-w-md space-y-3 px-6 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md bg-muted">
+                <Clock className="h-6 w-6 text-muted-foreground" strokeWidth={1.75} />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-base font-semibold">Em breve.</h3>
+                <p className="text-sm text-muted-foreground">
+                  O Departamento Pessoal deste cliente ainda está em construção.
+                </p>
+              </div>
+            </div>
+          </div>
         </TabsContent>
       )}
 
@@ -522,10 +497,6 @@ export function ContactCadastroTab({ contactId }: Props) {
             'responsible_id', 'dp_responsible_id', 'financeiro_responsible_id', 'contabil_responsible_id', 'comercial_responsible_id',
             'categorias', 'status_cliente',
             'data_inicio_contrato', 'data_saida_cliente',
-            'data_abertura_junta', 'data_encerramento_junta',
-            'data_abertura_rf', 'data_encerramento_rf',
-            'data_abertura_prefeitura', 'data_encerramento_prefeitura',
-            'data_abertura_estado', 'data_encerramento_estado',
           ])}
           isPending={updateSuperPerfil.isPending}
           contactId={contactId}
@@ -533,7 +504,7 @@ export function ContactCadastroTab({ contactId }: Props) {
         />
       </TabsContent>
       )}
-    </Tabs>
+    </>
   );
 }
 
@@ -627,7 +598,6 @@ function OperacionalSection({
   const { isModuleVisible, isSubItemVisible } = useModuleAccess();
   const canViewSub = (subKey: string) =>
     isModuleVisible('perfil_cliente') && isSubItemVisible('perfil_cliente', subKey);
-  const canViewCobranca = canViewSub('perfil_cliente_financeiro');
   const canDeleteContact = canViewSub('perfil_cliente_operacional_excluir');
 
   const handleDelete = () => {
@@ -710,51 +680,12 @@ function OperacionalSection({
         </CardContent>
       </Card>
 
-      {!isPessoaFisica && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">Datas por Esfera</CardTitle></CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 pr-3 font-medium text-xs text-muted-foreground">Esfera</th>
-                    <th className="text-left py-2 pr-3 font-medium text-xs text-muted-foreground">Abertura</th>
-                    <th className="text-left py-2 font-medium text-xs text-muted-foreground">Encerramento</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    { label: 'Junta Comercial', open: 'data_abertura_junta', close: 'data_encerramento_junta' },
-                    { label: 'Receita Federal', open: 'data_abertura_rf', close: 'data_encerramento_rf' },
-                    { label: 'Prefeitura', open: 'data_abertura_prefeitura', close: 'data_encerramento_prefeitura' },
-                    { label: 'Estado', open: 'data_abertura_estado', close: 'data_encerramento_estado' },
-                  ].map(row => (
-                    <tr key={row.label} className="border-b last:border-0">
-                      <td className="py-2 pr-3">{row.label}</td>
-                      <td className="py-2 pr-3">
-                        <Input type="date" value={form[row.open] || ''} onChange={e => set(row.open, e.target.value)} />
-                      </td>
-                      <td className="py-2">
-                        <Input type="date" value={form[row.close] || ''} onChange={e => set(row.close, e.target.value)} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <div className="flex justify-end">
         <Button onClick={onSave} disabled={isPending}>
           {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
           Salvar
         </Button>
       </div>
-
-      {canViewCobranca && contact && <ContactBillingCard contact={contact} />}
 
       {canDeleteContact && (
         <Card className="border-destructive/30">
