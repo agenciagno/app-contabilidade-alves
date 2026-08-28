@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import {
-  Copy, Download, Eye, Loader2, MoreHorizontal, Pencil, Plus, RotateCw, Trash2, Mail,
+  Bell, Copy, Download, Eye, Loader2, MoreHorizontal, Pencil, Plus, RotateCw, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -221,13 +221,25 @@ export default function CadastroCertificados() {
                       <p className="text-ui text-ink">{titularLabel(c)}</p>
                       {titularDocumento(c) && <p className="font-mono text-meta text-muted-ink-2">{titularDocumento(c)}</p>}
                     </TableCell>
-                    <TableCell><DsBadge tone="neutral">{c.tipo_pessoa}</DsBadge></TableCell>
-                    <TableCell><DsBadge tone="neutral">{c.modelo}</DsBadge></TableCell>
+                    <TableCell>
+                      <DsBadge tone={sv.estado === 'vencido' ? 'danger' : 'neutral'} className={sv.estado === 'vencido' ? 'border border-danger' : undefined}>
+                        {c.tipo_pessoa}
+                      </DsBadge>
+                    </TableCell>
+                    <TableCell>
+                      <DsBadge tone={sv.estado === 'vencido' ? 'danger' : 'neutral'} className={sv.estado === 'vencido' ? 'border border-danger' : undefined}>
+                        {c.modelo}
+                      </DsBadge>
+                    </TableCell>
                     <TableCell className="font-mono text-ui">{format(new Date(`${c.data_validade}T00:00:00`), 'dd/MM/yyyy')}</TableCell>
                     <TableCell className={cn('font-mono text-ui', sv.estado === 'vencido' && 'text-danger')}>
                       {sv.dias >= 0 ? `${sv.dias} dias` : `${sv.dias} dias`}
                     </TableCell>
-                    <TableCell><DsBadge tone={sv.tone}>{sv.label}</DsBadge></TableCell>
+                    <TableCell>
+                      <DsBadge tone={sv.tone} className={sv.estado === 'vencido' ? 'border border-danger' : undefined}>
+                        {sv.label}
+                      </DsBadge>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
                         <Button size="icon" variant="ghost" className="h-8 w-8" title="Ver senha" onClick={() => handleRevelar(c)}>
@@ -250,7 +262,7 @@ export default function CadastroCertificados() {
                               <Pencil className="mr-2 h-4 w-4" /> Editar
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setNotificando(c)}>
-                              <Mail className="mr-2 h-4 w-4" /> E-mail
+                              <Bell className="mr-2 h-4 w-4" /> Notificação
                             </DropdownMenuItem>
                             <DropdownMenuItem className="text-danger focus:text-danger" onClick={() => setExcluindo(c)}>
                               <Trash2 className="mr-2 h-4 w-4" /> Excluir
