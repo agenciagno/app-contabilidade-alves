@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { PageHeader, StatCardRow, DsBadge, SearchField, segmentedListClass, segmentedTriggerClass } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -54,6 +55,7 @@ export default function CadastroCertificados() {
   const [renovando, setRenovando] = useState<CertificateRow | null>(null);
   const [notificando, setNotificando] = useState<CertificateRow | null>(null);
   const [excluindo, setExcluindo] = useState<CertificateRow | null>(null);
+  const [deleteInput, setDeleteInput] = useState('');
   const [revelado, setRevelado] = useState<{ cert: CertificateRow; senha: string | null } | null>(null);
   const [revelandoId, setRevelandoId] = useState<string | null>(null);
 
@@ -123,6 +125,7 @@ export default function CadastroCertificados() {
       await excluir.mutateAsync(excluindo);
       toast.success('Certificado excluído.');
       setExcluindo(null);
+      setDeleteInput('');
     } catch (e: any) {
       toast.error(e?.message ?? 'Falha ao excluir certificado.');
     }
@@ -303,17 +306,36 @@ export default function CadastroCertificados() {
       <RenovarCertificadoDialog open={!!renovando} onOpenChange={(o) => !o && setRenovando(null)} certificate={renovando} />
       <NotificarClienteDialog open={!!notificando} onOpenChange={(o) => !o && setNotificando(null)} certificate={notificando} />
 
-      <AlertDialog open={!!excluindo} onOpenChange={(o) => !o && setExcluindo(null)}>
+      <AlertDialog open={!!excluindo} onOpenChange={(o) => { if (!o) { setExcluindo(null); setDeleteInput(''); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir certificado?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {excluindo && `${titularLabel(excluindo)} — esta ação não pode ser desfeita.`}
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                {excluindo && (
+                  <p>
+                    <strong>{titularLabel(excluindo)}</strong> — esta ação não pode ser desfeita.
+                  </p>
+                )}
+                <p>Digite o titular exato para confirmar:</p>
+                <Input
+                  autoFocus
+                  value={deleteInput}
+                  onChange={(e) => setDeleteInput(e.target.value)}
+                  placeholder={excluindo ? titularLabel(excluindo) : ''}
+                  autoComplete="off"
+                />
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleExcluir}>Excluir</AlertDialogAction>
+            <AlertDialogAction
+              onClick={handleExcluir}
+              disabled={!excluindo || deleteInput.trim() !== titularLabel(excluindo)}
+            >
+              Excluir
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
