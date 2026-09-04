@@ -541,7 +541,7 @@ function useContactObligations(contactId: string, enabled: boolean) {
     },
   });
 
-  const { data: contactObligations = [] } = useQuery({
+  const { data: contactObligations = [], isSuccess: obligationsLoaded } = useQuery({
     queryKey: ['client-obligations', contactId],
     enabled,
     queryFn: async () => {
@@ -554,15 +554,19 @@ function useContactObligations(contactId: string, enabled: boolean) {
     },
   });
 
+  // `contactObligations` começa como [] (valor padrão do useQuery) antes da consulta
+  // real responder — só inicializamos `selected` a partir dela quando a query de fato
+  // carregou (isSuccess), senão o box nasce marcado como vazio e um "Salvar" precoce
+  // apagaria as tarefas já salvas no banco.
   useEffect(() => {
-    if (!initialized && enabled) {
+    if (!initialized && obligationsLoaded) {
       setSelected(new Set(contactObligations.map(o => o.obligation_id)));
       setInitialized(true);
     }
-  }, [contactObligations, initialized, enabled]);
+  }, [contactObligations, initialized, obligationsLoaded]);
 
   const sync = async () => {
-    if (!company?.id) return;
+    if (!company?.id || !initialized) return;
     const original = new Set(contactObligations.map(o => o.obligation_id));
     const toDelete: string[] = [];
     const toInsert: string[] = [];
