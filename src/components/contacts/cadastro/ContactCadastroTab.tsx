@@ -144,16 +144,36 @@ export function ContactCadastroTab({ contactId }: Props) {
         setor_atuacao: form.setor_atuacao ?? null,
         segmento_atuacao: form.segmento_atuacao ?? null,
       });
-    } catch {
+    } finally {
       setSavingFiscal(false);
+    }
+  };
+
+  const [savingOperacional, setSavingOperacional] = useState(false);
+  const saveOperacionalSection = async () => {
+    setSavingOperacional(true);
+    try {
+      await updateSuperPerfil.mutateAsync({
+        responsible_id: form.responsible_id ?? null,
+        dp_responsible_id: form.dp_responsible_id ?? null,
+        financeiro_responsible_id: form.financeiro_responsible_id ?? null,
+        contabil_responsible_id: form.contabil_responsible_id ?? null,
+        comercial_responsible_id: form.comercial_responsible_id ?? null,
+        categorias: form.categorias ?? null,
+        status_cliente: form.status_cliente ?? null,
+        data_inicio_contrato: form.data_inicio_contrato ?? null,
+        data_saida_cliente: form.data_saida_cliente ?? null,
+      });
+    } catch {
+      setSavingOperacional(false);
       return; // updateSuperPerfil já mostra o toast de erro
     }
     try {
       await syncObligations();
     } catch (e: any) {
-      toast.error(e?.message || 'Erro ao salvar obrigações fiscais');
+      toast.error(e?.message || 'Erro ao salvar tarefas');
     } finally {
-      setSavingFiscal(false);
+      setSavingOperacional(false);
     }
   };
 
@@ -449,17 +469,6 @@ export function ContactCadastroTab({ contactId }: Props) {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle className="text-base">Obrigações Fiscais</CardTitle></CardHeader>
-            <CardContent>
-              <ContactObligationsSelector
-                options={obligationsCatalog}
-                selectedIds={selectedObligations}
-                onChange={setSelectedObligations}
-              />
-            </CardContent>
-          </Card>
-
           <div className="flex justify-end">
             <Button onClick={saveFiscalSection} disabled={savingFiscal}>
               {savingFiscal ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
@@ -494,14 +503,13 @@ export function ContactCadastroTab({ contactId }: Props) {
         <OperacionalSection
           form={form}
           set={set}
-          onSave={() => saveSection([
-            'responsible_id', 'dp_responsible_id', 'financeiro_responsible_id', 'contabil_responsible_id', 'comercial_responsible_id',
-            'categorias', 'status_cliente',
-            'data_inicio_contrato', 'data_saida_cliente',
-          ])}
-          isPending={updateSuperPerfil.isPending}
+          onSave={saveOperacionalSection}
+          isPending={savingOperacional}
           contactId={contactId}
           isPessoaFisica={isPessoaFisica}
+          obligationsCatalog={obligationsCatalog}
+          selectedObligations={selectedObligations}
+          setSelectedObligations={setSelectedObligations}
         />
       </TabsContent>
       )}
@@ -509,11 +517,11 @@ export function ContactCadastroTab({ contactId }: Props) {
   );
 }
 
-// ============ Obrigações Fiscais ============
+// ============ Tarefas (obrigações fiscais) ============
 // Estado + sync ficam num hook (não num componente com botão próprio) para que o
-// salvamento aconteça junto com o resto da aba Fiscal, num único botão "Salvar" —
+// salvamento aconteça junto com o resto da aba Operacional, num único botão "Salvar" —
 // dois botões "Salvar" adjacentes e mal identificados levavam a edições perdidas
-// (usuário clicava no botão errado e as obrigações nunca eram persistidas).
+// (usuário clicava no botão errado e as tarefas nunca eram persistidas).
 function useContactObligations(contactId: string, enabled: boolean) {
   const { company } = useCompany();
   const queryClient = useQueryClient();
@@ -583,6 +591,7 @@ function useContactObligations(contactId: string, enabled: boolean) {
 // ============ Operacional ============
 function OperacionalSection({
   form, set, onSave, isPending, contactId, isPessoaFisica,
+  obligationsCatalog, selectedObligations, setSelectedObligations,
 }: {
   form: Record<string, any>;
   set: (k: string, v: any) => void;
@@ -590,6 +599,9 @@ function OperacionalSection({
   isPending: boolean;
   contactId: string;
   isPessoaFisica: boolean;
+  obligationsCatalog: { id: string; name: string; is_custom?: boolean }[];
+  selectedObligations: Set<string>;
+  setSelectedObligations: (s: Set<string>) => void;
 }) {
   const { contacts, deleteContact } = useContacts();
   const contact = contacts.find(c => c.id === contactId);
@@ -680,6 +692,19 @@ function OperacionalSection({
           </Field>
         </CardContent>
       </Card>
+
+      {!isPessoaFisica && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Tarefas</CardTitle></CardHeader>
+          <CardContent>
+            <ContactObligationsSelector
+              options={obligationsCatalog}
+              selectedIds={selectedObligations}
+              onChange={setSelectedObligations}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex justify-end">
         <Button onClick={onSave} disabled={isPending}>
