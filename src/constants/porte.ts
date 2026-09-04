@@ -4,4 +4,5 @@ export const PORTE_OPTIONS = [
   { value: 'EPP', label: 'EPP' },
   { value: 'Médio', label: 'Médio' },
   { value: 'Grande', label: 'Grande' },
+  { value: 'Demais', label: 'Demais' },
 ];
