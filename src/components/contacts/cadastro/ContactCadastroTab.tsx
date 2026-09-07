@@ -908,18 +908,12 @@ function PartnerDialogV2({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
           <Field label="Nome *"><Input value={f.name || ''} onChange={e => setF({ ...f, name: e.target.value })} /></Field>
           <Field label="CPF"><Input value={f.cpf || ''} onChange={e => setF({ ...f, cpf: maskCPF(e.target.value) })} /></Field>
-          <Field label="RG"><Input value={f.rg || ''} onChange={e => setF({ ...f, rg: e.target.value })} /></Field>
           <Field label="E-mail"><Input type="email" value={f.email || ''} onChange={e => setF({ ...f, email: e.target.value })} /></Field>
           <Field label="WhatsApp"><Input value={f.whatsapp || ''} onChange={e => setF({ ...f, whatsapp: maskPhone(e.target.value) })} /></Field>
           <Field label="Participação (%)">
             <Input type="number" step="0.01" value={f.participation_percentage ?? 0}
               onChange={e => setF({ ...f, participation_percentage: e.target.value })} />
           </Field>
-          <div className="md:col-span-2">
-            <Field label="Endereço">
-              <Textarea rows={2} value={f.endereco || ''} onChange={e => setF({ ...f, endereco: e.target.value })} />
-            </Field>
-          </div>
           <Field label="Data de Entrada">
             <Input type="date" value={f.data_entrada || ''} onChange={e => setF({ ...f, data_entrada: e.target.value })} />
           </Field>

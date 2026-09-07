@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -13,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Search, User, Mail, Phone, Copy, Users, X, FileText, LayoutGrid, List, Pencil, Trash2, Building2, CalendarDays, FolderOpen } from 'lucide-react';
 import { useContacts, Contact, ContactInsert, TAX_REGIME_LABELS } from '@/hooks/useContacts';
+import { supabase } from '@/integrations/supabase/client';
 import { useTransactions } from '@/hooks/useTransactions';
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
 import { ContactBulkEditDialog } from '@/components/contacts/ContactBulkEditDialog';
@@ -55,7 +57,20 @@ export default function Contacts() {
   const [filterCategoria, setFilterCategoria] = useState('all');
   const [filterRegime, setFilterRegime] = useState('all');
   const [filterResponsible, setFilterResponsible] = useState('all');
+  const [filterResponsibleDp, setFilterResponsibleDp] = useState('all');
   const { data: fiscalProfiles = [] } = useAllFiscalProfiles();
+  const { data: activeProfiles = [] } = useQuery({
+    queryKey: ['profiles-active-all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('status_active', true)
+        .order('full_name', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -106,9 +121,15 @@ export default function Contacts() {
         matchesResponsible = filterResponsible === 'none' ? !rid : rid === filterResponsible;
       }
 
-      return matchesSearch && matchesStatusCliente && matchesCategoria && matchesRegime && matchesResponsible && !isArchivedContact(c);
+      let matchesResponsibleDp = true;
+      if (filterResponsibleDp !== 'all') {
+        const rid = (c as any).dp_responsible_id ?? null;
+        matchesResponsibleDp = filterResponsibleDp === 'none' ? !rid : rid === filterResponsibleDp;
+      }
+
+      return matchesSearch && matchesStatusCliente && matchesCategoria && matchesRegime && matchesResponsible && matchesResponsibleDp && !isArchivedContact(c);
     }).sort((a, b) => getContactDisplayName(a).localeCompare(getContactDisplayName(b), 'pt-BR', { sensitivity: 'base' }));
-  }, [contacts, searchTerm, filterStatusCliente, filterCategoria, filterRegime, filterResponsible, transactions]);
+  }, [contacts, searchTerm, filterStatusCliente, filterCategoria, filterRegime, filterResponsible, filterResponsibleDp, transactions]);
 
   const archivedContacts = useMemo(() => {
     const q = searchTerm.toLowerCase();
@@ -127,7 +148,7 @@ export default function Contacts() {
 
   const activeContacts = filteredContacts.filter(c => c.is_active);
   const inactiveContacts = filteredContacts.filter(c => !c.is_active);
-  const hasActiveFilters = searchTerm || filterStatusCliente !== 'all' || filterCategoria !== 'all' || filterRegime !== 'all' || filterResponsible !== 'all';
+  const hasActiveFilters = searchTerm || filterStatusCliente !== 'all' || filterCategoria !== 'all' || filterRegime !== 'all' || filterResponsible !== 'all' || filterResponsibleDp !== 'all';
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -135,6 +156,7 @@ export default function Contacts() {
     setFilterCategoria('all');
     setFilterRegime('all');
     setFilterResponsible('all');
+    setFilterResponsibleDp('all');
   };
 
 
@@ -193,12 +215,14 @@ export default function Contacts() {
     cliente: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 hover:bg-blue-500/15',
     fornecedor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 hover:bg-purple-500/15',
     colaborador: 'bg-ok/10 text-ok dark:text-ok border-ok/20 hover:bg-ok/15',
+    pessoa_fisica: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/15',
     outros: 'bg-muted text-muted-foreground border-border hover:bg-muted/80',
   };
   const categoriaLabel: Record<string, string> = {
     cliente: 'Cliente',
     fornecedor: 'Fornecedor',
     colaborador: 'Colaborador',
+    pessoa_fisica: 'Pessoa Física',
     outros: 'Outros',
   };
 
@@ -393,6 +417,7 @@ export default function Contacts() {
                   <SelectItem value="cliente">Clientes</SelectItem>
                   <SelectItem value="fornecedor">Fornecedores</SelectItem>
                   <SelectItem value="colaborador">Colaboradores</SelectItem>
+                  <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
                   <SelectItem value="outros">Outros</SelectItem>
                 </SelectContent>
               </Select>
@@ -413,14 +438,28 @@ export default function Contacts() {
               </Select>
               <Select value={filterResponsible} onValueChange={setFilterResponsible}>
                 <SelectTrigger className="w-[200px] h-9 bg-card border-border">
-                  <SelectValue placeholder="Responsável" />
+                  <SelectValue placeholder="Responsável Fiscal" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos responsáveis</SelectItem>
-                  <SelectItem value="none">Sem responsável</SelectItem>
+                  <SelectItem value="all">Todos resp. Fiscal</SelectItem>
+                  <SelectItem value="none">Sem responsável Fiscal</SelectItem>
                   {fiscalProfiles.map(p => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.full_name || p.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterResponsibleDp} onValueChange={setFilterResponsibleDp}>
+                <SelectTrigger className="w-[200px] h-9 bg-card border-border">
+                  <SelectValue placeholder="Responsável DP" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos resp. DP</SelectItem>
+                  <SelectItem value="none">Sem responsável DP</SelectItem>
+                  {activeProfiles.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.full_name || 'Sem nome'}
                     </SelectItem>
                   ))}
                 </SelectContent>
