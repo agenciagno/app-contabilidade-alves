@@ -9,8 +9,12 @@ import { TAX_REGIMES } from '@/constants/taxRegimes';
 interface EligibleContact {
   id: string;
   name: string;
-  responsible_id: string | null;
   tax_regime: string | null;
+  responsible_id: string | null;
+  dp_responsible_id: string | null;
+  financeiro_responsible_id: string | null;
+  contabil_responsible_id: string | null;
+  comercial_responsible_id: string | null;
 }
 
 export const regimeLabel = (value: string | null) => {
@@ -19,13 +23,57 @@ export const regimeLabel = (value: string | null) => {
 };
 
 /**
- * Breakdown do que o RPC generate_monthly_fiscal_tasks vai criar: mesmo critério de
- * elegibilidade (is_active, responsible_id no setor da obrigação, categoria 'cliente')
- * e mesmo vínculo real via client_obligations — não usar fiscal_obligations_catalog.applies_to
- * pra contar clientes, porque isso é metadado da obrigação, não o vínculo efetivo.
- * Compartilhado entre o preview de Pré-lançamento e o modal de seleção de regime.
+ * Mesma regra do RPC generate_monthly_fiscal_tasks: o responsável de uma obrigação
+ * é o do SETOR dela (pessoal/financeiro/contábil/comercial), não sempre o Fiscal —
+ * senão o preview e o filtro por colaborador contam errado obrigação de outro setor.
  */
-export function useCalendarLaunchBreakdown(rows: FiscalCalendarEffectiveRow[]) {
+function deptResponsibleId(contact: EligibleContact, department: string | null | undefined): string | null {
+  switch (department) {
+    case 'pessoal':
+      return contact.dp_responsible_id;
+    case 'financeiro':
+      return contact.financeiro_responsible_id;
+    case 'contabil':
+      return contact.contabil_responsible_id;
+    case 'comercial':
+      return contact.comercial_responsible_id;
+    default:
+      return contact.responsible_id;
+  }
+}
+
+interface GroupAccumulator {
+  total: number;
+  launched: number;
+  clients: Set<string>;
+  pendingClients: Set<string>;
+}
+
+function bump(map: Map<string, GroupAccumulator>, key: string, clientId: string, isLaunched: boolean) {
+  const entry = map.get(key) ?? {
+    total: 0,
+    launched: 0,
+    clients: new Set<string>(),
+    pendingClients: new Set<string>(),
+  };
+  entry.total += 1;
+  entry.clients.add(clientId);
+  if (isLaunched) entry.launched += 1;
+  else entry.pendingClients.add(clientId);
+  map.set(key, entry);
+}
+
+/**
+ * Breakdown do que o RPC generate_monthly_fiscal_tasks vai criar (e do que já foi
+ * criado) pro período. Compartilhado entre o preview de Pré-lançamento e o modal de
+ * seleção de regime/colaborador — os números precisam bater entre os dois.
+ *
+ * Lançamento é incremental: uma obrigação de um (cliente, obrigação) já lançada em
+ * uma leva anterior (outro regime/colaborador) entra como "já lançada" e não conta
+ * de novo em "pendente" — é exatamente o mesmo critério de dedup do RPC (NOT EXISTS
+ * em fiscal_tasks por contact_id+obligation_id+competência).
+ */
+export function useCalendarLaunchBreakdown(rows: FiscalCalendarEffectiveRow[], year: number, month: number) {
   const { company } = useCompany();
   const companyId = company?.id;
 
@@ -34,10 +82,11 @@ export function useCalendarLaunchBreakdown(rows: FiscalCalendarEffectiveRow[]) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('contacts')
-        .select('id, name, responsible_id, tax_regime')
+        .select(
+          'id, name, tax_regime, responsible_id, dp_responsible_id, financeiro_responsible_id, contabil_responsible_id, comercial_responsible_id'
+        )
         .eq('company_id', companyId!)
         .eq('is_active', true)
-        .not('responsible_id', 'is', null)
         .contains('categorias', ['cliente']);
       if (error) throw error;
       return (data ?? []) as EligibleContact[];
@@ -75,6 +124,25 @@ export function useCalendarLaunchBreakdown(rows: FiscalCalendarEffectiveRow[]) {
     enabled: !!companyId,
   });
 
+  const { data: existingTasks = [], isLoading: existingLoading } = useQuery<
+    { contact_id: string; obligation_id: string }[]
+  >({
+    // Prefixo 'fiscal-tasks' de propósito: useConfirmMonthlyTasks já invalida
+    // queryKey ['fiscal-tasks'] no onSuccess, isso cai junto sem invalidação extra.
+    queryKey: ['fiscal-tasks', 'launch-existing', companyId, year, month],
+    queryFn: async () =>
+      fetchAllPages<{ contact_id: string; obligation_id: string }>(() =>
+        supabase
+          .from('fiscal_tasks')
+          .select('contact_id, obligation_id')
+          .eq('company_id', companyId!)
+          .eq('competence_year', year)
+          .eq('competence_month', month)
+          .order('id', { ascending: true })
+      ),
+    enabled: !!companyId,
+  });
+
   const profileName = (id: string | null) => {
     if (!id) return 'Sem responsável';
     const p = profiles.find((x) => x.id === id);
@@ -83,73 +151,107 @@ export function useCalendarLaunchBreakdown(rows: FiscalCalendarEffectiveRow[]) {
 
   const breakdown = useMemo(() => {
     const contactsById = new Map(contacts.map((c) => [c.id, c]));
+    const existingSet = new Set(existingTasks.map((t) => `${t.contact_id}|${t.obligation_id}`));
+
+    const byRegime = new Map<string, GroupAccumulator>();
+    const byCollaborator = new Map<string, GroupAccumulator>();
+
     const perObligation = rows.map((r) => {
+      const department = r.fiscal_obligations_catalog?.department;
       const linkedContactIds = clientObligations
         .filter((co) => co.obligation_id === r.obligation_id)
         .map((co) => co.contact_id);
-      const clients = linkedContactIds
-        .map((id) => contactsById.get(id))
-        .filter((c): c is EligibleContact => !!c);
+
+      let total = 0;
+      let launched = 0;
+
+      linkedContactIds.forEach((contactId) => {
+        const contact = contactsById.get(contactId);
+        if (!contact) return;
+        const respId = deptResponsibleId(contact, department);
+        if (!respId) return; // mesma regra do RPC: só conta com responsável definido no setor
+
+        const isLaunched = existingSet.has(`${contactId}|${r.obligation_id}`);
+        total += 1;
+        if (isLaunched) launched += 1;
+
+        const regimeKey = contact.tax_regime ?? '__none__';
+        bump(byRegime, regimeKey, contactId, isLaunched);
+        bump(byCollaborator, respId, contactId, isLaunched);
+      });
+
       return {
         id: r.id,
         name: r.fiscal_obligations_catalog?.name ?? '—',
-        clientCount: clients.length,
-        clients,
+        total,
+        launched,
+        pending: total - launched,
         adjustedDueDate: r.adjusted_due_date,
         internalDeliveryDate: r.internal_delivery_date,
       };
     });
 
-    const byProfile = new Map<string, number>();
-    const byRegime = new Map<string, { tasks: number; clients: Set<string> }>();
-    let totalTasks = 0;
-    const clientsTouched = new Set<string>();
-    perObligation.forEach((o) => {
-      o.clients.forEach((c) => {
-        totalTasks += 1;
-        clientsTouched.add(c.id);
-
-        const profileKey = c.responsible_id ?? '__none__';
-        byProfile.set(profileKey, (byProfile.get(profileKey) ?? 0) + 1);
-
-        const regimeKey = c.tax_regime ?? '__none__';
-        const entry = byRegime.get(regimeKey) ?? { tasks: 0, clients: new Set<string>() };
-        entry.tasks += 1;
-        entry.clients.add(c.id);
-        byRegime.set(regimeKey, entry);
-      });
-    });
-
-    const perCollaborator = Array.from(byProfile.entries())
-      .map(([id, count]) => ({
-        id: id === '__none__' ? null : id,
-        name: id === '__none__' ? 'Sem responsável' : profileName(id),
-        count,
-        pct: totalTasks > 0 ? (count / totalTasks) * 100 : 0,
-      }))
-      .sort((a, b) => b.count - a.count);
+    const totalPending = perObligation.reduce((sum, o) => sum + o.pending, 0);
 
     const perRegime = Array.from(byRegime.entries())
-      .map(([regime, entry]) => ({
+      .map(([regime, g]) => ({
         regime: regime === '__none__' ? null : regime,
         label: regime === '__none__' ? 'Sem regime' : regimeLabel(regime),
-        taskCount: entry.tasks,
-        clientCount: entry.clients.size,
-        pct: totalTasks > 0 ? (entry.tasks / totalTasks) * 100 : 0,
+        total: g.total,
+        launched: g.launched,
+        pending: g.total - g.launched,
+        clientCount: g.clients.size,
+        pendingClientCount: g.pendingClients.size,
+        pct: totalPending > 0 ? ((g.total - g.launched) / totalPending) * 100 : 0,
       }))
-      .sort((a, b) => b.taskCount - a.taskCount);
+      .sort((a, b) => b.pending - a.pending || b.total - a.total);
+
+    const perCollaborator = Array.from(byCollaborator.entries())
+      .map(([id, g]) => ({
+        id,
+        name: profileName(id),
+        total: g.total,
+        launched: g.launched,
+        pending: g.total - g.launched,
+        clientCount: g.clients.size,
+        pendingClientCount: g.pendingClients.size,
+        pct: totalPending > 0 ? ((g.total - g.launched) / totalPending) * 100 : 0,
+      }))
+      .sort((a, b) => b.pending - a.pending || b.total - a.total);
+
+    // Contagem geral de clientes (não dá pra derivar de byRegime/byCollaborator:
+    // um cliente pode ter tarefa pendente em mais de um grupo e seria contado 2x).
+    const pendingClientsTotal = new Set<string>();
+    const eligibleClientsTotal = new Set<string>();
+    rows.forEach((r) => {
+      const department = r.fiscal_obligations_catalog?.department;
+      clientObligations
+        .filter((co) => co.obligation_id === r.obligation_id)
+        .forEach((co) => {
+          const contact = contactsById.get(co.contact_id);
+          if (!contact) return;
+          const respId = deptResponsibleId(contact, department);
+          if (!respId) return;
+          eligibleClientsTotal.add(co.contact_id);
+          if (!existingSet.has(`${co.contact_id}|${r.obligation_id}`)) {
+            pendingClientsTotal.add(co.contact_id);
+          }
+        });
+    });
 
     return {
       perObligation,
-      perCollaborator,
       perRegime,
-      totalTasks,
-      clientCount: clientsTouched.size,
+      perCollaborator,
+      totalTasks: totalPending,
+      totalLaunched: perObligation.reduce((sum, o) => sum + o.launched, 0),
+      clientCount: pendingClientsTotal.size,
+      eligibleClientCount: eligibleClientsTotal.size,
     };
-  }, [rows, contacts, clientObligations, profiles]);
+  }, [rows, contacts, clientObligations, existingTasks, profiles]);
 
   return {
     ...breakdown,
-    loading: contactsLoading || clientObligationsLoading,
+    loading: contactsLoading || clientObligationsLoading || existingLoading,
   };
 }

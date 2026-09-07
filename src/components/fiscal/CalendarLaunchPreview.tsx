@@ -12,21 +12,25 @@ import { FiscalCalendarEffectiveRow } from '@/hooks/useFiscalCalendar';
 
 interface Props {
   rows: FiscalCalendarEffectiveRow[];
+  year: number;
+  month: number;
   reviewed: boolean;
   onReviewedChange: (v: boolean) => void;
 }
 
-export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Props) {
-  const breakdown = useCalendarLaunchBreakdown(rows);
-  const { perObligation, perCollaborator, perRegime, totalTasks, clientCount, loading } = breakdown;
+export function CalendarLaunchPreview({ rows, year, month, reviewed, onReviewedChange }: Props) {
+  const breakdown = useCalendarLaunchBreakdown(rows, year, month);
+  const { perObligation, perCollaborator, perRegime, totalTasks, totalLaunched, clientCount, loading } = breakdown;
 
   const overloaded = perCollaborator.filter((c) => c.pct > 40);
 
-  // Reset reviewed flag when rows change
+  // Reset reviewed flag quando o calendário muda de fato (recálculo), não a cada
+  // lançamento parcial — senão o segundo lançamento (outro regime/colaborador) exige
+  // marcar "revisei" de novo sem motivo, já que a distribuição não mudou.
   useEffect(() => {
     onReviewedChange(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows.length]);
+  }, [rows.length, year, month]);
 
   const initials = (name: string) =>
     name
@@ -51,6 +55,9 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
               <>
                 Serão geradas <strong className="text-foreground">{totalTasks}</strong> tarefa(s) para{' '}
                 <strong className="text-foreground">{clientCount}</strong> cliente(s).
+                {totalLaunched > 0 && (
+                  <span className="text-muted-foreground"> ({totalLaunched} já lançada(s) neste período.)</span>
+                )}
               </>
             )}
           </p>
@@ -70,8 +77,8 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
             >
               <AlertTriangle className="h-4 w-4 shrink-0 text-warn dark:text-warn mt-0.5" />
               <p>
-                <strong>{c.name}</strong> ficará com <strong>{c.pct.toFixed(0)}%</strong> das tarefas ({c.count}) — considere
-                redistribuir.
+                <strong>{c.name}</strong> ficará com <strong>{c.pct.toFixed(0)}%</strong> das tarefas pendentes ({c.pending}) —
+                considere redistribuir.
               </p>
             </div>
           ))}
@@ -86,7 +93,7 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
               <TableHeader>
                 <TableRow>
                   <TableHead>Obrigação</TableHead>
-                  <TableHead className="text-right w-20">Clientes</TableHead>
+                  <TableHead className="text-right w-24">Pendente</TableHead>
                   <TableHead className="w-28">Vencimento</TableHead>
                   <TableHead className="w-28">Entrega</TableHead>
                 </TableRow>
@@ -106,7 +113,12 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
                   perObligation.map((o) => (
                     <TableRow key={o.id}>
                       <TableCell className="font-medium">{o.name}</TableCell>
-                      <TableCell className="text-right tabular-nums">{o.clientCount}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {o.pending}
+                        {o.launched > 0 && (
+                          <span className="text-[11px] text-muted-foreground block">{o.launched} lançada(s)</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm">{format(parseISO(o.adjustedDueDate), 'dd/MM/yyyy')}</TableCell>
                       <TableCell className="text-sm">{format(parseISO(o.internalDeliveryDate), 'dd/MM/yyyy')}</TableCell>
                     </TableRow>
@@ -125,7 +137,7 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)
             ) : perRegime.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma tarefa será gerada.</p>
+              <p className="text-sm text-muted-foreground">Nenhuma tarefa pendente.</p>
             ) : (
               perRegime.map((r) => (
                 <div
@@ -140,9 +152,11 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
                   </div>
                   <div className="text-right shrink-0">
                     <Badge variant="outline" className="tabular-nums">
-                      {r.taskCount} tarefa(s)
+                      {r.pending} pendente(s)
                     </Badge>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{r.clientCount} cliente(s)</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {r.pendingClientCount} cliente(s){r.launched > 0 ? ` · ${r.launched} já lançada(s)` : ''}
+                    </p>
                   </div>
                 </div>
               ))
@@ -158,7 +172,7 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)
             ) : perCollaborator.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma tarefa será gerada.</p>
+              <p className="text-sm text-muted-foreground">Nenhuma tarefa pendente.</p>
             ) : (
               perCollaborator.map((c) => (
                 <div
@@ -186,7 +200,7 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
                     </div>
                   </div>
                   <Badge variant="outline" className="tabular-nums">
-                    {c.count} ({c.pct.toFixed(0)}%)
+                    {c.pending} ({c.pct.toFixed(0)}%)
                   </Badge>
                 </div>
               ))

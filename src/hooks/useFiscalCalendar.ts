@@ -13,6 +13,7 @@ export interface FiscalObligationCatalog {
   description?: string | null;
   due_rule?: string | null;
   holiday_adjustment?: string | null;
+  department?: string | null;
 }
 
 export interface FiscalCalendarEffectiveRow {
@@ -37,7 +38,7 @@ export function useFiscalCalendar(year: number, month: number, enabled: boolean 
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from('fiscal_calendar_effective')
-        .select('*, fiscal_obligations_catalog!inner(id, name, code, applies_to, is_custom, description, due_rule, holiday_adjustment)')
+        .select('*, fiscal_obligations_catalog!inner(id, name, code, applies_to, is_custom, description, due_rule, holiday_adjustment, department)')
         .eq('year', year)
         .eq('month', month)
         .order('adjusted_due_date', { ascending: true });
@@ -115,12 +116,14 @@ export function useConfirmMonthlyTasks() {
       companyId,
       launchedBy,
       taxRegimes,
+      responsibleIds,
     }: {
       year: number;
       month: number;
       companyId?: string | null;
       launchedBy?: string;
       taxRegimes?: string[] | null;
+      responsibleIds?: string[] | null;
     }) => {
       // Capture timestamp slightly before RPC to account for clock skew
       const beforeTs = new Date(Date.now() - 2000).toISOString();
@@ -128,6 +131,7 @@ export function useConfirmMonthlyTasks() {
         p_year: year,
         p_month: month,
         p_tax_regimes: taxRegimes && taxRegimes.length > 0 ? taxRegimes : null,
+        p_responsible_ids: responsibleIds && responsibleIds.length > 0 ? responsibleIds : null,
       });
       if (error) throw error;
       const tasksCreated: number =
@@ -147,10 +151,15 @@ export function useConfirmMonthlyTasks() {
       }
 
       if (companyId) {
+        // Lançamento por regime/colaborador é incremental — mescla com os ids de
+        // uma leva anterior no mesmo mês, senão "Desfazer lançamento" perde o
+        // rastro da primeira leva e essas tarefas ficam presas pra sempre.
+        const prevMeta = loadLaunchMeta(companyId, year, month);
+        const mergedTaskIds = Array.from(new Set([...(prevMeta?.task_ids ?? []), ...taskIds]));
         saveLaunchMeta(companyId, year, month, {
           launched_at: new Date().toISOString(),
           launched_by: launchedBy ?? 'Usuário',
-          task_ids: taskIds,
+          task_ids: mergedTaskIds,
         });
         // Fire-and-forget notifications to each responsible
         notifyCalendarLaunched({ companyId, year, month, taskIds }).catch(() => {});
@@ -162,7 +171,7 @@ export function useConfirmMonthlyTasks() {
     onSuccess: ({ tasksCreated, year, month }) => {
       const label = `${String(month).padStart(2, '0')}/${year}`;
       if (tasksCreated === 0) {
-        toast.info(`ℹ️ Todas as tarefas deste mês já foram lançadas`);
+        toast.info(`ℹ️ Nenhuma tarefa nova — já lançadas ou fora do filtro escolhido`);
       } else {
         toast.success(`✅ ${tasksCreated} tarefas lançadas para ${label}`);
       }

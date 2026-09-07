@@ -16,18 +16,25 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCalendarLaunchBreakdown } from '@/hooks/useCalendarLaunchBreakdown';
 import { FiscalCalendarEffectiveRow } from '@/hooks/useFiscalCalendar';
 
+export interface LaunchFilters {
+  taxRegimes: string[] | null;
+  responsibleIds: string[] | null;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rows: FiscalCalendarEffectiveRow[];
+  year: number;
+  month: number;
   isPending: boolean;
-  onConfirm: (taxRegimes: string[] | null) => void;
+  onConfirm: (filters: LaunchFilters) => void;
 }
 
-type Mode = 'all' | 'select';
+type Mode = 'all' | 'regime' | 'collaborator';
 
-export function LaunchTasksDialog({ open, onOpenChange, rows, isPending, onConfirm }: Props) {
-  const { perRegime, totalTasks, loading } = useCalendarLaunchBreakdown(rows);
+export function LaunchTasksDialog({ open, onOpenChange, rows, year, month, isPending, onConfirm }: Props) {
+  const { perRegime, perCollaborator, totalTasks, loading } = useCalendarLaunchBreakdown(rows, year, month);
   const [mode, setMode] = useState<Mode>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -38,24 +45,42 @@ export function LaunchTasksDialog({ open, onOpenChange, rows, isPending, onConfi
     }
   }, [open]);
 
-  const toggleRegime = (regime: string) => {
+  const handleModeChange = (v: Mode) => {
+    setMode(v);
+    setSelected(new Set());
+  };
+
+  const toggle = (key: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(regime)) next.delete(regime);
-      else next.add(regime);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
 
-  const selectedTasks = perRegime
-    .filter((r) => r.regime && selected.has(r.regime))
-    .reduce((sum, r) => sum + r.taskCount, 0);
+  const activeGroups = mode === 'regime' ? perRegime : mode === 'collaborator' ? perCollaborator : [];
+  const groupKey = (g: { regime?: string | null; id?: string | null }) =>
+    mode === 'regime' ? g.regime ?? undefined : g.id ?? undefined;
+
+  const selectedPending = activeGroups
+    .filter((g) => {
+      const key = groupKey(g);
+      return key && selected.has(key);
+    })
+    .reduce((sum, g) => sum + g.pending, 0);
 
   const handleConfirm = () => {
-    onConfirm(mode === 'all' ? null : Array.from(selected));
+    if (mode === 'all') {
+      onConfirm({ taxRegimes: null, responsibleIds: null });
+    } else if (mode === 'regime') {
+      onConfirm({ taxRegimes: Array.from(selected), responsibleIds: null });
+    } else {
+      onConfirm({ taxRegimes: null, responsibleIds: Array.from(selected) });
+    }
   };
 
-  const confirmDisabled = isPending || (mode === 'select' && selected.size === 0);
+  const confirmDisabled = isPending || (mode !== 'all' && selected.size === 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -63,55 +88,68 @@ export function LaunchTasksDialog({ open, onOpenChange, rows, isPending, onConfi
         <DialogHeader>
           <DialogTitle>Lançar tarefas</DialogTitle>
           <DialogDescription>
-            Lance todas as tarefas do período ou só as de regimes tributários específicos.
+            Lance todas as tarefas pendentes do período, ou só as de regimes tributários ou colaboradores específicos.
+            Quem já foi lançado antes não é duplicado.
           </DialogDescription>
         </DialogHeader>
 
-        <RadioGroup value={mode} onValueChange={(v) => setMode(v as Mode)} className="gap-3">
+        <RadioGroup value={mode} onValueChange={(v) => handleModeChange(v as Mode)} className="gap-3">
           <div className="flex items-center gap-2">
             <RadioGroupItem value="all" id="launch-mode-all" />
             <Label htmlFor="launch-mode-all" className="cursor-pointer font-normal">
-              Todas as tarefas {!loading && <span className="text-muted-foreground">({totalTasks})</span>}
+              Todas as tarefas pendentes {!loading && <span className="text-muted-foreground">({totalTasks})</span>}
             </Label>
           </div>
           <div className="flex items-center gap-2">
-            <RadioGroupItem value="select" id="launch-mode-select" />
-            <Label htmlFor="launch-mode-select" className="cursor-pointer font-normal">
+            <RadioGroupItem value="regime" id="launch-mode-regime" />
+            <Label htmlFor="launch-mode-regime" className="cursor-pointer font-normal">
               Selecionar regimes tributários
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="collaborator" id="launch-mode-collaborator" />
+            <Label htmlFor="launch-mode-collaborator" className="cursor-pointer font-normal">
+              Selecionar colaboradores
             </Label>
           </div>
         </RadioGroup>
 
-        {mode === 'select' && (
-          <div className="space-y-2 rounded-md border p-3">
+        {(mode === 'regime' || mode === 'collaborator') && (
+          <div className="space-y-1 rounded-md border p-3 max-h-64 overflow-y-auto">
             {loading ? (
               <Skeleton className="h-20 w-full" />
-            ) : perRegime.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma tarefa a lançar neste período.</p>
+            ) : activeGroups.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma tarefa pendente neste período.</p>
             ) : (
-              perRegime
-                .filter((r) => !!r.regime)
-                .map((r) => (
+              activeGroups.map((g) => {
+                const key = groupKey(g);
+                if (!key) return null;
+                const label = mode === 'regime' ? (g as (typeof perRegime)[number]).label : (g as (typeof perCollaborator)[number]).name;
+                const noPending = g.pending === 0;
+                return (
                   <label
-                    key={r.regime}
-                    className="flex items-center justify-between gap-2 cursor-pointer py-1"
+                    key={key}
+                    className={`flex items-center justify-between gap-2 py-1 ${noPending ? 'opacity-50' : 'cursor-pointer'}`}
                   >
                     <span className="flex items-center gap-2 text-sm">
                       <Checkbox
-                        checked={selected.has(r.regime!)}
-                        onCheckedChange={() => toggleRegime(r.regime!)}
+                        checked={selected.has(key)}
+                        onCheckedChange={() => toggle(key)}
+                        disabled={noPending}
                       />
-                      {r.label}
+                      {label}
                     </span>
                     <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-                      {r.taskCount} tarefa(s) · {r.clientCount} cliente(s)
+                      {noPending ? 'já lançado' : `${g.pending} pendente(s)`}
+                      {g.launched > 0 && !noPending ? ` · ${g.launched} lançada(s)` : ''}
                     </span>
                   </label>
-                ))
+                );
+              })
             )}
-            {mode === 'select' && selected.size > 0 && (
+            {selected.size > 0 && (
               <p className="text-xs text-muted-foreground pt-2 mt-1 border-t">
-                {selectedTasks} tarefa(s) serão lançadas.
+                {selectedPending} tarefa(s) serão lançadas.
               </p>
             )}
           </div>

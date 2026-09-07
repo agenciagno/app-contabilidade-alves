@@ -63,7 +63,7 @@ import { BulkEditCalendarDialog } from '@/components/fiscal/BulkEditCalendarDial
 import { CustomObligationDialog, CustomObligationInitial } from '@/components/fiscal/CustomObligationDialog';
 import { CalendarLaunchPreview } from '@/components/fiscal/CalendarLaunchPreview';
 import { CalendarConflictMap } from '@/components/fiscal/CalendarConflictMap';
-import { LaunchTasksDialog } from '@/components/fiscal/LaunchTasksDialog';
+import { LaunchTasksDialog, LaunchFilters } from '@/components/fiscal/LaunchTasksDialog';
 import { FiscalPeriodStatusControl } from '@/components/fiscal/FiscalPeriodStatusControl';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -191,9 +191,9 @@ export default function FiscalCalendar() {
   const handleCalculate = () => {
     calculate.mutate({ year, month }, { onSuccess: () => setPhasePersist('calculated') });
   };
-  const handleConfirm = (taxRegimes: string[] | null) => {
+  const handleConfirm = (filters: LaunchFilters) => {
     confirm.mutate(
-      { year, month, companyId, launchedBy: userName, taxRegimes },
+      { year, month, companyId, launchedBy: userName, ...filters },
       {
         onSuccess: () => {
           setPhasePersist('launched');
@@ -351,7 +351,7 @@ export default function FiscalCalendar() {
             </Button>
           )}
 
-          {phase === 'calculated' && (
+          {(phase === 'calculated' || phase === 'launched') && (
             <Button
               onClick={() => setLaunchDialogOpen(true)}
               disabled={confirm.isPending || !previewReviewed}
@@ -361,7 +361,7 @@ export default function FiscalCalendar() {
               {confirm.isPending ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Lançando...</>
               ) : (
-                <><Rocket className="h-4 w-4" /> Lançar Tarefas</>
+                <><Rocket className="h-4 w-4" /> {phase === 'launched' ? 'Lançar mais tarefas' : 'Lançar Tarefas'}</>
               )}
             </Button>
           )}
@@ -408,9 +408,11 @@ export default function FiscalCalendar() {
         />
       )}
 
-      {phase === 'calculated' && sorted.length > 0 && (
+      {(phase === 'calculated' || phase === 'launched') && sorted.length > 0 && (
         <CalendarLaunchPreview
           rows={sorted}
+          year={year}
+          month={month}
           reviewed={previewReviewed}
           onReviewedChange={setPreviewReviewed}
         />
@@ -744,6 +746,8 @@ export default function FiscalCalendar() {
         open={launchDialogOpen}
         onOpenChange={setLaunchDialogOpen}
         rows={sorted}
+        year={year}
+        month={month}
         isPending={confirm.isPending}
         onConfirm={handleConfirm}
       />
