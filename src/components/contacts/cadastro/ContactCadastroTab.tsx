@@ -384,9 +384,10 @@ export function ContactCadastroTab({ contactId }: Props) {
             <CardHeader><CardTitle className="text-base">Regime e Inscrições</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="Regime Tributário">
-                <Select value={form.tax_regime || ''} onValueChange={v => set('tax_regime', v)}>
+                <Select value={form.tax_regime || '_ausente'} onValueChange={v => set('tax_regime', v === '_ausente' ? null : v)}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="_ausente">Ausente / Não informado</SelectItem>
                     {TAX_REGIMES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
