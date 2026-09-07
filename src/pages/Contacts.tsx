@@ -106,7 +106,10 @@ export default function Contacts() {
       let matchesRegime = true;
       if (filterRegime !== 'all') {
         const regime = ((c as any).tax_regime || '').toString().toLowerCase().trim();
-        if (filterRegime === 'ausente') {
+        if (filterRegime === 'pessoa_fisica') {
+          const cats = (c.categorias || []).map(x => (x || '').toLowerCase());
+          matchesRegime = cats.includes('pessoa_fisica');
+        } else if (filterRegime === 'ausente') {
           matchesRegime = regime === '';
         } else if (filterRegime === 'nao_aplica') {
           matchesRegime = regime === 'nao_aplica' || regime === 'isento';
@@ -417,7 +420,6 @@ export default function Contacts() {
                   <SelectItem value="cliente">Clientes</SelectItem>
                   <SelectItem value="fornecedor">Fornecedores</SelectItem>
                   <SelectItem value="colaborador">Colaboradores</SelectItem>
-                  <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
                   <SelectItem value="outros">Outros</SelectItem>
                 </SelectContent>
               </Select>
@@ -431,6 +433,7 @@ export default function Contacts() {
                   <SelectItem value="lucro_presumido">Lucro Presumido</SelectItem>
                   <SelectItem value="lucro_real">Lucro Real</SelectItem>
                   <SelectItem value="mei">MEI</SelectItem>
+                  <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
                   <SelectItem value="nao_aplica">Isento / Não contribuinte</SelectItem>
                   <SelectItem value="ausente">Ausente / Não informado</SelectItem>
 
