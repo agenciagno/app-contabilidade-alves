@@ -1,11 +1,12 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Pencil, CircleDollarSign, Trash2 } from 'lucide-react';
+import { getContactDisplayName } from '@/lib/contact-display';
 
 export interface TransactionActionsTarget {
   id: string;
   description: string;
-  contact?: { name: string } | null;
+  contact?: { name: string; display_name?: string | null; nome_fantasia?: string | null; razao_social?: string | null } | null;
 }
 
 interface TransactionActionsDialogProps {
@@ -30,7 +31,7 @@ export function TransactionActionsDialog({
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="truncate">
-            {transaction?.contact?.name ?? transaction?.description ?? 'Transação'}
+            {(transaction && getContactDisplayName(transaction.contact)) || transaction?.description || 'Transação'}
           </DialogTitle>
           <DialogDescription>O que você quer fazer com esta transação?</DialogDescription>
         </DialogHeader>

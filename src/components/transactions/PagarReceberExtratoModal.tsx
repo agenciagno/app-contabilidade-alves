@@ -14,6 +14,7 @@ import { useCompany } from '@/hooks/useCompany';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { zebraPorData } from '@/lib/pdf-zebra';
+import { getContactDisplayName } from '@/lib/contact-display';
 
 interface Category {
   id: string;
@@ -103,7 +104,7 @@ export function PagarReceberExtratoModal({ open, onOpenChange, transactions, ban
       return {
         id: t.id,
         date: formatDateBR(dateKeyOf(t) || ''),
-        contact_name: t.contact?.name ?? null,
+        contact_name: getContactDisplayName(t.contact) || null,
         category_name: t.category?.name ?? null,
         bank_name: banks.find(b => b.id === t.bank_id)?.name ?? null,
         description: t.description,
@@ -160,7 +161,7 @@ export function PagarReceberExtratoModal({ open, onOpenChange, transactions, ban
     : 'Todos';
 
   const contactLabel = contactId !== 'all'
-    ? contacts.find(c => c.id === contactId)?.name || 'Todos'
+    ? getContactDisplayName(contacts.find(c => c.id === contactId)) || 'Todos'
     : 'Todos';
 
   const reportTitle = isReceivables ? 'Extrato — A Receber' : 'Extrato — Pagar/Receber';
@@ -627,7 +628,7 @@ ${transactionsOfx}
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     {contacts.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>{getContactDisplayName(c)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

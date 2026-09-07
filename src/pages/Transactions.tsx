@@ -14,6 +14,7 @@ import { useTransactions, Transaction, TransactionInsert } from '@/hooks/useTran
 import { useServerTransactions, useTransactionKPIs, useDistinctTransactionValues, PAGE_SIZE, ServerFilters, IS_EMPTY } from '@/hooks/useServerTransactions';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
+import { getContactDisplayName } from '@/lib/contact-display';
 import { useCategories } from '@/hooks/useCategories';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { useBanks } from '@/hooks/useBanks';
@@ -742,7 +743,7 @@ export default function Transactions() {
   const uniqueContactOptions = useMemo(() => {
     return contacts
       .filter(c => c.is_active)
-      .map(c => ({ id: c.id, name: c.name }))
+      .map(c => ({ id: c.id, name: getContactDisplayName(c) }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [contacts]);
 
@@ -853,7 +854,7 @@ export default function Transactions() {
     date: t.date, is_paid: t.is_paid,
     category: t.category ? { id: t.category.id, name: t.category.name, color: t.category.color || '#6B7280' } : null,
     bank: t.bank ? { id: t.bank.id, name: t.bank.name, color: t.bank.color || '#3B82F6' } : null,
-    contact: t.contact ? { id: t.contact.id, name: t.contact.name, type: t.contact.type } : null,
+    contact: t.contact ? { id: t.contact.id, name: t.contact.name, type: t.contact.type, display_name: t.contact.display_name, nome_fantasia: t.contact.nome_fantasia, razao_social: t.contact.razao_social } : null,
   })) as ReportTransaction[];
 
 
@@ -1128,6 +1129,7 @@ export default function Transactions() {
                 <div className="divide-y divide-border/30">
                   {transactions.map(transaction => {
                     const isOverdue = !isEffectivelyPaid(transaction) && transaction.due_date && transaction.due_date < new Date().toISOString().split('T')[0];
+                    const contactDisplayName = getContactDisplayName(transaction.contact) || transaction.description;
                     return (
                       <div key={transaction.id} className={`grid grid-cols-[18px_minmax(120px,1fr)_minmax(120px,1fr)_96px_96px_96px_80px_100px_100px_90px] gap-2 px-4 py-[10px] hover:bg-muted/30 transition-colors items-center ${selectedIds.has(transaction.id) ? 'bg-primary/10 border-l-2 border-l-primary' : ''}`}>
                         <div className="flex items-center justify-center">
@@ -1135,7 +1137,7 @@ export default function Transactions() {
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <Tooltip><TooltipTrigger asChild><span className="truncate text-sm font-semibold text-foreground">{transaction.contact?.name ?? transaction.description}</span></TooltipTrigger><TooltipContent side="top" className="apple-tooltip"><p>{transaction.contact?.name ?? transaction.description}</p></TooltipContent></Tooltip>
+                            <Tooltip><TooltipTrigger asChild><span className="truncate text-sm font-semibold text-foreground">{contactDisplayName}</span></TooltipTrigger><TooltipContent side="top" className="apple-tooltip"><p>{contactDisplayName}</p></TooltipContent></Tooltip>
                             {isOverdue && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-danger/20 text-danger border border-danger/40 whitespace-nowrap shrink-0">Vencido</span>}
                             {(() => {
                               const isVisualCash = transaction.is_paid && !!transaction.date && !!transaction.due_date && !!transaction.issue_date && transaction.date === transaction.due_date && transaction.due_date === transaction.issue_date;

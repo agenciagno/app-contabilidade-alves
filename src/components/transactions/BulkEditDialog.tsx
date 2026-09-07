@@ -14,6 +14,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { getContactDisplayName } from '@/lib/contact-display';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { Loader2, CalendarIcon } from 'lucide-react';
 
@@ -123,7 +124,7 @@ export function BulkEditDialog({
                 <SelectContent>
                   <SelectItem value="placeholder" disabled>Selecione o cliente</SelectItem>
                   {activeContacts.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{getContactDisplayName(c)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
+import { getContactDisplayName } from '@/lib/contact-display';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -600,7 +601,7 @@ export function TransactionFormDialog({
                       </SelectItem>
                       {filteredContacts.map(c => (
                         <SelectItem key={c.id} value={c.id}>
-                          <div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-muted-foreground" />{c.name}</div>
+                          <div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-muted-foreground" />{getContactDisplayName(c)}</div>
                         </SelectItem>
                       ))}
                     </SelectContent>

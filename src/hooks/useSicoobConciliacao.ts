@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getContactDisplayName } from '@/lib/contact-display';
 
 // A API devolve valores monetários como string (ex.: "427.00") — não converter pra number na
 // interface, os componentes formatam com Intl.NumberFormat, que aceita string numérica direto.
@@ -78,7 +79,7 @@ export function useSicoobConciliacao(mes: number, ano: number) {
     queryFn: async (): Promise<BoletoParaMatch[]> => {
       const { data, error } = await (supabase as any)
         .from('boleto_controls')
-        .select('id, nosso_numero, valor, status, data_vencimento, data_pagamento, contacts:contact_id ( name )')
+        .select('id, nosso_numero, valor, status, data_vencimento, data_pagamento, contacts:contact_id ( name, display_name, nome_fantasia, razao_social )')
         .not('nosso_numero', 'is', null);
       if (error) throw error;
       return (data || []).map((b: any) => ({
@@ -88,7 +89,7 @@ export function useSicoobConciliacao(mes: number, ano: number) {
         status: b.status,
         data_vencimento: b.data_vencimento,
         data_pagamento: b.data_pagamento,
-        contact_name: b.contacts?.name ?? '—',
+        contact_name: b.contacts ? (getContactDisplayName(b.contacts) || '—') : '—',
       }));
     },
     staleTime: 1000 * 30,

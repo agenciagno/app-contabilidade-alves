@@ -192,7 +192,7 @@ export function useServerTransactions(page: number, filters: ServerFilters) {
           *,
           category:categories(id, name, color),
           bank:banks(id, name, color),
-          contact:contacts(id, name, type)
+          contact:contacts(id, name, type, display_name, nome_fantasia, razao_social)
         `, { count: 'exact' })
         .eq('company_id', activeCompanyId!);
 

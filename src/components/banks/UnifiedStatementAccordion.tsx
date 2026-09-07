@@ -7,6 +7,7 @@ import { Bank } from '@/hooks/useBanks';
 import { useContacts } from '@/hooks/useContacts';
 import { useCategories } from '@/hooks/useCategories';
 import { useBankTransactions } from '@/hooks/useBankTransactions';
+import { getContactDisplayName } from '@/lib/contact-display';
 
 interface UnifiedStatementAccordionProps {
   banks: Bank[];
@@ -139,7 +140,7 @@ export function UnifiedStatementAccordion({ banks }: UnifiedStatementAccordionPr
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
             {contacts.map(c => (
-              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              <SelectItem key={c.id} value={c.id}>{getContactDisplayName(c)}</SelectItem>
             ))}
           </SelectContent>
         </Select>

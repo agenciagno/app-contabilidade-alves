@@ -16,6 +16,7 @@ import { format, parseISO, isWithinInterval } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { zebraPorData } from '@/lib/pdf-zebra';
+import { getContactDisplayName } from '@/lib/contact-display';
 import type { Transaction } from '@/hooks/useTransactions';
 import type { Bank } from '@/hooks/useBanks';
 import type { Contact } from '@/hooks/useContacts';
@@ -175,7 +176,7 @@ export function CashFlowReportModal({
   const contactLabel = contactIds.size === 0
     ? 'Todos'
     : contactIds.size === 1
-      ? contacts.find(c => contactIds.has(c.id))?.name || '1 selecionado'
+      ? getContactDisplayName(contacts.find(c => contactIds.has(c.id))) || '1 selecionado'
       : `${contactIds.size} selecionados`;
   const typeLabel = typeFilter === 'receita' ? 'A Receber' : typeFilter === 'despesa' ? 'A Pagar' : 'Todos';
 
@@ -354,7 +355,7 @@ export function CashFlowReportModal({
   };
   const getContactKey = (t: Transaction) => ({
     id: t.contact?.id || '__no_contact__',
-    name: t.contact?.name || 'Sem cliente/fornecedor',
+    name: getContactDisplayName(t.contact) || 'Sem cliente/fornecedor',
     color: null as string | null,
   });
 
@@ -451,7 +452,7 @@ export function CashFlowReportModal({
   }, [monthlySelectedCategories, categories]);
   const monthlyContactLabel = useMemo(() => {
     if (monthlySelectedContacts.size === 0) return 'Todos';
-    const names = contacts.filter(c => monthlySelectedContacts.has(c.id)).map(c => c.name);
+    const names = contacts.filter(c => monthlySelectedContacts.has(c.id)).map(c => getContactDisplayName(c));
     if (names.length === 1) return names[0];
     return `${names.length} selecionados: ${names.join(', ')}`;
   }, [monthlySelectedContacts, contacts]);
@@ -543,7 +544,7 @@ export function CashFlowReportModal({
       ? [['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia']]
       : [['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia']];
     const body = rowsWithBalance.map(r => isReceivables ? [
-      r.contact?.name || r.description,
+      getContactDisplayName(r.contact) || r.description,
       formatCurrency(Number(r.amount)),
       r.due_date ? formatDateBR(r.due_date) : '',
       r.category?.name || '',
@@ -553,7 +554,7 @@ export function CashFlowReportModal({
       weekdayOf(r.due_date || r.expected_date),
     ] : [
       formatDateBR(r.expected_date || ''),
-      r.contact?.name || r.description,
+      getContactDisplayName(r.contact) || r.description,
       r.type === 'receita' ? formatCurrency(Number(r.amount)) : '',
       r.type === 'despesa' ? formatCurrency(Number(r.amount)) : '',
       r.due_date ? formatDateBR(r.due_date) : '',
@@ -697,7 +698,7 @@ export function CashFlowReportModal({
       : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia'];
     const colSpan = headers.length;
     const tableRows = rowsWithBalance.map(r => isReceivables ? [
-      r.contact?.name || r.description || '',
+      getContactDisplayName(r.contact) || r.description || '',
       Number(r.amount).toFixed(2).replace('.', ','),
       r.due_date ? formatDateBR(r.due_date) : '',
       r.category?.name || '',
@@ -707,7 +708,7 @@ export function CashFlowReportModal({
       weekdayOf(r.due_date || r.expected_date),
     ] : [
       formatDateBR(r.expected_date || ''),
-      r.contact?.name || r.description || '',
+      getContactDisplayName(r.contact) || r.description || '',
       r.type === 'receita' ? Number(r.amount).toFixed(2).replace('.', ',') : '',
       r.type === 'despesa' ? Number(r.amount).toFixed(2).replace('.', ',') : '',
       r.due_date ? formatDateBR(r.due_date) : '',
@@ -772,7 +773,7 @@ export function CashFlowReportModal({
       ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia']
       : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia'];
     const dataLines = rowsWithBalance.map(r => (isReceivables ? [
-      `"${(r.contact?.name || r.description || '').replace(/"/g, '""')}"`,
+      `"${(getContactDisplayName(r.contact) || r.description || '').replace(/"/g, '""')}"`,
       Number(r.amount).toFixed(2).replace('.', ','),
       r.due_date ? formatDateBR(r.due_date) : '',
       r.category?.name || '',
@@ -782,7 +783,7 @@ export function CashFlowReportModal({
       weekdayOf(r.due_date || r.expected_date),
     ] : [
       formatDateBR(r.expected_date || ''),
-      `"${(r.contact?.name || r.description || '').replace(/"/g, '""')}"`,
+      `"${(getContactDisplayName(r.contact) || r.description || '').replace(/"/g, '""')}"`,
       r.type === 'receita' ? Number(r.amount).toFixed(2).replace('.', ',') : '',
       r.type === 'despesa' ? Number(r.amount).toFixed(2).replace('.', ',') : '',
       r.due_date ? formatDateBR(r.due_date) : '',
@@ -1288,7 +1289,7 @@ export function CashFlowReportModal({
                               className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-bg-2 text-left"
                             >
                               <Checkbox checked={checked} />
-                              <span className="truncate">{ct.name}</span>
+                              <span className="truncate">{getContactDisplayName(ct)}</span>
                             </button>
                           );
                         });
@@ -1552,7 +1553,7 @@ export function CashFlowReportModal({
                         {monthlySelectedContacts.size === 0
                           ? 'Todos os clientes/fornecedores'
                           : monthlySelectedContacts.size === 1
-                          ? contacts.find(c => monthlySelectedContacts.has(c.id))?.name || '1 selecionado'
+                          ? getContactDisplayName(contacts.find(c => monthlySelectedContacts.has(c.id))) || '1 selecionado'
                           : `${monthlySelectedContacts.size} selecionados`}
                       </span>
                       <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
@@ -1603,7 +1604,7 @@ export function CashFlowReportModal({
                                 className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-bg-2 text-left"
                               >
                                 <Checkbox checked={checked} />
-                                <span className="truncate">{ct.name}</span>
+                                <span className="truncate">{getContactDisplayName(ct)}</span>
                               </button>
                             );
                           });

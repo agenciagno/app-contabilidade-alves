@@ -7,6 +7,7 @@ import autoTable from 'jspdf-autotable';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { zebraPorData } from '@/lib/pdf-zebra';
 import { fetchAllPages } from '@/lib/fetch-all';
+import { getContactDisplayName } from '@/lib/contact-display';
 
 interface ReportFilters {
   startDate?: Date;
@@ -29,7 +30,7 @@ export interface ReportTransaction {
   is_paid: boolean;
   category?: { id: string; name: string; color: string } | null;
   bank?: { id: string; name: string; color: string } | null;
-  contact?: { id: string; name: string; type: string; tax_regime?: string | null; phone?: string | null } | null;
+  contact?: { id: string; name: string; type: string; tax_regime?: string | null; phone?: string | null; display_name?: string | null; nome_fantasia?: string | null; razao_social?: string | null } | null;
 }
 
 export function useReportData(filters: ReportFilters) {
@@ -53,7 +54,7 @@ export function useReportData(filters: ReportFilters) {
             is_paid,
             category:categories(id, name, color),
             bank:banks(id, name, color),
-            contact:contacts(id, name, type, tax_regime, phone)
+            contact:contacts(id, name, type, tax_regime, phone, display_name, nome_fantasia, razao_social)
           `)
           .eq('company_id', activeCompanyId!)
           .is('deleted_at', null)
@@ -234,7 +235,7 @@ export function exportToCSV(transactions: ReportTransaction[]) {
     t.type === 'receita' ? 'Receita' : 'Despesa',
     t.category?.name || 'Sem categoria',
     t.bank?.name || 'Sem banco',
-    t.contact?.name || '',
+    getContactDisplayName(t.contact) || '',
     Number(t.amount).toFixed(2).replace('.', ','),
     t.is_paid ? 'Pago' : 'Pendente',
   ]);

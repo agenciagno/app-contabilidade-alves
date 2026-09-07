@@ -92,7 +92,7 @@ export interface Transaction {
   deleted_at?: string | null;
   category?: { id: string; name: string; color: string } | null;
   bank?: { id: string; name: string; color: string } | null;
-  contact?: { id: string; name: string; type: string } | null;
+  contact?: { id: string; name: string; type: string; display_name: string | null; nome_fantasia: string | null; razao_social: string | null } | null;
 }
 
 export type TransactionInsert = {
@@ -132,7 +132,7 @@ export function useTransactions() {
             *,
             category:categories(id, name, color),
             bank:banks(id, name, color),
-            contact:contacts(id, name, type)
+            contact:contacts(id, name, type, display_name, nome_fantasia, razao_social)
           `)
           .eq('company_id', activeCompanyId!)
           .is('deleted_at', null)

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getContactDisplayName } from '@/lib/contact-display';
 
 export type BoletoStatus = 'PENDENTE' | 'PAGO' | 'FILA_IMPRESSAO' | 'IMPRESSO' | string;
 export type CanalEntrega = 'whatsapp' | 'email' | 'impresso' | 'whatsapp_email' | null;
@@ -118,7 +119,7 @@ export function useBoletoControls(vencimentoMonth: string) {
           valor, valor_pago, data_vencimento, data_pagamento, canal_entrega,
           nosso_numero, seu_numero, linha_digitavel, codigo_barras, url_qrcode,
           origem_baixa, sicoob_response, pdf_url,
-          contacts:contact_id ( id, name, type, document, email, phone )
+          contacts:contact_id ( id, name, type, document, email, phone, display_name, nome_fantasia, razao_social )
         `)
         .gte('data_vencimento', vencimentoMonth)
         .lt('data_vencimento', addMonthISO(vencimentoMonth))
@@ -126,7 +127,7 @@ export function useBoletoControls(vencimentoMonth: string) {
       if (error) throw error;
       return (data || []).map((bc: any): BoletoWithContact => ({
         ...bc,
-        contact_name: bc.contacts?.name ?? '—',
+        contact_name: bc.contacts ? (getContactDisplayName(bc.contacts) || '—') : '—',
         contact_type: bc.contacts?.type ?? 'cliente',
         contact_document: bc.contacts?.document ?? null,
         contact_email: bc.contacts?.email ?? null,

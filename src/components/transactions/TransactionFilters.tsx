@@ -12,6 +12,7 @@ import { Contact } from '@/hooks/useContacts';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { getContactDisplayName } from '@/lib/contact-display';
 export type PeriodFilter = 'all' | 'thisMonth' | 'lastMonth' | 'last30Days' | 'last15Days' | 'thisYear' | 'next15Days' | 'nextMonth' | 'next30Days' | 'custom';
 interface TransactionFiltersProps {
   period: PeriodFilter;
@@ -243,7 +244,7 @@ export function TransactionFilters({
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
                 {contacts.filter(c => c.is_active).map(contact => <SelectItem key={contact.id} value={contact.id}>
-                    {contact.name}
+                    {getContactDisplayName(contact)}
                   </SelectItem>)}
               </SelectContent>
             </Select>
