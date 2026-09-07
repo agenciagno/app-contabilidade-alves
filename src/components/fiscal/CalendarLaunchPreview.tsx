@@ -1,16 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
-import { AlertTriangle, CheckCircle2, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Scale, Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
-import { fetchAllPages } from '@/lib/fetch-all';
-import { useQuery } from '@tanstack/react-query';
-import { useCompany } from '@/hooks/useCompany';
+import { useCalendarLaunchBreakdown } from '@/hooks/useCalendarLaunchBreakdown';
 import { FiscalCalendarEffectiveRow } from '@/hooks/useFiscalCalendar';
 
 interface Props {
@@ -19,126 +16,11 @@ interface Props {
   onReviewedChange: (v: boolean) => void;
 }
 
-interface EligibleContact {
-  id: string;
-  name: string;
-  responsible_id: string | null;
-}
-
 export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Props) {
-  const { company } = useCompany();
-  const companyId = company?.id;
+  const breakdown = useCalendarLaunchBreakdown(rows);
+  const { perObligation, perCollaborator, perRegime, totalTasks, clientCount, loading } = breakdown;
 
-  // Mesmo critério de elegibilidade do RPC generate_monthly_fiscal_tasks:
-  // is_active, responsible_id definido e categorizado como 'cliente'.
-  const { data: contacts = [], isLoading: contactsLoading } = useQuery<EligibleContact[]>({
-    queryKey: ['fiscal-eligible-contacts', companyId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('id, name, responsible_id')
-        .eq('company_id', companyId!)
-        .eq('is_active', true)
-        .not('responsible_id', 'is', null)
-        .contains('categorias', ['cliente']);
-      if (error) throw error;
-      return (data ?? []) as EligibleContact[];
-    },
-    enabled: !!companyId,
-  });
-
-  // Vínculo real por cliente (client_obligations) — a mesma fonte que o RPC usa.
-  // Não usar fiscal_obligations_catalog.applies_to (regime) pra contar clientes: uma
-  // obrigação pode aplicar a um regime mas só estar marcada em alguns clientes dele.
-  const { data: clientObligations = [], isLoading: clientObligationsLoading } = useQuery<
-    { obligation_id: string; contact_id: string }[]
-  >({
-    queryKey: ['client-obligations-all', companyId],
-    queryFn: async () =>
-      // fetchAllPages: a tabela já passa de 1000 linhas — sem isso o PostgREST
-      // corta e o preview subconta clientes por obrigação.
-      fetchAllPages<{ obligation_id: string; contact_id: string }>(() =>
-        supabase
-          .from('client_obligations')
-          .select('obligation_id, contact_id')
-          .eq('company_id', companyId!)
-          .order('id', { ascending: true })
-      ),
-    enabled: !!companyId,
-  });
-
-  const { data: profiles = [] } = useQuery<{ id: string; full_name: string | null; email: string | null }[]>({
-    queryKey: ['profiles-min', companyId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .eq('company_id', companyId!);
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !!companyId,
-  });
-
-  const profileName = (id: string | null) => {
-    if (!id) return 'Sem responsável';
-    const p = profiles.find((x) => x.id === id);
-    return p?.full_name || p?.email?.split('@')[0] || 'Desconhecido';
-  };
-
-  const breakdown = useMemo(() => {
-    // Para cada obrigação, contar só os clientes com vínculo real em client_obligations
-    // (o mesmo dado que o RPC generate_monthly_fiscal_tasks usa pra gerar as tarefas).
-    const contactsById = new Map(contacts.map((c) => [c.id, c]));
-    const perObligation = rows.map((r) => {
-      const linkedContactIds = clientObligations
-        .filter((co) => co.obligation_id === r.obligation_id)
-        .map((co) => co.contact_id);
-      const clients = linkedContactIds
-        .map((id) => contactsById.get(id))
-        .filter((c): c is EligibleContact => !!c);
-      return {
-        id: r.id,
-        name: r.fiscal_obligations_catalog?.name ?? '—',
-        clientCount: clients.length,
-        clients,
-        adjustedDueDate: r.adjusted_due_date,
-        internalDeliveryDate: r.internal_delivery_date,
-      };
-    });
-
-    // Per-collaborator counts (one task per client per obligation that applies)
-    const byProfile = new Map<string, number>();
-    let totalTasks = 0;
-    const clientsTouched = new Set<string>();
-    perObligation.forEach((o) => {
-      o.clients.forEach((c) => {
-        totalTasks += 1;
-        clientsTouched.add(c.id);
-        const key = c.responsible_id ?? '__none__';
-        byProfile.set(key, (byProfile.get(key) ?? 0) + 1);
-      });
-    });
-
-    const perCollaborator = Array.from(byProfile.entries())
-      .map(([id, count]) => ({
-        id: id === '__none__' ? null : id,
-        name: id === '__none__' ? 'Sem responsável' : profileName(id),
-        count,
-        pct: totalTasks > 0 ? (count / totalTasks) * 100 : 0,
-      }))
-      .sort((a, b) => b.count - a.count);
-
-    return {
-      perObligation,
-      perCollaborator,
-      totalTasks,
-      clientCount: clientsTouched.size,
-    };
-  }, [rows, contacts, clientObligations, profiles]);
-
-  const overloaded = breakdown.perCollaborator.filter((c) => c.pct > 40);
-  const loading = contactsLoading || clientObligationsLoading;
+  const overloaded = perCollaborator.filter((c) => c.pct > 40);
 
   // Reset reviewed flag when rows change
   useEffect(() => {
@@ -167,8 +49,8 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
               <Skeleton className="h-4 w-64" />
             ) : (
               <>
-                Serão geradas <strong className="text-foreground">{breakdown.totalTasks}</strong> tarefa(s) para{' '}
-                <strong className="text-foreground">{breakdown.clientCount}</strong> cliente(s).
+                Serão geradas <strong className="text-foreground">{totalTasks}</strong> tarefa(s) para{' '}
+                <strong className="text-foreground">{clientCount}</strong> cliente(s).
               </>
             )}
           </p>
@@ -196,7 +78,7 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div>
           <h3 className="text-sm font-semibold mb-2">Por obrigação</h3>
           <div className="rounded-md border overflow-hidden">
@@ -221,7 +103,7 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
                     </TableRow>
                   ))
                 ) : (
-                  breakdown.perObligation.map((o) => (
+                  perObligation.map((o) => (
                     <TableRow key={o.id}>
                       <TableCell className="font-medium">{o.name}</TableCell>
                       <TableCell className="text-right tabular-nums">{o.clientCount}</TableCell>
@@ -237,15 +119,48 @@ export function CalendarLaunchPreview({ rows, reviewed, onReviewedChange }: Prop
 
         <div>
           <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+            <Scale className="h-4 w-4" /> Por regime tributário
+          </h3>
+          <div className="space-y-2">
+            {loading ? (
+              Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)
+            ) : perRegime.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma tarefa será gerada.</p>
+            ) : (
+              perRegime.map((r) => (
+                <div
+                  key={r.regime ?? 'none'}
+                  className="flex items-center gap-3 rounded-md border bg-background p-2.5"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{r.label}</p>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden mt-1">
+                      <div className="h-full bg-primary" style={{ width: `${Math.min(100, r.pct)}%` }} />
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <Badge variant="outline" className="tabular-nums">
+                      {r.taskCount} tarefa(s)
+                    </Badge>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{r.clientCount} cliente(s)</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
             <Users className="h-4 w-4" /> Por colaborador
           </h3>
           <div className="space-y-2">
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)
-            ) : breakdown.perCollaborator.length === 0 ? (
+            ) : perCollaborator.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhuma tarefa será gerada.</p>
             ) : (
-              breakdown.perCollaborator.map((c) => (
+              perCollaborator.map((c) => (
                 <div
                   key={c.id ?? 'none'}
                   className="flex items-center gap-3 rounded-md border bg-background p-2.5"

@@ -3,8 +3,6 @@ import { Navigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import {
   CalendarRange,
-  CheckCircle2,
-  ClipboardCheck,
   Info,
   Loader2,
   Lock,
@@ -65,8 +63,7 @@ import { BulkEditCalendarDialog } from '@/components/fiscal/BulkEditCalendarDial
 import { CustomObligationDialog, CustomObligationInitial } from '@/components/fiscal/CustomObligationDialog';
 import { CalendarLaunchPreview } from '@/components/fiscal/CalendarLaunchPreview';
 import { CalendarConflictMap } from '@/components/fiscal/CalendarConflictMap';
-import { IbsCbsSection, isRtRow } from '@/components/fiscal/IbsCbsSection';
-import { RtChecklistDialog } from '@/components/fiscal/RtChecklistDialog';
+import { LaunchTasksDialog } from '@/components/fiscal/LaunchTasksDialog';
 import { FiscalPeriodStatusControl } from '@/components/fiscal/FiscalPeriodStatusControl';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -109,8 +106,8 @@ export default function FiscalCalendar() {
   const [unlockOpen, setUnlockOpen] = useState(false);
   const [rollbackOpen, setRollbackOpen] = useState(false);
 
-  // RT checklist
-  const [rtChecklistOpen, setRtChecklistOpen] = useState(false);
+  // Launch dialog (todas as tarefas x seleção de regimes)
+  const [launchDialogOpen, setLaunchDialogOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -194,10 +191,15 @@ export default function FiscalCalendar() {
   const handleCalculate = () => {
     calculate.mutate({ year, month }, { onSuccess: () => setPhasePersist('calculated') });
   };
-  const handleConfirm = () => {
+  const handleConfirm = (taxRegimes: string[] | null) => {
     confirm.mutate(
-      { year, month, companyId, launchedBy: userName },
-      { onSuccess: () => setPhasePersist('launched') },
+      { year, month, companyId, launchedBy: userName, taxRegimes },
+      {
+        onSuccess: () => {
+          setPhasePersist('launched');
+          setLaunchDialogOpen(false);
+        },
+      },
     );
   };
   const handleUnlock = () => {
@@ -329,10 +331,6 @@ export default function FiscalCalendar() {
           <p className="mt-1 text-body text-muted-ink">Revise a distribuição antes de lançar as tarefas no Kanban.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={() => setRtChecklistOpen(true)}>
-            <ClipboardCheck className="h-4 w-4" /> Checklist RT
-          </Button>
-
           <FiscalPeriodStatusControl year={year} month={month} />
 
           <Button
@@ -355,7 +353,7 @@ export default function FiscalCalendar() {
 
           {phase === 'calculated' && (
             <Button
-              onClick={handleConfirm}
+              onClick={() => setLaunchDialogOpen(true)}
               disabled={confirm.isPending || !previewReviewed}
               className="bg-ok hover:bg-ok"
               title={!previewReviewed ? 'Marque "Revisei a distribuição" para liberar o lançamento' : undefined}
@@ -604,24 +602,6 @@ export default function FiscalCalendar() {
         </Table>
       </Card>
 
-      {phase !== 'idle' && sorted.length > 0 && (
-        <IbsCbsSection
-          rows={sorted}
-          disabled={editingDisabled}
-          onNewRtObligation={() => {
-            setCustomInitial({
-              name: '',
-              description: '[RT] ',
-              applies_to: [],
-              due_rule: null,
-              holiday_adjustment: 'prev_business_day',
-            });
-            setCustomOpen(true);
-          }}
-        />
-      )}
-
-
       <FiscalObligationOverrideDialog
         row={editing}
         open={dialogOpen}
@@ -760,7 +740,13 @@ export default function FiscalCalendar() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <RtChecklistDialog open={rtChecklistOpen} onOpenChange={setRtChecklistOpen} />
+      <LaunchTasksDialog
+        open={launchDialogOpen}
+        onOpenChange={setLaunchDialogOpen}
+        rows={sorted}
+        isPending={confirm.isPending}
+        onConfirm={handleConfirm}
+      />
     </div>
   );
 }

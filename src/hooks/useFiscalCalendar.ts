@@ -114,17 +114,20 @@ export function useConfirmMonthlyTasks() {
       month,
       companyId,
       launchedBy,
+      taxRegimes,
     }: {
       year: number;
       month: number;
       companyId?: string | null;
       launchedBy?: string;
+      taxRegimes?: string[] | null;
     }) => {
       // Capture timestamp slightly before RPC to account for clock skew
       const beforeTs = new Date(Date.now() - 2000).toISOString();
       const { data, error } = await (supabase as any).rpc('generate_monthly_fiscal_tasks', {
         p_year: year,
         p_month: month,
+        p_tax_regimes: taxRegimes && taxRegimes.length > 0 ? taxRegimes : null,
       });
       if (error) throw error;
       const tasksCreated: number =
