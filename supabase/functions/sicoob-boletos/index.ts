@@ -116,9 +116,14 @@ async function getSicoobToken(scope = "boletos_inclusao boletos_consulta"): Prom
     "https://auth.sicoob.com.br/auth/realms/cooperado/protocol/openid-connect/token",
     { method: "POST", client, headers: { "Content-Type": "application/x-www-form-urlencoded" }, body },
   );
-  const data = await res.json().catch(() => ({}));
+  // Lê como texto primeiro — um 403 de gateway/WAF (não do Sicoob) não vem em JSON, e
+  // res.json().catch(()=>({})) mascarava isso como mensagem vazia (16/09/2026).
+  const raw = await res.text();
+  let data: any = {};
+  try { data = JSON.parse(raw); } catch { /* corpo não é JSON */ }
   if (!res.ok || !data.access_token) {
-    throw new Error(`Falha ao autenticar no Sicoob (HTTP ${res.status}): ${data?.error_description || data?.error || ""}`);
+    const detail = data?.error_description || data?.error || raw.slice(0, 500) || "sem corpo de resposta";
+    throw new Error(`Falha ao autenticar no Sicoob (HTTP ${res.status}): ${detail}`);
   }
   return data.access_token as string;
 }
