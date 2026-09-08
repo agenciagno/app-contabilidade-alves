@@ -29,6 +29,7 @@ import { useBoletoControls, type BoletoWithContact } from '@/hooks/useBoletoCont
 import { BoletoGenerationDialog } from '@/components/financeiro/BoletoGenerationDialog';
 import { IndividualBoletoDialog } from '@/components/financeiro/IndividualBoletoDialog';
 import { BoletoCalendarView } from '@/components/financeiro/BoletoCalendarView';
+import { NotificarCobrancaDialog } from '@/components/financeiro/NotificarCobrancaDialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -92,6 +93,7 @@ export default function Boletos() {
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [detailsOf, setDetailsOf] = useState<BoletoWithContact | null>(null);
+  const [cobrancaOf, setCobrancaOf] = useState<BoletoWithContact | null>(null);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [singleOpen, setSingleOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -99,7 +101,7 @@ export default function Boletos() {
   const { toast } = useToast();
 
   const {
-    boletoList, isLoading, markAsPrinted, resendBilling, fetchPreview, generateBoletos,
+    boletoList, isLoading, markAsPrinted, fetchPreview, generateBoletos,
     generateSingleBoleto, listSyncContacts, findOrphanBoletos, downloadBoletoPdf,
   } = useBoletoControls(vencimentoMonth);
 
@@ -478,11 +480,8 @@ export default function Boletos() {
                                 </DropdownMenuItem>
                               )}
                               {canResend && (
-                                <DropdownMenuItem
-                                  onClick={() => resendBilling.mutate(b)}
-                                  disabled={resendBilling.isPending}
-                                >
-                                  <Send className="h-4 w-4 mr-2" /> Reenviar cobrança
+                                <DropdownMenuItem onClick={() => setCobrancaOf(b)}>
+                                  <Send className="h-4 w-4 mr-2" /> Cobrança
                                 </DropdownMenuItem>
                               )}
                               {canMarkPrinted && (
@@ -601,6 +600,13 @@ export default function Boletos() {
         onOpenChange={setSingleOpen}
         fetchPreview={fetchPreview}
         generateSingleBoleto={generateSingleBoleto}
+      />
+
+      {/* Dialog: cobrança (mensagem editável + Copiar/WhatsApp/E-mail + histórico — padrão de Certificados) */}
+      <NotificarCobrancaDialog
+        open={!!cobrancaOf}
+        onOpenChange={(o) => !o && setCobrancaOf(null)}
+        boleto={cobrancaOf}
       />
     </div>
   );

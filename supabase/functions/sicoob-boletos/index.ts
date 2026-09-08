@@ -187,6 +187,32 @@ function extrairDataPagamento(listaHistorico: unknown): string | null {
   return data ? String(data).slice(0, 10) : null;
 }
 
+// GET /boletos/segunda-via — único jeito de recuperar o PDF de um boleto que já existe no Sicoob
+// (a criação retorna o PDF na hora, mas a listagem por pagador usada no sync não traz o binário).
+// Confirmado no código-fonte de uma lib de terceiro que implementa a v3 (não há Swagger público
+// completo): GET com numeroCliente+codigoModalidade+nossoNumero+gerarPdf=true, resposta no mesmo
+// formato de "resultado.pdfBoleto" da criação. Falha aqui nunca bloqueia o sync — só fica sem PDF,
+// igual já acontece hoje (16/09/2026).
+async function buscarSegundaViaPdf(token: string, nossoNumero: number): Promise<Uint8Array | null> {
+  try {
+    // @ts-ignore unstable API
+    const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+    const url = `https://api.sicoob.com.br/cobranca-bancaria/v3/boletos/segunda-via?numeroCliente=${NUMERO_CLIENTE}&codigoModalidade=1&nossoNumero=${nossoNumero}&gerarPdf=true`;
+    const res = await fetch(url, {
+      method: "GET",
+      client,
+      headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Accept": "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => ({}));
+    const b64: string | undefined = data?.resultado?.pdfBoleto ?? data?.pdfBoleto;
+    if (!b64) return null;
+    return Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
+  } catch {
+    return null;
+  }
+}
+
 // GET /saldo — saldo atual/bloqueado/limite da conta corrente. Só leitura.
 async function consultarSaldo(token: string) {
   // @ts-ignore unstable API
@@ -343,14 +369,37 @@ Deno.serve(async (req) => {
       .eq("is_active", true);
     if (cErr) throw cErr;
 
-    // Boletos já gerados neste ciclo de emissão (mês real de hoje)
-    const { data: existentes, error: eErr } = await supabase
-      .from("boleto_controls")
-      .select("contact_id")
-      .eq("company_id", COMPANY_ID)
-      .eq("reference_month", emissaoMonth);
-    if (eErr) throw eErr;
-    const jaGerados = new Set((existentes || []).map((b: any) => b.contact_id));
+    // Meses de vencimento já registrados por contato — QUALQUER origem (manual no Sicoob,
+    // "Gerar lote" ou "Boleto avulso") e QUALQUER status, não só o que nasceu com
+    // reference_month = mês de emissão de hoje. Motivo (16/09/2026): boleto criado manualmente
+    // no Sicoob só entra em boleto_controls quando o sync roda, dias/semanas depois — o
+    // reference_month dele reflete a emissão real (no Sicoob), não o ciclo de hoje. Um cliente
+    // com boleto pendente vencendo mês que vem (criado manualmente há semanas) reaparecia como
+    // "elegível" aqui, e "Gerar lote" duplicava a cobrança pro mesmo mês de vencimento. Ver
+    // roadmap.md 16/09/2026.
+    const contactIds = (contatos || []).map((c: any) => c.id);
+    const vencimentoMonthsByContact = new Map<string, Set<string>>();
+    if (contactIds.length) {
+      const { data: existentes, error: eErr } = await supabase
+        .from("boleto_controls")
+        .select("contact_id, data_vencimento")
+        .eq("company_id", COMPANY_ID)
+        .in("contact_id", contactIds);
+      if (eErr) throw eErr;
+      for (const row of existentes || []) {
+        if (!row.data_vencimento) continue;
+        const mes = String(row.data_vencimento).slice(0, 7);
+        if (!vencimentoMonthsByContact.has(row.contact_id)) vencimentoMonthsByContact.set(row.contact_id, new Set());
+        vencimentoMonthsByContact.get(row.contact_id)!.add(mes);
+      }
+    }
+    function jaTemBoletoNoMesDeVencimento(contactId: string, dataVencimentoISO: string): boolean {
+      return vencimentoMonthsByContact.get(contactId)?.has(dataVencimentoISO.slice(0, 7)) ?? false;
+    }
+    function marcarVencimentoGerado(contactId: string, dataVencimentoISO: string) {
+      if (!vencimentoMonthsByContact.has(contactId)) vencimentoMonthsByContact.set(contactId, new Set());
+      vencimentoMonthsByContact.get(contactId)!.add(dataVencimentoISO.slice(0, 7));
+    }
 
     // ---------------- PREVIEW ----------------
     if (action === "preview") {
@@ -364,7 +413,7 @@ Deno.serve(async (req) => {
           valor: c.boleto_value != null ? Number(c.boleto_value) : null,
           canal_entrega: c.canal_entrega,
           data_vencimento: contactDatas?.dataVencimentoISO ?? null,
-          already_generated: jaGerados.has(c.id),
+          already_generated: contactDatas ? jaTemBoletoNoMesDeVencimento(c.id, contactDatas.dataVencimentoISO) : false,
           missing_fields: faltando,
         };
       });
@@ -398,18 +447,18 @@ Deno.serve(async (req) => {
           results.push({ contact_id: id, name: null, status: "error", message: "Contato não elegível ou não encontrado" });
           continue;
         }
-        if (jaGerados.has(id)) {
-          results.push({ contact_id: id, name: c.name, status: "skipped", message: "Boleto já existe neste mês" });
-          continue;
-        }
         const faltando = missingFields(c);
         if (faltando.length) {
           results.push({ contact_id: id, name: c.name, status: "error", message: `Dados incompletos: ${faltando.join(", ")}` });
           continue;
         }
+        const contactDatas = computeContactDatas(dataEmissaoISO, c.boleto_due_day);
+        if (jaTemBoletoNoMesDeVencimento(id, contactDatas.dataVencimentoISO)) {
+          results.push({ contact_id: id, name: c.name, status: "skipped", message: "Cliente já tem boleto com vencimento neste mês" });
+          continue;
+        }
 
         try {
-          const contactDatas = computeContactDatas(dataEmissaoISO, c.boleto_due_day);
           const datas: ContactDatas = { dataEmissaoISO, ...contactDatas };
           const seuNumero = seuNumeroFor(emissaoMonth, c.document);
           const resp = await criarBoletoSicoob(token, c, datas, seuNumero);
@@ -460,7 +509,7 @@ Deno.serve(async (req) => {
             results.push({ contact_id: id, name: c.name, status: "error", message: `Boleto gerado no Sicoob mas falhou ao salvar: ${insErr.message}` });
             continue;
           }
-          jaGerados.add(id);
+          marcarVencimentoGerado(id, contactDatas.dataVencimentoISO);
           results.push({ contact_id: id, name: c.name, status: "ok", pdf: !!pdfPath });
         } catch (e) {
           results.push({ contact_id: id, name: c.name, status: "error", message: String((e as Error).message || e) });
@@ -490,6 +539,21 @@ Deno.serve(async (req) => {
 
       const faltando = missingFields(c);
       if (faltando.length) return json({ error: `Dados incompletos: ${faltando.join(", ")}` }, 400);
+
+      // Trava de segurança: mesmo cliente + mesma data de vencimento exata já registrado
+      // (qualquer origem/status) — bloqueia duplicidade óbvia sem impedir 2 boletos avulsos
+      // legítimos no mesmo mês com vencimentos diferentes.
+      const { data: dupRows, error: dupErr } = await supabase
+        .from("boleto_controls")
+        .select("id")
+        .eq("company_id", COMPANY_ID)
+        .eq("contact_id", contactId)
+        .eq("data_vencimento", vencimentoInput)
+        .limit(1);
+      if (dupErr) throw dupErr;
+      if (dupRows && dupRows.length) {
+        return json({ error: "Este cliente já tem um boleto registrado com esse mesmo vencimento." }, 409);
+      }
 
       let token: string;
       try {
@@ -620,31 +684,51 @@ Deno.serve(async (req) => {
             const nn = Number(b.nossoNumero);
             if (!nn) continue;
 
-            // Já existe localmente — atualiza só quando o Sicoob já mostra LIQUIDADO e o registro
-            // local ainda não está PAGO. Visual apenas: não baixa boleto nem cria movimentação.
+            // Já existe localmente — atualiza status quando o Sicoob já mostra LIQUIDADO e o
+            // registro local ainda não está PAGO, e completa o PDF se estiver faltando (boleto
+            // sincronizado nunca teve PDF salvo, porque a listagem por pagador não devolve o
+            // binário — só a criação e a "segunda via" trazem). Visual/arquivo apenas: não baixa
+            // boleto nem cria movimentação.
             if (known.has(nn)) {
-              if (mapSituacaoBoleto(b.situacaoBoleto) !== "PAGO") continue;
               const { data: localRow } = await supabase
                 .from("boleto_controls")
-                .select("id, status")
+                .select("id, status, pdf_url, reference_month")
                 .eq("company_id", COMPANY_ID)
                 .eq("nosso_numero", nn)
                 .maybeSingle();
-              if (!localRow || localRow.status === "PAGO") continue;
+              if (!localRow) continue;
 
-              let dataPagamento: string | null = null;
-              try {
-                const det = await consultarBoletoDetalhe(token, nn);
-                if (det.ok) dataPagamento = extrairDataPagamento((det.data as any)?.resultado?.listaHistorico);
-              } catch {
-                // Segue sem data — não bloqueia a atualização do status por causa disso.
+              const updates: Record<string, unknown> = {};
+
+              if (!localRow.pdf_url) {
+                const pdfBytes = await buscarSegundaViaPdf(token, nn);
+                if (pdfBytes) {
+                  const pdfPath = `${localRow.reference_month}/${id}-${nn}.pdf`;
+                  const up = await supabase.storage.from("boletos").upload(pdfPath, pdfBytes, {
+                    contentType: "application/pdf",
+                    upsert: true,
+                  });
+                  if (!up.error) updates.pdf_url = pdfPath;
+                }
               }
-              const { error: updErr } = await supabase.from("boleto_controls").update({
-                status: "PAGO",
-                data_pagamento: dataPagamento,
-                sicoob_response: b,
-              }).eq("id", localRow.id);
-              if (!updErr) statusAtualizados++;
+
+              if (mapSituacaoBoleto(b.situacaoBoleto) === "PAGO" && localRow.status !== "PAGO") {
+                let dataPagamento: string | null = null;
+                try {
+                  const det = await consultarBoletoDetalhe(token, nn);
+                  if (det.ok) dataPagamento = extrairDataPagamento((det.data as any)?.resultado?.listaHistorico);
+                } catch {
+                  // Segue sem data — não bloqueia a atualização do status por causa disso.
+                }
+                updates.status = "PAGO";
+                updates.data_pagamento = dataPagamento;
+                updates.sicoob_response = b;
+              }
+
+              if (Object.keys(updates).length) {
+                const { error: updErr } = await supabase.from("boleto_controls").update(updates).eq("id", localRow.id);
+                if (!updErr && updates.status === "PAGO") statusAtualizados++;
+              }
               continue;
             }
 
@@ -658,6 +742,19 @@ Deno.serve(async (req) => {
               ? `${dataVencimento.slice(0, 7)}-01`
               : null;
             if (!referenceMonthOrfao) continue; // sem data suficiente para classificar o mês
+
+            // PDF do boleto recém-achado — a listagem por pagador não traz o binário, busca
+            // separado via segunda via. Falha aqui não bloqueia o registro do boleto.
+            let pdfPath: string | null = null;
+            const pdfBytes = await buscarSegundaViaPdf(token, nn);
+            if (pdfBytes) {
+              const path = `${referenceMonthOrfao}/${id}-${nn}.pdf`;
+              const up = await supabase.storage.from("boletos").upload(path, pdfBytes, {
+                contentType: "application/pdf",
+                upsert: true,
+              });
+              if (!up.error) pdfPath = path;
+            }
 
             // upsert com ignoreDuplicates: a constraint única (company_id, nosso_numero) é quem
             // garante idempotência de verdade — o Set em memória não protege contra execuções
@@ -677,6 +774,7 @@ Deno.serve(async (req) => {
               seu_numero: b.seuNumero ?? null,
               canal_entrega: c.canal_entrega ?? null,
               sicoob_response: b,
+              pdf_url: pdfPath,
             }, { onConflict: "company_id,nosso_numero", ignoreDuplicates: true });
             if (!insErr) {
               known.add(nn);

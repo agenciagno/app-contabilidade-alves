@@ -89,9 +89,8 @@ export interface BoletoWithContact extends BoletoControl {
   contact_document: string | null;
   contact_email: string | null;
   contact_phone: string | null;
+  contact_whatsapp: string | null;
 }
-
-const N8N_REENVIO_URL = 'https://n8n.contabilidadealves.com.br/webhook/sicoob-reenvio';
 
 // Geração processada em lotes para não estourar o tempo de execução da edge function.
 const GENERATE_CHUNK_SIZE = 15;
@@ -119,7 +118,7 @@ export function useBoletoControls(vencimentoMonth: string) {
           valor, valor_pago, data_vencimento, data_pagamento, canal_entrega,
           nosso_numero, seu_numero, linha_digitavel, codigo_barras, url_qrcode,
           origem_baixa, sicoob_response, pdf_url,
-          contacts:contact_id ( id, name, type, document, email, phone, display_name, nome_fantasia, razao_social )
+          contacts:contact_id ( id, name, type, document, email, phone, whatsapp, display_name, nome_fantasia, razao_social )
         `)
         .gte('data_vencimento', vencimentoMonth)
         .lt('data_vencimento', addMonthISO(vencimentoMonth))
@@ -132,6 +131,7 @@ export function useBoletoControls(vencimentoMonth: string) {
         contact_document: bc.contacts?.document ?? null,
         contact_email: bc.contacts?.email ?? null,
         contact_phone: bc.contacts?.phone ?? null,
+        contact_whatsapp: bc.contacts?.whatsapp ?? null,
       }));
     },
     staleTime: 1000 * 30,
@@ -152,28 +152,6 @@ export function useBoletoControls(vencimentoMonth: string) {
     },
     onError: (e: Error) => {
       toast({ title: 'Erro ao atualizar', description: e.message, variant: 'destructive' });
-    },
-  });
-
-  // 3. Reenviar cobrança via N8N
-  const resendBilling = useMutation({
-    mutationFn: async (boleto: BoletoWithContact) => {
-      const res = await fetch(N8N_REENVIO_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          boleto_id: boleto.id,
-          contact_id: boleto.contact_id,
-          canal_entrega: boleto.canal_entrega,
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    },
-    onSuccess: () => {
-      toast({ title: 'Cobrança reenviada com sucesso' });
-    },
-    onError: () => {
-      toast({ title: 'Erro ao reenviar', variant: 'destructive' });
     },
   });
 
@@ -279,7 +257,6 @@ export function useBoletoControls(vencimentoMonth: string) {
     isLoading,
     refetch,
     markAsPrinted,
-    resendBilling,
     fetchPreview,
     generateBoletos,
     generateSingleBoleto,
