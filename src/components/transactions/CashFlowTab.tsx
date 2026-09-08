@@ -24,7 +24,7 @@ import {
 import { format, parseISO, isWithinInterval, startOfYear, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { calcularEncargosAtraso } from '@/lib/financial-utils';
-import { getContactDisplayName } from '@/lib/contact-display';
+import { getContactLegalName } from '@/lib/contact-display';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { CashFlowReportModal } from './CashFlowReportModal';
 import { TransactionCalendarView } from './TransactionCalendarView';
@@ -228,7 +228,7 @@ function ContactEventMultiFilter({
                 {filteredContacts.map(c => (
                   <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-xs">
                     <Checkbox checked={selectedContacts.includes(c.id)} onCheckedChange={() => toggleContact(c.id)} className="h-3.5 w-3.5" />
-                    <span className="truncate">{getContactDisplayName(c)}</span>
+                    <span className="truncate">{getContactLegalName(c)}</span>
                   </label>
                 ))}
               </>
@@ -529,7 +529,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
   const uniqueContactOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const t of transactions) {
-      const displayName = getContactDisplayName(t.contact);
+      const displayName = getContactLegalName(t.contact);
       if (displayName && t.contact_id) map.set(t.contact_id, displayName);
     }
     return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
@@ -759,7 +759,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
   const calendarItems = useMemo(() => rows.map(row => ({
     id: row.id,
     dateKey: isReceivables ? row.due_date : (row.expected_date || row.due_date),
-    label: getContactDisplayName(row.contact) || row.description,
+    label: getContactLegalName(row.contact) || row.description,
     type: row.type as 'receita' | 'despesa',
   })), [rows, isReceivables]);
 
@@ -1035,7 +1035,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                       )}
 
                       {/* Cliente/Fornecedor */}
-                      <TableCell className="truncate max-w-[150px]"><Tooltip><TooltipTrigger asChild><span className="truncate block">{getContactDisplayName(row.contact) || row.description}</span></TooltipTrigger><TooltipContent side="top" className="apple-tooltip"><p>{getContactDisplayName(row.contact) || row.description}</p></TooltipContent></Tooltip></TableCell>
+                      <TableCell className="truncate max-w-[150px]"><Tooltip><TooltipTrigger asChild><span className="truncate block">{getContactLegalName(row.contact) || row.description}</span></TooltipTrigger><TooltipContent side="top" className="apple-tooltip"><p>{getContactLegalName(row.contact) || row.description}</p></TooltipContent></Tooltip></TableCell>
 
 
                       {/* A Receber */}
@@ -1135,7 +1135,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
           {confirmModal.row && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                O cliente <strong>{getContactDisplayName(confirmModal.row.contact) || confirmModal.row.description}</strong> pagou o valor original ou com juros e multa?
+                O cliente <strong>{getContactLegalName(confirmModal.row.contact) || confirmModal.row.description}</strong> pagou o valor original ou com juros e multa?
               </p>
               <DialogFooter className="flex flex-col sm:flex-row gap-2">
                 <Button

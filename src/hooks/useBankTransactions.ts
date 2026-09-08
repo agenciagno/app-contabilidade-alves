@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useActiveCompany } from '@/contexts/CompanyContext';
-import { getContactDisplayName } from '@/lib/contact-display';
+import { getContactLegalName } from '@/lib/contact-display';
 
 export interface BankStatementRow {
   id: string;
@@ -185,7 +185,7 @@ export function useBankTransactions(
     return {
       id: t.id,
       date: formatDate(t.date),
-      contact_name: t.contacts ? (getContactDisplayName(t.contacts) || null) : null,
+      contact_name: t.contacts ? (getContactLegalName(t.contacts) || null) : null,
       category_name: t.categories?.name ?? null,
       bank_name: t.banks?.name ?? null,
       bank_id: t.bank_id,

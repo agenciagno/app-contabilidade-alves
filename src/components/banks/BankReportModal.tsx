@@ -16,7 +16,7 @@ import { useCompany } from '@/hooks/useCompany';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { zebraPorData } from '@/lib/pdf-zebra';
-import { getContactDisplayName } from '@/lib/contact-display';
+import { getContactLegalName } from '@/lib/contact-display';
 
 interface BankReportModalProps {
   open: boolean;
@@ -192,7 +192,7 @@ export function BankReportModal({ open, onOpenChange, banks }: BankReportModalPr
     : 'Todos';
 
   const contactLabel = selectedContactIds.length > 0
-    ? contacts.filter(c => selectedContactIds.includes(c.id)).map(c => getContactDisplayName(c)).join(', ')
+    ? contacts.filter(c => selectedContactIds.includes(c.id)).map(c => getContactLegalName(c)).join(', ')
     : 'Todos';
 
   // ─── PDF Export ───────────────────────────────────────────────────
@@ -656,7 +656,7 @@ ${transactions}
               <div>
                 <Label className="text-sm font-semibold mb-1 block">Cliente/Fornecedor</Label>
                 <MultiSelectDropdown
-                  items={contacts.map(c => ({ id: c.id, name: getContactDisplayName(c) }))}
+                  items={contacts.map(c => ({ id: c.id, name: getContactLegalName(c) }))}
                   selectedIds={selectedContactIds}
                   onToggle={toggleContact}
                   onClear={() => setSelectedContactIds([])}

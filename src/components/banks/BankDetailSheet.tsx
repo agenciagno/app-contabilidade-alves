@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DateField } from '@/components/ds';
-import { getContactDisplayName } from '@/lib/contact-display';
+import { getContactLegalName } from '@/lib/contact-display';
 
 interface BankDetailSheetProps {
   bank: Bank | null;
@@ -162,7 +162,7 @@ export function BankDetailSheet({ bank, open, onOpenChange }: BankDetailSheetPro
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   {contacts.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{getContactDisplayName(c)}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{getContactLegalName(c)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

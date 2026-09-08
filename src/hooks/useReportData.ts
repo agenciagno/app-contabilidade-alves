@@ -7,7 +7,7 @@ import autoTable from 'jspdf-autotable';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { zebraPorData } from '@/lib/pdf-zebra';
 import { fetchAllPages } from '@/lib/fetch-all';
-import { getContactDisplayName } from '@/lib/contact-display';
+import { getContactLegalName } from '@/lib/contact-display';
 
 interface ReportFilters {
   startDate?: Date;
@@ -235,7 +235,7 @@ export function exportToCSV(transactions: ReportTransaction[]) {
     t.type === 'receita' ? 'Receita' : 'Despesa',
     t.category?.name || 'Sem categoria',
     t.bank?.name || 'Sem banco',
-    getContactDisplayName(t.contact) || '',
+    getContactLegalName(t.contact) || '',
     Number(t.amount).toFixed(2).replace('.', ','),
     t.is_paid ? 'Pago' : 'Pendente',
   ]);

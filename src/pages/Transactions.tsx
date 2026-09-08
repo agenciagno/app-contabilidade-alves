@@ -14,7 +14,7 @@ import { useTransactions, Transaction, TransactionInsert } from '@/hooks/useTran
 import { useServerTransactions, useTransactionKPIs, useDistinctTransactionValues, PAGE_SIZE, ServerFilters, IS_EMPTY } from '@/hooks/useServerTransactions';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
-import { getContactDisplayName } from '@/lib/contact-display';
+import { getContactLegalName } from '@/lib/contact-display';
 import { useCategories } from '@/hooks/useCategories';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { useBanks } from '@/hooks/useBanks';
@@ -743,7 +743,7 @@ export default function Transactions() {
   const uniqueContactOptions = useMemo(() => {
     return contacts
       .filter(c => c.is_active)
-      .map(c => ({ id: c.id, name: getContactDisplayName(c) }))
+      .map(c => ({ id: c.id, name: getContactLegalName(c) }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [contacts]);
 
@@ -1129,7 +1129,7 @@ export default function Transactions() {
                 <div className="divide-y divide-border/30">
                   {transactions.map(transaction => {
                     const isOverdue = !isEffectivelyPaid(transaction) && transaction.due_date && transaction.due_date < new Date().toISOString().split('T')[0];
-                    const contactDisplayName = getContactDisplayName(transaction.contact) || transaction.description;
+                    const contactDisplayName = getContactLegalName(transaction.contact) || transaction.description;
                     return (
                       <div key={transaction.id} className={`grid grid-cols-[18px_minmax(120px,1fr)_minmax(120px,1fr)_96px_96px_96px_80px_100px_100px_90px] gap-2 px-4 py-[10px] hover:bg-muted/30 transition-colors items-center ${selectedIds.has(transaction.id) ? 'bg-primary/10 border-l-2 border-l-primary' : ''}`}>
                         <div className="flex items-center justify-center">
