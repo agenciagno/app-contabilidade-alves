@@ -612,10 +612,15 @@ export default function Boletos() {
   );
 }
 
-// Padrão vigente: multa 2%, juros de mora 0,07%/dia. Boletos gerados pelo fluxo N8N antigo
-// (antes de 16/07/2026) foram registrados no Sicoob com 2%/dia de juros por engano — o valor
-// abaixo serve só pra sinalizar esse desvio na tela, não é usado em nenhum cálculo de geração.
+// Padrão vigente: multa 2%, juros de mora equivalente a 0,07%/dia. Duas formas de registrar isso
+// no Sicoob (campo tipoJurosMora), as duas corretas — confirmado com Gabriel (08/09/2026), que
+// preenche manualmente no internet banking do Sicoob e só existe lá o campo mensal:
+// tipoJurosMora "1" = valor direto em %/dia (o que o fluxo próprio desta tela manda, 0,07);
+// tipoJurosMora "2" = taxa mensal (2%/mês) — o Sicoob já converte sozinho pro mesmo 0,07%/dia.
+// Achado anterior (achava que era juros de 2%/dia, 28x o esperado) era leitura errada: o valor
+// "2" nunca foi por dia, era por mês, e batia com o padrão o tempo todo.
 const JUROS_DIA_ESPERADO = 0.07;
+const JUROS_MES_ESPERADO = 2;
 
 function EncargosSection({ b }: { b: BoletoWithContact }) {
   const r = b.sicoob_response;
@@ -624,7 +629,9 @@ function EncargosSection({ b }: { b: BoletoWithContact }) {
   }
   const fmtPct = (v: number | undefined) =>
     v != null ? `${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}%` : '—';
-  const jurosDivergente = r.valorJurosMora != null && Number(r.valorJurosMora) !== JUROS_DIA_ESPERADO;
+  const jurosMensal = String(r.tipoJurosMora) === '2';
+  const jurosEsperado = jurosMensal ? JUROS_MES_ESPERADO : JUROS_DIA_ESPERADO;
+  const jurosDivergente = r.valorJurosMora != null && Number(r.valorJurosMora) !== jurosEsperado;
   return (
     <div className="border rounded-md p-3 bg-muted/30 space-y-1 text-sm">
       <p className="text-muted-foreground text-xs mb-1.5">Desconto, multa e juros</p>
@@ -639,15 +646,15 @@ function EncargosSection({ b }: { b: BoletoWithContact }) {
       )}
       {r.dataJurosMora && (
         <p>
-          A partir de {fmtDate(r.dataJurosMora)}: <span className="text-destructive font-medium">{fmtPct(r.valorJurosMora)} de juros ao dia</span>
+          A partir de {fmtDate(r.dataJurosMora)}: <span className="text-destructive font-medium">{fmtPct(r.valorJurosMora)} de juros {jurosMensal ? 'ao mês' : 'ao dia'}</span>
         </p>
       )}
       {jurosDivergente && (
         <div className="flex items-start gap-1.5 text-xs text-warn dark:text-warn bg-warn/10 border border-warn/30 rounded p-2 mt-2">
           <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
           <span>
-            Juros registrado no Sicoob ({fmtPct(r.valorJurosMora)}/dia) diverge do padrão vigente ({JUROS_DIA_ESPERADO}%/dia).
-            Provavelmente boleto gerado antes da correção de 16/07 — confirme com o banco antes de comunicar ao cliente.
+            Juros registrado no Sicoob ({fmtPct(r.valorJurosMora)}{jurosMensal ? '/mês' : '/dia'}) diverge do padrão vigente ({jurosEsperado}%{jurosMensal ? '/mês' : '/dia'}).
+            Confira com o banco antes de comunicar ao cliente.
           </span>
         </div>
       )}

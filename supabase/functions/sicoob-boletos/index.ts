@@ -106,7 +106,15 @@ function missingFields(c: Record<string, unknown>): string[] {
 }
 
 const CONTACT_COLS =
-  "id,name,document,email,phone,whatsapp,email_cobranca,whatsapp_cobranca,address,address_number,neighborhood,city,state,cep,boleto_value,boleto_due_day,canal_entrega,enviar_cobranca_auto";
+  "id,name,document,email,phone,whatsapp,email_cobranca,whatsapp_cobranca,address,address_number,neighborhood,city,state,cep,boleto_value,boleto_due_day,canal_entrega,enviar_cobranca_auto,razao_social,nome_fantasia,display_name";
+
+// Mesma cascata de getContactLegalName (src/lib/contact-display.ts) — razão social é o padrão
+// legal em todo o Financeiro. Só pro nome do arquivo no Drive, em caixa alta (pedido de Gabriel,
+// 08/09/2026), não muda o que é mandado pro Sicoob (pagador.nome já usa c.name direto, correto).
+function legalNameUpper(c: Record<string, any>): string {
+  const nome = c.razao_social || c.nome_fantasia || c.display_name || c.name || "";
+  return String(nome).toUpperCase();
+}
 
 // ---------- Sicoob ----------
 // Escopo padrão (boletos). Conta Corrente (extrato/saldo) usa cco_consulta — API 3 no portal
@@ -549,7 +557,7 @@ Deno.serve(async (req) => {
           if (pdfPath) {
             // deno-lint-ignore no-explicit-any
             (globalThis as any).EdgeRuntime?.waitUntil(avisarDriveWebhook(supabase, {
-              nomeCliente: c.name,
+              nomeCliente: legalNameUpper(c),
               valor: Number(c.boleto_value),
               dataVencimento: contactDatas.dataVencimentoISO,
               pdfPath,
@@ -665,7 +673,7 @@ Deno.serve(async (req) => {
       if (pdfPath) {
         // deno-lint-ignore no-explicit-any
         (globalThis as any).EdgeRuntime?.waitUntil(avisarDriveWebhook(supabase, {
-          nomeCliente: c.name,
+          nomeCliente: legalNameUpper(c),
           valor: valorInput,
           dataVencimento: vencimentoInput,
           pdfPath,
