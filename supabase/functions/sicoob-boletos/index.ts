@@ -351,6 +351,33 @@ async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: C
   return { ok: res.ok, status: res.status, data };
 }
 
+// Assina a URL do PDF (10 min) e dispara o webhook N8N que sobe pro Drive. Usado tanto pelo
+// aviso automático (fire-and-forget) quanto pelo resync manual (action: 'resync_drive'), que
+// precisa saber se deu certo pra reportar item a item.
+async function enviarParaDrive(
+  supabase: ReturnType<typeof createClient>,
+  params: { nomeCliente: string; valor: number; dataVencimento: string; pdfPath: string },
+): Promise<{ ok: boolean; message?: string }> {
+  const { data: signed, error } = await supabase.storage
+    .from("boletos")
+    .createSignedUrl(params.pdfPath, 600);
+  if (error || !signed?.signedUrl) {
+    return { ok: false, message: error?.message || "Falha ao gerar signed URL do PDF" };
+  }
+  const res = await fetch(N8N_DRIVE_WEBHOOK_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      nome_cliente: params.nomeCliente,
+      valor: params.valor,
+      data_vencimento: params.dataVencimento,
+      pdf_signed_url: signed.signedUrl,
+    }),
+  });
+  if (!res.ok) return { ok: false, message: `Webhook N8N respondeu HTTP ${res.status}` };
+  return { ok: true };
+}
+
 // Dispara em background (EdgeRuntime.waitUntil) pra não atrasar a resposta da geração —
 // falha aqui nunca derruba o boleto, que já está gerado e salvo no Sicoob/banco.
 async function avisarDriveWebhook(
@@ -358,20 +385,7 @@ async function avisarDriveWebhook(
   params: { nomeCliente: string; valor: number; dataVencimento: string; pdfPath: string },
 ) {
   try {
-    const { data: signed, error } = await supabase.storage
-      .from("boletos")
-      .createSignedUrl(params.pdfPath, 600);
-    if (error || !signed?.signedUrl) return;
-    await fetch(N8N_DRIVE_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nome_cliente: params.nomeCliente,
-        valor: params.valor,
-        data_vencimento: params.dataVencimento,
-        pdf_signed_url: signed.signedUrl,
-      }),
-    });
+    await enviarParaDrive(supabase, params);
   } catch {
     // N8N/Drive fora do ar não deve nunca aparecer como erro de geração de boleto.
   }
@@ -872,6 +886,53 @@ Deno.serve(async (req) => {
         errors: errors.length,
         details: results.filter((r) => r.orfaos > 0 || r.atualizados > 0 || r.status === "error"),
       });
+    }
+
+    // ---------------- RESYNC_DRIVE (reenvia pro Drive boletos cujo PDF já existe no Storage mas
+    // o webhook N8N não recebeu na hora — ex. VPS do N8N fora do ar durante a geração) ----------------
+    if (action === "resync_drive") {
+      const boletoIds: string[] = Array.isArray(payload.boleto_ids) ? payload.boleto_ids : [];
+      if (!boletoIds.length) return json({ error: "boleto_ids vazio" }, 400);
+
+      const { data: rows, error: rowsErr } = await supabase
+        .from("boleto_controls")
+        .select("id, contact_id, valor, data_vencimento, pdf_url")
+        .eq("company_id", COMPANY_ID)
+        .in("id", boletoIds);
+      if (rowsErr) throw rowsErr;
+
+      const contactIdsNeeded = [...new Set((rows || []).map((r: any) => r.contact_id))];
+      const { data: contatosResync, error: contatosErr } = await supabase
+        .from("contacts")
+        .select("id,razao_social,nome_fantasia,display_name,name")
+        .in("id", contactIdsNeeded.length ? contactIdsNeeded : [""]);
+      if (contatosErr) throw contatosErr;
+      const contactById = new Map((contatosResync || []).map((c: any) => [c.id, c]));
+
+      const results: any[] = [];
+      for (const row of rows || []) {
+        if (!row.pdf_url) {
+          results.push({ id: row.id, contact_id: row.contact_id, status: "skipped", message: "Sem PDF salvo no Storage" });
+          continue;
+        }
+        const c = contactById.get(row.contact_id);
+        const nomeCliente = c ? legalNameUpper(c) : "DESCONHECIDO";
+        try {
+          const outcome = await enviarParaDrive(supabase, {
+            nomeCliente,
+            valor: Number(row.valor),
+            dataVencimento: row.data_vencimento,
+            pdfPath: row.pdf_url,
+          });
+          results.push({ id: row.id, contact_id: row.contact_id, name: nomeCliente, status: outcome.ok ? "ok" : "error", message: outcome.message });
+        } catch (e) {
+          results.push({ id: row.id, contact_id: row.contact_id, name: nomeCliente, status: "error", message: String((e as Error).message || e) });
+        }
+      }
+      const ok = results.filter((r) => r.status === "ok").length;
+      const errors = results.filter((r) => r.status === "error").length;
+      const skipped = results.filter((r) => r.status === "skipped").length;
+      return json({ ok, errors, skipped, results });
     }
 
     // ---------------- SALDO (só leitura, Conta Corrente) ----------------
