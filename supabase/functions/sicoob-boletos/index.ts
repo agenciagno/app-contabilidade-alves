@@ -20,6 +20,11 @@ const NUMERO_CLIENTE = Number(Deno.env.get("SICOOB_NUMERO_CLIENTE"));
 const NUMERO_CONTA = Number(Deno.env.get("SICOOB_NUMERO_CONTA"));
 const NUMERO_CONTRATO = Deno.env.get("SICOOB_NUMERO_CONTRATO")!;
 
+// N8N: salva o PDF na pasta do mês no Drive (BOLETOS SICOOB > 2026 > <MÊS>). Só pros boletos
+// gerados por "Gerar lote"/"Boleto avulso" a partir de 16/09/2026 — decisão de Gabriel, o
+// histórico sincronizado via find_orphans não entra nessa automação.
+const N8N_DRIVE_WEBHOOK_URL = "https://n8n.contabilidadealves.com.br/webhook/boleto-pdf-drive";
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -338,6 +343,32 @@ async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: C
   return { ok: res.ok, status: res.status, data };
 }
 
+// Dispara em background (EdgeRuntime.waitUntil) pra não atrasar a resposta da geração —
+// falha aqui nunca derruba o boleto, que já está gerado e salvo no Sicoob/banco.
+async function avisarDriveWebhook(
+  supabase: ReturnType<typeof createClient>,
+  params: { nomeCliente: string; valor: number; dataVencimento: string; pdfPath: string },
+) {
+  try {
+    const { data: signed, error } = await supabase.storage
+      .from("boletos")
+      .createSignedUrl(params.pdfPath, 600);
+    if (error || !signed?.signedUrl) return;
+    await fetch(N8N_DRIVE_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome_cliente: params.nomeCliente,
+        valor: params.valor,
+        data_vencimento: params.dataVencimento,
+        pdf_signed_url: signed.signedUrl,
+      }),
+    });
+  } catch {
+    // N8N/Drive fora do ar não deve nunca aparecer como erro de geração de boleto.
+  }
+}
+
 function extractSicoobError(data: any, status: number): string {
   const msgs = data?.mensagens || data?.messages;
   if (Array.isArray(msgs) && msgs.length) {
@@ -515,6 +546,15 @@ Deno.serve(async (req) => {
             continue;
           }
           marcarVencimentoGerado(id, contactDatas.dataVencimentoISO);
+          if (pdfPath) {
+            // deno-lint-ignore no-explicit-any
+            (globalThis as any).EdgeRuntime?.waitUntil(avisarDriveWebhook(supabase, {
+              nomeCliente: c.name,
+              valor: Number(c.boleto_value),
+              dataVencimento: contactDatas.dataVencimentoISO,
+              pdfPath,
+            }));
+          }
           results.push({ contact_id: id, name: c.name, status: "ok", pdf: !!pdfPath });
         } catch (e) {
           results.push({ contact_id: id, name: c.name, status: "error", message: String((e as Error).message || e) });
@@ -620,6 +660,16 @@ Deno.serve(async (req) => {
       });
       if (insErr) {
         return json({ error: `Boleto gerado no Sicoob mas falhou ao salvar: ${insErr.message}` }, 500);
+      }
+
+      if (pdfPath) {
+        // deno-lint-ignore no-explicit-any
+        (globalThis as any).EdgeRuntime?.waitUntil(avisarDriveWebhook(supabase, {
+          nomeCliente: c.name,
+          valor: valorInput,
+          dataVencimento: vencimentoInput,
+          pdfPath,
+        }));
       }
 
       return json({ ok: true, contact_id: contactId, name: c.name, nosso_numero: resultado?.nossoNumero ?? null, pdf: !!pdfPath });
