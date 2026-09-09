@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { format, addMonths, subMonths, startOfMonth, parseISO, isBefore, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  AlertCircle, Plus, Mail, MessageCircle, Printer,
+  AlertCircle, Plus,
   FileX, MoreHorizontal, Eye, Send, CheckSquare, Download, Loader2,
   X, Copy, SlidersHorizontal, ListChecks, CalendarDays,
 } from 'lucide-react';
@@ -55,20 +55,6 @@ function StatusBadge({ b }: { b: BoletoWithContact }) {
   if (b.status === 'FILA_IMPRESSAO') return <DsBadge tone="info">gerado</DsBadge>;
   if (b.status === 'IMPRESSO') return <DsBadge tone="neutral">impresso</DsBadge>;
   return <DsBadge tone="warn">a vencer</DsBadge>;
-}
-
-function CanalIcon({ canal }: { canal: BoletoWithContact['canal_entrega'] }) {
-  if (!canal) return <span className="text-muted-ink-2">—</span>;
-  const cls = 'h-3.5 w-3.5 text-muted-ink';
-  if (canal === 'whatsapp') return <span className="inline-flex items-center gap-1.5 text-ui text-ink"><MessageCircle className={cls} /> WhatsApp</span>;
-  if (canal === 'email') return <span className="inline-flex items-center gap-1.5 text-ui text-ink"><Mail className={cls} /> E-mail</span>;
-  if (canal === 'impresso') return <span className="inline-flex items-center gap-1.5 text-ui text-ink"><Printer className={cls} /> Impresso</span>;
-  if (canal === 'whatsapp_email') return (
-    <span className="inline-flex items-center gap-1.5 text-ui text-ink">
-      <MessageCircle className={cls} /><Mail className={cls} /> WA + E-mail
-    </span>
-  );
-  return <span className="text-ui text-ink">{canal}</span>;
 }
 
 function getMonthOptions(): string[] {
@@ -416,7 +402,6 @@ export default function Boletos() {
                   <TableHead>Valor</TableHead>
                   <TableHead>Vencimento</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Canal</TableHead>
                   <TableHead>Data pgto.</TableHead>
                   <TableHead>Valor pago</TableHead>
                   <TableHead className="w-[60px]"></TableHead>
@@ -426,14 +411,14 @@ export default function Boletos() {
                 {isLoading ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 8 }).map((__, j) => (
+                      {Array.from({ length: 7 }).map((__, j) => (
                         <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : pageRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-48 text-center text-muted-foreground">
                       <div className="flex flex-col items-center gap-2">
                         <FileX className="h-10 w-10 opacity-30" />
                         <span>Nenhum boleto encontrado para o período selecionado</span>
@@ -460,7 +445,6 @@ export default function Boletos() {
                         <TableCell>{fmtBRL(b.valor)}</TableCell>
                         <TableCell className={cn(overdue && 'text-danger font-medium')}>{fmtDate(b.data_vencimento)}</TableCell>
                         <TableCell><StatusBadge b={b} /></TableCell>
-                        <TableCell><CanalIcon canal={b.canal_entrega} /></TableCell>
                         <TableCell>{fmtDate(b.data_pagamento)}</TableCell>
                         <TableCell>{fmtBRL(b.valor_pago)}</TableCell>
                         <TableCell>
