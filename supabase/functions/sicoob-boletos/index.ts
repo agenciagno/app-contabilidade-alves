@@ -21,7 +21,7 @@ const NUMERO_CONTA = Number(Deno.env.get("SICOOB_NUMERO_CONTA"));
 const NUMERO_CONTRATO = Deno.env.get("SICOOB_NUMERO_CONTRATO")!;
 
 // N8N: salva o PDF na pasta do mês no Drive (BOLETOS SICOOB > 2026 > <MÊS>). Só pros boletos
-// gerados por "Gerar lote"/"Boleto avulso" a partir de 16/09/2026 — decisão de Gabriel, o
+// gerados por "Gerar lote"/"Boleto avulso" a partir de 08/09/2026 — decisão de Gabriel, o
 // histórico sincronizado via find_orphans não entra nessa automação.
 const N8N_DRIVE_WEBHOOK_URL = "https://n8n.contabilidadealves.com.br/webhook/boleto-pdf-drive";
 
@@ -122,7 +122,7 @@ async function getSicoobToken(scope = "boletos_inclusao boletos_consulta"): Prom
     { method: "POST", client, headers: { "Content-Type": "application/x-www-form-urlencoded" }, body },
   );
   // Lê como texto primeiro — um 403 de gateway/WAF (não do Sicoob) não vem em JSON, e
-  // res.json().catch(()=>({})) mascarava isso como mensagem vazia (16/09/2026).
+  // res.json().catch(()=>({})) mascarava isso como mensagem vazia (08/09/2026).
   const raw = await res.text();
   let data: any = {};
   try { data = JSON.parse(raw); } catch { /* corpo não é JSON */ }
@@ -202,7 +202,7 @@ function extrairDataPagamento(listaHistorico: unknown): string | null {
 // Confirmado no código-fonte de uma lib de terceiro que implementa a v3 (não há Swagger público
 // completo): GET com numeroCliente+codigoModalidade+nossoNumero+gerarPdf=true, resposta no mesmo
 // formato de "resultado.pdfBoleto" da criação. Falha aqui nunca bloqueia o sync — só fica sem PDF,
-// igual já acontece hoje (16/09/2026).
+// igual já acontece hoje (08/09/2026).
 async function buscarSegundaViaPdf(token: string, nossoNumero: number): Promise<Uint8Array | null> {
   try {
     // @ts-ignore unstable API
@@ -407,12 +407,12 @@ Deno.serve(async (req) => {
 
     // Meses de vencimento já registrados por contato — QUALQUER origem (manual no Sicoob,
     // "Gerar lote" ou "Boleto avulso") e QUALQUER status, não só o que nasceu com
-    // reference_month = mês de emissão de hoje. Motivo (16/09/2026): boleto criado manualmente
+    // reference_month = mês de emissão de hoje. Motivo (08/09/2026): boleto criado manualmente
     // no Sicoob só entra em boleto_controls quando o sync roda, dias/semanas depois — o
     // reference_month dele reflete a emissão real (no Sicoob), não o ciclo de hoje. Um cliente
     // com boleto pendente vencendo mês que vem (criado manualmente há semanas) reaparecia como
     // "elegível" aqui, e "Gerar lote" duplicava a cobrança pro mesmo mês de vencimento. Ver
-    // roadmap.md 16/09/2026.
+    // roadmap.md 08/09/2026.
     const contactIds = (contatos || []).map((c: any) => c.id);
     const vencimentoMonthsByContact = new Map<string, Set<string>>();
     if (contactIds.length) {
