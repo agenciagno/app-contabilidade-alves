@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { SearchField } from '@/components/ds';
 import type { PreviewItem, PreviewResponse, GenerateResult } from '@/hooks/useBoletoControls';
 
 const fmtBRL = (n: number | null) =>
@@ -43,6 +44,7 @@ export function BoletoGenerationDialog({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [results, setResults] = useState<GenerateResult[]>([]);
+  const [search, setSearch] = useState('');
 
   // Carrega o preview ao abrir
   useEffect(() => {
@@ -52,6 +54,7 @@ export function BoletoGenerationDialog({
     setPreview(null);
     setResults([]);
     setProgress({ done: 0, total: 0 });
+    setSearch('');
     fetchPreview()
       .then((data) => {
         setPreview(data);
@@ -75,6 +78,14 @@ export function BoletoGenerationDialog({
   const allEligibleSelected = eligibleItems.length > 0 && eligibleItems.every((i) => selected.has(i.contact_id));
   const toggleAll = () =>
     setSelected(allEligibleSelected ? new Set() : new Set(eligibleItems.map((i) => i.contact_id)));
+
+  // Busca filtra só o que é exibido — "Selecionar todos os elegíveis" continua valendo pra
+  // lista inteira, não só pro resultado da busca (evita desmarcar quem não está visível).
+  const term = search.trim().toLowerCase();
+  const visibleItems = term
+    ? (preview?.items ?? []).filter((i) =>
+        `${i.name} ${i.document ?? ''}`.toLowerCase().includes(term))
+    : preview?.items ?? [];
 
   const runGeneration = async () => {
     const ids = Array.from(selected);
@@ -142,9 +153,21 @@ export function BoletoGenerationDialog({
                 </span>
               </div>
 
+              <SearchField
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar cliente…"
+                wrapperClassName="w-full"
+              />
+
               <div className="border border-line rounded-lg overflow-y-auto min-h-[200px] max-h-[50vh]">
                 <div className="divide-y divide-line-2">
-                  {preview.items.map((i) => {
+                  {visibleItems.length === 0 && (
+                    <div className="px-3 py-8 text-center text-sm text-muted-ink">
+                      Nenhum cliente encontrado para "{search}"
+                    </div>
+                  )}
+                  {visibleItems.map((i) => {
                     const eligible = isEligible(i);
                     return (
                       <div
