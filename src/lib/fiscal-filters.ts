@@ -49,7 +49,15 @@ export function fiscalTaskContactLabel(
   return contactsMap[contactId] || 'Cliente';
 }
 
-/** Uma tarefa fiscal é "feita" por status=concluido OU por já ter anexo — nunca só um dos dois. */
-export function isFiscalTaskDone(t: { status: string; attachment_url?: string | null }): boolean {
-  return t.status === 'concluido' || !!t.attachment_url;
+/** Uma tarefa fiscal é "feita" só por status=concluido — conclusão por anexo foi descontinuada. */
+export function isFiscalTaskDone(t: { status: string }): boolean {
+  return t.status === 'concluido';
+}
+
+/**
+ * Competência (mês de apuração) é sempre o mês anterior ao vencimento — ex.: DAS que
+ * vence em 20/09 apura agosto. Mesma regra usada por calculate-fiscal-calendar no banco.
+ */
+export function competenceFromMonthYear(month: number, year: number): { year: number; month: number } {
+  return month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
 }

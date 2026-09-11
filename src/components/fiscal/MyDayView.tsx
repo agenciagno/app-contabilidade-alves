@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { format, parseISO, differenceInCalendarDays, isToday, addDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Target, AlertTriangle, Clock, CheckCircle, Upload, ExternalLink } from 'lucide-react';
+import { Target, AlertTriangle, Clock, CheckCircle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -37,7 +37,6 @@ interface Props {
   isAdminUser: boolean;
   onStatusChange: (taskId: string, newStatus: string) => void;
   onTaskClick: (task: FiscalTask) => void;
-  onUploadAttachment: (task: FiscalTask, file: File) => Promise<void>;
 }
 
 function bucketize(tasks: FiscalTask[]) {
@@ -71,31 +70,15 @@ function TaskItem({
   contactsMap,
   onStatusChange,
   onTaskClick,
-  onUploadAttachment,
   urgencyBadge,
 }: {
   task: FiscalTask;
   contactsMap: Record<string, string>;
   onStatusChange: Props['onStatusChange'];
   onTaskClick: Props['onTaskClick'];
-  onUploadAttachment: Props['onUploadAttachment'];
   urgencyBadge?: React.ReactNode;
 }) {
-  const [uploading, setUploading] = useState(false);
   const clientName = fiscalTaskContactLabel(task.contact_id, contactsMap, task.title);
-  const inputId = `myday-att-${task.id}`;
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      setUploading(true);
-      await onUploadAttachment(task, file);
-    } finally {
-      setUploading(false);
-      e.target.value = '';
-    }
-  };
 
   return (
     <Card className="p-3 hover:shadow-sm transition-shadow">
@@ -127,24 +110,6 @@ function TaskItem({
               ))}
             </SelectContent>
           </Select>
-
-          {task.attachment_url ? (
-            <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" asChild>
-              <a href={task.attachment_url} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-3.5 h-3.5" /> Ver
-              </a>
-            </Button>
-          ) : (
-            <>
-              <Label htmlFor={inputId} className="cursor-pointer">
-                <div className="inline-flex items-center gap-1 h-8 px-2 rounded-md border border-dashed border-border hover:bg-muted/50 text-xs">
-                  <Upload className="w-3.5 h-3.5" />
-                  {uploading ? 'Enviando...' : 'Anexar'}
-                </div>
-              </Label>
-              <input id={inputId} type="file" className="hidden" onChange={handleFile} disabled={uploading} />
-            </>
-          )}
         </div>
       </div>
     </Card>
@@ -157,7 +122,6 @@ function TaskListSection({
   contactsMap,
   onStatusChange,
   onTaskClick,
-  onUploadAttachment,
   badgeFor,
 }: {
   title: string;
@@ -165,7 +129,6 @@ function TaskListSection({
   contactsMap: Record<string, string>;
   onStatusChange: Props['onStatusChange'];
   onTaskClick: Props['onTaskClick'];
-  onUploadAttachment: Props['onUploadAttachment'];
   badgeFor?: (t: FiscalTask) => React.ReactNode;
 }) {
   if (items.length === 0) return null;
@@ -180,7 +143,6 @@ function TaskListSection({
             contactsMap={contactsMap}
             onStatusChange={onStatusChange}
             onTaskClick={onTaskClick}
-            onUploadAttachment={onUploadAttachment}
             urgencyBadge={badgeFor?.(t)}
           />
         ))}
@@ -195,7 +157,6 @@ function buildUrgencySections(
   contactsMap: Record<string, string>,
   onStatusChange: Props['onStatusChange'],
   onTaskClick: Props['onTaskClick'],
-  onUploadAttachment: Props['onUploadAttachment'],
 ) {
   const today = startOfDay(new Date());
   const { overdue, dueToday, next48h, next7 } = bucketize(tasks);
@@ -216,7 +177,6 @@ function buildUrgencySections(
           contactsMap={contactsMap}
           onStatusChange={onStatusChange}
           onTaskClick={onTaskClick}
-          onUploadAttachment={onUploadAttachment}
           badgeFor={(t) => {
             const days = Math.abs(differenceInCalendarDays(parseISO(t.due_date), today));
             return (
@@ -232,7 +192,6 @@ function buildUrgencySections(
           contactsMap={contactsMap}
           onStatusChange={onStatusChange}
           onTaskClick={onTaskClick}
-          onUploadAttachment={onUploadAttachment}
           badgeFor={() => (
             <Badge variant="outline" className="text-[10px] bg-state-doing/15 text-state-doing dark:text-state-doing border-state-doing/30 inline-flex items-center gap-1">
               <Clock className="w-3 h-3" /> Hoje
@@ -245,7 +204,6 @@ function buildUrgencySections(
           contactsMap={contactsMap}
           onStatusChange={onStatusChange}
           onTaskClick={onTaskClick}
-          onUploadAttachment={onUploadAttachment}
           badgeFor={(t) => (
             <Badge variant="outline" className="text-[10px] bg-state-waiting/15 text-state-waiting dark:text-state-waiting border-state-waiting/30">
               {format(parseISO(t.due_date), 'dd/MM', { locale: ptBR })}
@@ -258,7 +216,6 @@ function buildUrgencySections(
           contactsMap={contactsMap}
           onStatusChange={onStatusChange}
           onTaskClick={onTaskClick}
-          onUploadAttachment={onUploadAttachment}
         />
       </div>
     ),
@@ -273,7 +230,6 @@ export function MyDayView({
   isAdminUser,
   onStatusChange,
   onTaskClick,
-  onUploadAttachment,
 }: Props) {
   const [mode, setMode] = useState<Mode>('mine');
   const [showAll, setShowAll] = useState(false);
@@ -354,7 +310,7 @@ export function MyDayView({
             );
           }
           const { totalShown, totalAll, sections } = buildUrgencySections(
-            myTasks, limit, contactsMap, onStatusChange, onTaskClick, onUploadAttachment,
+            myTasks, limit, contactsMap, onStatusChange, onTaskClick,
           );
           return (
             <>
@@ -395,7 +351,7 @@ export function MyDayView({
                 const pending = list.filter((t) => t.status !== 'concluido');
                 if (pending.length === 0) return null;
                 const { totalShown, totalAll, sections } = buildUrgencySections(
-                  list, limit, contactsMap, onStatusChange, onTaskClick, onUploadAttachment,
+                  list, limit, contactsMap, onStatusChange, onTaskClick,
                 );
                 return (
                   <div key={profId} className="space-y-3">

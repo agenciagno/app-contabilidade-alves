@@ -21,6 +21,7 @@ import { differenceInDays, parseISO } from 'date-fns';
 import { FiscalTask } from '@/hooks/useFiscalTasks';
 import { TaskCard } from './TaskCard';
 import { GroupedTaskCard } from './GroupedTaskCard';
+import { TaskCompletionDialog } from './TaskCompletionDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveCoverageByContact } from '@/hooks/useTemporaryTransfers';
 import { fiscalTaskContactLabel, isFiscalTaskDone } from '@/lib/fiscal-filters';
@@ -53,7 +54,6 @@ interface KanbanBoardProps {
   onTaskClick: (task: FiscalTask) => void;
   onEdit?: (task: FiscalTask) => void;
   onDelete?: (taskId: string) => void;
-  onUploadAttachment?: (task: FiscalTask, file: File) => Promise<void>;
   onCompleteTask?: (task: FiscalTask, data: { protocolNumber: string | null; completionNotes: string | null }) => void;
   onUncompleteTask?: (task: FiscalTask) => void;
   onGroupClick?: (tasks: FiscalTask[]) => void;
@@ -156,11 +156,10 @@ function SortableSingle({ item, contactsMap, profilesMap, onTaskClick, onEdit, o
   );
 }
 
-function SortableGroup({ item, contactsMap, profilesMap, onUploadAttachment, onCompleteTask, onUncompleteTask, columnId, onCardClick }: {
+function SortableGroup({ item, contactsMap, profilesMap, onCompleteTask, onUncompleteTask, columnId, onCardClick }: {
   item: GroupItem;
   contactsMap: Record<string, string>;
   profilesMap: Record<string, { name: string; initials: string }>;
-  onUploadAttachment: (task: FiscalTask, file: File) => Promise<void>;
   onCompleteTask?: (task: FiscalTask, data: { protocolNumber: string | null; completionNotes: string | null }) => void;
   onUncompleteTask?: (task: FiscalTask) => void;
   columnId?: string;
@@ -183,7 +182,6 @@ function SortableGroup({ item, contactsMap, profilesMap, onUploadAttachment, onC
         tasks={item.tasks}
         responsibleInitials={profile.initials}
         responsibleName={profile.name}
-        onUploadAttachment={onUploadAttachment}
         onCompleteTask={onCompleteTask}
         onUncompleteTask={onUncompleteTask}
         columnId={columnId}
@@ -194,8 +192,11 @@ function SortableGroup({ item, contactsMap, profilesMap, onUploadAttachment, onC
   );
 }
 
-export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, onTaskClick, onEdit, onDelete, onUploadAttachment, onCompleteTask, onUncompleteTask, onGroupClick, profileOptions, onReassign }: KanbanBoardProps) {
+export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, onTaskClick, onEdit, onDelete, onCompleteTask, onUncompleteTask, onGroupClick, profileOptions, onReassign }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Drag-and-drop de tarefa única pra coluna Concluído abre o mesmo diálogo de
+  // protocolo/observação usado pelo checkbox — anexo não é mais gate de conclusão.
+  const [completingSingle, setCompletingSingle] = useState<FiscalTask | null>(null);
   const [columnSort, setColumnSort] = useState<Record<string, SortDir>>(() =>
     COLUMNS.reduce((acc, c) => ({ ...acc, [c.id]: 'asc' as SortDir }), {}),
   );
@@ -329,12 +330,8 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
     if (item.type === 'single') {
       const task = item.task;
       if (targetStatus === task.status) return;
-      if (targetStatus === 'concluido' && !task.attachment_url) {
-        toast({
-          title: 'Anexo obrigatório',
-          description: 'É necessário anexar um arquivo antes de concluir a tarefa.',
-          variant: 'destructive',
-        });
+      if (targetStatus === 'concluido') {
+        setCompletingSingle(task);
         return;
       }
       onStatusChange(task.id, targetStatus);
@@ -345,8 +342,8 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
     if (targetStatus === item.displayStatus) return;
     if (targetStatus === 'concluido') {
       toast({
-        title: 'Conclusão por anexo',
-        description: 'Para concluir, faça o upload do anexo em cada obrigação.',
+        title: 'Conclua obrigação por obrigação',
+        description: 'Este card tem mais de uma obrigação — abra o card e conclua cada uma pelo checklist.',
       });
       return;
     }
@@ -363,8 +360,6 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
 
   const toggleColumnSort = (id: string) =>
     setColumnSort((prev) => ({ ...prev, [id]: prev[id] === 'desc' ? 'asc' : 'desc' }));
-
-  const noopUpload = async () => {};
 
   return (
     <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -401,7 +396,6 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
                     item={item}
                     contactsMap={contactsMap}
                     profilesMap={profilesMap}
-                    onUploadAttachment={onUploadAttachment ?? noopUpload}
                     onCompleteTask={onCompleteTask}
                     onUncompleteTask={onUncompleteTask}
                     columnId={col.id}
@@ -434,10 +428,17 @@ export function KanbanBoard({ tasks, contactsMap, profilesMap, onStatusChange, o
             tasks={activeItem.tasks}
             responsibleInitials={profilesMap[activeItem.tasks[0]?.responsible_id || '']?.initials || '?'}
             responsibleName={profilesMap[activeItem.tasks[0]?.responsible_id || '']?.name || '?'}
-            onUploadAttachment={noopUpload}
           />
         )}
       </DragOverlay>
+      <TaskCompletionDialog
+        open={!!completingSingle}
+        onOpenChange={(o) => { if (!o) setCompletingSingle(null); }}
+        onConfirm={(data) => {
+          if (completingSingle) onCompleteTask?.(completingSingle, data);
+          setCompletingSingle(null);
+        }}
+      />
     </DndContext>
   );
 }

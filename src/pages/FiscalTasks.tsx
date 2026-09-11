@@ -44,7 +44,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { isContactFiscalEligible } from '@/lib/fiscal-filters';
+import { isContactFiscalEligible, competenceFromMonthYear } from '@/lib/fiscal-filters';
 import { toast } from 'sonner';
 
 type ViewMode = 'myday' | 'kanban' | 'list' | 'calendar';
@@ -145,8 +145,8 @@ export default function FiscalTasks() {
   const [filterResponsible, setFilterResponsible] = useState('all');
   const [filterObligation, setFilterObligation] = useState('all');
   const now = new Date();
-  const [competenceMonth, setCompetenceMonth] = useState<string>(String(now.getMonth() + 1));
-  const [competenceYear, setCompetenceYear] = useState<string>(String(now.getFullYear()));
+  const [vencimentoMonth, setVencimentoMonth] = useState<string>(String(now.getMonth() + 1));
+  const [vencimentoYear, setVencimentoYear] = useState<string>(String(now.getFullYear()));
   const isAdminUser = isAdmin || isSuperAdmin;
   const [viewMode, setViewMode] = useState<ViewMode>(isAdminUser ? 'kanban' : 'myday');
 
@@ -243,9 +243,9 @@ export default function FiscalTasks() {
     titleSearch: filterObligation !== 'all'
       ? (obligations.find((o) => o.id === filterObligation)?.name)
       : undefined,
-    competenceMonth: competenceMonth !== 'all' ? Number(competenceMonth) : null,
-    competenceYear: competenceYear ? Number(competenceYear) : null,
-  }), [startDate, endDate, filterContact, filterResponsible, filterObligation, obligations, competenceMonth, competenceYear]);
+    dueMonth: vencimentoMonth !== 'all' ? Number(vencimentoMonth) : null,
+    dueYear: vencimentoYear ? Number(vencimentoYear) : null,
+  }), [startDate, endDate, filterContact, filterResponsible, filterObligation, obligations, vencimentoMonth, vencimentoYear]);
 
   const { tasks, isLoading, createTask, updateTask, deleteTask, deleteTasks } = useFiscalTasks(filters);
 
@@ -265,10 +265,13 @@ export default function FiscalTasks() {
     }
     return false;
   };
+  // A competência (apuração) é sempre o mês anterior ao vencimento selecionado no filtro.
+  const selectedCompetence = vencimentoMonth !== 'all' && vencimentoYear
+    ? competenceFromMonthYear(Number(vencimentoMonth), Number(vencimentoYear))
+    : null;
   const isSelectedPeriodClosed =
-    competenceMonth !== 'all' &&
-    !!competenceYear &&
-    !!closedPeriods?.has(`${competenceYear}-${competenceMonth}`);
+    !!selectedCompetence &&
+    !!closedPeriods?.has(`${selectedCompetence.year}-${selectedCompetence.month}`);
 
   // Quick filter (cards de KPI no topo)
   type QuickFilter = 'overdue' | 'today' | 'awaiting' | null;
@@ -343,31 +346,6 @@ export default function FiscalTasks() {
     updateTask.mutate({ id: taskId, status: newStatus as FiscalTask['status'] });
   };
 
-  const handleUploadAttachment = async (task: FiscalTask, file: File) => {
-    if (!companyId) return;
-    if (guardLocked(task.id)) return;
-    try {
-      const ext = file.name.split('.').pop();
-      const path = `fiscal/${companyId}/${task.id}/${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from('transaction-attachments')
-        .upload(path, file);
-      if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage
-        .from('transaction-attachments')
-        .getPublicUrl(path);
-      await updateTask.mutateAsync({
-        id: task.id,
-        attachment_url: urlData.publicUrl,
-        status: 'concluido' as FiscalTask['status'],
-      });
-    } catch (e: any) {
-      // updateTask shows its own error toast; storage errors fall here
-      console.error('Upload error', e);
-    }
-  };
-
-
   const handleCompleteTask = (task: FiscalTask, data: { protocolNumber: string | null; completionNotes: string | null }) => {
     if (guardLocked(task.id)) return;
     const completion_type = data.protocolNumber ? 'protocol' : 'transmitted';
@@ -410,9 +388,10 @@ export default function FiscalTasks() {
 
   const handleCreate = (data: { contact_id: string | null; responsible_id: string | null; titles: string[]; description: string | null; due_date: string }) => {
     if (!companyId) return;
-    // Competência é derivada do vencimento — sem isso a tarefa fica invisível no filtro
-    // padrão de "Competência" (mês atual), que exclui linhas com competence_month nulo.
+    // Competência é derivada do vencimento (mês anterior) — sem isso a tarefa fica
+    // invisível no filtro padrão de "Vencimento" (mês atual) e no encerramento de período.
     const dueDateObj = new Date(`${data.due_date}T00:00:00`);
+    const comp = competenceFromMonthYear(dueDateObj.getMonth() + 1, dueDateObj.getFullYear());
     // Checklist com mais de 1 item (sem cliente) ganha group_key compartilhado, senão
     // cada tarefa avulsa vira seu próprio card isolado no Kanban.
     const groupKey = data.titles.length > 1 ? crypto.randomUUID() : null;
@@ -427,8 +406,8 @@ export default function FiscalTasks() {
         due_date: data.due_date,
         attachment_url: null,
         notes: null,
-        competence_month: dueDateObj.getMonth() + 1,
-        competence_year: dueDateObj.getFullYear(),
+        competence_month: comp.month,
+        competence_year: comp.year,
         group_key: groupKey,
       } as any);
     });
@@ -537,12 +516,12 @@ export default function FiscalTasks() {
     <div className="space-y-6">
       <PageHeader
         kicker={
-          competenceMonth !== 'all'
-            ? `~/tarefas · competência ${MESES[Number(competenceMonth) - 1] ?? ''} ${competenceYear}`
+          vencimentoMonth !== 'all'
+            ? `~/tarefas · vencimento ${MESES[Number(vencimentoMonth) - 1] ?? ''} ${vencimentoYear}`
             : '~/tarefas'
         }
         title="Tarefas."
-        subtitle={`${kpis.totalMonth} tarefas no board · ${kpis.overdue} atrasadas de competências anteriores.`}
+        subtitle={`${kpis.totalMonth} tarefas no board · ${kpis.overdue} atrasadas de meses anteriores.`}
         actions={
           <>
             <Button variant="outline" onClick={() => setBulkCompleteOpen(true)}>
@@ -580,7 +559,7 @@ export default function FiscalTasks() {
             key: 'overdue' as const,
             label: 'Atrasadas',
             value: kpis.overdue,
-            hint: 'fora da competência atual',
+            hint: 'de meses anteriores',
             onClick: () => setQuickFilter((q) => (q === 'overdue' ? null : 'overdue')),
           },
           {
@@ -631,7 +610,7 @@ export default function FiscalTasks() {
           intervalo de datas e filtros salvos, que não têm slot no protótipo mas
           continuam funcionais (nada de real foi descartado). */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Competência — pill único (Figma: ícone calendário + "Julho 2026" + chevron) */}
+        {/* Vencimento — pill único (Figma: ícone calendário + "Julho 2026" + chevron) */}
         <Popover>
           <PopoverTrigger asChild>
             <button
@@ -640,24 +619,24 @@ export default function FiscalTasks() {
             >
               <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-ink" strokeWidth={1.75} />
               <span className="truncate">
-                {competenceMonth !== 'all' ? `${MESES[Number(competenceMonth) - 1]} ${competenceYear}` : 'Todas as competências'}
+                {vencimentoMonth !== 'all' ? `${MESES[Number(vencimentoMonth) - 1]} ${vencimentoYear}` : 'Todos os vencimentos'}
               </span>
               <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-ink-2" strokeWidth={1.75} />
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-64 space-y-2 p-3">
-            <Label className="text-xs">Competência</Label>
+            <Label className="text-xs">Vencimento</Label>
             <div className="flex gap-2">
-              <Select value={competenceMonth} onValueChange={setCompetenceMonth}>
+              <Select value={vencimentoMonth} onValueChange={setVencimentoMonth}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {MESES.map((m, i) => (
                     <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={competenceYear} onValueChange={setCompetenceYear}>
+              <Select value={vencimentoYear} onValueChange={setVencimentoYear}>
                 <SelectTrigger className="h-9 w-[90px] text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {[2024, 2025, 2026, 2027].map((y) => (
@@ -866,7 +845,6 @@ export default function FiscalTasks() {
           isAdminUser={isAdminUser}
           onStatusChange={handleStatusChange}
           onTaskClick={handleTaskClick}
-          onUploadAttachment={handleUploadAttachment}
         />
       )}
 
@@ -879,7 +857,6 @@ export default function FiscalTasks() {
           onTaskClick={handleTaskClick}
           onEdit={handleTaskClick}
           onDelete={canDelete ? (id) => { if (!guardLocked(id)) deleteTask.mutate(id); } : undefined}
-          onUploadAttachment={handleUploadAttachment}
           onCompleteTask={handleCompleteTask}
           onUncompleteTask={handleUncompleteTask}
           onGroupClick={handleGroupClick}
@@ -967,13 +944,14 @@ export default function FiscalTasks() {
         isLoading={createTask.isPending}
       />
 
-      {/* Bulk Complete Modal */}
+      {/* Bulk Complete Modal — usa a competência real (vencimento - 1 mês), pois
+          fiscal_tasks.competence_month/year é o que o BulkCompleteDialog consulta. */}
       <BulkCompleteDialog
         open={bulkCompleteOpen}
         onOpenChange={setBulkCompleteOpen}
         companyId={companyId}
-        year={competenceYear ? Number(competenceYear) : new Date().getFullYear()}
-        month={competenceMonth !== 'all' ? Number(competenceMonth) : new Date().getMonth() + 1}
+        year={(selectedCompetence ?? competenceFromMonthYear(now.getMonth() + 1, now.getFullYear())).year}
+        month={(selectedCompetence ?? competenceFromMonthYear(now.getMonth() + 1, now.getFullYear())).month}
       />
 
       {/* Detail Modal */}
@@ -991,7 +969,6 @@ export default function FiscalTasks() {
           deleteTasks.mutate(ids);
         }}
         groupTasks={selectedGroupTasks}
-        onUploadForTask={handleUploadAttachment}
       />
 
       <BulkReassignModal

@@ -1,6 +1,4 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { abrirDocumentoViaEdge } from '@/lib/documento-baixar';
-
 import { format, parseISO, differenceInCalendarDays, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -31,7 +29,7 @@ import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  Upload, Paperclip, CheckCircle, Trash2, Send,
+  Paperclip, CheckCircle, Trash2, Send,
   Clock, AlertTriangle, CheckCircle2, ExternalLink,
   Plus, ArrowRight, UserCog, Hash, AtSign,
 } from 'lucide-react';
@@ -208,7 +206,6 @@ interface TaskDetailModalProps {
   onDelete: (id: string) => void;
   onDeleteGroup?: (ids: string[]) => void;
   groupTasks?: FiscalTask[] | null;
-  onUploadForTask?: (task: FiscalTask, file: File) => Promise<void>;
 }
 
 const STATUS_OPTIONS = [
@@ -225,7 +222,7 @@ const statusBadgeClass: Record<string, string> = {
   concluido: 'bg-ok/15 text-ok dark:text-ok border-ok/30',
 };
 
-export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, onUpdate, onDelete, onDeleteGroup, groupTasks, onUploadForTask }: TaskDetailModalProps) {
+export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, onUpdate, onDelete, onDeleteGroup, groupTasks }: TaskDetailModalProps) {
   const { isColaborador, isSuperAdmin, isAdmin } = useUserRole();
   const { company } = useCompany();
   const { user } = useAuth();
@@ -240,8 +237,6 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
   const [responsibleId, setResponsibleId] = useState('');
   const [notesRaw, setNotesRaw] = useState<string | null>(null);
   const [newNote, setNewNote] = useState('');
-  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
   // Espelho local das obrigações do grupo — o painel some as próprias mutações não
   // voltam via prop (groupTasks é congelado no momento em que o card foi aberto).
   const [groupTasksState, setGroupTasksState] = useState<FiscalTask[]>([]);
@@ -264,7 +259,6 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
       setResponsibleId(task.responsible_id || '');
       setNotesRaw(task.notes ?? null);
       setNewNote('');
-      setAttachmentUrl(task.attachment_url);
       setCompletionTarget(null);
       setPendingMentions([]);
       setMentionQuery(null);
@@ -322,37 +316,9 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
 
   if (!task) return null;
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    try {
-      const ext = file.name.split('.').pop();
-      const path = `fiscal/${companyId}/${task.id}/${Date.now()}.${ext}`;
-      const { error } = await supabase.storage
-        .from('transaction-attachments')
-        .upload(path, file);
-      if (error) throw error;
-
-      const { data: urlData } = supabase.storage
-        .from('transaction-attachments')
-        .getPublicUrl(path);
-
-      setAttachmentUrl(urlData.publicUrl);
-      setStatus('concluido');
-      onUpdate(task.id, { attachment_url: urlData.publicUrl, status: 'concluido' });
-      toast({ title: '✅ Anexo adicionado. Tarefa marcada como concluída.' });
-    } catch {
-      toast({ title: 'Erro ao enviar anexo', variant: 'destructive' });
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const handleSaveTaskInfo = () => {
     if (!canEdit) return;
-    if (status === 'concluido' && !attachmentUrl && task.status !== 'concluido') {
+    if (status === 'concluido' && task.status !== 'concluido') {
       // Open confirm dialog to capture protocol/notes
       setCompletionTarget({ task, closeOnConfirm: true });
       return;
@@ -439,14 +405,6 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
   // t: task being completed (main task, or a single item from the group checklist)
   // closeOnConfirm: whether to close the whole sheet once completion is confirmed
   const handleOpenCompletion = (t: FiscalTask = task, closeOnConfirm = true) => {
-    if (t.attachment_url) {
-      const patch = { status: 'concluido' as const, completion_type: 'attachment', completed_at: new Date().toISOString() };
-      onUpdate(t.id, patch as any);
-      patchGroupTask(t.id, patch as any);
-      if (t.id === task.id) setStatus('concluido');
-      if (closeOnConfirm) onOpenChange(false);
-      return;
-    }
     setCompletionTarget({ task: t, closeOnConfirm });
   };
 
@@ -481,23 +439,17 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     patchGroupTask(t.id, patch as any);
     if (t.id === task.id) {
       setStatus('a_fazer');
-      setAttachmentUrl(null);
     }
     toast({ title: 'Tarefa desmarcada.' });
   };
 
-  const handleChecklistUpload = async (t: FiscalTask, file: File) => {
-    await onUploadForTask?.(t, file);
-    patchGroupTask(t.id, { status: 'concluido' } as any);
-    if (t.id === task.id) setStatus('concluido');
-  };
-
-
-
-
   const contactName = task.contact_id ? (contacts.find(c => c.id === task.contact_id)?.name || '—') : task.title;
   const responsibleName = profiles.find(p => p.id === responsibleId)?.full_name || '—';
-  const competencia = task.due_date ? format(parseISO(task.due_date), 'MM/yyyy') : '—';
+  // Competência é o mês de apuração — sempre o mês anterior ao vencimento — e já vem
+  // gravada assim em fiscal_tasks.competence_month/year (não é derivada do vencimento aqui).
+  const competencia = (task as any).competence_month && (task as any).competence_year
+    ? `${String((task as any).competence_month).padStart(2, '0')}/${(task as any).competence_year}`
+    : '—';
 
   const sla = getSlaInfo(task);
   const SlaIcon = sla.Icon;
@@ -513,6 +465,23 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     : '';
   const timeline = buildTimeline(task, profiles);
 
+  // Quando o card tem várias obrigações e todas já foram concluídas, o resumo
+  // agregado substitui o banner de SLA de uma tarefa só (que só refletia a
+  // "representante" do grupo, escondendo atrasos individuais das demais).
+  const isGroupCard = !!groupTasks && groupTasks.length > 1;
+  const allGroupDone = isGroupCard && groupTasksState.length > 0 && groupTasksState.every((t) => t.status === 'concluido');
+  const groupSummary = allGroupDone
+    ? groupTasksState.reduce(
+        (acc, t) => {
+          const due = t.due_date ? parseISO(t.due_date) : null;
+          const completedAt = (t as any).completed_at ? parseISO((t as any).completed_at) : null;
+          const late = due && completedAt ? differenceInCalendarDays(completedAt, due) > 0 : false;
+          return { total: acc.total + 1, late: acc.late + (late ? 1 : 0), onTime: acc.onTime + (late ? 0 : 1) };
+        },
+        { total: 0, late: 0, onTime: 0 },
+      )
+    : null;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto px-6 py-6">
@@ -526,12 +495,21 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
               Vencimento: {dueDate ? format(parseISO(dueDate), 'dd/MM/yyyy') : '—'}
             </span>
           </div>
-          <div
-            className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium ${slaToneClass[sla.tone]} ${sla.pulse ? 'animate-pulse' : ''}`}
-          >
-            <SlaIcon className="w-4 h-4 shrink-0" />
-            <span>{sla.label}</span>
-          </div>
+          {groupSummary ? (
+            <div className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium ${slaToneClass['done']}`}>
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>
+                {groupSummary.total} entregue{groupSummary.total === 1 ? '' : 's'}, {groupSummary.late} em atraso, {groupSummary.onTime} dentro do vencimento
+              </span>
+            </div>
+          ) : (
+            <div
+              className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium ${slaToneClass[sla.tone]} ${sla.pulse ? 'animate-pulse' : ''}`}
+            >
+              <SlaIcon className="w-4 h-4 shrink-0" />
+              <span>{sla.label}</span>
+            </div>
+          )}
           {wasTransferred && (
             <Badge variant="outline" className="bg-warn/10 text-warn dark:text-warn border-warn/30 w-fit">
               Originalmente atribuída a {originalResponsibleName}
@@ -680,7 +658,6 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                   <ChecklistRow
                     key={gt.id}
                     task={gt}
-                    onUpload={handleChecklistUpload}
                     onComplete={(t) => handleOpenCompletion(t, false)}
                     onUncomplete={handleUncomplete}
                     canDelete={canEdit}
@@ -692,7 +669,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
               <div className="rounded-md border border-border/50 p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    {status === 'concluido' || attachmentUrl ? (
+                    {status === 'concluido' ? (
                       <button
                         type="button"
                         onClick={() => handleUncomplete(task)}
@@ -711,30 +688,11 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                     )}
                     <span className="text-sm truncate">{title}</span>
                   </div>
-                  {attachmentUrl ? (
-                    <button
-                      type="button"
-                      onClick={() => abrirDocumentoViaEdge('transaction-attachments', attachmentUrl)}
-                      className="text-xs text-primary underline shrink-0 inline-flex items-center gap-1"
-                    >
-                      <Paperclip className="w-3 h-3" /> Ver anexo
-                    </button>
-
-                  ) : (
-                    <Label htmlFor="task-attachment-detail" className="cursor-pointer shrink-0">
-                      <div className="inline-flex items-center gap-1 px-2 py-1 rounded border border-dashed border-border hover:bg-muted/50 text-xs">
-                        <Upload className="w-3 h-3" />
-                        {uploading ? 'Enviando...' : '📎 Anexar'}
-                      </div>
-                    </Label>
-                  )}
-                  <input
-                    id="task-attachment-detail"
-                    type="file"
-                    className="hidden"
-                    onChange={handleUpload}
-                    disabled={uploading}
-                  />
+                  <span className="text-[11px] text-muted-foreground shrink-0">
+                    {status === 'concluido'
+                      ? `Venceu ${dueDate ? format(parseISO(dueDate), 'dd/MM/yyyy') : '—'} · Concluída ${(task as any).completed_at ? format(parseISO((task as any).completed_at), 'dd/MM/yyyy') : '—'}`
+                      : `Vence ${dueDate ? format(parseISO(dueDate), 'dd/MM/yyyy') : '—'}`}
+                  </span>
                 </div>
                 {task.status === 'concluido' && (() => {
                   const ct = (task as any).completion_type as string | null;
@@ -757,17 +715,8 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                       </div>
                     );
                   }
-                  return attachmentUrl ? (
-                    <Badge variant="outline" className="text-[10px] bg-ok/10 text-ok dark:text-ok border-ok/30 inline-flex items-center gap-1">
-                      <Paperclip className="w-3 h-3" /> Documento anexado
-                    </Badge>
-                  ) : null;
+                  return null;
                 })()}
-                {task.status !== 'concluido' && attachmentUrl && (
-                  <Badge variant="outline" className="text-[10px] bg-ok/10 text-ok dark:text-ok border-ok/30">
-                    ✅ Documento anexado
-                  </Badge>
-                )}
               </div>
             )}
           </section>
@@ -964,34 +913,18 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
 
 function ChecklistRow({
   task,
-  onUpload,
   onComplete,
   onUncomplete,
   canDelete,
   onDelete,
 }: {
   task: FiscalTask;
-  onUpload?: (task: FiscalTask, file: File) => Promise<void>;
   onComplete?: (task: FiscalTask) => void;
   onUncomplete?: (task: FiscalTask) => void;
   canDelete?: boolean;
   onDelete?: (task: FiscalTask) => void;
 }) {
-  const [uploading, setUploading] = useState(false);
-  const done = task.status === 'concluido' || !!task.attachment_url;
-  const inputId = `chk-${task.id}`;
-
-  const handle = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !onUpload) return;
-    try {
-      setUploading(true);
-      await onUpload(task, file);
-    } finally {
-      setUploading(false);
-      e.target.value = '';
-    }
-  };
+  const done = task.status === 'concluido';
 
   return (
     <div className="flex items-center justify-between gap-2">
@@ -1018,30 +951,11 @@ function ChecklistRow({
         </span>
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
-        {done && task.attachment_url ? (
-          <button
-            type="button"
-            onClick={() => abrirDocumentoViaEdge('transaction-attachments', task.attachment_url!)}
-            className="text-xs text-primary underline shrink-0 inline-flex items-center gap-1"
-          >
-            <Paperclip className="w-3 h-3" /> Ver anexo
-          </button>
-
-        ) : done ? (
-          <Badge variant="outline" className="text-[10px] bg-ok/10 text-ok dark:text-ok border-ok/30 shrink-0">
-            ✅ Anexado
-          </Badge>
-        ) : (
-          <>
-            <Label htmlFor={inputId} className="cursor-pointer shrink-0">
-              <div className="inline-flex items-center gap-1 px-2 py-1 rounded border border-dashed border-border hover:bg-muted/50 text-xs">
-                <Upload className="w-3 h-3" />
-                {uploading ? 'Enviando...' : '📎 Anexar'}
-              </div>
-            </Label>
-            <input id={inputId} type="file" className="hidden" onChange={handle} disabled={uploading} />
-          </>
-        )}
+        <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+          {done
+            ? `Venceu ${task.due_date ? format(parseISO(task.due_date), 'dd/MM/yyyy') : '—'} · Concluída ${(task as any).completed_at ? format(parseISO((task as any).completed_at), 'dd/MM/yyyy') : '—'}`
+            : `Vence ${task.due_date ? format(parseISO(task.due_date), 'dd/MM/yyyy') : '—'}`}
+        </span>
         {canDelete && (
           <button
             type="button"

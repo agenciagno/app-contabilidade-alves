@@ -34,8 +34,9 @@ export interface FiscalTaskFilters {
   responsibleId?: string;
   titleSearch?: string;
   sortOrder?: 'asc' | 'desc';
-  competenceMonth?: number | null;
-  competenceYear?: number | null;
+  /** Mês/ano de vencimento (due_date) — filtro principal da tela de Tarefas. */
+  dueMonth?: number | null;
+  dueYear?: number | null;
 }
 
 export function useFiscalTasks(filters: FiscalTaskFilters = {}) {
@@ -105,11 +106,14 @@ export function useFiscalTasks(filters: FiscalTaskFilters = {}) {
       if (filters.titleSearch) {
         query = query.ilike('title', `%${filters.titleSearch}%`);
       }
-      if (filters.competenceMonth) {
-        query = query.eq('competence_month', filters.competenceMonth);
-      }
-      if (filters.competenceYear) {
-        query = query.eq('competence_year', filters.competenceYear);
+      if (filters.dueMonth && filters.dueYear) {
+        const lastDay = new Date(filters.dueYear, filters.dueMonth, 0).getDate();
+        const mm = String(filters.dueMonth).padStart(2, '0');
+        query = query
+          .gte('due_date', `${filters.dueYear}-${mm}-01`)
+          .lte('due_date', `${filters.dueYear}-${mm}-${String(lastDay).padStart(2, '0')}`);
+      } else if (filters.dueYear) {
+        query = query.gte('due_date', `${filters.dueYear}-01-01`).lte('due_date', `${filters.dueYear}-12-31`);
       }
 
       const { data, error } = await query;

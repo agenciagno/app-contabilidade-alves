@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, AlertTriangle, FileUp, Loader2, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -23,7 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 
-type CompletionType = 'attachment' | 'protocol' | 'transmitted';
+type CompletionType = 'protocol' | 'transmitted';
 
 type PendingTask = {
   id: string;
@@ -47,25 +47,14 @@ interface Props {
 
 const MONTH_LABEL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
-const onlyDigits = (s: string) => s.replace(/\D/g, '');
-
-const extractCnpjFromFilename = (name: string): string | null => {
-  const digits = onlyDigits(name);
-  // try to find a 14-digit chunk
-  const m = digits.match(/(\d{14})/);
-  return m ? m[1] : null;
-};
-
 export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month }: Props) {
   const qc = useQueryClient();
   const [step, setStep] = useState(1);
   const [obligationId, setObligationId] = useState<string>('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [completionType, setCompletionType] = useState<CompletionType>('attachment');
+  const [completionType, setCompletionType] = useState<CompletionType>('protocol');
   const [protocol, setProtocol] = useState('');
   const [notes, setNotes] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
-  const [manualMatches, setManualMatches] = useState<Record<string, string>>({}); // fileName -> contact_id
   const [markCompleted, setMarkCompleted] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -74,11 +63,9 @@ export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month 
     setStep(1);
     setObligationId('');
     setSelectedIds(new Set());
-    setCompletionType('attachment');
+    setCompletionType('protocol');
     setProtocol('');
     setNotes('');
-    setFiles([]);
-    setManualMatches({});
     setMarkCompleted(true);
     setProgress(0);
   };
@@ -139,41 +126,6 @@ export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month 
     [tasksForObligation, selectedIds],
   );
 
-  // File <-> task matching by CNPJ
-  const fileMatches = useMemo(() => {
-    const auto: Record<string, string> = {}; // fileName -> task.id
-    const unmatched: File[] = [];
-    files.forEach((f) => {
-      const cnpj = extractCnpjFromFilename(f.name);
-      let taskId: string | undefined;
-      if (cnpj) {
-        const match = selectedTasks.find(
-          (t) => t.contact_document && onlyDigits(t.contact_document) === cnpj,
-        );
-        if (match) taskId = match.id;
-      }
-      if (taskId) auto[f.name] = taskId;
-      else if (manualMatches[f.name]) auto[f.name] = manualMatches[f.name];
-      else unmatched.push(f);
-    });
-    return { auto, unmatched };
-  }, [files, selectedTasks, manualMatches]);
-
-  // task.id -> file
-  const taskFileMap = useMemo(() => {
-    const map: Record<string, File> = {};
-    files.forEach((f) => {
-      const tid = fileMatches.auto[f.name];
-      if (tid) map[tid] = f;
-    });
-    return map;
-  }, [files, fileMatches]);
-
-  const tasksWithoutFile = useMemo(
-    () => selectedTasks.filter((t) => !taskFileMap[t.id]),
-    [selectedTasks, taskFileMap],
-  );
-
   // ===== Step navigation =====
   const canGoStep2 = !!obligationId && selectedIds.size > 0;
   const canGoStep3 = () => {
@@ -213,20 +165,7 @@ export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month 
           updates.status = 'concluido';
           updates.completed_at = new Date().toISOString();
         }
-        if (completionType === 'attachment') {
-          const file = taskFileMap[task.id];
-          if (file) {
-            const path = `fiscal/${companyId}/${task.id}/${Date.now()}_${file.name}`;
-            const { error: upErr } = await supabase.storage
-              .from('transaction-attachments')
-              .upload(path, file);
-            if (upErr) throw upErr;
-            const { data: urlData } = supabase.storage
-              .from('transaction-attachments')
-              .getPublicUrl(path);
-            updates.attachment_url = urlData.publicUrl;
-          }
-        } else if (completionType === 'protocol') {
+        if (completionType === 'protocol') {
           updates.protocol_number = protocol.trim();
         } else if (completionType === 'transmitted') {
           updates.completion_notes = notes.trim() || null;
@@ -335,10 +274,6 @@ export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month 
                 <Label>Tipo de conclusão</Label>
                 <RadioGroup value={completionType} onValueChange={(v) => setCompletionType(v as CompletionType)}>
                   <div className="flex items-start gap-2">
-                    <RadioGroupItem value="attachment" id="ct-att" className="mt-1" />
-                    <Label htmlFor="ct-att" className="font-normal cursor-pointer">Anexar comprovantes</Label>
-                  </div>
-                  <div className="flex items-start gap-2">
                     <RadioGroupItem value="protocol" id="ct-prot" className="mt-1" />
                     <Label htmlFor="ct-prot" className="font-normal cursor-pointer">Informar protocolo</Label>
                   </div>
@@ -348,82 +283,6 @@ export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month 
                   </div>
                 </RadioGroup>
               </div>
-
-              {completionType === 'attachment' && (
-                <div className="space-y-3">
-                  <div className="border-2 border-dashed rounded-md p-4 text-center">
-                    <Input
-                      type="file"
-                      multiple
-                      onChange={(e) => {
-                        const incoming = Array.from(e.target.files ?? []);
-                        setFiles((prev) => [...prev, ...incoming]);
-                        e.target.value = '';
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground mt-2">
-                      O CNPJ é extraído do nome do arquivo para vincular automaticamente.
-                    </p>
-                  </div>
-
-                  {selectedTasks.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium uppercase text-muted-foreground">Vinculação por cliente</p>
-                      <div className="border rounded-md max-h-[180px] overflow-y-auto divide-y">
-                        {selectedTasks.map((t) => {
-                          const file = taskFileMap[t.id];
-                          return (
-                            <div key={t.id} className="flex items-center justify-between gap-2 text-sm px-3 py-2">
-                              <span className="truncate">{t.contact_name}</span>
-                              {file ? (
-                                <span className="flex items-center gap-1.5 text-ok">
-                                  <CheckCircle2 className="h-3.5 w-3.5" />
-                                  <span className="truncate max-w-[220px]">{file.name}</span>
-                                </span>
-                              ) : (
-                                <span className="flex items-center gap-1.5 text-state-waiting">
-                                  <AlertTriangle className="h-3.5 w-3.5" /> Sem comprovante
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {fileMatches.unmatched.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium uppercase text-muted-foreground">Vincular manualmente</p>
-                      <div className="border rounded-md divide-y">
-                        {fileMatches.unmatched.map((f) => (
-                          <div key={f.name} className="flex items-center gap-2 px-3 py-2 text-sm">
-                            <FileUp className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="truncate flex-1">{f.name}</span>
-                            <Select
-                              value={manualMatches[f.name] ?? ''}
-                              onValueChange={(v) => setManualMatches((prev) => ({ ...prev, [f.name]: v }))}
-                            >
-                              <SelectTrigger className="w-[220px] h-8"><SelectValue placeholder="Escolher cliente" /></SelectTrigger>
-                              <SelectContent>
-                                {selectedTasks.map((t) => (
-                                  <SelectItem key={t.id} value={t.id}>{t.contact_name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              variant="ghost" size="icon" className="h-7 w-7"
-                              onClick={() => setFiles((prev) => prev.filter((x) => x.name !== f.name))}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {completionType === 'protocol' && (
                 <div className="space-y-1.5">
@@ -449,17 +308,14 @@ export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month 
                   <TableHeader>
                     <TableRow>
                       <TableHead>Cliente</TableHead>
-                      <TableHead>{completionType === 'attachment' ? 'Arquivo' : completionType === 'protocol' ? 'Protocolo' : 'Observação'}</TableHead>
+                      <TableHead>{completionType === 'protocol' ? 'Protocolo' : 'Observação'}</TableHead>
                       <TableHead>Ação</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {selectedTasks.map((t) => {
                       let detail: React.ReactNode = '—';
-                      if (completionType === 'attachment') {
-                        const f = taskFileMap[t.id];
-                        detail = f ? f.name : <span className="text-state-waiting">Sem comprovante</span>;
-                      } else if (completionType === 'protocol') {
+                      if (completionType === 'protocol') {
                         detail = protocol || '—';
                       } else if (completionType === 'transmitted') {
                         detail = notes || '—';

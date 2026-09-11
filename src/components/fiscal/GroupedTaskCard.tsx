@@ -1,9 +1,8 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Calendar, Paperclip, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Calendar, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -20,7 +19,6 @@ interface GroupedTaskCardProps {
   tasks: FiscalTask[]; // sorted
   responsibleInitials: string;
   responsibleName: string;
-  onUploadAttachment: (task: FiscalTask, file: File) => Promise<void>;
   onCompleteTask?: (task: FiscalTask, data: { protocolNumber: string | null; completionNotes: string | null }) => void;
   onUncompleteTask?: (task: FiscalTask) => void;
   columnId?: string;
@@ -51,15 +49,12 @@ export function GroupedTaskCard({
   departmentLabel,
   tasks,
   responsibleInitials,
-  onUploadAttachment,
   onCompleteTask,
   onUncompleteTask,
   columnId,
   dragProps,
   onCardClick,
 }: GroupedTaskCardProps) {
-  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [completingTask, setCompletingTask] = useState<FiscalTask | null>(null);
 
   const isTaskDone = isFiscalTaskDone;
@@ -84,22 +79,6 @@ export function GroupedTaskCard({
   const dateColor = badgeDate ? getDueDateColor(badgeDate) : null;
 
   const stopAll = (e: React.SyntheticEvent) => e.stopPropagation();
-
-  const handlePick = (taskId: string) => {
-    fileInputRefs.current[taskId]?.click();
-  };
-
-  const handleFile = async (task: FiscalTask, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      setUploadingId(task.id);
-      await onUploadAttachment(task, file);
-    } finally {
-      setUploadingId(null);
-      e.target.value = '';
-    }
-  };
 
   return (
     <>
@@ -155,7 +134,6 @@ export function GroupedTaskCard({
           {tasks.map((task) => {
             const done = isTaskDone(task);
             const overdue = isTaskOverdue(task);
-            const isUploading = uploadingId === task.id;
             const itemDate = effDate(task);
             return (
               <li
@@ -189,44 +167,8 @@ export function GroupedTaskCard({
                 {done ? (
                   <CheckCircle2 className="w-3.5 h-3.5 text-ok shrink-0" />
                 ) : overdue ? (
-                  <>
-                    <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0" />
-                    <input
-                      ref={(el) => (fileInputRefs.current[task.id] = el)}
-                      type="file"
-                      className="hidden"
-                      onChange={(e) => handleFile(task, e)}
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 px-2 text-[10px] gap-1"
-                      disabled={isUploading}
-                      onClick={(e) => { e.stopPropagation(); handlePick(task.id); }}
-                    >
-                      {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paperclip className="w-3 h-3" />}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <input
-                      ref={(el) => (fileInputRefs.current[task.id] = el)}
-                      type="file"
-                      className="hidden"
-                      onChange={(e) => handleFile(task, e)}
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 px-2 text-[10px] gap-1"
-                      disabled={isUploading}
-                      onClick={(e) => { e.stopPropagation(); handlePick(task.id); }}
-                    >
-                      {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paperclip className="w-3 h-3" />}
-                      Anexar
-                    </Button>
-                  </>
-                )}
+                  <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                ) : null}
               </li>
             );
           })}
