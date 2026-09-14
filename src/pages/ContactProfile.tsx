@@ -17,7 +17,7 @@ import { AcessosTab } from '@/components/contacts/AcessosTab';
 import { ContactCadastroTab } from '@/components/contacts/cadastro/ContactCadastroTab';
 import { ContactLogsWithComunicacaoTab } from '@/components/contacts/ContactLogsWithComunicacaoTab';
 import { getDocumentType } from '@/lib/utils';
-import { getContactDisplayName } from '@/lib/contact-display';
+import { getContactDisplayName, getContactStatusTone } from '@/lib/contact-display';
 import { DsBadge } from '@/components/ds';
 
 const taxRegimeLabels: Record<string, string> = {
@@ -165,8 +165,8 @@ export default function ContactProfile() {
             {contact.tax_regime && (
               <span className="text-meta text-muted-ink-2">{taxRegimeLabels[contact.tax_regime]}</span>
             )}
-            <DsBadge tone={isInadimplente ? 'danger' : 'ok'}>
-              {isInadimplente ? 'inadimplente' : 'adimplente'}
+            <DsBadge tone={getContactStatusTone(contact.status_cliente)}>
+              {contact.status_cliente || 'Sem status'}
             </DsBadge>
           </div>
         </div>

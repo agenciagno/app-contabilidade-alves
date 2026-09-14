@@ -1,3 +1,18 @@
+import type { BadgeTone } from '@/components/ds';
+
+// Cor do badge de status_cliente — usado no card da listagem e no header do Super Perfil.
+const CONTACT_STATUS_TONE: Record<string, BadgeTone> = {
+  Ativo: 'ok',
+  Suspenso: 'warn',
+  Inativo: 'danger',
+  Encerrado: 'neutral',
+  'Ex-cliente': 'neutral',
+};
+
+export function getContactStatusTone(status?: string | null): BadgeTone {
+  return (status && CONTACT_STATUS_TONE[status]) || 'neutral';
+}
+
 // Helper para obter o nome de exibição de um contato, com fallback.
 export function getContactDisplayName(c: {
   display_name?: string | null;

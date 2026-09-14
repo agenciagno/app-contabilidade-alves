@@ -1,6 +1,7 @@
 import { Building2, ArrowUpRight } from 'lucide-react';
 import { IconBox, DsBadge, type BadgeTone } from '@/components/ds';
 import { cn } from '@/lib/utils';
+import { getContactStatusTone } from '@/lib/contact-display';
 
 /**
  * Card de empresa — frame "empresa/*" da tela R6 (Cadastros › Empresas) do Figma,
@@ -13,14 +14,6 @@ import { cn } from '@/lib/utils';
  * O tom do IconBox e do selo segue a situação (status_cliente) do cliente, não a identidade dele:
  * é o que dá para varrer a grade e achar quem está Suspenso/Inativo sem ler nome por nome.
  */
-
-const STATUS_TONE: Record<string, BadgeTone> = {
-  Ativo: 'ok',
-  Suspenso: 'warn',
-  Inativo: 'danger',
-  Encerrado: 'neutral',
-  'Ex-cliente': 'neutral',
-};
 
 export interface EmpresaCardProps {
   nome: string;
@@ -53,7 +46,7 @@ export function EmpresaCard({
   onNomeClick,
   className,
 }: EmpresaCardProps) {
-  const tom: BadgeTone = (status && STATUS_TONE[status]) || 'neutral';
+  const tom: BadgeTone = getContactStatusTone(status);
   const selo = status || 'Sem status';
 
   return (

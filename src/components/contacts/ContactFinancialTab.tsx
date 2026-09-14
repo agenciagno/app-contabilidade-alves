@@ -44,8 +44,12 @@ export function ContactFinancialTab({ contactId, contactName, contact }: Contact
   const sortedTransactions = useMemo(() => {
     if (!transactions) return [];
     return [...transactions].sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
+      // Ordena só por vencimento (due_date) — sem vencimento fica sempre por último.
+      if (!a.due_date && !b.due_date) return 0;
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      const dateA = new Date(a.due_date).getTime();
+      const dateB = new Date(b.due_date).getTime();
       return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
     });
   }, [transactions, sortOrder]);
