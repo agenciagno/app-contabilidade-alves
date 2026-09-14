@@ -7,6 +7,7 @@ const CONTACT_STATUS_TONE: Record<string, BadgeTone> = {
   Inativo: 'danger',
   Encerrado: 'neutral',
   'Ex-cliente': 'neutral',
+  'Ex-Colaborador': 'neutral',
 };
 
 export function getContactStatusTone(status?: string | null): BadgeTone {

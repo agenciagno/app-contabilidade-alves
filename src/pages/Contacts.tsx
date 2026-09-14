@@ -19,7 +19,8 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
 import { ContactBulkEditDialog } from '@/components/contacts/ContactBulkEditDialog';
 import { useToast } from '@/hooks/use-toast';
-import { NewClients2026Tab } from '@/components/contacts/NewClients2026Tab';
+import { EntradaClientesTab } from '@/components/contacts/EntradaClientesTab';
+import { SaidaClientesTab } from '@/components/contacts/SaidaClientesTab';
 import { useUserRole } from '@/hooks/useUserRole';
 import { maskPhone } from '@/lib/utils';
 import { getContactDisplayName } from '@/lib/contact-display';
@@ -41,7 +42,7 @@ function Contador({ tom, valor, label }: { tom: string; valor: number; label: st
   );
 }
 
-const ARCHIVED_STATUSES = ['Encerrado', 'Ex-cliente'];
+const ARCHIVED_STATUSES = ['Encerrado', 'Ex-cliente', 'Ex-Colaborador'];
 const isArchivedContact = (c: Contact) => ARCHIVED_STATUSES.includes(((c as any).status_cliente || '').toString());
 
 export default function Contacts() {
@@ -357,11 +358,18 @@ export default function Contacts() {
             Contatos
           </TabsTrigger>
           <TabsTrigger
-            value="entrada-2026"
+            value="entrada-clientes"
             className="h-11 gap-[7px] rounded-none border-b-2 border-transparent px-3.5 text-nav text-muted-ink data-[state=active]:border-ink data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-none"
           >
             <CalendarDays className="h-4 w-4" strokeWidth={1.75} />
-            Entrada de clientes 2026
+            Entrada de Clientes
+          </TabsTrigger>
+          <TabsTrigger
+            value="saida-clientes"
+            className="h-11 gap-[7px] rounded-none border-b-2 border-transparent px-3.5 text-nav text-muted-ink data-[state=active]:border-ink data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-none"
+          >
+            <CalendarDays className="h-4 w-4" strokeWidth={1.75} />
+            Saída de Clientes
           </TabsTrigger>
           <TabsTrigger
             value="arquivados"
@@ -561,8 +569,12 @@ export default function Contacts() {
           </div>
         </TabsContent>
 
-        <TabsContent value="entrada-2026">
-          <NewClients2026Tab contacts={contacts} />
+        <TabsContent value="entrada-clientes">
+          <EntradaClientesTab contacts={contacts} />
+        </TabsContent>
+
+        <TabsContent value="saida-clientes">
+          <SaidaClientesTab />
         </TabsContent>
 
         <TabsContent value="arquivados">
@@ -580,7 +592,7 @@ export default function Contacts() {
             {archivedContacts.length === 0 ? (
               <Card className="bg-card">
                 <CardContent className="text-muted-foreground text-center py-16">
-                  Nenhum contato arquivado (status Encerrado ou Ex-cliente)
+                  Nenhum contato arquivado (status Encerrado, Ex-cliente ou Ex-Colaborador)
                 </CardContent>
               </Card>
             ) : viewMode === 'card' ? (

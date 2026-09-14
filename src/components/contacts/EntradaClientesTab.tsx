@@ -1,21 +1,33 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { DateField } from '@/components/ds';
 import { Contact } from '@/hooks/useContacts';
-import { Users, DollarSign } from 'lucide-react';
+import { Users, DollarSign, X } from 'lucide-react';
 
-interface NewClients2026TabProps {
+interface EntradaClientesTabProps {
   contacts: Contact[];
 }
 
-export function NewClients2026Tab({ contacts }: NewClients2026TabProps) {
+export function EntradaClientesTab({ contacts }: EntradaClientesTabProps) {
+  // Filtro por data de cadastro — DateField (De/Até), mesmo padrão já usado
+  // em Boletos/FiscalTasks pra range de data.
+  const [dateStart, setDateStart] = useState('');
+  const [dateEnd, setDateEnd] = useState('');
+
   const newClients = useMemo(() => {
-    return contacts.filter(c => {
-      const createdAt = new Date(c.created_at);
-      return createdAt.getFullYear() === 2026 && c.origin === 'manual';
-    }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [contacts]);
+    return contacts
+      .filter(c => {
+        if (c.origin !== 'manual') return false;
+        const createdDate = c.created_at.slice(0, 10);
+        if (dateStart && createdDate < dateStart) return false;
+        if (dateEnd && createdDate > dateEnd) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [contacts, dateStart, dateEnd]);
 
   const totalClients = newClients.length;
   const totalRevenue = useMemo(() => {
@@ -27,6 +39,25 @@ export function NewClients2026Tab({ contacts }: NewClients2026TabProps) {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <p className="text-xs text-muted-ink-2 px-1">De</p>
+          <DateField value={dateStart} onChange={setDateStart} className="w-[160px]" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-xs text-muted-ink-2 px-1">Até</p>
+          <DateField value={dateEnd} onChange={setDateEnd} className="w-[160px]" />
+        </div>
+        {(dateStart || dateEnd) && (
+          <Button
+            variant="ghost" size="sm" className="gap-1.5"
+            onClick={() => { setDateStart(''); setDateEnd(''); }}
+          >
+            <X className="h-3.5 w-3.5" /> Limpar período
+          </Button>
+        )}
+      </div>
+
       <Card className="bg-card border-border/50">
         {newClients.length > 0 ? (
           <Table>
@@ -57,7 +88,9 @@ export function NewClients2026Tab({ contacts }: NewClients2026TabProps) {
           </Table>
         ) : (
           <CardContent className="text-muted-foreground text-center py-16">
-            Nenhum cliente cadastrado manualmente em 2026
+            {dateStart || dateEnd
+              ? 'Nenhum cliente cadastrado manualmente no período selecionado'
+              : 'Nenhum cliente cadastrado manualmente'}
           </CardContent>
         )}
       </Card>
