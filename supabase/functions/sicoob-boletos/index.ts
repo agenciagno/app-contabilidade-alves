@@ -31,6 +31,25 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+// Roda `fn` sobre `items` com no máximo `limit` execuções simultâneas — usado em find_orphans pra
+// não fazer as chamadas ao Sicoob (mTLS + round-trip) uma de cada vez, sequencial.
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const i = cursor++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 // ---------- Datas ----------
 // Sem ajuste de dia útil: o Sicoob já trata fim de semana/feriado na hora do pagamento.
 function dateKey(d: Date): string {
@@ -728,29 +747,28 @@ Deno.serve(async (req) => {
         return json({ error: String((e as Error).message || e) }, 502);
       }
 
-      const results: any[] = [];
+      // Um cliente de cada vez levava ~14 lotes de 15 a estourar o timeout do pg_net (5s) e a
+      // deixar o botão "Sincronizar" lento — cada contato faz 1+ chamadas ao Sicoob (mTLS) em
+      // série. Processando alguns contatos em paralelo (limite abaixo) sem sobrecarregar o Sicoob.
+      const FIND_ORPHANS_CONCURRENCY = 5;
 
-      for (const id of contactIds) {
+      const processContact = async (id: string): Promise<any> => {
         const c = byId.get(id);
         if (!c) {
-          results.push({ contact_id: id, name: null, encontrados: 0, orfaos: 0, status: "error", message: "Contato não encontrado" });
-          continue;
+          return { contact_id: id, name: null, encontrados: 0, orfaos: 0, status: "error", message: "Contato não encontrado" };
         }
         const cpfCnpj = (c.document || "").replace(/\D/g, "");
         if (!cpfCnpj) {
-          results.push({ contact_id: id, name: c.name, encontrados: 0, orfaos: 0, status: "skipped", message: "Sem CPF/CNPJ" });
-          continue;
+          return { contact_id: id, name: c.name, encontrados: 0, orfaos: 0, status: "skipped", message: "Sem CPF/CNPJ" };
         }
         try {
           const resp = await listarBoletosPorPagador(token, cpfCnpj);
           if (!resp.ok) {
             // 400/404 = pagador sem boletos no Sicoob (comum); outro status = falha real
             if (resp.status === 400 || resp.status === 404) {
-              results.push({ contact_id: id, name: c.name, encontrados: 0, orfaos: 0, status: "ok" });
-            } else {
-              results.push({ contact_id: id, name: c.name, encontrados: 0, orfaos: 0, status: "error", message: extractSicoobError(resp.data, resp.status) });
+              return { contact_id: id, name: c.name, encontrados: 0, orfaos: 0, status: "ok" };
             }
-            continue;
+            return { contact_id: id, name: c.name, encontrados: 0, orfaos: 0, status: "error", message: extractSicoobError(resp.data, resp.status) };
           }
 
           const lista: SicoobPagadorBoleto[] = Array.isArray(resp.data?.resultado) ? resp.data.resultado : [];
@@ -860,7 +878,7 @@ Deno.serve(async (req) => {
               falhasInsercao++;
             }
           }
-          results.push({
+          return {
             contact_id: id,
             name: c.name,
             encontrados: lista.length,
@@ -868,11 +886,13 @@ Deno.serve(async (req) => {
             atualizados: statusAtualizados,
             status: falhasInsercao > 0 ? "error" : "ok",
             message: falhasInsercao > 0 ? `${falhasInsercao} boleto(s) encontrados mas não salvos (erro ao inserir)` : undefined,
-          });
+          };
         } catch (e) {
-          results.push({ contact_id: id, name: c.name, encontrados: 0, orfaos: 0, atualizados: 0, status: "error", message: String((e as Error).message || e) });
+          return { contact_id: id, name: c.name, encontrados: 0, orfaos: 0, atualizados: 0, status: "error", message: String((e as Error).message || e) };
         }
-      }
+      };
+
+      const results = await mapWithConcurrency(contactIds, FIND_ORPHANS_CONCURRENCY, processContact);
 
       const totalEncontrados = results.reduce((s, r) => s + (r.encontrados || 0), 0);
       const totalOrfaos = results.reduce((s, r) => s + (r.orfaos || 0), 0);
