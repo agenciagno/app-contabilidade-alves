@@ -25,7 +25,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PageHeader, DsBadge, SearchField, DateField } from '@/components/ds';
+import { PageHeader, StatCardRow, DsBadge, SearchField, DateField } from '@/components/ds';
 import { useBoletoControls, type BoletoWithContact } from '@/hooks/useBoletoControls';
 import { BoletoGenerationDialog } from '@/components/financeiro/BoletoGenerationDialog';
 import { IndividualBoletoDialog } from '@/components/financeiro/IndividualBoletoDialog';
@@ -86,11 +86,12 @@ function getMonthOptions(): string[] {
 export default function Boletos() {
   const monthOptions = useMemo(() => getMonthOptions(), []);
   const [vencimentoMonth, setVencimentoMonth] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-01'));
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDENTE' | 'PAGO' | 'VENCIDO' | 'FILA_IMPRESSAO'>('ALL');
-  const [canalFilter, setCanalFilter] = useState<'ALL' | 'whatsapp' | 'email' | 'impresso' | 'whatsapp_email'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDENTE' | 'PAGO' | 'VENCIDO'>('ALL');
   const [search, setSearch] = useState('');
   const [valorMin, setValorMin] = useState('');
   const [valorMax, setValorMax] = useState('');
+  const [vencimentoStart, setVencimentoStart] = useState('');
+  const [vencimentoEnd, setVencimentoEnd] = useState('');
   const [pagamentoStart, setPagamentoStart] = useState('');
   const [pagamentoEnd, setPagamentoEnd] = useState('');
   const [page, setPage] = useState(1);
@@ -158,9 +159,10 @@ export default function Boletos() {
     // acontece para ninguém ler o número como conciliado.
     const totalPago = pago.reduce((s: number, b: BoletoWithContact) => s + (b.valor_pago ?? b.valor ?? 0), 0);
     const estimado = pago.some((b: BoletoWithContact) => b.valor_pago == null);
+    const totalGerado = boletoList.reduce((s: number, b: BoletoWithContact) => s + (b.valor ?? 0), 0);
     const pendentes = boletoList.filter((b: BoletoWithContact) => b.status === 'PENDENTE').length;
     const vencidos = boletoList.filter((b: BoletoWithContact) => isOverdue(b)).length;
-    return { total, totalPago, estimado, pendentes, vencidos, liquidados: pago.length };
+    return { total, totalPago, totalGerado, estimado, pendentes, vencidos, liquidados: pago.length };
   }, [boletoList]);
 
   // Filtro
@@ -169,8 +171,6 @@ export default function Boletos() {
     const min = valorMin.trim() ? Number(valorMin.replace(',', '.')) : null;
     const max = valorMax.trim() ? Number(valorMax.replace(',', '.')) : null;
     return (boletoList as BoletoWithContact[]).filter(b => {
-      if (canalFilter !== 'ALL' && b.canal_entrega !== canalFilter) return false;
-
       if (statusFilter !== 'ALL') {
         const matchesStatus =
           statusFilter === 'VENCIDO' ? isOverdue(b) :
@@ -187,16 +187,20 @@ export default function Boletos() {
       if (min != null && !Number.isNaN(min) && !(b.valor != null && b.valor >= min)) return false;
       if (max != null && !Number.isNaN(max) && !(b.valor != null && b.valor <= max)) return false;
 
+      if (vencimentoStart && (!b.data_vencimento || b.data_vencimento < vencimentoStart)) return false;
+      if (vencimentoEnd && (!b.data_vencimento || b.data_vencimento > vencimentoEnd)) return false;
+
       if (pagamentoStart && (!b.data_pagamento || b.data_pagamento < pagamentoStart)) return false;
       if (pagamentoEnd && (!b.data_pagamento || b.data_pagamento > pagamentoEnd)) return false;
 
       return true;
     });
-  }, [boletoList, statusFilter, canalFilter, search, valorMin, valorMax, pagamentoStart, pagamentoEnd]);
+  }, [boletoList, statusFilter, search, valorMin, valorMax, vencimentoStart, vencimentoEnd, pagamentoStart, pagamentoEnd]);
 
-  const hasExtraFilters = !!search || !!valorMin || !!valorMax || !!pagamentoStart || !!pagamentoEnd;
+  const hasExtraFilters = !!search || !!valorMin || !!valorMax || !!vencimentoStart || !!vencimentoEnd || !!pagamentoStart || !!pagamentoEnd;
   const clearExtraFilters = () => {
     setSearch(''); setValorMin(''); setValorMax('');
+    setVencimentoStart(''); setVencimentoEnd('');
     setPagamentoStart(''); setPagamentoEnd('');
     setPage(1);
   };
@@ -236,192 +240,181 @@ export default function Boletos() {
       />
 
       {/*
-        Estrutura mudou de KPIs em linha + tabela full-width pra coluna lateral
-        fixa (300px) + área principal — o Figma usa uma disposição diferente da
-        anterior, não é só repintar (22/08/2026). Empilha em telas estreitas.
+        Layout de 1 coluna, mesmo padrão de Transactions.tsx: KPIs em cards
+        no topo, filtros numa barra horizontal, tabela abaixo — substitui a
+        coluna lateral fixa + área principal de antes (16/09/2026, pedido
+        de Gabriel).
       */}
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        {/* Coluna lateral — lg:sticky trava no topo enquanto a tabela rola
-            (só no breakpoint lg:, onde o layout é lado a lado; items-start
-            no container pai já impede a coluna de esticar pra altura da
-            tabela, pré-requisito pro sticky funcionar) (22/08/2026). */}
-        <div className="flex w-full shrink-0 flex-col gap-4 lg:sticky lg:top-8 lg:w-[300px]">
-          {/* Stats — lista vertical num card só, não StatCardRow (o Figma não usa cards separados aqui) */}
-          <div className="divide-y divide-line-2 rounded-lg border border-line bg-paper">
-            <div className="flex items-center justify-between p-4">
-              <span className="text-body text-muted-ink">Boletos gerados</span>
-              <span className="text-h3-section text-ink">{kpis.total}</span>
-            </div>
-            <div className="flex items-center justify-between p-4">
-              <span className="text-body text-muted-ink">Pendentes</span>
-              <span className={cn('text-h3-section', kpis.pendentes > 0 ? 'text-warn' : 'text-ink')}>{kpis.pendentes}</span>
-            </div>
-            <div className="flex items-center justify-between p-4">
-              <span className="text-body text-muted-ink">Vencidos</span>
-              <span className="text-h3-section text-ink">{kpis.vencidos}</span>
-            </div>
-            <div className="flex items-center justify-between p-4">
-              <span className="text-body text-muted-ink">Liquidados</span>
-              <div className="text-right">
-                <div className="text-h3-section text-ink">{fmtBRL(kpis.totalPago)}</div>
-                {kpis.estimado && <div className="text-meta text-muted-ink-2">estimado</div>}
+      <div className="space-y-4">
+        <StatCardRow
+          items={[
+            { label: 'Boletos gerados', value: kpis.total },
+            { label: 'Pendentes', value: kpis.pendentes, emphasis: kpis.pendentes > 0 ? 'warm' : 'none' },
+            { label: 'Vencidos', value: <span className="text-danger">{kpis.vencidos}</span> },
+            { label: 'Pagos', value: <span className="text-ok">{kpis.liquidados}</span> },
+            { label: 'Valor estimado', value: fmtBRL(kpis.totalGerado), hint: 'soma dos boletos gerados no mês' },
+            {
+              label: 'Valor já pago',
+              value: fmtBRL(kpis.totalPago),
+              hint: kpis.estimado ? 'estimado — só dos boletos pagos' : 'só dos boletos pagos',
+            },
+          ]}
+        />
+
+        {/* Filtros — barra horizontal, mesmo padrão da toolbar de Transactions.tsx */}
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchField
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Buscar cliente…"
+            wrapperClassName="h-8 min-w-[220px] max-w-sm flex-1"
+          />
+
+          <Select value={vencimentoMonth} onValueChange={(v) => { setVencimentoMonth(v); setPage(1); }}>
+            <SelectTrigger className="h-8 w-auto border-line bg-paper text-ui shrink-0">
+              <SelectValue placeholder="Mês de vencimento" />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map(m => (
+                <SelectItem key={m} value={m}>
+                  {format(parseISO(m), "MMMM 'de' yyyy", { locale: ptBR })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={(v: any) => { setStatusFilter(v); setPage(1); }}>
+            <SelectTrigger className="h-8 w-auto border-line bg-paper text-ui shrink-0">
+              <span className="text-muted-ink">Status:</span>&nbsp;<SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Todos</SelectItem>
+              <SelectItem value="PENDENTE">Pendente</SelectItem>
+              <SelectItem value="PAGO">Pago</SelectItem>
+              <SelectItem value="VENCIDO">Vencido</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Vencimento e pagamento ficam em filtros de data separados — não dá pra
+              misturar as duas datas num único período (pedido de Gabriel, 16/09/2026). */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="flex h-8 shrink-0 items-center gap-1.5 rounded-sm border border-line bg-paper px-3 text-ui text-muted-ink transition-colors hover:bg-bg-2"
+              >
+                <span>Vencimento</span>
+                {(vencimentoStart || vencimentoEnd) && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-action" />}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 space-y-3 p-3" align="start">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-ink-2 px-1">De</p>
+                  <DateField value={vencimentoStart} onChange={(v) => { setVencimentoStart(v); setPage(1); }} />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-ink-2 px-1">Até</p>
+                  <DateField value={vencimentoEnd} onChange={(v) => { setVencimentoEnd(v); setPage(1); }} />
+                </div>
               </div>
-            </div>
-          </div>
-
-          {/* Filtros */}
-          <div className="flex flex-col gap-3 rounded-lg border border-line bg-paper p-4">
-            <p className="text-kicker uppercase text-muted-ink-2">Filtros</p>
-
-            <SearchField
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Buscar cliente…"
-              wrapperClassName="w-full"
-            />
-
-            <Select value={vencimentoMonth} onValueChange={(v) => { setVencimentoMonth(v); setPage(1); }}>
-              <SelectTrigger className="h-9 w-full border-line bg-paper text-ui">
-                <SelectValue placeholder="Mês de vencimento" />
-              </SelectTrigger>
-              <SelectContent>
-                {monthOptions.map(m => (
-                  <SelectItem key={m} value={m}>
-                    {format(parseISO(m), "MMMM 'de' yyyy", { locale: ptBR })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={statusFilter} onValueChange={(v: any) => { setStatusFilter(v); setPage(1); }}>
-              <SelectTrigger className="h-9 w-full border-line bg-paper text-ui">
-                <span className="text-muted-ink">Status:</span>&nbsp;<SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Todos</SelectItem>
-                <SelectItem value="PENDENTE">Pendente</SelectItem>
-                <SelectItem value="PAGO">Pago</SelectItem>
-                <SelectItem value="VENCIDO">Vencido</SelectItem>
-                <SelectItem value="FILA_IMPRESSAO">Fila de Impressão</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={canalFilter} onValueChange={(v: any) => { setCanalFilter(v); setPage(1); }}>
-              <SelectTrigger className="h-9 w-full border-line bg-paper text-ui">
-                <span className="text-muted-ink">Canal:</span>&nbsp;<SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Todos</SelectItem>
-                <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                <SelectItem value="email">E-mail</SelectItem>
-                <SelectItem value="impresso">Impresso</SelectItem>
-                <SelectItem value="whatsapp_email">WhatsApp + E-mail</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Mais filtros — faixa de valor + data de pagamento, sem slot no Figma mas
-                continuam funcionais (nada de real foi descartado, ver FiscalTasks.tsx). */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="flex h-9 w-full items-center justify-between gap-1.5 rounded-sm border border-line bg-paper px-3 text-ui text-muted-ink transition-colors hover:bg-bg-2"
+              {(vencimentoStart || vencimentoEnd) && (
+                <Button
+                  variant="ghost" size="sm" className="w-full gap-1.5"
+                  onClick={() => { setVencimentoStart(''); setVencimentoEnd(''); setPage(1); }}
                 >
-                  <span className="flex items-center gap-1.5">
-                    <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
-                    Mais filtros
-                  </span>
-                  {(valorMin || valorMax || pagamentoStart || pagamentoEnd) && (
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-action" />
-                  )}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 space-y-3 p-3" align="start">
-                <div className="space-y-1.5">
-                  <p className="text-xs text-muted-ink px-1">Faixa de valor</p>
-                  <div className="flex items-center gap-1.5">
-                    <Input
-                      type="number" inputMode="decimal" step="0.01"
-                      value={valorMin}
-                      onChange={(e) => { setValorMin(e.target.value); setPage(1); }}
-                      placeholder="Valor mín."
-                      className="h-9 border-line bg-paper text-ui"
-                    />
-                    <span className="text-muted-ink text-sm">–</span>
-                    <Input
-                      type="number" inputMode="decimal" step="0.01"
-                      value={valorMax}
-                      onChange={(e) => { setValorMax(e.target.value); setPage(1); }}
-                      placeholder="Valor máx."
-                      className="h-9 border-line bg-paper text-ui"
-                    />
-                  </div>
+                  <X className="h-3.5 w-3.5" /> Limpar período
+                </Button>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="flex h-8 shrink-0 items-center gap-1.5 rounded-sm border border-line bg-paper px-3 text-ui text-muted-ink transition-colors hover:bg-bg-2"
+              >
+                <span>Pagamento</span>
+                {(pagamentoStart || pagamentoEnd) && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-action" />}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 space-y-3 p-3" align="start">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-ink-2 px-1">De</p>
+                  <DateField value={pagamentoStart} onChange={(v) => { setPagamentoStart(v); setPage(1); }} />
                 </div>
-
-                <div className="space-y-1.5 border-t border-line pt-3">
-                  <p className="text-xs text-muted-ink px-1">Data de pagamento</p>
-                  {/*
-                    Antes: 2 <Calendar> sempre abertos lado a lado num grid de
-                    2 colunas dentro de um Popover de 320px — cada calendário
-                    precisa de ~280px pra caber sem espremer, daí os números
-                    embolados/sobrepostos. Troca pro DateField (texto + ícone
-                    que abre 1 calendário por vez), já o padrão em todo o
-                    resto do sistema (22/08/2026).
-                  */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-ink-2 px-1">De</p>
-                      <DateField
-                        value={pagamentoStart}
-                        onChange={(v) => { setPagamentoStart(v); setPage(1); }}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-ink-2 px-1">Até</p>
-                      <DateField
-                        value={pagamentoEnd}
-                        onChange={(v) => { setPagamentoEnd(v); setPage(1); }}
-                      />
-                    </div>
-                  </div>
-                  {(pagamentoStart || pagamentoEnd) && (
-                    <Button
-                      variant="ghost" size="sm" className="w-full gap-1.5"
-                      onClick={() => { setPagamentoStart(''); setPagamentoEnd(''); setPage(1); }}
-                    >
-                      <X className="h-3.5 w-3.5" /> Limpar período
-                    </Button>
-                  )}
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-ink-2 px-1">Até</p>
+                  <DateField value={pagamentoEnd} onChange={(v) => { setPagamentoEnd(v); setPage(1); }} />
                 </div>
-              </PopoverContent>
-            </Popover>
+              </div>
+              {(pagamentoStart || pagamentoEnd) && (
+                <Button
+                  variant="ghost" size="sm" className="w-full gap-1.5"
+                  onClick={() => { setPagamentoStart(''); setPagamentoEnd(''); setPage(1); }}
+                >
+                  <X className="h-3.5 w-3.5" /> Limpar período
+                </Button>
+              )}
+            </PopoverContent>
+          </Popover>
 
-            {hasExtraFilters && (
-              <Button variant="ghost" size="sm" onClick={clearExtraFilters} className="gap-1.5 text-muted-ink">
-                <X className="h-3.5 w-3.5" /> Limpar filtros
-              </Button>
-            )}
-          </div>
-        </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="flex h-8 shrink-0 items-center gap-1.5 rounded-sm border border-line bg-paper px-3 text-ui text-muted-ink transition-colors hover:bg-bg-2"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.75} />
+                <span>Valor</span>
+                {(valorMin || valorMax) && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-action" />}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 space-y-1.5 p-3" align="start">
+              <p className="text-xs text-muted-ink px-1">Faixa de valor</p>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number" inputMode="decimal" step="0.01"
+                  value={valorMin}
+                  onChange={(e) => { setValorMin(e.target.value); setPage(1); }}
+                  placeholder="Valor mín."
+                  className="h-9 border-line bg-paper text-ui"
+                />
+                <span className="text-muted-ink text-sm">–</span>
+                <Input
+                  type="number" inputMode="decimal" step="0.01"
+                  value={valorMax}
+                  onChange={(e) => { setValorMax(e.target.value); setPage(1); }}
+                  placeholder="Valor máx."
+                  className="h-9 border-line bg-paper text-ui"
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
 
-        {/* Área principal */}
-        <div className="min-w-0 flex-1 space-y-4">
+          {hasExtraFilters && (
+            <Button variant="ghost" size="sm" onClick={clearExtraFilters} className="h-8 gap-1.5 text-muted-ink shrink-0">
+              <X className="h-3.5 w-3.5" /> Limpar filtros
+            </Button>
+          )}
+
           {/* Toggle Lista/Calendário — mesma lógica de src/pages/FiscalTasks.tsx (22/08/2026). */}
-          <div className="flex justify-end">
-            <ToggleGroup
-              type="single"
-              value={viewMode}
-              onValueChange={v => v && setViewMode(v as 'list' | 'calendar')}
-              className="gap-0.5 rounded-md border border-line bg-bg-2 p-1"
-            >
-              <ToggleGroupItem value="list" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Lista">
-                <ListChecks className="h-[15px] w-[15px]" strokeWidth={1.75} />
-              </ToggleGroupItem>
-              <ToggleGroupItem value="calendar" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Calendário">
-                <CalendarDays className="h-[15px] w-[15px]" strokeWidth={1.75} />
-              </ToggleGroupItem>
-            </ToggleGroup>
-          </div>
+          <ToggleGroup
+            type="single"
+            value={viewMode}
+            onValueChange={v => v && setViewMode(v as 'list' | 'calendar')}
+            className="ml-auto gap-0.5 rounded-md border border-line bg-bg-2 p-1"
+          >
+            <ToggleGroupItem value="list" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Lista">
+              <ListChecks className="h-[15px] w-[15px]" strokeWidth={1.75} />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="calendar" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Calendário">
+              <CalendarDays className="h-[15px] w-[15px]" strokeWidth={1.75} />
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
 
           {viewMode === 'calendar' ? (
             <BoletoCalendarView boletos={filtered} isOverdue={isOverdue} onBoletoClick={setDetailsOf} />
@@ -572,7 +565,6 @@ export default function Boletos() {
           </div>
           </>
           )}
-        </div>
       </div>
 
       {/* Dialog: detalhes do boleto */}
