@@ -1031,6 +1031,373 @@ Deno.serve(async (req) => {
       return json(data);
     }
 
+    // ---------------- WEBHOOK_SOLICITACOES (histórico de entregas de um webhook — sucesso/erro
+    // por notificação, pra diagnosticar se o Sicoob tá conseguindo nos avisar) ----------------
+    if (action === "webhook_solicitacoes") {
+      const idWebhook = Number(payload.id_webhook);
+      const dataSolicitacao: string = payload.data_solicitacao || getDataEmissaoISO();
+      if (!idWebhook) return json({ error: "id_webhook é obrigatório" }, 400);
+
+      let token: string;
+      try {
+        token = await getSicoobToken("webhooks_consulta");
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+      // @ts-ignore unstable API
+      const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+      const url = `https://api.sicoob.com.br/cobranca-bancaria/v3/webhooks/${idWebhook}/solicitacoes?dataSolicitacao=${dataSolicitacao}&pagina=1`;
+      const res = await fetch(url, {
+        method: "GET",
+        client,
+        headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Accept": "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return json({ error: extractSicoobError(data, res.status) }, 502);
+      return json(data);
+    }
+
+    // ---------------- WEBHOOK_REATIVAR (reativa um webhook que o Sicoob desativou sozinho —
+    // ex.: depois de falhas repetidas de entrega) ----------------
+    if (action === "webhook_reativar") {
+      const idWebhook = Number(payload.id_webhook);
+      if (!idWebhook) return json({ error: "id_webhook é obrigatório" }, 400);
+
+      let token: string;
+      try {
+        token = await getSicoobToken("webhooks_alteracao");
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+      // @ts-ignore unstable API
+      const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+      const res = await fetch(`https://api.sicoob.com.br/cobranca-bancaria/v3/webhooks/${idWebhook}/reativar`, {
+        method: "PATCH",
+        client,
+        headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Content-Type": "application/json" },
+      });
+      if (res.status !== 204) {
+        const data = await res.json().catch(() => ({}));
+        return json({ error: extractSicoobError(data, res.status) }, 502);
+      }
+      return json({ ok: true });
+    }
+
+    // ---------------- WEBHOOK_HEALTHCHECK (pensado pra rodar 1x/dia via cron: confere se o
+    // webhook de baixa continua ativo no Sicoob e reativa sozinho se não estiver — sem isso, uma
+    // desativação silenciosa faria a baixa em tempo real parar sem ninguém perceber) ----------------
+    if (action === "webhook_healthcheck") {
+      let token: string;
+      try {
+        token = await getSicoobToken("webhooks_consulta webhooks_alteracao");
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+      // @ts-ignore unstable API
+      const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+      const consultaRes = await fetch("https://api.sicoob.com.br/cobranca-bancaria/v3/webhooks?codigoTipoMovimento=7", {
+        method: "GET",
+        client,
+        headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Accept": "application/json" },
+      });
+      const consultaData = await consultaRes.json().catch(() => ({}));
+      if (!consultaRes.ok) return json({ error: extractSicoobError(consultaData, consultaRes.status) }, 502);
+
+      const webhooks = Array.isArray(consultaData?.resultado) ? consultaData.resultado : [];
+      const webhook = webhooks[0];
+      if (!webhook) return json({ status: "sem_webhook_cadastrado" });
+
+      // Heurística: só reativa quando a descrição não indica sucesso — não sabemos de antemão
+      // todos os códigos possíveis de codigoSituacao (docs não listam), então não arriscamos
+      // interpretar um código específico como "ativo".
+      const situacaoOk = String(webhook.descricaoSituacao || "").toLowerCase().includes("sucesso");
+      if (situacaoOk) {
+        return json({ status: "ativo", descricaoSituacao: webhook.descricaoSituacao, idWebhook: webhook.idWebhook });
+      }
+
+      const reativarRes = await fetch(`https://api.sicoob.com.br/cobranca-bancaria/v3/webhooks/${webhook.idWebhook}/reativar`, {
+        method: "PATCH",
+        client,
+        headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Content-Type": "application/json" },
+      });
+      const reativado = reativarRes.status === 204;
+
+      // global_logs exige user_id (not null, FK de usuário real) — não cabe um evento de cron
+      // sem usuário logado. Fica só no log da function mesmo (query_logs no Supabase consulta
+      // isso se precisar investigar); o retorno do healthcheck já reporta o estado.
+      console.log(
+        reativado
+          ? `Webhook Sicoob estava inativo (${webhook.descricaoSituacao}) — reativado automaticamente.`
+          : `Webhook Sicoob inativo (${webhook.descricaoSituacao}) — tentativa de reativação falhou, precisa de atenção manual.`,
+        { idWebhook: webhook.idWebhook },
+      );
+
+      return json({ status: reativado ? "reativado" : "falha_ao_reativar", descricaoSituacao: webhook.descricaoSituacao, idWebhook: webhook.idWebhook });
+    }
+
+    // ---------------- HEALTH (disponibilidade da API — usado como preflight antes de rodar lote,
+    // pra dar um erro claro em vez de uma parede de falhas por timeout) ----------------
+    if (action === "health") {
+      try {
+        const token = await getSicoobToken();
+        // @ts-ignore unstable API
+        const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+        const res = await fetch("https://api.sicoob.com.br/cobranca-bancaria/v3/health", {
+          method: "GET",
+          client,
+          headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID },
+        });
+        return json({ ok: res.ok, status: res.status });
+      } catch (e) {
+        return json({ ok: false, error: String((e as Error).message || e) });
+      }
+    }
+
+    // ---------------- ATUALIZAR_PAGADOR (sincroniza o cadastro do pagador no Sicoob com o que
+    // está em contacts hoje — PUT /pagadores usa o mesmo mapeamento de campos já usado na criação
+    // de boleto) ----------------
+    if (action === "atualizar_pagador") {
+      const contactId: string = payload.contact_id;
+      const c = (contatos || []).find((x: any) => x.id === contactId);
+      if (!c) return json({ error: "Cliente não encontrado ou inativo" }, 404);
+      const faltando = missingFields(c);
+      if (faltando.length) return json({ error: `Dados incompletos: ${faltando.join(", ")}` }, 400);
+
+      let token: string;
+      try {
+        token = await getSicoobToken("boletos_alteracao");
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+      // @ts-ignore unstable API
+      const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+      const res = await fetch("https://api.sicoob.com.br/cobranca-bancaria/v3/pagadores", {
+        method: "PUT",
+        client,
+        headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          numeroCliente: NUMERO_CLIENTE,
+          numeroCpfCnpj: (c.document || "").replace(/\D/g, ""),
+          nome: c.name,
+          endereco: `${c.address}, ${c.address_number}`,
+          bairro: c.neighborhood,
+          cidade: c.city,
+          uf: c.state,
+          cep: (c.cep || "").replace(/\D/g, ""),
+          email: c.email_cobranca || c.email,
+        }),
+      });
+      if (res.status !== 204) {
+        const data = await res.json().catch(() => ({}));
+        return json({ error: extractSicoobError(data, res.status) }, 502);
+      }
+      return json({ ok: true, name: c.name });
+    }
+
+    // ---------------- ALTERAR_BOLETO (PATCH /boletos/{nossoNumero} — só 1 objeto de alteração
+    // por chamada, por isso o action aceita só "campo": 'prorrogacaoVencimento' | 'valorNominal') ----------------
+    if (action === "alterar_boleto") {
+      const nossoNumero = Number(payload.nosso_numero);
+      const campo: string = payload.campo;
+      if (!nossoNumero || !["prorrogacaoVencimento", "valorNominal"].includes(campo)) {
+        return json({ error: "nosso_numero e campo (prorrogacaoVencimento|valorNominal) são obrigatórios" }, 400);
+      }
+
+      let alteracao: Record<string, unknown>;
+      let localUpdate: Record<string, unknown>;
+      if (campo === "prorrogacaoVencimento") {
+        const novaData: string = payload.data_vencimento;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(novaData || "")) return json({ error: "data_vencimento inválida" }, 400);
+        alteracao = { prorrogacaoVencimento: { dataVencimento: novaData } };
+        localUpdate = { data_vencimento: novaData };
+      } else {
+        const novoValor = Number(payload.valor);
+        if (!Number.isFinite(novoValor) || novoValor <= 0) return json({ error: "valor inválido" }, 400);
+        alteracao = { valorNominal: { valor: novoValor } };
+        localUpdate = { valor: novoValor };
+      }
+
+      let token: string;
+      try {
+        token = await getSicoobToken("boletos_alteracao");
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+      // @ts-ignore unstable API
+      const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+      const res = await fetch(`https://api.sicoob.com.br/cobranca-bancaria/v3/boletos/${nossoNumero}`, {
+        method: "PATCH",
+        client,
+        headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Content-Type": "application/json" },
+        body: JSON.stringify({ numeroCliente: NUMERO_CLIENTE, codigoModalidade: 1, ...alteracao }),
+      });
+      if (res.status !== 204) {
+        const data = await res.json().catch(() => ({}));
+        return json({ error: extractSicoobError(data, res.status) }, 502);
+      }
+
+      const { error: updErr } = await supabase
+        .from("boleto_controls")
+        .update(localUpdate)
+        .eq("company_id", COMPANY_ID)
+        .eq("nosso_numero", nossoNumero);
+      if (updErr) return json({ error: `Alterado no Sicoob mas falhou ao atualizar localmente: ${updErr.message}` }, 500);
+      return json({ ok: true });
+    }
+
+    // ---------------- BAIXAR_MANUAL (POST /boletos/{nossoNumero}/baixar — comanda no Sicoob o
+    // cancelamento de um boleto PENDENTE pago por fora da rede bancária, ex. Pix direto/dinheiro.
+    // Só cancela no Sicoob; quem grava valor_pago/liquida o lançamento é o caller, depois do ok) ----------------
+    if (action === "baixar_manual") {
+      const nossoNumero = Number(payload.nosso_numero);
+      if (!nossoNumero) return json({ error: "nosso_numero inválido" }, 400);
+
+      let token: string;
+      try {
+        token = await getSicoobToken("boletos_alteracao");
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+      // @ts-ignore unstable API
+      const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+      const res = await fetch(`https://api.sicoob.com.br/cobranca-bancaria/v3/boletos/${nossoNumero}/baixar`, {
+        method: "POST",
+        client,
+        headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Content-Type": "application/json" },
+        body: JSON.stringify({ numeroCliente: NUMERO_CLIENTE, codigoModalidade: 1 }),
+      });
+      if (res.status !== 204) {
+        const data = await res.json().catch(() => ({}));
+        return json({ error: extractSicoobError(data, res.status) }, 502);
+      }
+      return json({ ok: true });
+    }
+
+    // ---------------- MOVIMENTACAO_SYNC (relatório em lote da carteira — POST solicitar → GET
+    // status (com espera curta) → GET download → decodifica e atualiza boleto_controls. Só
+    // enriquece leitura (valor_pago/data_pagamento/status), nunca toca lançamento — mesma regra
+    // do webhook. Período máximo de 2 dias por chamada, limite real da API Sicoob.) ----------------
+    if (action === "movimentacao_sync") {
+      const dataInicial: string = payload.data_inicial;
+      const dataFinal: string = payload.data_final;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dataInicial || "") || !/^\d{4}-\d{2}-\d{2}$/.test(dataFinal || "")) {
+        return json({ error: "data_inicial e data_final (YYYY-MM-DD) são obrigatórias" }, 400);
+      }
+
+      let token: string;
+      try {
+        token = await getSicoobToken("boletos_consulta");
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+      // @ts-ignore unstable API
+      const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+      const authHeaders = { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Content-Type": "application/json", "Accept": "application/json" };
+
+      // 5 = Liquidação (só o que interessa pra preencher valor_pago/data_pagamento).
+      const solicitarRes = await fetch("https://api.sicoob.com.br/cobranca-bancaria/v3/boletos/movimentacoes", {
+        method: "POST",
+        client,
+        headers: authHeaders,
+        body: JSON.stringify({ numeroCliente: NUMERO_CLIENTE, tipoMovimento: 5, dataInicial, dataFinal }),
+      });
+      const solicitarData = await solicitarRes.json().catch(() => ({}));
+      if (!solicitarRes.ok) return json({ error: extractSicoobError(solicitarData, solicitarRes.status) }, 502);
+      const codigoSolicitacao = solicitarData?.resultado?.codigoSolicitacao;
+      if (!codigoSolicitacao) return json({ error: "Sicoob não retornou código da solicitação" }, 502);
+
+      // Processamento é assíncrono do lado do Sicoob — poll com espera curta dentro do mesmo
+      // request (docs não informam SLA; desiste depois de ~24s pra não estourar o timeout da
+      // function e devolve status "processando" pro caller tentar de novo mais tarde).
+      let idArquivos: number[] = [];
+      let processado = false;
+      for (let tentativa = 0; tentativa < 8; tentativa++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const statusUrl = `https://api.sicoob.com.br/cobranca-bancaria/v3/boletos/movimentacoes?numeroCliente=${NUMERO_CLIENTE}&codigoSolicitacao=${codigoSolicitacao}`;
+        const statusRes = await fetch(statusUrl, { method: "GET", client, headers: authHeaders });
+        if (statusRes.status === 204) {
+          processado = true; // processado, sem movimentação nenhuma no período
+          break;
+        }
+        if (statusRes.ok) {
+          const statusData = await statusRes.json().catch(() => ({}));
+          if (Array.isArray(statusData?.resultado?.idArquivos) && statusData.resultado.idArquivos.length) {
+            idArquivos = statusData.resultado.idArquivos;
+            processado = true;
+            break;
+          }
+        }
+        // status != 200/204 com corpo de arquivos ainda = segue tentando.
+      }
+      if (!processado) {
+        return json({ status: "processando", codigo_solicitacao: codigoSolicitacao, message: "Sicoob ainda processando — tente de novo em instantes com este código." });
+      }
+      if (!idArquivos.length) {
+        return json({ status: "ok", registros_encontrados: 0, atualizados: 0, nao_reconhecidos: 0 });
+      }
+
+      // Schema exato do arquivo decodificado não é documentado publicamente (só "JSON" é citado
+      // na prosa) — tenta várias chaves plausíveis por campo em vez de travar num nome só, e
+      // conta como "não reconhecido" (sem gravar nada) qualquer registro que não bata em nenhuma.
+      // Segurança por design: na dúvida, não escreve — nunca grava valor/data errados.
+      let registrosEncontrados = 0;
+      let atualizados = 0;
+      let naoReconhecidos = 0;
+      const amostraNaoReconhecida: unknown[] = [];
+
+      for (const idArquivo of idArquivos) {
+        const downloadUrl = `https://api.sicoob.com.br/cobranca-bancaria/v3/boletos/movimentacoes/download?numeroCliente=${NUMERO_CLIENTE}&codigoSolicitacao=${codigoSolicitacao}&idArquivo=${idArquivo}`;
+        const downloadRes = await fetch(downloadUrl, { method: "GET", client, headers: authHeaders });
+        if (!downloadRes.ok) continue;
+        const downloadData = await downloadRes.json().catch(() => ({}));
+        const b64: string | undefined = downloadData?.resultado?.arquivo;
+        if (!b64) continue;
+
+        let registros: any[] = [];
+        try {
+          const texto = new TextDecoder().decode(Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0)));
+          const parsed = JSON.parse(texto);
+          registros = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.registros) ? parsed.registros : Array.isArray(parsed?.resultado) ? parsed.resultado : []);
+        } catch {
+          continue; // arquivo não é JSON puro (ex. zip) — precisa de ajuste depois de ver um caso real
+        }
+
+        for (const r of registros) {
+          registrosEncontrados++;
+          const dados = r?.dados ?? r; // pode vir plano ou aninhado em "dados", igual ao webhook
+          const nn = Number(dados?.nossoNumero);
+          const valorPago = dados?.valorPagamento ?? dados?.valorLiquidacao ?? dados?.valorRecebido ?? dados?.valor;
+          const dataPagRaw = dados?.dataHoraSituacaoBaixa ?? dados?.dataLiquidacao ?? dados?.dataPagamento ?? dados?.dataMovimento;
+          if (!nn || valorPago == null || !dataPagRaw) {
+            naoReconhecidos++;
+            if (amostraNaoReconhecida.length < 3) amostraNaoReconhecida.push(r);
+            continue;
+          }
+          const { data: updRows, error } = await supabase
+            .from("boleto_controls")
+            .update({
+              status: "PAGO",
+              valor_pago: Number(valorPago),
+              data_pagamento: String(dataPagRaw).slice(0, 10),
+              origem_baixa: "movimentacao_lote",
+              sicoob_response: dados,
+            })
+            .eq("company_id", COMPANY_ID)
+            .eq("nosso_numero", nn)
+            .select("id");
+          if (!error && updRows && updRows.length) atualizados++;
+        }
+      }
+
+      return json({
+        status: "ok",
+        registros_encontrados: registrosEncontrados,
+        atualizados,
+        nao_reconhecidos: naoReconhecidos,
+        amostra_nao_reconhecida: naoReconhecidos > 0 ? amostraNaoReconhecida : undefined,
+      });
+    }
+
     return json({ error: "action inválido" }, 400);
   } catch (e) {
     return json({ error: String((e as Error).message || e) }, 500);

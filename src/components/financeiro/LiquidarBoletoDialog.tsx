@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -13,15 +13,21 @@ import { DsBadge, DateField } from '@/components/ds';
 import { useToast } from '@/hooks/use-toast';
 import type { BoletoWithContact, LancamentoCandidato } from '@/hooks/useBoletoControls';
 
+type LiquidarMutation = {
+  mutateAsync: (params: { boleto: BoletoWithContact; transactionId: string; valorPago: number; dataPagamento: string }) => Promise<void>;
+  isPending: boolean;
+};
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   boleto: BoletoWithContact | null;
   fetchLancamentosAbertos: (contactId: string) => Promise<LancamentoCandidato[]>;
-  liquidarBoleto: {
-    mutateAsync: (params: { boleto: BoletoWithContact; transactionId: string; valorPago: number; dataPagamento: string }) => Promise<void>;
-    isPending: boolean;
-  };
+  liquidarBoleto: LiquidarMutation;
+  // 'baixar' = boleto PENDENTE que o cliente pagou por fora (Pix direto, dinheiro): comanda a
+  // baixa no Sicoob antes de liquidar o lançamento. Passa `darBaixaManual` como `liquidarBoleto`
+  // nesse modo — mesma assinatura, o dialog não muda de mutation em si, só o texto/aviso.
+  mode?: 'liquidar' | 'baixar';
 }
 
 const fmtBRL = (n: number | null) =>
@@ -34,7 +40,7 @@ const fmtDate = (s: string | null) => {
 
 const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
 
-export function LiquidarBoletoDialog({ open, onOpenChange, boleto, fetchLancamentosAbertos, liquidarBoleto }: Props) {
+export function LiquidarBoletoDialog({ open, onOpenChange, boleto, fetchLancamentosAbertos, liquidarBoleto, mode = 'liquidar' }: Props) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [candidatos, setCandidatos] = useState<LancamentoCandidato[]>([]);
@@ -86,13 +92,24 @@ export function LiquidarBoletoDialog({ open, onOpenChange, boleto, fetchLancamen
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Liquidar boleto</DialogTitle>
+          <DialogTitle>{mode === 'baixar' ? 'Dar baixa (pago por fora)' : 'Liquidar boleto'}</DialogTitle>
           <DialogDescription>
             {boleto.contact_name} · vencimento {fmtDate(boleto.data_vencimento)}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
+          {mode === 'baixar' && (
+            <div className="flex items-start gap-2 text-xs text-warn bg-warn/10 border border-warn/30 rounded-md p-2.5">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>
+                Isso comanda o cancelamento deste boleto direto no Sicoob — ele para de ser cobrável pela
+                rede bancária (se o cliente tentar pagar por lá depois, vai dar erro). Use só quando o
+                pagamento já aconteceu por outro canal.
+              </span>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="liquidar-valor">Valor recebido</Label>
@@ -153,9 +170,9 @@ export function LiquidarBoletoDialog({ open, onOpenChange, boleto, fetchLancamen
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleConfirm} disabled={!canConfirm || liquidarBoleto.isPending}>
+          <Button onClick={handleConfirm} disabled={!canConfirm || liquidarBoleto.isPending} variant={mode === 'baixar' ? 'destructive' : 'default'}>
             {liquidarBoleto.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
-            Liquidar lançamento
+            {mode === 'baixar' ? 'Dar baixa e liquidar' : 'Liquidar lançamento'}
           </Button>
         </DialogFooter>
       </DialogContent>

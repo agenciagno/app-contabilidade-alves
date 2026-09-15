@@ -280,54 +280,179 @@ export function useBoletoControls(vencimentoMonth: string) {
     }));
   };
 
-  // Liquida o lançamento escolhido com os dados do boleto pago e grava o vínculo — um único
+  // Núcleo comum a "Liquidar" (boleto já PAGO no Sicoob) e "Dar baixa" (boleto PENDENTE pago por
+  // fora — ver darBaixaManual): liga o lançamento ao boleto e liquida a transação. Um único
   // UPDATE em transactions (is_paid, paid_amount, date, bank_id) + o transaction_id no boleto.
   // `is_paid: false` no filtro do UPDATE garante que nunca sobrescreve um lançamento que alguém
   // já liquidou por fora entre a busca e a confirmação (a mesma trava que protege lançamentos
   // liquidados manualmente no passado — exigência do Gabriel, 15/09/2026).
+  const liquidarLancamento = async (params: { boleto: BoletoWithContact; transactionId: string; valorPago: number; dataPagamento: string }) => {
+    const { boleto, transactionId, valorPago, dataPagamento } = params;
+    const { data: updatedRows, error: txnErr } = await supabase
+      .from('transactions')
+      .update({ is_paid: true, paid_amount: valorPago, date: dataPagamento, bank_id: SICOOB_BANK_ID })
+      .eq('id', transactionId)
+      .eq('is_paid', false)
+      .select('id');
+    if (txnErr) throw txnErr;
+    if (!updatedRows || updatedRows.length === 0) {
+      throw new Error('Este lançamento já foi liquidado por outra via — atualize a tela e confira.');
+    }
+
+    const { error: boletoErr } = await (supabase as any)
+      .from('boleto_controls')
+      .update({ transaction_id: transactionId })
+      .eq('id', boleto.id);
+    if (boletoErr) throw boletoErr;
+
+    await createGlobalLog({
+      action: 'ALTERACAO',
+      module: 'FINANCEIRO',
+      entityId: transactionId,
+      entityName: boleto.contact_name,
+      details: `Liquidado via boleto Sicoob (nosso número ${boleto.nosso_numero ?? '—'}) — valor pago ${valorPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, pagamento em ${dataPagamento}.`,
+    });
+  };
+
+  const invalidateAposLiquidar = () => {
+    queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2'] });
+    queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    queryClient.invalidateQueries({ queryKey: ['server-transactions'] });
+    queryClient.invalidateQueries({ queryKey: ['transaction-kpis'] });
+    queryClient.invalidateQueries({ queryKey: ['banks'] });
+    queryClient.invalidateQueries({ queryKey: ['dre-previsto'] });
+    queryClient.invalidateQueries({ queryKey: ['dre-realizado'] });
+    queryClient.invalidateQueries({ queryKey: ['global-logs'] });
+  };
+
   const liquidarBoleto = useMutation({
-    mutationFn: async (params: { boleto: BoletoWithContact; transactionId: string; valorPago: number; dataPagamento: string }) => {
-      const { boleto, transactionId, valorPago, dataPagamento } = params;
-      const { data: updatedRows, error: txnErr } = await supabase
-        .from('transactions')
-        .update({ is_paid: true, paid_amount: valorPago, date: dataPagamento, bank_id: SICOOB_BANK_ID })
-        .eq('id', transactionId)
-        .eq('is_paid', false)
-        .select('id');
-      if (txnErr) throw txnErr;
-      if (!updatedRows || updatedRows.length === 0) {
-        throw new Error('Este lançamento já foi liquidado por outra via — atualize a tela e confira.');
-      }
-
-      const { error: boletoErr } = await (supabase as any)
-        .from('boleto_controls')
-        .update({ transaction_id: transactionId })
-        .eq('id', boleto.id);
-      if (boletoErr) throw boletoErr;
-
-      await createGlobalLog({
-        action: 'ALTERACAO',
-        module: 'FINANCEIRO',
-        entityId: transactionId,
-        entityName: boleto.contact_name,
-        details: `Liquidado via boleto Sicoob (nosso número ${boleto.nosso_numero ?? '—'}) — valor pago ${valorPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, pagamento em ${dataPagamento}.`,
-      });
-    },
+    mutationFn: liquidarLancamento,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2'] });
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['server-transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['transaction-kpis'] });
-      queryClient.invalidateQueries({ queryKey: ['banks'] });
-      queryClient.invalidateQueries({ queryKey: ['dre-previsto'] });
-      queryClient.invalidateQueries({ queryKey: ['dre-realizado'] });
-      queryClient.invalidateQueries({ queryKey: ['global-logs'] });
+      invalidateAposLiquidar();
       toast({ title: 'Lançamento liquidado' });
     },
     onError: (e: Error) => {
       toast({ title: 'Erro ao liquidar', description: e.message, variant: 'destructive' });
     },
   });
+
+  // Dar baixa manual: pro boleto PENDENTE que o cliente pagou por fora (Pix direto, dinheiro).
+  // 1) comanda a baixa no Sicoob (cancela o boleto na rede bancária — POST /baixar);
+  // 2) marca o boleto localmente como CANCELADO com os dados do pagamento informado;
+  // 3) liquida o lançamento vinculado, reaproveitando o mesmo núcleo do "Liquidar".
+  // Só entra aqui boleto com liquidacao_habilitada=true (mesma regra do botão Liquidar).
+  const darBaixaManual = useMutation({
+    mutationFn: async (params: { boleto: BoletoWithContact; transactionId: string; valorPago: number; dataPagamento: string }) => {
+      const { boleto, transactionId, valorPago, dataPagamento } = params;
+      const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
+        body: { action: 'baixar_manual', nosso_numero: boleto.nosso_numero },
+      });
+      if (error) throw new Error(error.message || 'Falha ao dar baixa no Sicoob');
+      if ((data as any)?.error) throw new Error((data as any).error);
+
+      const { error: boletoErr } = await (supabase as any)
+        .from('boleto_controls')
+        .update({ status: 'CANCELADO', valor_pago: valorPago, data_pagamento: dataPagamento, origem_baixa: 'manual' })
+        .eq('id', boleto.id);
+      if (boletoErr) throw boletoErr;
+
+      await liquidarLancamento({ boleto, transactionId, valorPago, dataPagamento });
+    },
+    onSuccess: () => {
+      invalidateAposLiquidar();
+      toast({ title: 'Baixa registrada', description: 'Boleto cancelado no Sicoob e lançamento liquidado.' });
+    },
+    onError: (e: Error) => {
+      toast({ title: 'Erro ao dar baixa', description: e.message, variant: 'destructive' });
+    },
+  });
+
+  // Prorroga vencimento ou altera o valor de um boleto PENDENTE (PATCH /boletos/{nossoNumero} —
+  // só aceita 1 objeto de alteração por chamada, por isso os 2 campos são mutuamente exclusivos).
+  const alterarBoleto = useMutation({
+    mutationFn: async (params: { boleto: BoletoWithContact; campo: 'prorrogacaoVencimento'; dataVencimento: string } | { boleto: BoletoWithContact; campo: 'valorNominal'; valor: number }) => {
+      const body: Record<string, unknown> = { action: 'alterar_boleto', nosso_numero: params.boleto.nosso_numero, campo: params.campo };
+      if (params.campo === 'prorrogacaoVencimento') body.data_vencimento = params.dataVencimento;
+      else body.valor = params.valor;
+      const { data, error } = await supabase.functions.invoke('sicoob-boletos', { body });
+      if (error) throw new Error(error.message || 'Falha ao alterar boleto');
+      if ((data as any)?.error) throw new Error((data as any).error);
+
+      await createGlobalLog({
+        action: 'ALTERACAO',
+        module: 'FINANCEIRO',
+        entityId: params.boleto.id,
+        entityName: params.boleto.contact_name,
+        details: params.campo === 'prorrogacaoVencimento'
+          ? `Vencimento do boleto Sicoob (nosso número ${params.boleto.nosso_numero ?? '—'}) prorrogado pra ${params.dataVencimento}.`
+          : `Valor do boleto Sicoob (nosso número ${params.boleto.nosso_numero ?? '—'}) alterado pra ${params.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}.`,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2'] });
+      queryClient.invalidateQueries({ queryKey: ['global-logs'] });
+      toast({ title: 'Boleto alterado no Sicoob' });
+    },
+    onError: (e: Error) => {
+      toast({ title: 'Erro ao alterar boleto', description: e.message, variant: 'destructive' });
+    },
+  });
+
+  // Sincroniza o cadastro do pagador no Sicoob com os dados atuais do contato (PUT /pagadores).
+  const atualizarPagador = useMutation({
+    mutationFn: async (contactId: string) => {
+      const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
+        body: { action: 'atualizar_pagador', contact_id: contactId },
+      });
+      if (error) throw new Error(error.message || 'Falha ao sincronizar cadastro');
+      if ((data as any)?.error) throw new Error((data as any).error);
+    },
+    onSuccess: () => toast({ title: 'Cadastro sincronizado no Sicoob' }),
+    onError: (e: Error) => {
+      toast({ title: 'Erro ao sincronizar cadastro', description: e.message, variant: 'destructive' });
+    },
+  });
+
+  // Busca em lote (Movimentação, tipoMovimento=5 Liquidação) — reforço/backfill pro webhook:
+  // preenche valor_pago/data_pagamento em boletos já PAGO que não vieram por ele (ex. os 230
+  // boletos anteriores a 15/09, ou uma notificação que o webhook perdeu). Só leitura em
+  // boleto_controls, nunca toca lançamento — por isso não tem gate de liquidacao_habilitada.
+  // Período máximo de 2 dias por chamada (limite real da API Sicoob).
+  const movimentacaoSync = useMutation({
+    mutationFn: async (params: { dataInicial: string; dataFinal: string }) => {
+      const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
+        body: { action: 'movimentacao_sync', data_inicial: params.dataInicial, data_final: params.dataFinal },
+      });
+      if (error) throw new Error(error.message || 'Falha na sincronização em lote');
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data as { status: string; registros_encontrados?: number; atualizados?: number; nao_reconhecidos?: number; message?: string };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2'] });
+      if (data.status === 'processando') {
+        toast({ title: 'Sicoob ainda processando', description: data.message });
+        return;
+      }
+      toast({
+        title: `${data.atualizados ?? 0} boleto(s) atualizado(s)`,
+        description: `${data.registros_encontrados ?? 0} registro(s) no período${(data.nao_reconhecidos ?? 0) > 0 ? ` · ${data.nao_reconhecidos} não reconhecido(s)` : ''}.`,
+      });
+    },
+    onError: (e: Error) => {
+      toast({ title: 'Erro na sincronização em lote', description: e.message, variant: 'destructive' });
+    },
+  });
+
+  // Preflight de disponibilidade do Sicoob — usado antes do "Atualizar" pra dar um erro claro em
+  // vez de uma parede de falhas por timeout quando o Sicoob está fora do ar.
+  const checkSicoobHealth = async (): Promise<boolean> => {
+    try {
+      const { data } = await supabase.functions.invoke('sicoob-boletos', { body: { action: 'health' } });
+      return !!(data as any)?.ok;
+    } catch {
+      return true; // falha na própria checagem não deve bloquear a tentativa real
+    }
+  };
 
   // 7. Baixar o PDF do boleto (signed URL do bucket privado).
   const downloadBoletoPdf = async (boleto: BoletoWithContact) => {
@@ -356,5 +481,10 @@ export function useBoletoControls(vencimentoMonth: string) {
     downloadBoletoPdf,
     fetchLancamentosAbertos,
     liquidarBoleto,
+    darBaixaManual,
+    alterarBoleto,
+    atualizarPagador,
+    movimentacaoSync,
+    checkSicoobHealth,
   };
 }

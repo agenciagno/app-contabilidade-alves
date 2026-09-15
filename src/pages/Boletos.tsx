@@ -6,6 +6,7 @@ import {
   AlertCircle, Plus,
   FileX, MoreHorizontal, Eye, Send, CheckSquare, Download, Loader2,
   X, Copy, SlidersHorizontal, ListChecks, CalendarDays, HandCoins,
+  CalendarClock, PenLine, RefreshCw, History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,6 +32,8 @@ import { IndividualBoletoDialog } from '@/components/financeiro/IndividualBoleto
 import { BoletoCalendarView } from '@/components/financeiro/BoletoCalendarView';
 import { NotificarCobrancaDialog } from '@/components/financeiro/NotificarCobrancaDialog';
 import { LiquidarBoletoDialog } from '@/components/financeiro/LiquidarBoletoDialog';
+import { AlterarBoletoDialog } from '@/components/financeiro/AlterarBoletoDialog';
+import { MovimentacaoSyncDialog } from '@/components/financeiro/MovimentacaoSyncDialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +43,10 @@ const fmtBRL = (n: number | null) =>
 const fmtDate = (s: string | null) => {
   if (!s) return '—';
   try { return format(parseISO(s), 'dd/MM/yyyy'); } catch { return '—'; }
+};
+
+const CANAL_LABEL: Record<string, string> = {
+  whatsapp: 'WhatsApp', email: 'E-mail', impresso: 'Impresso', whatsapp_email: 'WhatsApp + E-mail',
 };
 
 const PAGE_SIZE = 20;
@@ -91,6 +98,9 @@ export default function Boletos() {
   const [detailsOf, setDetailsOf] = useState<BoletoWithContact | null>(null);
   const [cobrancaOf, setCobrancaOf] = useState<BoletoWithContact | null>(null);
   const [liquidarOf, setLiquidarOf] = useState<BoletoWithContact | null>(null);
+  const [baixarOf, setBaixarOf] = useState<BoletoWithContact | null>(null);
+  const [alterarOf, setAlterarOf] = useState<{ boleto: BoletoWithContact; campo: 'prorrogacaoVencimento' | 'valorNominal' } | null>(null);
+  const [movimentacaoOpen, setMovimentacaoOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [singleOpen, setSingleOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -100,10 +110,16 @@ export default function Boletos() {
   const {
     boletoList, isLoading, markAsPrinted, fetchPreview, generateBoletos,
     generateSingleBoleto, listSyncContacts, findOrphanBoletos, downloadBoletoPdf,
-    fetchLancamentosAbertos, liquidarBoleto,
+    fetchLancamentosAbertos, liquidarBoleto, darBaixaManual, alterarBoleto,
+    atualizarPagador, movimentacaoSync, checkSicoobHealth,
   } = useBoletoControls(vencimentoMonth);
 
   const handleSync = async () => {
+    const healthy = await checkSicoobHealth();
+    if (!healthy) {
+      toast({ title: 'Sicoob indisponível no momento', description: 'A API do Sicoob não respondeu ao teste de disponibilidade — tente de novo em alguns minutos.', variant: 'destructive' });
+      return;
+    }
     setSyncing(true);
     setSyncProgress({ done: 0, total: 0 });
     try {
@@ -201,6 +217,12 @@ export default function Boletos() {
             <Button variant="outline" onClick={handleSync} disabled={syncing}>
               {syncing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {syncing ? `Sincronizando… ${syncProgress.done}/${syncProgress.total || '…'}` : 'Atualizar'}
+            </Button>
+            {/* Reforço/backfill pro webhook — busca direto na Movimentação do Sicoob, período
+                curto (máx. 2 dias), não substitui o "Atualizar" (que varre por cliente). */}
+            <Button variant="outline" className="gap-1.5" onClick={() => setMovimentacaoOpen(true)}>
+              <History className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Histórico Sicoob
             </Button>
             <Button variant="outline" onClick={() => setSingleOpen(true)}>
               Boleto avulso
@@ -445,6 +467,10 @@ export default function Boletos() {
                     // Só oferece liquidar pra boleto pago a partir de quando esse fluxo passou a
                     // existir (liquidacao_habilitada) e que ainda não foi vinculado a um lançamento.
                     const canLiquidar = b.status === 'PAGO' && b.liquidacao_habilitada && !b.transaction_id;
+                    // Mesma regra de elegibilidade do Liquidar, mas pro caso do cliente ter pago
+                    // por fora (Pix direto, dinheiro) — só faz sentido pra boleto ainda PENDENTE.
+                    const canBaixarManual = b.status === 'PENDENTE' && b.liquidacao_habilitada;
+                    const canAlterar = b.status === 'PENDENTE';
                     return (
                       <TableRow key={b.id}>
                         <TableCell className="font-medium">
@@ -496,6 +522,27 @@ export default function Boletos() {
                                   <HandCoins className="h-4 w-4 mr-2" /> Liquidar
                                 </DropdownMenuItem>
                               )}
+                              {canBaixarManual && (
+                                <DropdownMenuItem onClick={() => setBaixarOf(b)}>
+                                  <HandCoins className="h-4 w-4 mr-2" /> Dar baixa (pago por fora)
+                                </DropdownMenuItem>
+                              )}
+                              {canAlterar && (
+                                <DropdownMenuItem onClick={() => setAlterarOf({ boleto: b, campo: 'prorrogacaoVencimento' })}>
+                                  <CalendarClock className="h-4 w-4 mr-2" /> Prorrogar vencimento
+                                </DropdownMenuItem>
+                              )}
+                              {canAlterar && (
+                                <DropdownMenuItem onClick={() => setAlterarOf({ boleto: b, campo: 'valorNominal' })}>
+                                  <PenLine className="h-4 w-4 mr-2" /> Alterar valor
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                onClick={() => atualizarPagador.mutate(b.contact_id)}
+                                disabled={atualizarPagador.isPending}
+                              >
+                                <RefreshCw className="h-4 w-4 mr-2" /> Sincronizar cadastro no Sicoob
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -537,6 +584,19 @@ export default function Boletos() {
           </DialogHeader>
           {detailsOf && (
             <div className="space-y-3 text-sm">
+              {/* Resumo — mesmos campos já visíveis na tabela, faltavam aqui (pedido de Gabriel,
+                  15/09/2026): valor, vencimento, status, data de pagamento e valor pago. */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <Field label="Valor" value={fmtBRL(detailsOf.valor)} />
+                <Field label="Vencimento" value={fmtDate(detailsOf.data_vencimento)} />
+                <div>
+                  <p className="text-muted-foreground text-xs mb-1">Status</p>
+                  <StatusBadge b={detailsOf} />
+                </div>
+                <Field label="Data de pagamento" value={fmtDate(detailsOf.data_pagamento)} />
+                <Field label="Valor pago" value={fmtBRL(detailsOf.valor_pago)} />
+                <Field label="Canal de entrega" value={detailsOf.canal_entrega ? (CANAL_LABEL[detailsOf.canal_entrega] ?? detailsOf.canal_entrega) : null} />
+              </div>
               <Field label="Linha digitável" value={detailsOf.linha_digitavel} mono />
               <Field label="Código de barras" value={detailsOf.codigo_barras} mono />
               <div className="grid grid-cols-2 gap-3">
@@ -620,6 +680,32 @@ export default function Boletos() {
         boleto={liquidarOf}
         fetchLancamentosAbertos={fetchLancamentosAbertos}
         liquidarBoleto={liquidarBoleto}
+      />
+
+      {/* Dialog: dar baixa manual (boleto PENDENTE pago por fora — cancela no Sicoob + liquida) */}
+      <LiquidarBoletoDialog
+        open={!!baixarOf}
+        onOpenChange={(o) => !o && setBaixarOf(null)}
+        boleto={baixarOf}
+        fetchLancamentosAbertos={fetchLancamentosAbertos}
+        liquidarBoleto={darBaixaManual}
+        mode="baixar"
+      />
+
+      {/* Dialog: prorrogar vencimento / alterar valor (PATCH direto no Sicoob) */}
+      <AlterarBoletoDialog
+        open={!!alterarOf}
+        onOpenChange={(o) => !o && setAlterarOf(null)}
+        boleto={alterarOf?.boleto ?? null}
+        campo={alterarOf?.campo ?? 'prorrogacaoVencimento'}
+        alterarBoleto={alterarBoleto}
+      />
+
+      {/* Dialog: buscar histórico de pagamento em lote (Movimentação Sicoob) */}
+      <MovimentacaoSyncDialog
+        open={movimentacaoOpen}
+        onOpenChange={setMovimentacaoOpen}
+        movimentacaoSync={movimentacaoSync}
       />
     </div>
   );
