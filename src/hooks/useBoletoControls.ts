@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getContactLegalName } from '@/lib/contact-display';
+import { updateTransactionCore } from '@/hooks/useTransactions';
 import { createGlobalLog } from '@/hooks/useGlobalLogs';
 
 // Conta "Sicoob" em `banks` — mesma conta usada em 100% dos lançamentos de honorários já
@@ -281,37 +282,46 @@ export function useBoletoControls(vencimentoMonth: string) {
   };
 
   // Núcleo comum a "Liquidar" (boleto já PAGO no Sicoob) e "Dar baixa" (boleto PENDENTE pago por
-  // fora — ver darBaixaManual): liga o lançamento ao boleto e liquida a transação. Um único
-  // UPDATE em transactions (is_paid, paid_amount, date, bank_id) + o transaction_id no boleto.
-  // `is_paid: false` no filtro do UPDATE garante que nunca sobrescreve um lançamento que alguém
-  // já liquidou por fora entre a busca e a confirmação (a mesma trava que protege lançamentos
-  // liquidados manualmente no passado — exigência do Gabriel, 15/09/2026).
+  // fora — ver darBaixaManual): liga o lançamento ao boleto e liquida a transação.
+  //
+  // Achado ao revisar a pedido do Gabriel (16/09/2026): "Liquidar" tem que ser literalmente a
+  // MESMA função usada pelo botão "Liquidar" de Lançamentos — não uma segunda implementação que
+  // faz algo parecido (foi assim que a invalidação de cache ficou incompleta na primeira versão).
+  // Rastreei o botão real: Transactions.tsx → TransactionFormDialog (mode="settle") → mutation
+  // updateTransaction, cujo núcleo agora é updateTransactionCore (extraído de useTransactions.ts
+  // nesta mesma revisão). Aqui chamamos exatamente essa função — mesmo UPDATE, mesmo diff de
+  // auditoria em global_logs — passando só os 4 campos que o boleto sabe com certeza (is_paid,
+  // paid_amount, date, bank_id=Sicoob); os demais campos do lançamento (categoria, contraparte,
+  // notas etc.) ficam intocados, igual a um settle onde ninguém mexeu neles.
   const liquidarLancamento = async (params: { boleto: BoletoWithContact; transactionId: string; valorPago: number; dataPagamento: string }) => {
     const { boleto, transactionId, valorPago, dataPagamento } = params;
-    const { data: updatedRows, error: txnErr } = await supabase
+
+    // Pré-checagem: updateTransactionCore não tem trava de concorrência (o botão de Lançamentos
+    // também não tem — confia no estado que a UI já está mostrando). Aqui a trava extra é
+    // deliberada: nunca sobrescrever um lançamento já liquidado por outra via entre a busca e a
+    // confirmação — exigência explícita do Gabriel (15/09/2026) de não tocar em nada já liquidado.
+    const { data: current, error: checkErr } = await supabase
       .from('transactions')
-      .update({ is_paid: true, paid_amount: valorPago, date: dataPagamento, bank_id: SICOOB_BANK_ID })
+      .select('is_paid')
       .eq('id', transactionId)
-      .eq('is_paid', false)
-      .select('id');
-    if (txnErr) throw txnErr;
-    if (!updatedRows || updatedRows.length === 0) {
+      .single();
+    if (checkErr) throw checkErr;
+    if (current?.is_paid) {
       throw new Error('Este lançamento já foi liquidado por outra via — atualize a tela e confira.');
     }
+
+    await updateTransactionCore(transactionId, {
+      is_paid: true,
+      paid_amount: valorPago,
+      date: dataPagamento,
+      bank_id: SICOOB_BANK_ID,
+    });
 
     const { error: boletoErr } = await (supabase as any)
       .from('boleto_controls')
       .update({ transaction_id: transactionId })
       .eq('id', boleto.id);
     if (boletoErr) throw boletoErr;
-
-    await createGlobalLog({
-      action: 'ALTERACAO',
-      module: 'FINANCEIRO',
-      entityId: transactionId,
-      entityName: boleto.contact_name,
-      details: `Liquidado via boleto Sicoob (nosso número ${boleto.nosso_numero ?? '—'}) — valor pago ${valorPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, pagamento em ${dataPagamento}.`,
-    });
   };
 
   // Mesmo conjunto de invalidação usado por updateTransaction/togglePaid em useTransactions.ts —

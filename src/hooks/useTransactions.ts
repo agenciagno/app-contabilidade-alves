@@ -114,6 +114,45 @@ export type TransactionInsert = {
 
 export type TransactionUpdate = Partial<TransactionInsert>;
 
+// Núcleo de "atualizar um lançamento" — extraído do mutationFn de updateTransaction (16/09/2026)
+// pra ser a MESMA função usada por qualquer botão "Liquidar" do sistema (Lançamentos e Boletos),
+// não duas implementações paralelas que podem divergir com o tempo (já divergiram uma vez: a
+// invalidação de cache do Liquidar de Boletos ficou incompleta por não reaproveitar isto).
+// Update parcial — só os campos passados em `updates` mudam; o resto do lançamento fica intocado.
+export async function updateTransactionCore(id: string, updates: TransactionUpdate): Promise<Transaction> {
+  // Captura o estado anterior para o histórico de alterações (auditoria).
+  const { data: oldRow } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  // Registra o diff legível em global_logs (reaproveita o padrão do módulo).
+  if (oldRow) {
+    const changes = await buildTransactionDiff(oldRow, updates);
+    if (changes.length) {
+      await createGlobalLog({
+        action: 'ALTERACAO',
+        module: 'FINANCEIRO',
+        entityId: id,
+        entityName: (data as any)?.description ?? oldRow.description,
+        details: changes.join(' · '),
+      });
+    }
+  }
+
+  return data as Transaction;
+}
+
 export function useTransactions() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -195,39 +234,7 @@ export function useTransactions() {
   });
 
   const updateTransaction = useMutation({
-    mutationFn: async ({ id, ...updates }: TransactionUpdate & { id: string }) => {
-      // Captura o estado anterior para o histórico de alterações (auditoria).
-      const { data: oldRow } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      const { data, error } = await supabase
-        .from('transactions')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Registra o diff legível em global_logs (reaproveita o padrão do módulo).
-      if (oldRow) {
-        const changes = await buildTransactionDiff(oldRow, updates);
-        if (changes.length) {
-          await createGlobalLog({
-            action: 'ALTERACAO',
-            module: 'FINANCEIRO',
-            entityId: id,
-            entityName: (data as any)?.description ?? oldRow.description,
-            details: changes.join(' · '),
-          });
-        }
-      }
-
-      return data;
-    },
+    mutationFn: async ({ id, ...updates }: TransactionUpdate & { id: string }) => updateTransactionCore(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['server-transactions'] });
