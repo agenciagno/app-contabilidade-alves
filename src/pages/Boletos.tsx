@@ -5,7 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import {
   AlertCircle, Plus,
   FileX, MoreHorizontal, Eye, Send, CheckSquare, Download, Loader2,
-  X, Copy, SlidersHorizontal, ListChecks, CalendarDays,
+  X, Copy, SlidersHorizontal, ListChecks, CalendarDays, HandCoins,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,6 +30,7 @@ import { BoletoGenerationDialog } from '@/components/financeiro/BoletoGeneration
 import { IndividualBoletoDialog } from '@/components/financeiro/IndividualBoletoDialog';
 import { BoletoCalendarView } from '@/components/financeiro/BoletoCalendarView';
 import { NotificarCobrancaDialog } from '@/components/financeiro/NotificarCobrancaDialog';
+import { LiquidarBoletoDialog } from '@/components/financeiro/LiquidarBoletoDialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -51,7 +52,16 @@ function isOverdue(b: BoletoWithContact) {
 
 function StatusBadge({ b }: { b: BoletoWithContact }) {
   if (isOverdue(b)) return <DsBadge tone="danger">vencido</DsBadge>;
-  if (b.status === 'PAGO') return <DsBadge tone="ok">pago</DsBadge>;
+  if (b.status === 'PAGO') {
+    return (
+      <div className="flex flex-col items-start gap-1">
+        <DsBadge tone="ok">pago</DsBadge>
+        {/* Sinaliza se o lançamento de honorários já foi liquidado a partir deste boleto —
+            só existe pra boletos pagos a partir de 15/09/2026 (liquidacao_habilitada). */}
+        {b.transaction_id && <span className="text-[10px] text-muted-ink-2">lançamento liquidado</span>}
+      </div>
+    );
+  }
   if (b.status === 'FILA_IMPRESSAO') return <DsBadge tone="info">gerado</DsBadge>;
   if (b.status === 'IMPRESSO') return <DsBadge tone="neutral">impresso</DsBadge>;
   return <DsBadge tone="warn">a vencer</DsBadge>;
@@ -80,6 +90,7 @@ export default function Boletos() {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [detailsOf, setDetailsOf] = useState<BoletoWithContact | null>(null);
   const [cobrancaOf, setCobrancaOf] = useState<BoletoWithContact | null>(null);
+  const [liquidarOf, setLiquidarOf] = useState<BoletoWithContact | null>(null);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [singleOpen, setSingleOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -89,6 +100,7 @@ export default function Boletos() {
   const {
     boletoList, isLoading, markAsPrinted, fetchPreview, generateBoletos,
     generateSingleBoleto, listSyncContacts, findOrphanBoletos, downloadBoletoPdf,
+    fetchLancamentosAbertos, liquidarBoleto,
   } = useBoletoControls(vencimentoMonth);
 
   const handleSync = async () => {
@@ -430,6 +442,9 @@ export default function Boletos() {
                     const overdue = isOverdue(b);
                     const canResend = (b.status === 'PENDENTE' || overdue) && b.canal_entrega !== 'impresso';
                     const canMarkPrinted = b.status === 'FILA_IMPRESSAO';
+                    // Só oferece liquidar pra boleto pago a partir de quando esse fluxo passou a
+                    // existir (liquidacao_habilitada) e que ainda não foi vinculado a um lançamento.
+                    const canLiquidar = b.status === 'PAGO' && b.liquidacao_habilitada && !b.transaction_id;
                     return (
                       <TableRow key={b.id}>
                         <TableCell className="font-medium">
@@ -474,6 +489,11 @@ export default function Boletos() {
                                   disabled={markAsPrinted.isPending}
                                 >
                                   <CheckSquare className="h-4 w-4 mr-2" /> Marcar como impresso
+                                </DropdownMenuItem>
+                              )}
+                              {canLiquidar && (
+                                <DropdownMenuItem onClick={() => setLiquidarOf(b)}>
+                                  <HandCoins className="h-4 w-4 mr-2" /> Liquidar
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
@@ -591,6 +611,15 @@ export default function Boletos() {
         open={!!cobrancaOf}
         onOpenChange={(o) => !o && setCobrancaOf(null)}
         boleto={cobrancaOf}
+      />
+
+      {/* Dialog: liquidar (vincula boleto pago ao lançamento de honorários e liquida a transação) */}
+      <LiquidarBoletoDialog
+        open={!!liquidarOf}
+        onOpenChange={(o) => !o && setLiquidarOf(null)}
+        boleto={liquidarOf}
+        fetchLancamentosAbertos={fetchLancamentosAbertos}
+        liquidarBoleto={liquidarBoleto}
       />
     </div>
   );

@@ -2,6 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getContactLegalName } from '@/lib/contact-display';
+import { createGlobalLog } from '@/hooks/useGlobalLogs';
+
+// Conta "Sicoob" em `banks` — mesma conta usada em 100% dos lançamentos de honorários já
+// liquidados manualmente hoje (confirmado por amostragem real antes de automatizar, 15/09/2026).
+const SICOOB_BANK_ID = '74422cd4-e2e3-4bf1-80dc-b2c1e1b0ed71';
 
 export type BoletoStatus = 'PENDENTE' | 'PAGO' | 'FILA_IMPRESSAO' | 'IMPRESSO' | string;
 export type CanalEntrega = 'whatsapp' | 'email' | 'impresso' | 'whatsapp_email' | null;
@@ -29,6 +34,20 @@ export interface BoletoControl {
   origem_baixa: string | null;
   sicoob_response: any;
   pdf_url: string | null;
+  // Liquidação semi-automática (15/09/2026): transaction_id aponta pro lançamento já liquidado
+  // a partir deste boleto; liquidacao_habilitada é false pra todo boleto que já estava PAGO
+  // antes desse fluxo existir (nunca fica elegível pro botão "Liquidar", mesmo sem vínculo).
+  transaction_id: string | null;
+  liquidacao_habilitada: boolean;
+}
+
+// Lançamento candidato a ser liquidado por um boleto pago (busca por cliente + vencimento).
+export interface LancamentoCandidato {
+  id: string;
+  description: string;
+  amount: number;
+  due_date: string | null;
+  category_name: string | null;
 }
 
 // Preview de geração (retorno da edge function sicoob-boletos, action=preview)
@@ -117,7 +136,7 @@ export function useBoletoControls(vencimentoMonth: string) {
           created_at, updated_at,
           valor, valor_pago, data_vencimento, data_pagamento, canal_entrega,
           nosso_numero, seu_numero, linha_digitavel, codigo_barras, url_qrcode,
-          origem_baixa, sicoob_response, pdf_url,
+          origem_baixa, sicoob_response, pdf_url, transaction_id, liquidacao_habilitada,
           contacts:contact_id ( id, name, type, document, email, phone, whatsapp, display_name, nome_fantasia, razao_social )
         `)
         .gte('data_vencimento', vencimentoMonth)
@@ -238,6 +257,78 @@ export function useBoletoControls(vencimentoMonth: string) {
     };
   };
 
+  // 8. Liquidar: acha lançamentos em aberto (Contas a Receber) do mesmo cliente pra oferecer
+  // como candidato ao vincular um boleto PAGO. Busca por cliente + tipo — o vencimento decide
+  // qual vem pré-selecionado no dialog (LiquidarBoletoDialog), não filtra aqui pra também cobrir
+  // o caso de 0 match exato (usuário escolhe manualmente entre os lançamentos abertos do cliente).
+  const fetchLancamentosAbertos = async (contactId: string): Promise<LancamentoCandidato[]> => {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('id, description, amount, due_date, category:categories(name)')
+      .eq('contact_id', contactId)
+      .eq('type', 'receita')
+      .eq('is_paid', false)
+      .is('deleted_at', null)
+      .order('due_date', { ascending: true });
+    if (error) throw error;
+    return (data || []).map((t: any) => ({
+      id: t.id,
+      description: t.description,
+      amount: Number(t.amount),
+      due_date: t.due_date,
+      category_name: t.category?.name ?? null,
+    }));
+  };
+
+  // Liquida o lançamento escolhido com os dados do boleto pago e grava o vínculo — um único
+  // UPDATE em transactions (is_paid, paid_amount, date, bank_id) + o transaction_id no boleto.
+  // `is_paid: false` no filtro do UPDATE garante que nunca sobrescreve um lançamento que alguém
+  // já liquidou por fora entre a busca e a confirmação (a mesma trava que protege lançamentos
+  // liquidados manualmente no passado — exigência do Gabriel, 15/09/2026).
+  const liquidarBoleto = useMutation({
+    mutationFn: async (params: { boleto: BoletoWithContact; transactionId: string; valorPago: number; dataPagamento: string }) => {
+      const { boleto, transactionId, valorPago, dataPagamento } = params;
+      const { data: updatedRows, error: txnErr } = await supabase
+        .from('transactions')
+        .update({ is_paid: true, paid_amount: valorPago, date: dataPagamento, bank_id: SICOOB_BANK_ID })
+        .eq('id', transactionId)
+        .eq('is_paid', false)
+        .select('id');
+      if (txnErr) throw txnErr;
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error('Este lançamento já foi liquidado por outra via — atualize a tela e confira.');
+      }
+
+      const { error: boletoErr } = await (supabase as any)
+        .from('boleto_controls')
+        .update({ transaction_id: transactionId })
+        .eq('id', boleto.id);
+      if (boletoErr) throw boletoErr;
+
+      await createGlobalLog({
+        action: 'ALTERACAO',
+        module: 'FINANCEIRO',
+        entityId: transactionId,
+        entityName: boleto.contact_name,
+        details: `Liquidado via boleto Sicoob (nosso número ${boleto.nosso_numero ?? '—'}) — valor pago ${valorPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}, pagamento em ${dataPagamento}.`,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['server-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['transaction-kpis'] });
+      queryClient.invalidateQueries({ queryKey: ['banks'] });
+      queryClient.invalidateQueries({ queryKey: ['dre-previsto'] });
+      queryClient.invalidateQueries({ queryKey: ['dre-realizado'] });
+      queryClient.invalidateQueries({ queryKey: ['global-logs'] });
+      toast({ title: 'Lançamento liquidado' });
+    },
+    onError: (e: Error) => {
+      toast({ title: 'Erro ao liquidar', description: e.message, variant: 'destructive' });
+    },
+  });
+
   // 7. Baixar o PDF do boleto (signed URL do bucket privado).
   const downloadBoletoPdf = async (boleto: BoletoWithContact) => {
     if (!boleto.pdf_url) {
@@ -263,5 +354,7 @@ export function useBoletoControls(vencimentoMonth: string) {
     listSyncContacts,
     findOrphanBoletos,
     downloadBoletoPdf,
+    fetchLancamentosAbertos,
+    liquidarBoleto,
   };
 }

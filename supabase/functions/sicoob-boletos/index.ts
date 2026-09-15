@@ -985,6 +985,52 @@ Deno.serve(async (req) => {
       return json(resp.data?.resultado ?? resp.data);
     }
 
+    // ---------------- WEBHOOK_CADASTRAR (registra a URL de sicoob-webhook-boletos pra notificação
+    // em tempo real de baixa/pagamento — codigoTipoMovimento 7) ----------------
+    if (action === "webhook_cadastrar") {
+      const webhookUrl: string = payload.url;
+      const email: string = payload.email;
+      if (!webhookUrl || !email) return json({ error: "url e email são obrigatórios" }, 400);
+
+      let token: string;
+      try {
+        token = await getSicoobToken("webhooks_inclusao webhooks_consulta");
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+      // @ts-ignore unstable API
+      const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+      const res = await fetch("https://api.sicoob.com.br/cobranca-bancaria/v3/webhooks", {
+        method: "POST",
+        client,
+        headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Content-Type": "application/json" },
+        body: JSON.stringify({ url: webhookUrl, codigoTipoMovimento: 7, codigoPeriodoMovimento: 1, email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return json({ error: extractSicoobError(data, res.status) }, 502);
+      return json(data);
+    }
+
+    // ---------------- WEBHOOK_CONSULTAR (lista os webhooks cadastrados, pra checar saúde) ----------------
+    if (action === "webhook_consultar") {
+      let token: string;
+      try {
+        token = await getSicoobToken("webhooks_consulta");
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+      // @ts-ignore unstable API
+      const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
+      const res = await fetch("https://api.sicoob.com.br/cobranca-bancaria/v3/webhooks?codigoTipoMovimento=7", {
+        method: "GET",
+        client,
+        headers: { "Authorization": `Bearer ${token}`, "client_id": SICOOB_CLIENT_ID, "Accept": "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return json({ error: extractSicoobError(data, res.status) }, 502);
+      return json(data);
+    }
+
     return json({ error: "action inválido" }, 400);
   } catch (e) {
     return json({ error: String((e as Error).message || e) }, 500);
