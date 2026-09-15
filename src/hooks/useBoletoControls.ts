@@ -314,12 +314,21 @@ export function useBoletoControls(vencimentoMonth: string) {
     });
   };
 
+  // Mesmo conjunto de invalidação usado por updateTransaction/togglePaid em useTransactions.ts —
+  // achado ao revisar (16/09/2026): essa lista tinha ficado incompleta, faltando exatamente
+  // 'bank-transactions-prior'/'bank-transactions-period' (Conta Corrente, useBankTransactions.ts)
+  // e 'contacts' — o lançamento liquidava certo, mas Conta Corrente podia não atualizar sozinho
+  // (cache do React Query só invalida no que é listado aqui, refresh manual da tela escondia isso).
   const invalidateAposLiquidar = () => {
     queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2'] });
     queryClient.invalidateQueries({ queryKey: ['transactions'] });
     queryClient.invalidateQueries({ queryKey: ['server-transactions'] });
     queryClient.invalidateQueries({ queryKey: ['transaction-kpis'] });
+    queryClient.invalidateQueries({ queryKey: ['bank-transactions-prior'] });
+    queryClient.invalidateQueries({ queryKey: ['bank-transactions-period'] });
     queryClient.invalidateQueries({ queryKey: ['banks'] });
+    queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    queryClient.invalidateQueries({ queryKey: ['contact-transactions'] });
     queryClient.invalidateQueries({ queryKey: ['dre-previsto'] });
     queryClient.invalidateQueries({ queryKey: ['dre-realizado'] });
     queryClient.invalidateQueries({ queryKey: ['global-logs'] });

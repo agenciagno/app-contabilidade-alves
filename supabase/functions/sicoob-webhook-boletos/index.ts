@@ -28,6 +28,58 @@ interface BaixaWebhookDados {
   codigoMotivoCancelamento?: number;
 }
 
+const fmtBRL = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+// Notifica quem tem acesso real ao módulo Financeiro — mesmo critério do ModuleGuard da rota
+// /boletos (src/components/auth/ModuleGuard.tsx): super_admin/admin sempre têm acesso; colaborador
+// só se 'financeiro' estiver no allowed_modules dele. Falha aqui nunca derruba a baixa em si —
+// o boleto já foi atualizado antes desta chamada.
+async function notificarBoletoPago(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  boleto: { id: string; contact_id: string | null },
+  valorPago: number | null,
+  nossoNumero: number,
+) {
+  try {
+    let nomeCliente = "Cliente";
+    if (boleto.contact_id) {
+      const { data: contact } = await supabase
+        .from("contacts")
+        .select("name, razao_social, nome_fantasia, display_name")
+        .eq("id", boleto.contact_id)
+        .maybeSingle();
+      nomeCliente = contact?.razao_social || contact?.nome_fantasia || contact?.display_name || contact?.name || nomeCliente;
+    }
+
+    const { data: targets, error: targetsErr } = await supabase
+      .from("profiles")
+      .select("user_id")
+      .eq("company_id", COMPANY_ID)
+      .eq("status_active", true)
+      .or("role.in.(admin,super_admin),allowed_modules.cs.{financeiro}");
+    if (targetsErr || !targets?.length) return;
+
+    const body = valorPago != null
+      ? `${nomeCliente} — ${fmtBRL(valorPago)} (nosso número ${nossoNumero})`
+      : `${nomeCliente} (nosso número ${nossoNumero})`;
+
+    const rows = targets.map((t: { user_id: string }) => ({
+      user_id: t.user_id,
+      company_id: COMPANY_ID,
+      type: "boleto_pago",
+      title: "Boleto pago",
+      body,
+      action_url: "/boletos",
+      reference_type: "boleto_controls",
+      reference_id: boleto.id,
+    }));
+    await supabase.from("notifications").insert(rows);
+  } catch (e) {
+    console.error("Falha ao notificar boleto pago:", String((e as Error).message || e), { nossoNumero });
+  }
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   if (url.searchParams.get("token") !== WEBHOOK_TOKEN) {
@@ -63,21 +115,26 @@ Deno.serve(async (req) => {
       const dataPagamento = dados.dataHoraSituacaoBaixa
         ? String(dados.dataHoraSituacaoBaixa).slice(0, 10)
         : null;
-      const { error } = await supabase
+      const valorPago = dados.valorPagamento != null ? Number(dados.valorPagamento) : null;
+      const { data: updatedRow, error } = await supabase
         .from("boleto_controls")
         .update({
           status: "PAGO",
           data_pagamento: dataPagamento,
-          valor_pago: dados.valorPagamento != null ? Number(dados.valorPagamento) : null,
+          valor_pago: valorPago,
           origem_baixa: "webhook_sicoob",
           sicoob_response: dados,
         })
         .eq("company_id", COMPANY_ID)
-        .eq("nosso_numero", nossoNumero);
+        .eq("nosso_numero", nossoNumero)
+        .select("id, contact_id")
+        .maybeSingle();
       if (error) {
         // Não retorna erro pro Sicoob por causa disso — a falha fica só no log; o find_orphans
         // diário continua como rede de segurança pra esse boleto específico.
         console.error("Falha ao gravar baixa via webhook:", error.message, { nossoNumero });
+      } else if (updatedRow) {
+        await notificarBoletoPago(supabase, updatedRow, valorPago, nossoNumero);
       }
     }
   }
