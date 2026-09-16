@@ -169,7 +169,17 @@ export function ContactCadastroTab({ contactId }: Props) {
       return; // updateSuperPerfil já mostra o toast de erro
     }
     try {
-      await syncObligations();
+      const result = await syncObligations();
+      if (result && (result.removed > 0 || result.created > 0 || result.preserved > 0)) {
+        const parts: string[] = [];
+        if (result.removed > 0) parts.push(`${result.removed} tarefa(s) removida(s)`);
+        if (result.created > 0) {
+          const now = new Date();
+          parts.push(`${result.created} lançada(s) para ${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`);
+        }
+        if (result.preserved > 0) parts.push(`${result.preserved} em andamento preservada(s) — revise manualmente`);
+        toast.success(`Obrigações atualizadas — ${parts.join(', ')}`);
+      }
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao salvar tarefas');
     } finally {
@@ -566,15 +576,46 @@ function useContactObligations(contactId: string, enabled: boolean) {
     }
   }, [contactObligations, initialized, obligationsLoaded]);
 
+  // Trocar as obrigações aqui não pode deixar o Kanban desatualizado: obrigação
+  // removida some (só cards intocados — mesma trava do "Desfazer lançamento" do
+  // Calendário Fiscal, nunca mexe em tarefa em andamento ou concluída) e obrigação
+  // nova já lança o card do mês atual, se o calendário desse mês já foi calculado.
   const sync = async () => {
-    if (!company?.id || !initialized) return;
+    if (!company?.id || !initialized) return { removed: 0, preserved: 0, created: 0 };
     const original = new Set(contactObligations.map(o => o.obligation_id));
     const toDelete: string[] = [];
     const toInsert: string[] = [];
     original.forEach(id => { if (!selected.has(id)) toDelete.push(id); });
     selected.forEach(id => { if (!original.has(id)) toInsert.push(id); });
 
+    let removed = 0;
+    let preserved = 0;
+    let created = 0;
+
     if (toDelete.length) {
+      const { data: staleTasks, error: staleErr } = await supabase
+        .from('fiscal_tasks')
+        .select('id, status, created_at, updated_at')
+        .eq('contact_id', contactId)
+        .in('obligation_id', toDelete)
+        .neq('status', 'concluido');
+      if (staleErr) throw staleErr;
+
+      const deletableTaskIds: string[] = [];
+      (staleTasks ?? []).forEach((t: any) => {
+        const untouched =
+          t.status === 'a_fazer' &&
+          new Date(t.updated_at).getTime() - new Date(t.created_at).getTime() < 2000;
+        if (untouched) deletableTaskIds.push(t.id);
+        else preserved += 1;
+      });
+
+      if (deletableTaskIds.length) {
+        const { error: delTasksErr } = await supabase.from('fiscal_tasks').delete().in('id', deletableTaskIds);
+        if (delTasksErr) throw delTasksErr;
+        removed = deletableTaskIds.length;
+      }
+
       const { error } = await (supabase as any)
         .from('client_obligations').delete()
         .eq('contact_id', contactId).in('obligation_id', toDelete);
@@ -586,8 +627,24 @@ function useContactObligations(contactId: string, enabled: boolean) {
           toInsert.map(obligation_id => ({ contact_id: contactId, obligation_id, company_id: company.id }))
         );
       if (error) throw error;
+
+      const now = new Date();
+      const { data: genData, error: genErr } = await (supabase as any).rpc('generate_monthly_fiscal_tasks', {
+        p_year: now.getFullYear(),
+        p_month: now.getMonth() + 1,
+        p_tax_regimes: null,
+        p_responsible_ids: null,
+        p_contact_ids: [contactId],
+      });
+      if (genErr) throw genErr;
+      created = (genData && typeof genData === 'object' && 'tasks_created' in genData) ? (genData as any).tasks_created ?? 0 : 0;
     }
+
     await queryClient.invalidateQueries({ queryKey: ['client-obligations', contactId] });
+    if (removed > 0 || created > 0) {
+      await queryClient.invalidateQueries({ queryKey: ['fiscal-tasks'] });
+    }
+    return { removed, preserved, created };
   };
 
   return { catalog, selected, setSelected, sync };

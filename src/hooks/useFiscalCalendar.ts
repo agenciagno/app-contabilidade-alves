@@ -117,6 +117,7 @@ export function useConfirmMonthlyTasks() {
       launchedBy,
       taxRegimes,
       responsibleIds,
+      contactIds,
     }: {
       year: number;
       month: number;
@@ -124,6 +125,7 @@ export function useConfirmMonthlyTasks() {
       launchedBy?: string;
       taxRegimes?: string[] | null;
       responsibleIds?: string[] | null;
+      contactIds?: string[] | null;
     }) => {
       // Capture timestamp slightly before RPC to account for clock skew
       const beforeTs = new Date(Date.now() - 2000).toISOString();
@@ -132,6 +134,7 @@ export function useConfirmMonthlyTasks() {
         p_month: month,
         p_tax_regimes: taxRegimes && taxRegimes.length > 0 ? taxRegimes : null,
         p_responsible_ids: responsibleIds && responsibleIds.length > 0 ? responsibleIds : null,
+        p_contact_ids: contactIds && contactIds.length > 0 ? contactIds : null,
       });
       if (error) throw error;
       const tasksCreated: number =

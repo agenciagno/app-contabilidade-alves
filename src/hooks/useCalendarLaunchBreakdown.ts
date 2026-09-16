@@ -155,6 +155,7 @@ export function useCalendarLaunchBreakdown(rows: FiscalCalendarEffectiveRow[], y
 
     const byRegime = new Map<string, GroupAccumulator>();
     const byCollaborator = new Map<string, GroupAccumulator>();
+    const byClient = new Map<string, GroupAccumulator>();
 
     const perObligation = rows.map((r) => {
       const department = r.fiscal_obligations_catalog?.department;
@@ -178,6 +179,7 @@ export function useCalendarLaunchBreakdown(rows: FiscalCalendarEffectiveRow[], y
         const regimeKey = contact.tax_regime ?? '__none__';
         bump(byRegime, regimeKey, contactId, isLaunched);
         bump(byCollaborator, respId, contactId, isLaunched);
+        bump(byClient, contactId, contactId, isLaunched);
       });
 
       return {
@@ -219,6 +221,18 @@ export function useCalendarLaunchBreakdown(rows: FiscalCalendarEffectiveRow[], y
       }))
       .sort((a, b) => b.pending - a.pending || b.total - a.total);
 
+    // Ordenado por nome (não por pendência) — é uma lista de busca, não um ranking.
+    const perClient = Array.from(byClient.entries())
+      .map(([id, g]) => ({
+        id,
+        name: contactsById.get(id)?.name ?? 'Desconhecido',
+        total: g.total,
+        launched: g.launched,
+        pending: g.total - g.launched,
+        pct: totalPending > 0 ? ((g.total - g.launched) / totalPending) * 100 : 0,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
     // Contagem geral de clientes (não dá pra derivar de byRegime/byCollaborator:
     // um cliente pode ter tarefa pendente em mais de um grupo e seria contado 2x).
     const pendingClientsTotal = new Set<string>();
@@ -243,6 +257,7 @@ export function useCalendarLaunchBreakdown(rows: FiscalCalendarEffectiveRow[], y
       perObligation,
       perRegime,
       perCollaborator,
+      perClient,
       totalTasks: totalPending,
       totalLaunched: perObligation.reduce((sum, o) => sum + o.launched, 0),
       clientCount: pendingClientsTotal.size,

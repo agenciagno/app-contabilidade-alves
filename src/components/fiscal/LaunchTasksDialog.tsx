@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,6 +20,7 @@ import { FiscalCalendarEffectiveRow } from '@/hooks/useFiscalCalendar';
 export interface LaunchFilters {
   taxRegimes: string[] | null;
   responsibleIds: string[] | null;
+  contactIds: string[] | null;
 }
 
 interface Props {
@@ -31,23 +33,26 @@ interface Props {
   onConfirm: (filters: LaunchFilters) => void;
 }
 
-type Mode = 'all' | 'regime' | 'collaborator';
+type Mode = 'all' | 'regime' | 'collaborator' | 'client';
 
 export function LaunchTasksDialog({ open, onOpenChange, rows, year, month, isPending, onConfirm }: Props) {
-  const { perRegime, perCollaborator, totalTasks, loading } = useCalendarLaunchBreakdown(rows, year, month);
+  const { perRegime, perCollaborator, perClient, totalTasks, loading } = useCalendarLaunchBreakdown(rows, year, month);
   const [mode, setMode] = useState<Mode>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [clientSearch, setClientSearch] = useState('');
 
   useEffect(() => {
     if (open) {
       setMode('all');
       setSelected(new Set());
+      setClientSearch('');
     }
   }, [open]);
 
   const handleModeChange = (v: Mode) => {
     setMode(v);
     setSelected(new Set());
+    setClientSearch('');
   };
 
   const toggle = (key: string) => {
@@ -59,9 +64,14 @@ export function LaunchTasksDialog({ open, onOpenChange, rows, year, month, isPen
     });
   };
 
-  const activeGroups = mode === 'regime' ? perRegime : mode === 'collaborator' ? perCollaborator : [];
+  const activeGroups = mode === 'regime' ? perRegime : mode === 'collaborator' ? perCollaborator : mode === 'client' ? perClient : [];
   const groupKey = (g: { regime?: string | null; id?: string | null }) =>
     mode === 'regime' ? g.regime ?? undefined : g.id ?? undefined;
+
+  const visibleGroups =
+    mode === 'client' && clientSearch.trim()
+      ? activeGroups.filter((g) => (g as (typeof perClient)[number]).name.toLowerCase().includes(clientSearch.trim().toLowerCase()))
+      : activeGroups;
 
   const selectedPending = activeGroups
     .filter((g) => {
@@ -72,11 +82,13 @@ export function LaunchTasksDialog({ open, onOpenChange, rows, year, month, isPen
 
   const handleConfirm = () => {
     if (mode === 'all') {
-      onConfirm({ taxRegimes: null, responsibleIds: null });
+      onConfirm({ taxRegimes: null, responsibleIds: null, contactIds: null });
     } else if (mode === 'regime') {
-      onConfirm({ taxRegimes: Array.from(selected), responsibleIds: null });
+      onConfirm({ taxRegimes: Array.from(selected), responsibleIds: null, contactIds: null });
+    } else if (mode === 'collaborator') {
+      onConfirm({ taxRegimes: null, responsibleIds: Array.from(selected), contactIds: null });
     } else {
-      onConfirm({ taxRegimes: null, responsibleIds: Array.from(selected) });
+      onConfirm({ taxRegimes: null, responsibleIds: null, contactIds: Array.from(selected) });
     }
   };
 
@@ -88,7 +100,7 @@ export function LaunchTasksDialog({ open, onOpenChange, rows, year, month, isPen
         <DialogHeader>
           <DialogTitle>Lançar tarefas</DialogTitle>
           <DialogDescription>
-            Lance todas as tarefas pendentes do período, ou só as de regimes tributários ou colaboradores específicos.
+            Lance todas as tarefas pendentes do período, ou só as de regimes tributários, colaboradores ou um cliente específico.
             Quem já foi lançado antes não é duplicado.
           </DialogDescription>
         </DialogHeader>
@@ -112,16 +124,33 @@ export function LaunchTasksDialog({ open, onOpenChange, rows, year, month, isPen
               Selecionar colaboradores
             </Label>
           </div>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="client" id="launch-mode-client" />
+            <Label htmlFor="launch-mode-client" className="cursor-pointer font-normal">
+              Selecionar cliente específico
+            </Label>
+          </div>
         </RadioGroup>
 
-        {(mode === 'regime' || mode === 'collaborator') && (
+        {mode === 'client' && (
+          <Input
+            placeholder="Buscar cliente..."
+            value={clientSearch}
+            onChange={(e) => setClientSearch(e.target.value)}
+            className="h-9"
+          />
+        )}
+
+        {(mode === 'regime' || mode === 'collaborator' || mode === 'client') && (
           <div className="space-y-1 rounded-md border p-3 max-h-64 overflow-y-auto">
             {loading ? (
               <Skeleton className="h-20 w-full" />
             ) : activeGroups.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhuma tarefa pendente neste período.</p>
+            ) : visibleGroups.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum cliente encontrado.</p>
             ) : (
-              activeGroups.map((g) => {
+              visibleGroups.map((g) => {
                 const key = groupKey(g);
                 if (!key) return null;
                 const label = mode === 'regime' ? (g as (typeof perRegime)[number]).label : (g as (typeof perCollaborator)[number]).name;
