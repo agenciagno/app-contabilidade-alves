@@ -242,7 +242,7 @@ export default function Boletos() {
       {/*
         Layout de 1 coluna, mesmo padrão de Transactions.tsx: KPIs em cards
         no topo, filtros numa barra horizontal, tabela abaixo — substitui a
-        coluna lateral fixa + área principal de antes (16/09/2026, pedido
+        coluna lateral fixa + área principal de antes (15/09/2026, pedido
         de Gabriel).
       */}
       <div className="space-y-4">
@@ -296,7 +296,7 @@ export default function Boletos() {
           </Select>
 
           {/* Vencimento e pagamento ficam em filtros de data separados — não dá pra
-              misturar as duas datas num único período (pedido de Gabriel, 16/09/2026). */}
+              misturar as duas datas num único período (pedido de Gabriel, 15/09/2026). */}
           <Popover>
             <PopoverTrigger asChild>
               <button
