@@ -22,6 +22,7 @@ import {
 import { Contact, TaxRegime, useContacts } from '@/hooks/useContacts';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTeamProfiles } from '@/hooks/useTeamProfiles';
 import { useCompany } from '@/hooks/useCompany';
 import { ContactObligationsSelector } from '@/components/fiscal/ContactObligationsSelector';
 import { lookupCnpj, pickEmptyFields } from '@/lib/cnpj-lookup';
@@ -128,19 +129,7 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
   const [numeroAlvara, setNumeroAlvara] = useState(contact.numero_alvara || '');
   const [validadeAlvara, setValidadeAlvara] = useState((contact.validade_alvara || '').slice(0, 10));
 
-  const { data: profiles } = useQuery({
-    queryKey: ['profiles-active-for-contact-edit'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('status_active', true)
-        .order('full_name', { ascending: true });
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: section === 'fiscal',
-  });
+  const { data: profiles } = useTeamProfiles(section === 'fiscal');
 
   const { data: obligationsCatalog = [] } = useQuery({
     queryKey: ['fiscal-obligations-catalog'],

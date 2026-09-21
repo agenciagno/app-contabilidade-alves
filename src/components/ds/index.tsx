@@ -514,7 +514,7 @@ const alertTone = {
   danger: 'border-danger bg-danger-soft text-danger',
 } as const;
 
-export interface DsAlertProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface DsAlertProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   tone?: keyof typeof alertTone;
   icon?: React.ReactNode;
   title: React.ReactNode;

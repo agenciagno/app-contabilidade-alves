@@ -384,7 +384,7 @@ export function CashFlowReportModal({
 
     const macroMap = new Map<string, {
       name: string; color: string | null; monthly: number[]; total: number;
-      children: Map<string, { name: string; monthly: number[]; total: number }>;
+      children: Map<string, { name: string; color: string | null; monthly: number[]; total: number }>;
     }>();
 
     for (const t of rows) {
@@ -405,7 +405,7 @@ export function CashFlowReportModal({
       const child = childKeyFn(t);
       let cg = mg.children.get(child.id);
       if (!cg) {
-        cg = { name: child.name, monthly: Array(activeColumns.length).fill(0), total: 0 };
+        cg = { name: child.name, color: child.color, monthly: Array(activeColumns.length).fill(0), total: 0 };
         mg.children.set(child.id, cg);
       }
       cg.monthly[colIdx] += signed;

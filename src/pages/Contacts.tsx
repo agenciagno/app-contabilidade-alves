@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -14,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Search, User, Mail, Phone, Copy, Users, X, FileText, LayoutGrid, List, Pencil, Trash2, Building2, CalendarDays, FolderOpen } from 'lucide-react';
 import { useContacts, Contact, ContactInsert, TAX_REGIME_LABELS } from '@/hooks/useContacts';
-import { supabase } from '@/integrations/supabase/client';
+import { useTeamProfiles } from '@/hooks/useTeamProfiles';
 import { useTransactions } from '@/hooks/useTransactions';
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
 import { ContactBulkEditDialog } from '@/components/contacts/ContactBulkEditDialog';
@@ -60,18 +59,7 @@ export default function Contacts() {
   const [filterResponsible, setFilterResponsible] = useState('all');
   const [filterResponsibleDp, setFilterResponsibleDp] = useState('all');
   const { data: fiscalProfiles = [] } = useAllFiscalProfiles();
-  const { data: activeProfiles = [] } = useQuery({
-    queryKey: ['profiles-active-all'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('status_active', true)
-        .order('full_name', { ascending: true });
-      if (error) throw error;
-      return data || [];
-    },
-  });
+  const { data: activeProfiles = [] } = useTeamProfiles();
 
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);

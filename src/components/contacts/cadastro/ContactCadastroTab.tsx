@@ -29,6 +29,7 @@ import { useContactDependencies } from '@/hooks/useContactDependencies';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useTeamProfiles } from '@/hooks/useTeamProfiles';
 import { ContactObligationsSelector } from '@/components/fiscal/ContactObligationsSelector';
 import { useCompany } from '@/hooks/useCompany';
 import { maskPhone, maskCPF, maskCPFCNPJ, getDocumentType } from '@/lib/utils';
@@ -196,7 +197,7 @@ export function ContactCadastroTab({ contactId }: Props) {
     try {
       const r = await lookupCnpj(form.document);
       const inferred = !form.setor_atuacao
-        ? inferRamoFromCnaeDescricao(r.cnae_principal?.descricao || r.cnae_principal?.text || r.cnae_principal?.description)
+        ? inferRamoFromCnaeDescricao(r.cnae_principal?.descricao)
         : null;
       setForm(prev => ({
         ...prev,
@@ -682,18 +683,7 @@ function OperacionalSection({
     deleteContact.mutate(contactId, { onSuccess: () => navigate('/contatos') });
   };
 
-  const { data: profiles } = useQuery({
-    queryKey: ['profiles-active-cadastro'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('status_active', true)
-        .order('full_name', { ascending: true });
-      if (error) throw error;
-      return data || [];
-    },
-  });
+  const { data: profiles } = useTeamProfiles();
 
   const categoriasDisponiveis = ['cliente', 'fornecedor', 'colaborador', 'outros'];
   const toggleCategoria = (cat: string) => {
