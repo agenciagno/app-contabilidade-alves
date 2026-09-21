@@ -24,10 +24,8 @@ interface ContactBulkEditDialogProps {
 }
 
 const STATUS_OPTIONS = [
-  { value: 'ativo', label: 'Ativo' },
-  { value: 'inativo', label: 'Inativo' },
-  { value: 'prospecto', label: 'Prospecto' },
-  { value: 'suspenso', label: 'Suspenso' },
+  'Ativo', 'Suspensa - Contabilidade', 'Suspensa - Receita Federal', 'Inapta - Receita Federal',
+  'Cancelada - Receita Federal', 'Baixada', 'Ex-cliente', 'Ex-Colaborador',
 ];
 
 const CANAL_OPTIONS = [
@@ -245,7 +243,7 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
                   <Select value={statusCliente} onValueChange={setStatusCliente}>
                     <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
-                      {STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                      {STATUS_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 )}

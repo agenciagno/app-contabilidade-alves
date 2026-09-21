@@ -42,7 +42,10 @@ interface Props {
   contactId: string;
 }
 
-const STATUS_CLIENTE = ['Ativo', 'Inativo', 'Suspenso', 'Encerrado', 'Ex-cliente', 'Ex-Colaborador'];
+const STATUS_CLIENTE = [
+  'Ativo', 'Suspensa - Contabilidade', 'Suspensa - Receita Federal', 'Inapta - Receita Federal',
+  'Cancelada - Receita Federal', 'Baixada', 'Ex-cliente', 'Ex-Colaborador',
+];
 const BR_STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
 const AutofillBadge = () => (

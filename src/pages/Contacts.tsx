@@ -42,7 +42,7 @@ function Contador({ tom, valor, label }: { tom: string; valor: number; label: st
   );
 }
 
-const ARCHIVED_STATUSES = ['Encerrado', 'Ex-cliente', 'Ex-Colaborador'];
+const ARCHIVED_STATUSES = ['Baixada', 'Ex-cliente', 'Ex-Colaborador'];
 const isArchivedContact = (c: Contact) => ARCHIVED_STATUSES.includes(((c as any).status_cliente || '').toString());
 
 export default function Contacts() {
@@ -415,8 +415,10 @@ export default function Contacts() {
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="Ativo">Ativo</SelectItem>
-                  <SelectItem value="Suspenso">Suspenso</SelectItem>
-                  <SelectItem value="Inativo">Inativa</SelectItem>
+                  <SelectItem value="Suspensa - Contabilidade">Suspensa - Contabilidade</SelectItem>
+                  <SelectItem value="Suspensa - Receita Federal">Suspensa - Receita Federal</SelectItem>
+                  <SelectItem value="Inapta - Receita Federal">Inapta - Receita Federal</SelectItem>
+                  <SelectItem value="Cancelada - Receita Federal">Cancelada - Receita Federal</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={filterCategoria} onValueChange={setFilterCategoria}>
@@ -592,7 +594,7 @@ export default function Contacts() {
             {archivedContacts.length === 0 ? (
               <Card className="bg-card">
                 <CardContent className="text-muted-foreground text-center py-16">
-                  Nenhum contato arquivado (status Encerrado, Ex-cliente ou Ex-Colaborador)
+                  Nenhum contato arquivado (status Baixada, Ex-cliente ou Ex-Colaborador)
                 </CardContent>
               </Card>
             ) : viewMode === 'card' ? (

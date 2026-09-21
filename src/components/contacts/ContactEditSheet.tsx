@@ -105,7 +105,6 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
   const [naturezaJuridica, setNaturezaJuridica] = useState(contact.natureza_juridica || '');
   const [situacaoCadastral, setSituacaoCadastral] = useState(contact.situacao_cadastral || 'none');
   const [tipoEstabelecimento, setTipoEstabelecimento] = useState(contact.tipo_estabelecimento || 'none');
-  const [statusCliente, setStatusCliente] = useState(contact.status_cliente || 'none');
   const [tipoCliente, setTipoCliente] = useState(contact.tipo_cliente || 'none');
   const [grupoEscritorio, setGrupoEscritorio] = useState(contact.grupo_escritorio || '');
   const [dataInicioContrato, setDataInicioContrato] = useState((contact.data_inicio_contrato || '').slice(0, 10));
@@ -200,7 +199,6 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
     setNaturezaJuridica(contact.natureza_juridica || '');
     setSituacaoCadastral(contact.situacao_cadastral || 'none');
     setTipoEstabelecimento(contact.tipo_estabelecimento || 'none');
-    setStatusCliente(contact.status_cliente || 'none');
     setTipoCliente(contact.tipo_cliente || 'none');
     setGrupoEscritorio(contact.grupo_escritorio || '');
     setDataInicioContrato((contact.data_inicio_contrato || '').slice(0, 10));
@@ -359,7 +357,6 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
         natureza_juridica: naturezaJuridica || null,
         situacao_cadastral: situacaoCadastral === 'none' ? null : situacaoCadastral,
         tipo_estabelecimento: tipoEstabelecimento === 'none' ? null : tipoEstabelecimento,
-        status_cliente: statusCliente === 'none' ? null : statusCliente,
         tipo_cliente: tipoCliente === 'none' ? null : tipoCliente,
         grupo_escritorio: grupoEscritorio || null,
         data_inicio_contrato: dataInicioContrato || null,
@@ -633,19 +630,6 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
                     <SelectItem value="none">Não informado</SelectItem>
                     <SelectItem value="Matriz">Matriz</SelectItem>
                     <SelectItem value="Filial">Filial</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Status do Cliente</Label>
-                <Select value={statusCliente} onValueChange={setStatusCliente}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Não informado</SelectItem>
-                    <SelectItem value="Ativo">Ativo</SelectItem>
-                    <SelectItem value="Inativo">Inativo</SelectItem>
-                    <SelectItem value="Prospect">Prospect</SelectItem>
-                    <SelectItem value="Em Processo de Abertura">Em Processo de Abertura</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

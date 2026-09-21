@@ -3,9 +3,11 @@ import type { BadgeTone } from '@/components/ds';
 // Cor do badge de status_cliente — usado no card da listagem e no header do Super Perfil.
 const CONTACT_STATUS_TONE: Record<string, BadgeTone> = {
   Ativo: 'ok',
-  Suspenso: 'warn',
-  Inativo: 'danger',
-  Encerrado: 'neutral',
+  'Suspensa - Contabilidade': 'warn',
+  'Suspensa - Receita Federal': 'warn',
+  'Inapta - Receita Federal': 'danger',
+  'Cancelada - Receita Federal': 'danger',
+  Baixada: 'neutral',
   'Ex-cliente': 'neutral',
   'Ex-Colaborador': 'neutral',
 };

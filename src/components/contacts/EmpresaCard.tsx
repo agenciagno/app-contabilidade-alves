@@ -22,7 +22,7 @@ export interface EmpresaCardProps {
   regime?: string | null;
   porte?: string | null;
   responsavel?: string | null;
-  /** Status do cliente (Ativo/Inativo/Suspenso/Encerrado/Ex-cliente). */
+  /** Status do cliente (Ativo/Suspensa/Inapta/Cancelada/Baixada/Ex-cliente). */
   status?: string | null;
   inativo?: boolean;
   onAbrir: () => void;
