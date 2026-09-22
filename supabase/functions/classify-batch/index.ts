@@ -12,34 +12,25 @@
 // de um módulo compartilhado, pra não arriscar quebrar o classify-product
 // (já testado e em uso) ao refatorar os dois juntos.
 //
-// Itens ambíguos (mais de um CEST ou cClassTrib candidato) não são decididos
-// sozinhos: a planilha de saída marca "AMBÍGUO — revisar" com os candidatos
-// listados, e o item não entra no acervo — quem resolve é a equipe.
-//
 // Gemini (22/09/2026, v1 — não funcionou): a primeira versão pedia pro Gemini
 // escolher ENTRE os candidatos da busca textual (trigram). Descoberta na hora
 // de testar: descrição oficial do NCM é hierárquica — o termo genérico
 // ("peixe", "filé") só aparece no nível do capítulo/posição, não no código
 // de 8 dígitos que classifica de fato ("Bagre americano" não menciona peixe).
-// Mesmo concatenando a descrição com todos os ancestrais (ver
-// refresh_ncm_descricao_hierarquica), a busca textual pura não supera nomes
-// comerciais/de marca ("Filé Pescueiro Premium" não tem nenhuma palavra em
-// comum com a nomenclatura oficial) — os "candidatos" viravam ruído
-// (ex.: bateu com "Selos postais" por acaso de trigrama), e o Gemini
-// corretamente devolvia null pra tudo.
+// v2: Gemini PROPÕE o código usando o próprio conhecimento, e a gente VALIDA
+// contra a tabela oficial (validar_ncm_leaf_batch) antes de aceitar.
 //
-// v2 (atual): não restringe mais o Gemini aos candidatos da busca textual.
-// Ele PROPÕE o código NCM usando o próprio conhecimento de nomenclatura
-// brasileira/Mercosul (reconhece que "Pescueiro" é peixe, por ex.), e a gente
-// VALIDA o código proposto contra a tabela oficial (validar_ncm_leaf_batch)
-// antes de aceitar — nunca grava um código que não exista na tabela do
-// Siscomex, mesmo vindo da IA. Os candidatos da busca textual (FASE 3) ainda
-// vão no prompt como pista opcional, não como restrição.
-// Pra não reintroduzir o problema de N chamadas sequenciais que causou o
-// timeout original, o lote inteiro vai em poucas chamadas ao Gemini (chunks
-// de ~40 itens, com concorrência limitada), não uma por item. Sem
-// GEMINI_API_KEY configurada, esses itens caem no comportamento antigo (vão
-// pra revisão manual com os candidatos textuais, se houver).
+// Mapeamento de campos/colunas (23/09/2026): a planilha do cliente já vem com
+// colunas reservadas pra NCM/CEST/CFOP etc — em vez de sempre criar colunas
+// novas, cada campo pode ser mapeado pra uma coluna já existente
+// (mapeamento_saida). Nem sempre o cliente quer processar todos os 6 campos
+// (campos). Modo "conferir" não sobrescreve o valor original — só compara e
+// sinaliza divergência (precisa de mapeamento pra todo campo selecionado,
+// senão não tem o que comparar). CNAE do cliente (mais preciso que
+// segmento_atuacao/setor_atuacao — já testado com caso real: segmento dizia
+// "pecuária" pra um cliente cujo CNAE é "Criação de peixes em água doce") e
+// pistas extras da própria planilha (categoria, marca, unidade) entram no
+// prompt do Gemini quando disponíveis.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as XLSX from "npm:xlsx@0.18.5";
 
@@ -57,8 +48,29 @@ const GEMINI_MODEL = "gemini-flash-latest";
 const GEMINI_TAMANHO_CHUNK = 40;
 const GEMINI_CONCORRENCIA = 4;
 
+type CampoKey = "ncm" | "cest" | "cclasstrib" | "cst" | "csosn" | "cfop";
+const TODOS_CAMPOS: CampoKey[] = ["ncm", "cest", "cclasstrib", "cst", "csosn", "cfop"];
+const NOME_COLUNA_PADRAO: Record<CampoKey, string> = {
+  ncm: "NCM sugerido",
+  cest: "CEST sugerido",
+  cclasstrib: "cClassTrib sugerido",
+  cst: "CST-IBS/CBS",
+  csosn: "CSOSN sugerido",
+  cfop: "CFOP referência",
+};
+
 function normalizar(txt: string): string {
   return txt.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/** Normaliza pra comparação de códigos (modo conferência) — remove pontuação,
+ *  maiúsculas, pra "2202.10.00" e "22021000" baterem. */
+function compararCodigos(existente: unknown, calculado: unknown): boolean {
+  const norm = (v: unknown) => String(v ?? "").replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+  const a = norm(existente);
+  const b = norm(calculado);
+  if (!a || !b) return false;
+  return a === b;
 }
 
 interface CandidatoNcm {
@@ -66,10 +78,17 @@ interface CandidatoNcm {
   descricao: string;
 }
 
+interface PistasItem {
+  categoria?: string;
+  marca?: string;
+  unidade?: string;
+}
+
 interface ItemParaGemini {
   idx: number;
   descricao: string;
   candidatosFracos: CandidatoNcm[];
+  pistas?: PistasItem;
 }
 
 interface PropostaGemini {
@@ -84,7 +103,7 @@ interface PropostaGemini {
  *  ainda não é confiável por si só: quem chama isso tem que validar contra
  *  `validar_ncm_leaf_batch` antes de aceitar. */
 async function proporNcmsComGemini(
-  contexto: { segmento_atuacao?: string; setor_atuacao?: string },
+  contexto: { segmento_atuacao?: string; setor_atuacao?: string; cnae_descricao?: string },
   itens: ItemParaGemini[],
 ): Promise<PropostaGemini[]> {
   const propostas: PropostaGemini[] = [];
@@ -95,29 +114,39 @@ async function proporNcmsComGemini(
   if (!itens.length) return propostas;
   console.log(`[gemini] ${itens.length} itens pra IA propor NCM`);
 
+  const contextoPartes: string[] = [];
+  if (contexto.cnae_descricao) contextoPartes.push(`atividade principal (CNAE): "${contexto.cnae_descricao}"`);
   const segmento = contexto.segmento_atuacao || contexto.setor_atuacao;
+  if (segmento) contextoPartes.push(`segmento cadastrado: "${segmento}"`);
+  const linhaContexto = contextoPartes.length ? `Contexto do cliente: ${contextoPartes.join("; ")}.` : "";
+
   const chunks: ItemParaGemini[][] = [];
   for (let i = 0; i < itens.length; i += GEMINI_TAMANHO_CHUNK) {
     chunks.push(itens.slice(i, i + GEMINI_TAMANHO_CHUNK));
   }
 
+  function formatarItem(it: ItemParaGemini): string {
+    const extras = [
+      it.pistas?.categoria && `categoria: ${it.pistas.categoria}`,
+      it.pistas?.marca && `marca: ${it.pistas.marca}`,
+      it.pistas?.unidade && `unidade: ${it.pistas.unidade}`,
+      it.candidatosFracos.length
+        ? `pistas textuais: ${it.candidatosFracos.map((c) => `${c.codigo} - ${c.descricao}`).join(" | ")}`
+        : null,
+    ].filter(Boolean).join(", ");
+    return `${it.idx}. "${it.descricao}"${extras ? ` (${extras})` : ""}`;
+  }
+
   async function processarChunk(chunk: ItemParaGemini[]) {
     const prompt = `Você é especialista em classificação fiscal NCM (Nomenclatura Comum do Mercosul/Sistema
 Harmonizado) e conhece produtos e marcas comuns no comércio brasileiro.
-Para cada produto abaixo (nome comercial dado pelo cliente, que pode ser uma marca ou nome
-popular — ex.: "Pescueiro" é peixe), proponha o código NCM de 8 dígitos que melhor classifica o
-produto, usando seu próprio conhecimento. Se não tiver confiança nenhuma, devolva ncm_proposto null.
-Pistas de uma busca textual (podem não ser relevantes, use com cautela): quando existirem, aparecem
-entre parênteses após o produto.
-${segmento ? `Contexto: o cliente atua no segmento "${segmento}".` : ""}
+Para cada produto abaixo (nome comercial dado pelo cliente), proponha o código NCM de 8 dígitos que
+melhor classifica o produto, usando seu próprio conhecimento. Se não tiver confiança nenhuma, devolva
+ncm_proposto null pra esse item.
+${linhaContexto}
 
 Produtos:
-${chunk.map((it) => {
-      const pistas = it.candidatosFracos.length
-        ? ` (pistas textuais: ${it.candidatosFracos.map((c) => `${c.codigo} - ${c.descricao}`).join(" | ")})`
-        : "";
-      return `${it.idx}. "${it.descricao}"${pistas}`;
-    }).join("\n")}`;
+${chunk.map(formatarItem).join("\n")}`;
 
     try {
       const res = await fetch(
@@ -236,6 +265,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const contactId: string | undefined = body.contact_id;
     const itens: ItemEntrada[] = Array.isArray(body.itens) ? body.itens : [];
+    const camposArr: CampoKey[] = Array.isArray(body.campos) && body.campos.length ? body.campos : TODOS_CAMPOS;
+    const camposSet = new Set(camposArr);
+    const mapeamentoSaida: Partial<Record<CampoKey, string>> = body.mapeamento_saida ?? {};
+    const mapeamentoPistas: PistasItem = body.mapeamento_pistas ?? {};
+    const modo: "classificar" | "conferir" = body.modo === "conferir" ? "conferir" : "classificar";
 
     if (!contactId) {
       return new Response(JSON.stringify({ error: "informe 'contact_id'" }), {
@@ -255,6 +289,17 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+    if (modo === "conferir") {
+      const semMapeamento = camposArr.filter((c) => !mapeamentoSaida[c]);
+      if (semMapeamento.length) {
+        return new Response(
+          JSON.stringify({
+            error: `Modo conferência exige uma coluna mapeada pra cada campo selecionado — faltou: ${semMapeamento.join(", ")}`,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
 
     const { data: companyId } = await supabase.rpc("get_user_company_id", {
       _user_id: userData.user.id,
@@ -262,10 +307,11 @@ Deno.serve(async (req) => {
 
     const { data: contact } = await supabase
       .from("contacts")
-      .select("name, tax_regime, setor_atuacao, segmento_atuacao, state")
+      .select("name, tax_regime, setor_atuacao, segmento_atuacao, state, cnae_principal")
       .eq("id", contactId)
       .maybeSingle();
     const regime = contact?.tax_regime as string | undefined;
+    const cnaeDescricao = (contact?.cnae_principal as { descricao?: string } | null)?.descricao;
 
     const { data: batch, error: batchErr } = await supabase
       .from("fiscal_classification_batches")
@@ -281,6 +327,10 @@ Deno.serve(async (req) => {
       .single();
     if (batchErr) throw batchErr;
     const batchId = batch.id as string;
+
+    // Se só CFOP foi selecionado, pula toda a resolução de NCM/CEST/cClassTrib/
+    // CSOSN — CFOP é sempre o mesmo valor de referência, não depende de nada.
+    const soCfop = camposSet.size === 1 && camposSet.has("cfop");
 
     // Estado por item, indexado pela posição original na planilha.
     interface EstadoItem {
@@ -299,141 +349,183 @@ Deno.serve(async (req) => {
       return { descricao, ncmInformado, semDescricaoNemNcm: !descricao && !ncmInformado };
     });
 
-    // ---- FASE 1: valida os NCMs já informados (1 chamada pro lote todo) ----
-    const idxComNcm: number[] = [];
-    const ncmsInformados: string[] = [];
-    estados.forEach((e, i) => {
-      if (e.ncmInformado) {
-        idxComNcm.push(i);
-        ncmsInformados.push(e.ncmInformado);
-      }
-    });
-    if (ncmsInformados.length) {
-      const { data: rows } = await supabase.rpc("find_ncm_exact_batch", { p_ncms: ncmsInformados });
-      const porIdx = agruparPorIdx(rows as Array<{ query_idx: number; codigo: string; descricao: string }>);
-      idxComNcm.forEach((origIdx, pos) => {
-        const match = porIdx.get(pos + 1)?.[0];
-        if (match) estados[origIdx].ncmResolvido = { codigo: match.codigo, descricao: match.descricao };
-        else estados[origIdx].ncmNaoEncontrado = true;
-      });
-    }
+    let cestPorIdx = new Map<number, Array<{ query_idx: number; codigo: string; descricao: string }>>();
+    let cclasstribPorIdx = new Map<
+      number,
+      Array<{ query_idx: number; cclasstrib_codigo: string; cclasstrib_nome: string; anexo: string; item_lei: string }>
+    >();
+    let cclasstribInfoPorCodigo = new Map<string, { codigo: string; nome: string | null; cst_vinculado: string | null }>();
+    let padraoRow: { codigo: string; nome: string | null; cst_vinculado: string | null } | undefined;
 
-    // ---- FASE 2: acervo, pra quem só tem descrição (1 chamada pro lote todo) ----
-    const idxSoDescricao: number[] = [];
-    const descricoesSoDescricao: string[] = [];
-    estados.forEach((e, i) => {
-      if (!e.ncmInformado && e.descricao) {
-        idxSoDescricao.push(i);
-        descricoesSoDescricao.push(normalizar(e.descricao));
+    if (!soCfop) {
+      // ---- FASE 1: valida os NCMs já informados (1 chamada pro lote todo) ----
+      const idxComNcm: number[] = [];
+      const ncmsInformados: string[] = [];
+      estados.forEach((e, i) => {
+        if (e.ncmInformado) {
+          idxComNcm.push(i);
+          ncmsInformados.push(e.ncmInformado);
+        }
+      });
+      if (ncmsInformados.length) {
+        const { data: rows } = await supabase.rpc("find_ncm_exact_batch", { p_ncms: ncmsInformados });
+        const porIdx = agruparPorIdx(rows as Array<{ query_idx: number; codigo: string; descricao: string }>);
+        idxComNcm.forEach((origIdx, pos) => {
+          const match = porIdx.get(pos + 1)?.[0];
+          if (match) estados[origIdx].ncmResolvido = { codigo: match.codigo, descricao: match.descricao };
+          else estados[origIdx].ncmNaoEncontrado = true;
+        });
       }
-    });
-    if (idxSoDescricao.length && companyId) {
-      const { data: rows } = await supabase.rpc("search_acervo_by_text_batch", {
-        p_company_id: companyId,
-        p_queries: descricoesSoDescricao,
-        p_limit: 1,
-      });
-      const porIdx = agruparPorIdx(rows as Array<{ query_idx: number } & Record<string, unknown>>);
-      idxSoDescricao.forEach((origIdx, pos) => {
-        const hit = porIdx.get(pos + 1)?.[0] as { score: number } & Record<string, unknown> | undefined;
-        if (hit && hit.score > 0.5) estados[origIdx].fonteAcervo = hit;
-      });
-    }
 
-    // ---- FASE 3: candidatos de NCM por descrição, pra quem sobrou (1 chamada) ----
-    const idxPrecisaCandidatos: number[] = [];
-    const descricoesPrecisaCandidatos: string[] = [];
-    idxSoDescricao.forEach((origIdx) => {
-      if (!estados[origIdx].fonteAcervo) {
-        idxPrecisaCandidatos.push(origIdx);
-        descricoesPrecisaCandidatos.push(normalizar(estados[origIdx].descricao!));
+      // ---- FASE 2: acervo, pra quem só tem descrição (1 chamada pro lote todo) ----
+      const idxSoDescricao: number[] = [];
+      const descricoesSoDescricao: string[] = [];
+      estados.forEach((e, i) => {
+        if (!e.ncmInformado && e.descricao) {
+          idxSoDescricao.push(i);
+          descricoesSoDescricao.push(normalizar(e.descricao));
+        }
+      });
+      if (idxSoDescricao.length && companyId) {
+        const { data: rows } = await supabase.rpc("search_acervo_by_text_batch", {
+          p_company_id: companyId,
+          p_queries: descricoesSoDescricao,
+          p_limit: 1,
+        });
+        const porIdx = agruparPorIdx(rows as Array<{ query_idx: number } & Record<string, unknown>>);
+        idxSoDescricao.forEach((origIdx, pos) => {
+          const hit = porIdx.get(pos + 1)?.[0] as { score: number } & Record<string, unknown> | undefined;
+          if (hit && hit.score > 0.5) estados[origIdx].fonteAcervo = hit;
+        });
       }
-    });
-    if (idxPrecisaCandidatos.length) {
-      const { data: rows } = await supabase.rpc("search_ncm_by_text_batch", {
-        p_queries: descricoesPrecisaCandidatos,
-        p_limit: 3,
-      });
-      const porIdx = agruparPorIdx(rows as Array<{ query_idx: number; codigo: string; descricao: string }>);
-      idxPrecisaCandidatos.forEach((origIdx, pos) => {
-        estados[origIdx].ncmCandidatos = (porIdx.get(pos + 1) ?? []).map((c) => ({
-          codigo: c.codigo,
-          descricao: c.descricao,
-        }));
-      });
-    }
 
-    // ---- FASE 3.5: Gemini propõe o NCM (conhecimento próprio) e a gente valida contra a tabela oficial ----
-    const itensParaGemini: ItemParaGemini[] = idxPrecisaCandidatos.map((origIdx) => ({
-      idx: origIdx,
-      descricao: estados[origIdx].descricao!,
-      candidatosFracos: estados[origIdx].ncmCandidatos ?? [],
-    }));
-    const propostasGemini = await proporNcmsComGemini(
-      { segmento_atuacao: contact?.segmento_atuacao, setor_atuacao: contact?.setor_atuacao },
-      itensParaGemini,
-    );
-    if (propostasGemini.length) {
-      const { data: validados } = await supabase.rpc("validar_ncm_leaf_batch", {
-        p_ncms: propostasGemini.map((p) => p.ncmProposto),
+      // ---- FASE 3: candidatos de NCM por descrição, pra quem sobrou (1 chamada) ----
+      const idxPrecisaCandidatos: number[] = [];
+      const descricoesPrecisaCandidatos: string[] = [];
+      idxSoDescricao.forEach((origIdx) => {
+        if (!estados[origIdx].fonteAcervo) {
+          idxPrecisaCandidatos.push(origIdx);
+          descricoesPrecisaCandidatos.push(normalizar(estados[origIdx].descricao!));
+        }
       });
-      const validadosPorPos = new Map(
-        (validados as Array<{ query_idx: number; codigo: string; descricao: string }>).map((v) => [v.query_idx, v]),
+      if (idxPrecisaCandidatos.length) {
+        const { data: rows } = await supabase.rpc("search_ncm_by_text_batch", {
+          p_queries: descricoesPrecisaCandidatos,
+          p_limit: 3,
+        });
+        const porIdx = agruparPorIdx(rows as Array<{ query_idx: number; codigo: string; descricao: string }>);
+        idxPrecisaCandidatos.forEach((origIdx, pos) => {
+          estados[origIdx].ncmCandidatos = (porIdx.get(pos + 1) ?? []).map((c) => ({
+            codigo: c.codigo,
+            descricao: c.descricao,
+          }));
+        });
+      }
+
+      // ---- FASE 3.5: Gemini propõe o NCM (conhecimento próprio) e a gente valida contra a tabela oficial ----
+      const itensParaGemini: ItemParaGemini[] = idxPrecisaCandidatos.map((origIdx) => ({
+        idx: origIdx,
+        descricao: estados[origIdx].descricao!,
+        candidatosFracos: estados[origIdx].ncmCandidatos ?? [],
+        pistas: {
+          categoria: mapeamentoPistas.categoria
+            ? String(itens[origIdx].linha_original[mapeamentoPistas.categoria] ?? "").trim() || undefined
+            : undefined,
+          marca: mapeamentoPistas.marca
+            ? String(itens[origIdx].linha_original[mapeamentoPistas.marca] ?? "").trim() || undefined
+            : undefined,
+          unidade: mapeamentoPistas.unidade
+            ? String(itens[origIdx].linha_original[mapeamentoPistas.unidade] ?? "").trim() || undefined
+            : undefined,
+        },
+      }));
+      const propostasGemini = await proporNcmsComGemini(
+        { segmento_atuacao: contact?.segmento_atuacao, setor_atuacao: contact?.setor_atuacao, cnae_descricao: cnaeDescricao },
+        itensParaGemini,
       );
-      let aceitos = 0;
-      propostasGemini.forEach((p, pos) => {
-        const validado = validadosPorPos.get(pos + 1);
-        if (!validado) return;
-        estados[p.idx].ncmResolvido = { codigo: validado.codigo, descricao: validado.descricao };
-        estados[p.idx].motivoIa = p.justificativa;
-        aceitos += 1;
-      });
-      console.log(`[gemini] ${propostasGemini.length} propostas, ${aceitos} validadas contra a tabela oficial`);
-    }
-
-    // ---- FASE 4: CEST + cClassTrib pra quem tem NCM resolvido (2 chamadas) ----
-    const idxComNcmResolvido: number[] = [];
-    const ncmsResolvidos: string[] = [];
-    const queriesCest: string[] = [];
-    estados.forEach((e, i) => {
-      if (e.ncmResolvido) {
-        idxComNcmResolvido.push(i);
-        ncmsResolvidos.push(e.ncmResolvido.codigo);
-        queriesCest.push(e.descricao ?? e.ncmResolvido.descricao);
+      if (propostasGemini.length) {
+        const { data: validados } = await supabase.rpc("validar_ncm_leaf_batch", {
+          p_ncms: propostasGemini.map((p) => p.ncmProposto),
+        });
+        const validadosPorPos = new Map(
+          (validados as Array<{ query_idx: number; codigo: string; descricao: string }>).map((v) => [v.query_idx, v]),
+        );
+        let aceitos = 0;
+        propostasGemini.forEach((p, pos) => {
+          const validado = validadosPorPos.get(pos + 1);
+          if (!validado) return;
+          estados[p.idx].ncmResolvido = { codigo: validado.codigo, descricao: validado.descricao };
+          estados[p.idx].motivoIa = p.justificativa;
+          aceitos += 1;
+        });
+        console.log(`[gemini] ${propostasGemini.length} propostas, ${aceitos} validadas contra a tabela oficial`);
       }
-    });
 
-    type CestHit = { query_idx: number; codigo: string; descricao: string };
-    type CclasstribHit = {
-      query_idx: number; cclasstrib_codigo: string; cclasstrib_nome: string; anexo: string; item_lei: string;
-    };
-    let cestPorIdx = new Map<number, CestHit[]>();
-    let cclasstribPorIdx = new Map<number, CclasstribHit[]>();
-    if (idxComNcmResolvido.length) {
-      const [cestRes, ccRes] = await Promise.all([
-        supabase.rpc("find_cest_by_ncm_batch", { p_ncms: ncmsResolvidos, p_queries: queriesCest, p_limit: 5 }),
-        supabase.rpc("resolve_cclasstrib_by_ncm_batch", { p_ncms: ncmsResolvidos }),
-      ]);
-      cestPorIdx = agruparPorIdx(cestRes.data as CestHit[]);
-      cclasstribPorIdx = agruparPorIdx(ccRes.data as CclasstribHit[]);
+      // ---- FASE 4: CEST + cClassTrib pra quem tem NCM resolvido (2 chamadas) ----
+      const idxComNcmResolvido: number[] = [];
+      const ncmsResolvidos: string[] = [];
+      const queriesCest: string[] = [];
+      estados.forEach((e, i) => {
+        if (e.ncmResolvido) {
+          idxComNcmResolvido.push(i);
+          ncmsResolvidos.push(e.ncmResolvido.codigo);
+          queriesCest.push(e.descricao ?? e.ncmResolvido.descricao);
+        }
+      });
+
+      if (idxComNcmResolvido.length) {
+        const [cestRes, ccRes] = await Promise.all([
+          supabase.rpc("find_cest_by_ncm_batch", { p_ncms: ncmsResolvidos, p_queries: queriesCest, p_limit: 5 }),
+          supabase.rpc("resolve_cclasstrib_by_ncm_batch", { p_ncms: ncmsResolvidos }),
+        ]);
+        cestPorIdx = agruparPorIdx(cestRes.data as Array<{ query_idx: number; codigo: string; descricao: string }>);
+        cclasstribPorIdx = agruparPorIdx(
+          ccRes.data as Array<{ query_idx: number; cclasstrib_codigo: string; cclasstrib_nome: string; anexo: string; item_lei: string }>,
+        );
+      }
+
+      // cClassTrib padrão + CST de todas as hipóteses especiais com exatamente 1
+      // hit — busca única em lote, feita aqui pra não precisar de mais uma
+      // chamada sequencial por item dentro do loop de montagem abaixo.
+      const codigosEspeciaisComHitUnico = Array.from(
+        new Set(
+          Array.from(cclasstribPorIdx.values())
+            .filter((hits) => hits.length === 1)
+            .map((hits) => hits[0].cclasstrib_codigo),
+        ),
+      );
+      const { data: cclasstribInfoRows } = await supabase
+        .from("cclasstrib_codes")
+        .select("codigo, nome, cst_vinculado")
+        .in("codigo", [...codigosEspeciaisComHitUnico, "000001"]);
+      cclasstribInfoPorCodigo = new Map((cclasstribInfoRows ?? []).map((r) => [r.codigo, r]));
+      padraoRow = cclasstribInfoPorCodigo.get("000001");
     }
 
-    // cClassTrib padrão + CST de todas as hipóteses especiais com exatamente 1
-    // hit — busca única em lote, feita aqui pra não precisar de mais uma
-    // chamada sequencial por item dentro do loop de montagem abaixo.
-    const codigosEspeciaisComHitUnico = Array.from(
-      new Set(
-        Array.from(cclasstribPorIdx.values())
-          .filter((hits) => hits.length === 1)
-          .map((hits) => hits[0].cclasstrib_codigo),
-      ),
-    );
-    const { data: cclasstribInfoRows } = await supabase
-      .from("cclasstrib_codes")
-      .select("codigo, nome, cst_vinculado")
-      .in("codigo", [...codigosEspeciaisComHitUnico, "000001"]);
-    const cclasstribInfoPorCodigo = new Map((cclasstribInfoRows ?? []).map((r) => [r.codigo, r]));
-    const padraoRow = cclasstribInfoPorCodigo.get("000001");
+    /** Escreve (ou compara, em modo conferência) um campo de saída — só se
+     *  ele estiver selecionado em `campos`. */
+    function escreverCampo(
+      linha: Record<string, unknown>,
+      linhaOriginal: Record<string, unknown>,
+      campo: CampoKey,
+      valor: unknown,
+      opts?: { ambiguo?: boolean },
+    ) {
+      if (!camposSet.has(campo)) return;
+      const label = NOME_COLUNA_PADRAO[campo];
+      if (modo === "conferir") {
+        if (opts?.ambiguo) {
+          linha[`${label} — conferência`] = `Múltiplos candidatos — revisar manualmente: ${valor}`;
+          return;
+        }
+        const existente = linhaOriginal[mapeamentoSaida[campo]!];
+        linha[`${label} — conferência`] = compararCodigos(existente, valor)
+          ? "OK"
+          : `Divergente — sistema sugere: ${valor}`;
+      } else {
+        linha[mapeamentoSaida[campo] || label] = valor;
+      }
+    }
 
     // ---- Monta as linhas de saída, na ordem original da planilha ----
     const linhasResultado: Array<Record<string, unknown>> = [];
@@ -441,24 +533,30 @@ Deno.serve(async (req) => {
     let confirmaveis = 0;
 
     itens.forEach((item, i) => {
-      const e = estados[i];
       const linha: Record<string, unknown> = { ...item.linha_original };
 
+      if (soCfop) {
+        escreverCampo(linha, item.linha_original, "cfop", CFOP_REFERENCIA_CODIGO);
+        linhasResultado.push(linha);
+        confirmaveis += 1;
+        return;
+      }
+
+      const e = estados[i];
+
       if (e.semDescricaoNemNcm) {
-        linha["Classificação — status"] = "sem descrição/NCM na linha";
         linhasResultado.push(linha);
         return;
       }
 
       if (e.fonteAcervo) {
         const fa = e.fonteAcervo;
-        linha["Classificação — status"] = "reaproveitado do acervo";
-        linha["NCM sugerido"] = fa.ncm;
-        linha["CEST sugerido"] = fa.cest;
-        linha["cClassTrib sugerido"] = fa.cclasstrib;
-        linha["CST-IBS/CBS"] = fa.cst_ibs_cbs;
-        linha["CSOSN sugerido"] = fa.csosn;
-        linha["CFOP referência"] = fa.cfop_referencia;
+        escreverCampo(linha, item.linha_original, "ncm", fa.ncm);
+        escreverCampo(linha, item.linha_original, "cest", fa.cest);
+        escreverCampo(linha, item.linha_original, "cclasstrib", fa.cclasstrib);
+        escreverCampo(linha, item.linha_original, "cst", fa.cst_ibs_cbs);
+        escreverCampo(linha, item.linha_original, "csosn", fa.csosn);
+        escreverCampo(linha, item.linha_original, "cfop", fa.cfop_referencia);
         linhasResultado.push(linha);
         registrosParaGravar.push({
           company_id: companyId,
@@ -480,15 +578,11 @@ Deno.serve(async (req) => {
       }
 
       if (e.ncmNaoEncontrado) {
-        linha["Classificação — status"] = `NCM "${e.ncmInformado}" não encontrado na base oficial`;
         linhasResultado.push(linha);
         return;
       }
 
       if (!e.ncmResolvido) {
-        linha["Classificação — status"] = GEMINI_API_KEY
-          ? "NCM não identificado com confiança (IA consultada, sem proposta válida)"
-          : "NCM não identificado com confiança";
         linha["Classificação — candidatos NCM"] = (e.ncmCandidatos ?? [])
           .map((c) => `${c.codigo} — ${c.descricao}`)
           .join(" | ");
@@ -533,16 +627,18 @@ Deno.serve(async (req) => {
         csosnSugerido = cestCandidatos.length > 0 ? "201" : "101";
       }
 
-      linha["Classificação — status"] = ambiguo || cestAmbiguo
-        ? "AMBÍGUO — revisar"
-        : e.motivoIa ? "sugerido por IA (Gemini) — confirmar" : "ok";
-      linha["NCM sugerido"] = e.ncmResolvido.codigo;
-      linha["CEST sugerido"] = cestTexto;
-      linha["cClassTrib sugerido"] = ambiguo ? cclasstribNome : `${cclasstribCodigo} — ${cclasstribNome}`;
-      linha["CST-IBS/CBS"] = cstFinal ?? "";
-      linha["CSOSN sugerido"] = csosnSugerido ?? "";
-      linha["CFOP referência"] = `${CFOP_REFERENCIA_CODIGO} (referência — confirmar na emissão)`;
-      if (e.motivoIa) linha["Classificação — IA (motivo)"] = e.motivoIa;
+      escreverCampo(linha, item.linha_original, "ncm", e.ncmResolvido.codigo);
+      escreverCampo(linha, item.linha_original, "cest", cestTexto, { ambiguo: cestAmbiguo });
+      escreverCampo(
+        linha,
+        item.linha_original,
+        "cclasstrib",
+        ambiguo ? cclasstribNome : `${cclasstribCodigo} — ${cclasstribNome}`,
+        { ambiguo },
+      );
+      escreverCampo(linha, item.linha_original, "cst", cstFinal ?? "");
+      escreverCampo(linha, item.linha_original, "csosn", csosnSugerido ?? "");
+      escreverCampo(linha, item.linha_original, "cfop", CFOP_REFERENCIA_CODIGO);
       linhasResultado.push(linha);
 
       if (!ambiguo && !cestAmbiguo) {

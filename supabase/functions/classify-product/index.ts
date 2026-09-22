@@ -54,14 +54,22 @@ interface NcmCandidato {
 async function proporNcmComGemini(
   descricao: string,
   candidatosFracos: NcmCandidato[],
-  contexto: { segmento_atuacao?: string; setor_atuacao?: string },
+  contexto: { segmento_atuacao?: string; setor_atuacao?: string; cnae_descricao?: string },
 ): Promise<{ codigo: string; justificativa: string } | null> {
   if (!GEMINI_API_KEY) {
     console.log("[gemini] GEMINI_API_KEY não configurada — pulando IA");
     return null;
   }
 
+  // CNAE é mais preciso que segmento/setor_atuacao (texto livre) — confirmado
+  // com caso real: segmento_atuacao dizia "pecuária" pra um cliente cujo CNAE
+  // principal é "Criação de peixes em água doce". Manda os dois quando existem.
+  const contextoPartes: string[] = [];
+  if (contexto.cnae_descricao) contextoPartes.push(`atividade principal (CNAE): "${contexto.cnae_descricao}"`);
   const segmento = contexto.segmento_atuacao || contexto.setor_atuacao;
+  if (segmento) contextoPartes.push(`segmento cadastrado: "${segmento}"`);
+  const linhaContexto = contextoPartes.length ? `Contexto do cliente: ${contextoPartes.join("; ")}.` : "";
+
   const pistas = candidatosFracos.length
     ? `\nPistas de uma busca textual (podem não ser relevantes, use com cautela): ${candidatosFracos.map((c) => `${c.codigo} - ${c.descricao}`).join(" | ")}`
     : "";
@@ -70,7 +78,7 @@ Harmonizado) e conhece produtos e marcas comuns no comércio brasileiro.
 Proponha o código NCM de 8 dígitos que melhor classifica o produto abaixo (nome comercial dado pelo
 cliente, que pode ser uma marca ou nome popular — ex.: "Pescueiro" é peixe), usando seu próprio
 conhecimento. Se não tiver confiança nenhuma, devolva ncm_proposto null.
-${segmento ? `Contexto: o cliente atua no segmento "${segmento}".` : ""}
+${linhaContexto}
 
 Produto (nome comercial): "${descricao}"${pistas}`;
 
@@ -174,7 +182,7 @@ Deno.serve(async (req) => {
     if (contactId) {
       const { data: contact } = await supabase
         .from("contacts")
-        .select("tax_regime, setor_atuacao, segmento_atuacao, state")
+        .select("tax_regime, setor_atuacao, segmento_atuacao, state, cnae_principal")
         .eq("id", contactId)
         .maybeSingle();
       if (contact) contexto = contact;
@@ -217,7 +225,11 @@ Deno.serve(async (req) => {
         });
         ncmCandidatos = candidatos ?? [];
 
-        const proposta = await proporNcmComGemini(descricao, ncmCandidatos, contexto);
+        const proposta = await proporNcmComGemini(descricao, ncmCandidatos, {
+          segmento_atuacao: contexto.segmento_atuacao as string | undefined,
+          setor_atuacao: contexto.setor_atuacao as string | undefined,
+          cnae_descricao: (contexto.cnae_principal as { descricao?: string } | null)?.descricao,
+        });
         let ncmValidado: { codigo: string; descricao: string } | null = null;
         if (proposta) {
           const { data: validados } = await supabase.rpc("validar_ncm_leaf_batch", {

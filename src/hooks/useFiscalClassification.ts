@@ -192,9 +192,15 @@ export function useFiscalClassificationHistory() {
   return { historico: query.data ?? [], ...query };
 }
 
+export type CampoLote = 'ncm' | 'cest' | 'cclasstrib' | 'cst' | 'csosn' | 'cfop';
+
 export interface ClassificarLoteInput {
   contactId: string;
   itens: Array<{ descricao?: string; ncm?: string; linha_original: Record<string, unknown> }>;
+  campos: CampoLote[];
+  mapeamentoSaida: Partial<Record<CampoLote, string>>;
+  mapeamentoPistas: { categoria?: string; marca?: string; unidade?: string };
+  modo: 'classificar' | 'conferir';
 }
 
 export interface ClassificarLoteResultado {
@@ -210,7 +216,12 @@ export function useClassifyBatch() {
   return useMutation({
     mutationFn: (input: ClassificarLoteInput) =>
       invocarFunction<ClassificarLoteResultado>('classify-batch', {
-        contact_id: input.contactId, itens: input.itens,
+        contact_id: input.contactId,
+        itens: input.itens,
+        campos: input.campos,
+        mapeamento_saida: input.mapeamentoSaida,
+        mapeamento_pistas: input.mapeamentoPistas,
+        modo: input.modo,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fiscal-classification-batches'] });

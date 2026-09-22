@@ -3,11 +3,13 @@ import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Download, FileSpreadsheet, Loader2, Upload } from 'lucide-react';
-import { DsAlert, DsBadge } from '@/components/ds';
+import { DsAlert, DsBadge, segmentedListClass, segmentedTriggerClass } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -18,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useContacts } from '@/hooks/useContacts';
 import {
   baixarPlanilhaLote, useClassifyBatch, useFiscalClassificationBatches,
+  type CampoLote,
 } from '@/hooks/useFiscalClassification';
 import { getContactDisplayName } from '@/lib/contact-display';
 
@@ -26,6 +29,15 @@ const STATUS_LABEL: Record<string, string> = {
   concluido: 'Concluído',
   erro: 'Erro',
 };
+
+const CAMPOS_CONFIG: Array<{ key: CampoLote; label: string }> = [
+  { key: 'ncm', label: 'NCM' },
+  { key: 'cest', label: 'CEST' },
+  { key: 'cclasstrib', label: 'cClassTrib' },
+  { key: 'cst', label: 'CST-IBS/CBS' },
+  { key: 'csosn', label: 'CSOSN' },
+  { key: 'cfop', label: 'CFOP' },
+];
 
 async function baixarArquivo(path: string, nomeArquivo: string) {
   const url = await baixarPlanilhaLote(path);
@@ -47,13 +59,29 @@ export function UploadLoteFiscal() {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [colDescricao, setColDescricao] = useState('');
   const [colNcm, setColNcm] = useState('');
+  const [colCategoria, setColCategoria] = useState('');
+  const [colMarca, setColMarca] = useState('');
+  const [colUnidade, setColUnidade] = useState('');
+  const [modo, setModo] = useState<'classificar' | 'conferir'>('classificar');
+  const [camposSelecionados, setCamposSelecionados] = useState<Record<CampoLote, boolean>>({
+    ncm: true, cest: true, cclasstrib: true, cst: true, csosn: true, cfop: true,
+  });
+  const [mapeamentoSaida, setMapeamentoSaida] = useState<Record<CampoLote, string>>({
+    ncm: '', cest: '', cclasstrib: '', cst: '', csosn: '', cfop: '',
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const clientes = useMemo(
     () => contacts.filter((c) => c.is_active && c.type === 'cliente'),
     [contacts],
   );
-  const podeProcessar = contactId && colDescricao && rows.length > 0 && !classificarLote.isPending;
+
+  const camposFaltandoMapeamento = modo === 'conferir'
+    ? CAMPOS_CONFIG.filter((c) => camposSelecionados[c.key] && !mapeamentoSaida[c.key])
+    : [];
+  const nenhumCampoSelecionado = CAMPOS_CONFIG.every((c) => !camposSelecionados[c.key]);
+  const podeProcessar = Boolean(contactId) && Boolean(colDescricao) && rows.length > 0
+    && !classificarLote.isPending && !nenhumCampoSelecionado && camposFaltandoMapeamento.length === 0;
 
   const handleFile = async (file: File) => {
     const data = await file.arrayBuffer();
@@ -71,6 +99,10 @@ export function UploadLoteFiscal() {
     setRows(parsedRows);
     setColDescricao('');
     setColNcm('');
+    setColCategoria('');
+    setColMarca('');
+    setColUnidade('');
+    setMapeamentoSaida({ ncm: '', cest: '', cclasstrib: '', cst: '', csosn: '', cfop: '' });
   };
 
   const processar = () => {
@@ -80,12 +112,28 @@ export function UploadLoteFiscal() {
       linha_original: row,
     }));
 
+    const campos = CAMPOS_CONFIG.filter((c) => camposSelecionados[c.key]).map((c) => c.key);
+    const mapeamentoSaidaFiltrado = Object.fromEntries(
+      Object.entries(mapeamentoSaida).filter(([, v]) => v),
+    ) as Partial<Record<CampoLote, string>>;
+
     classificarLote.mutate(
-      { contactId, itens },
+      {
+        contactId,
+        itens,
+        campos,
+        mapeamentoSaida: mapeamentoSaidaFiltrado,
+        mapeamentoPistas: {
+          categoria: colCategoria || undefined,
+          marca: colMarca || undefined,
+          unidade: colUnidade || undefined,
+        },
+        modo,
+      },
       {
         onSuccess: (r) => {
           toast({
-            title: 'Lote processado',
+            title: modo === 'conferir' ? 'Conferência concluída' : 'Lote processado',
             description: `${r.resolvidos_automaticamente} de ${r.total_itens} resolvidos automaticamente.`,
           });
         },
@@ -154,6 +202,96 @@ export function UploadLoteFiscal() {
                 </div>
               </div>
 
+              <div className="space-y-1.5">
+                <Label>Pistas extras (opcional — melhora a precisão da IA)</Label>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Select value={colCategoria} onValueChange={setColCategoria}>
+                    <SelectTrigger><SelectValue placeholder="Categoria/Departamento" /></SelectTrigger>
+                    <SelectContent>
+                      {headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={colMarca} onValueChange={setColMarca}>
+                    <SelectTrigger><SelectValue placeholder="Marca/Fabricante" /></SelectTrigger>
+                    <SelectContent>
+                      {headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={colUnidade} onValueChange={setColUnidade}>
+                    <SelectTrigger><SelectValue placeholder="Unidade/Embalagem" /></SelectTrigger>
+                    <SelectContent>
+                      {headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Modo</Label>
+                <Tabs value={modo} onValueChange={(v) => setModo(v as 'classificar' | 'conferir')}>
+                  <TabsList className={segmentedListClass}>
+                    <TabsTrigger value="classificar" className={segmentedTriggerClass}>Classificar</TabsTrigger>
+                    <TabsTrigger value="conferir" className={segmentedTriggerClass}>Conferir</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <p className="text-meta text-muted-ink-2">
+                  {modo === 'conferir'
+                    ? 'Compara o que a planilha já tem com o que o sistema calcula — não sobrescreve os valores originais, só sinaliza divergência.'
+                    : 'Preenche os campos marcados abaixo.'}
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>O que {modo === 'conferir' ? 'conferir' : 'processar'}</Label>
+                <div className="overflow-hidden rounded-md border border-line">
+                  <table className="w-full text-sm">
+                    <thead className="bg-bg-2 text-meta text-muted-ink-2">
+                      <tr>
+                        <th className="w-10 p-2 text-left" />
+                        <th className="p-2 text-left">Campo</th>
+                        <th className="p-2 text-left">Coluna já existente (opcional)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {CAMPOS_CONFIG.map((c) => (
+                        <tr key={c.key} className="border-t border-line">
+                          <td className="p-2">
+                            <Checkbox
+                              checked={camposSelecionados[c.key]}
+                              onCheckedChange={(v) =>
+                                setCamposSelecionados((s) => ({ ...s, [c.key]: v === true }))}
+                            />
+                          </td>
+                          <td className="p-2 font-medium text-ink">{c.label}</td>
+                          <td className="p-2">
+                            <Select
+                              value={mapeamentoSaida[c.key]}
+                              onValueChange={(v) => setMapeamentoSaida((s) => ({ ...s, [c.key]: v }))}
+                              disabled={!camposSelecionados[c.key]}
+                            >
+                              <SelectTrigger className="h-8"><SelectValue placeholder="Nova coluna" /></SelectTrigger>
+                              <SelectContent>
+                                {headers.map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {nenhumCampoSelecionado && (
+                  <DsAlert tone="warn" title="Selecione ao menos um campo pra processar." />
+                )}
+                {camposFaltandoMapeamento.length > 0 && (
+                  <DsAlert
+                    tone="warn"
+                    title="Modo conferência precisa de uma coluna mapeada pra cada campo marcado"
+                    description={`Faltou: ${camposFaltandoMapeamento.map((c) => c.label).join(', ')}.`}
+                  />
+                )}
+              </div>
+
               <p className="text-meta text-muted-ink-2">{rows.length} produtos encontrados na planilha.</p>
 
               {classificarLote.isPending && (
@@ -162,7 +300,7 @@ export function UploadLoteFiscal() {
 
               <Button onClick={processar} disabled={!podeProcessar}>
                 {classificarLote.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-                Processar {rows.length} produtos
+                {modo === 'conferir' ? 'Conferir' : 'Processar'} {rows.length} produtos
               </Button>
             </>
           )}
