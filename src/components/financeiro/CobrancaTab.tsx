@@ -97,11 +97,22 @@ export function CobrancaTab() {
     });
   };
 
-  const gerarPrint = async (): Promise<string | null> => {
+  // PNG (não JPEG) porque é o único formato que a Clipboard API aceita de forma confiável
+  // pra ClipboardItem em Chrome/Edge — precisa pro Ctrl+V direto no WhatsApp.
+  const gerarPrintBlob = async (): Promise<Blob | null> => {
     if (!reciboRef.current) return null;
     const html2canvas = (await import('html2canvas')).default;
     const canvas = await html2canvas(reciboRef.current, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-    return canvas.toDataURL('image/jpeg', 0.92);
+    return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'));
+  };
+
+  const baixarBlob = (blob: Blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cobranca-${format(new Date(), 'yyyy-MM-dd')}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleCopiar = async () => {
@@ -116,17 +127,27 @@ export function CobrancaTab() {
     if (!destinoWhats.trim()) { toast.error('Informe o WhatsApp de destino.'); return; }
     setGerandoPrint(true);
     try {
-      const url = await gerarPrint();
-      if (url) {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `cobranca-${format(new Date(), 'yyyy-MM-dd')}.jpg`;
-        a.click();
+      const blob = await gerarPrintBlob();
+      let imagemCopiada = false;
+      if (blob && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          imagemCopiada = true;
+        } catch {
+          imagemCopiada = false;
+        }
       }
+      // Sem suporte a copiar imagem (ou falhou) — baixa o arquivo como alternativa.
+      if (!imagemCopiada && blob) baixarBlob(blob);
+
       const numero = destinoWhats.replace(/\D/g, '');
       window.open(`https://wa.me/55${numero}?text=${encodeURIComponent(mensagem)}`, '_blank');
       registrarLocal.mutate({ boleto_ids: selectedBoletos.map((b) => b.id), canal: 'whatsapp', destino: destinoWhats, mensagem });
-      toast.success(url ? 'Print baixado — arraste pra dentro da conversa que abriu no WhatsApp.' : 'WhatsApp aberto.');
+      toast.success(
+        imagemCopiada
+          ? 'Imagem copiada — na conversa que abriu, dá um Ctrl+V pra anexar o print junto com o texto.'
+          : 'WhatsApp aberto — não deu pra copiar a imagem automaticamente aqui, baixei o arquivo pra anexar manualmente.',
+      );
     } catch (e: any) {
       toast.error(e?.message ?? 'Falha ao gerar o print.');
     } finally {
@@ -166,7 +187,7 @@ export function CobrancaTab() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+    <div className="space-y-6">
       <div className="space-y-4">
         {/* Busca multi-seleção de clientes com boleto vencido */}
         <div className="space-y-2">
@@ -307,19 +328,15 @@ export function CobrancaTab() {
         )}
       </div>
 
-      {/* Preview do print — mesmo conteúdo que vai pro JPG baixado ao clicar em WhatsApp */}
-      <div className="space-y-2">
-        <Label className="text-ink">Preview da cobrança</Label>
-        {selectedBoletos.length === 0 ? (
-          <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-line text-center text-meta text-muted-ink-2">
-            Selecione um cliente pra ver o preview.
-          </div>
-        ) : (
-          <div className="overflow-auto rounded-lg border border-line bg-bg-2 p-3">
+      {/* Preview do print — mesmo conteúdo que vai pra imagem copiada ao clicar em WhatsApp */}
+      {selectedBoletos.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-ink">Preview da cobrança</Label>
+          <div className="flex justify-center rounded-lg border border-line bg-bg-2 p-4">
             <ReciboPreview ref={reciboRef} contacts={selectedContacts} boletos={selectedBoletos} total={totalAtualizado} />
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
