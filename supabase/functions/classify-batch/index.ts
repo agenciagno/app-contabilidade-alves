@@ -16,14 +16,30 @@
 // sozinhos: a planilha de saída marca "AMBÍGUO — revisar" com os candidatos
 // listados, e o item não entra no acervo — quem resolve é a equipe.
 //
-// Gemini (22/09/2026): quando a busca textual (FASE 3) devolve candidatos mas
-// nenhum score alto o bastante pra decidir sozinha, pedimos pro Gemini
-// escolher UM candidato dentre os já buscados no banco oficial — nunca aceita
-// código fora da lista de candidatos. Pra não reintroduzir o mesmo problema
-// de N chamadas sequenciais que causou o timeout original, o lote inteiro vai
-// em poucas chamadas ao Gemini (chunks de ~40 itens, com concorrência
-// limitada), não uma por item. Sem GEMINI_API_KEY configurada, esses itens
-// simplesmente caem no comportamento antigo (vão pra revisão manual).
+// Gemini (22/09/2026, v1 — não funcionou): a primeira versão pedia pro Gemini
+// escolher ENTRE os candidatos da busca textual (trigram). Descoberta na hora
+// de testar: descrição oficial do NCM é hierárquica — o termo genérico
+// ("peixe", "filé") só aparece no nível do capítulo/posição, não no código
+// de 8 dígitos que classifica de fato ("Bagre americano" não menciona peixe).
+// Mesmo concatenando a descrição com todos os ancestrais (ver
+// refresh_ncm_descricao_hierarquica), a busca textual pura não supera nomes
+// comerciais/de marca ("Filé Pescueiro Premium" não tem nenhuma palavra em
+// comum com a nomenclatura oficial) — os "candidatos" viravam ruído
+// (ex.: bateu com "Selos postais" por acaso de trigrama), e o Gemini
+// corretamente devolvia null pra tudo.
+//
+// v2 (atual): não restringe mais o Gemini aos candidatos da busca textual.
+// Ele PROPÕE o código NCM usando o próprio conhecimento de nomenclatura
+// brasileira/Mercosul (reconhece que "Pescueiro" é peixe, por ex.), e a gente
+// VALIDA o código proposto contra a tabela oficial (validar_ncm_leaf_batch)
+// antes de aceitar — nunca grava um código que não exista na tabela do
+// Siscomex, mesmo vindo da IA. Os candidatos da busca textual (FASE 3) ainda
+// vão no prompt como pista opcional, não como restrição.
+// Pra não reintroduzir o problema de N chamadas sequenciais que causou o
+// timeout original, o lote inteiro vai em poucas chamadas ao Gemini (chunks
+// de ~40 itens, com concorrência limitada), não uma por item. Sem
+// GEMINI_API_KEY configurada, esses itens caem no comportamento antigo (vão
+// pra revisão manual com os candidatos textuais, se houver).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as XLSX from "npm:xlsx@0.18.5";
 
@@ -53,22 +69,31 @@ interface CandidatoNcm {
 interface ItemParaGemini {
   idx: number;
   descricao: string;
-  candidatos: CandidatoNcm[];
+  candidatosFracos: CandidatoNcm[];
 }
 
-/** Resolve, em poucas chamadas (chunks), qual candidato de NCM o Gemini escolhe
- *  pra cada item — nunca aceita código fora da lista de candidatos daquele item. */
-async function escolherNcmsComGemini(
+interface PropostaGemini {
+  idx: number;
+  ncmProposto: string;
+  justificativa: string;
+}
+
+/** Pede pro Gemini PROPOR o código NCM usando o próprio conhecimento de
+ *  nomenclatura (não restrito a candidatos de busca textual — ver comentário
+ *  no topo do arquivo sobre por que isso não funcionava). O código proposto
+ *  ainda não é confiável por si só: quem chama isso tem que validar contra
+ *  `validar_ncm_leaf_batch` antes de aceitar. */
+async function proporNcmsComGemini(
   contexto: { segmento_atuacao?: string; setor_atuacao?: string },
   itens: ItemParaGemini[],
-): Promise<Map<number, { codigo: string; justificativa: string }>> {
-  const resultado = new Map<number, { codigo: string; justificativa: string }>();
+): Promise<PropostaGemini[]> {
+  const propostas: PropostaGemini[] = [];
   if (!GEMINI_API_KEY) {
     console.log("[gemini] GEMINI_API_KEY não configurada — pulando IA");
-    return resultado;
+    return propostas;
   }
-  if (!itens.length) return resultado;
-  console.log(`[gemini] ${itens.length} itens pra IA escolher`);
+  if (!itens.length) return propostas;
+  console.log(`[gemini] ${itens.length} itens pra IA propor NCM`);
 
   const segmento = contexto.segmento_atuacao || contexto.setor_atuacao;
   const chunks: ItemParaGemini[][] = [];
@@ -77,14 +102,22 @@ async function escolherNcmsComGemini(
   }
 
   async function processarChunk(chunk: ItemParaGemini[]) {
-    const prompt = `Você é especialista em classificação fiscal NCM (Nomenclatura Comum do Mercosul).
-Para cada produto abaixo (nome comercial dado pelo cliente), escolha, ENTRE OS CANDIDATOS listados,
-o NCM que melhor descreve o produto. Nunca escolha um código fora da lista de candidatos daquele
-item. Se nenhum candidato for um bom match, devolva ncm_escolhido null pra esse item.
+    const prompt = `Você é especialista em classificação fiscal NCM (Nomenclatura Comum do Mercosul/Sistema
+Harmonizado) e conhece produtos e marcas comuns no comércio brasileiro.
+Para cada produto abaixo (nome comercial dado pelo cliente, que pode ser uma marca ou nome
+popular — ex.: "Pescueiro" é peixe), proponha o código NCM de 8 dígitos que melhor classifica o
+produto, usando seu próprio conhecimento. Se não tiver confiança nenhuma, devolva ncm_proposto null.
+Pistas de uma busca textual (podem não ser relevantes, use com cautela): quando existirem, aparecem
+entre parênteses após o produto.
 ${segmento ? `Contexto: o cliente atua no segmento "${segmento}".` : ""}
 
 Produtos:
-${chunk.map((it) => `${it.idx}. "${it.descricao}" — candidatos: ${it.candidatos.map((c) => `${c.codigo} (${c.descricao})`).join(" | ")}`).join("\n")}`;
+${chunk.map((it) => {
+      const pistas = it.candidatosFracos.length
+        ? ` (pistas textuais: ${it.candidatosFracos.map((c) => `${c.codigo} - ${c.descricao}`).join(" | ")})`
+        : "";
+      return `${it.idx}. "${it.descricao}"${pistas}`;
+    }).join("\n")}`;
 
     try {
       const res = await fetch(
@@ -105,10 +138,10 @@ ${chunk.map((it) => `${it.idx}. "${it.descricao}" — candidatos: ${it.candidato
                       type: "object",
                       properties: {
                         idx: { type: "integer" },
-                        ncm_escolhido: { type: "string", nullable: true },
+                        ncm_proposto: { type: "string", nullable: true },
                         justificativa: { type: "string" },
                       },
-                      required: ["idx", "ncm_escolhido", "justificativa"],
+                      required: ["idx", "ncm_proposto", "justificativa"],
                     },
                   },
                 },
@@ -129,19 +162,15 @@ ${chunk.map((it) => `${it.idx}. "${it.descricao}" — candidatos: ${it.candidato
         return;
       }
       const parsed = JSON.parse(texto) as {
-        resultados: Array<{ idx: number; ncm_escolhido: string | null; justificativa: string }>;
+        resultados: Array<{ idx: number; ncm_proposto: string | null; justificativa: string }>;
       };
-      const candidatosPorIdx = new Map(chunk.map((it) => [it.idx, it.candidatos]));
-      let resolvidosNoChunk = 0;
+      let propostasNoChunk = 0;
       for (const r of parsed.resultados ?? []) {
-        if (!r.ncm_escolhido) continue;
-        const validos = candidatosPorIdx.get(r.idx) ?? [];
-        if (validos.some((c) => c.codigo === r.ncm_escolhido)) {
-          resultado.set(r.idx, { codigo: r.ncm_escolhido, justificativa: r.justificativa });
-          resolvidosNoChunk += 1;
-        }
+        if (!r.ncm_proposto) continue;
+        propostas.push({ idx: r.idx, ncmProposto: r.ncm_proposto, justificativa: r.justificativa });
+        propostasNoChunk += 1;
       }
-      console.log(`[gemini] chunk de ${chunk.length} itens — ${resolvidosNoChunk} resolvidos`);
+      console.log(`[gemini] chunk de ${chunk.length} itens — ${propostasNoChunk} propostas (a validar)`);
     } catch (err) {
       console.log(`[gemini] chunk deu excecao: ${(err as Error).message}`);
     }
@@ -150,7 +179,7 @@ ${chunk.map((it) => `${it.idx}. "${it.descricao}" — candidatos: ${it.candidato
   for (let i = 0; i < chunks.length; i += GEMINI_CONCORRENCIA) {
     await Promise.all(chunks.slice(i, i + GEMINI_CONCORRENCIA).map(processarChunk));
   }
-  return resultado;
+  return propostas;
 }
 
 interface ItemEntrada {
@@ -334,23 +363,33 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ---- FASE 3.5: Gemini escolhe entre os candidatos, quando a busca textual não bastou ----
-    const itensParaGemini: ItemParaGemini[] = idxPrecisaCandidatos
-      .filter((origIdx) => (estados[origIdx].ncmCandidatos ?? []).length > 0)
-      .map((origIdx) => ({
-        idx: origIdx,
-        descricao: estados[origIdx].descricao!,
-        candidatos: estados[origIdx].ncmCandidatos!,
-      }));
-    const escolhasGemini = await escolherNcmsComGemini(
+    // ---- FASE 3.5: Gemini propõe o NCM (conhecimento próprio) e a gente valida contra a tabela oficial ----
+    const itensParaGemini: ItemParaGemini[] = idxPrecisaCandidatos.map((origIdx) => ({
+      idx: origIdx,
+      descricao: estados[origIdx].descricao!,
+      candidatosFracos: estados[origIdx].ncmCandidatos ?? [],
+    }));
+    const propostasGemini = await proporNcmsComGemini(
       { segmento_atuacao: contact?.segmento_atuacao, setor_atuacao: contact?.setor_atuacao },
       itensParaGemini,
     );
-    escolhasGemini.forEach((escolha, origIdx) => {
-      const candidato = estados[origIdx].ncmCandidatos!.find((c) => c.codigo === escolha.codigo)!;
-      estados[origIdx].ncmResolvido = { codigo: candidato.codigo, descricao: candidato.descricao };
-      estados[origIdx].motivoIa = escolha.justificativa;
-    });
+    if (propostasGemini.length) {
+      const { data: validados } = await supabase.rpc("validar_ncm_leaf_batch", {
+        p_ncms: propostasGemini.map((p) => p.ncmProposto),
+      });
+      const validadosPorPos = new Map(
+        (validados as Array<{ query_idx: number; codigo: string; descricao: string }>).map((v) => [v.query_idx, v]),
+      );
+      let aceitos = 0;
+      propostasGemini.forEach((p, pos) => {
+        const validado = validadosPorPos.get(pos + 1);
+        if (!validado) return;
+        estados[p.idx].ncmResolvido = { codigo: validado.codigo, descricao: validado.descricao };
+        estados[p.idx].motivoIa = p.justificativa;
+        aceitos += 1;
+      });
+      console.log(`[gemini] ${propostasGemini.length} propostas, ${aceitos} validadas contra a tabela oficial`);
+    }
 
     // ---- FASE 4: CEST + cClassTrib pra quem tem NCM resolvido (2 chamadas) ----
     const idxComNcmResolvido: number[] = [];
@@ -447,8 +486,8 @@ Deno.serve(async (req) => {
       }
 
       if (!e.ncmResolvido) {
-        linha["Classificação — status"] = GEMINI_API_KEY && (e.ncmCandidatos ?? []).length
-          ? "NCM não identificado com confiança (IA também não confirmou)"
+        linha["Classificação — status"] = GEMINI_API_KEY
+          ? "NCM não identificado com confiança (IA consultada, sem proposta válida)"
           : "NCM não identificado com confiança";
         linha["Classificação — candidatos NCM"] = (e.ncmCandidatos ?? [])
           .map((c) => `${c.codigo} — ${c.descricao}`)

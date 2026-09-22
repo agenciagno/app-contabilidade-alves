@@ -13,12 +13,23 @@
 // humano, com o contexto real do produto. Se não bate em nenhum, a sugestão é o
 // código padrão "000001 - Tributação integral", que é a regra geral da reforma.
 //
-// Busca por descrição livre (sem NCM): trigram sozinho não entende que
-// "Coca-Cola" é um "refrigerante" — por isso, quando a busca textual devolve
-// candidatos mas nenhum com score alto o bastante pra decidir, pedimos pro
-// Gemini escolher UM deles (nunca inventar código fora da lista de
-// candidatos oficiais). Sem GEMINI_API_KEY configurada, cai de volta pro
-// comportamento antigo (devolve candidatos, humano decide).
+// Busca por descrição livre (sem NCM), v1 — não funcionou: pedia pro Gemini
+// escolher ENTRE os candidatos da busca textual (trigram). Descoberta na hora
+// de testar: descrição oficial do NCM é hierárquica — o termo genérico
+// ("peixe", "filé") só aparece no nível do capítulo/posição, não no código de
+// 8 dígitos que classifica de fato ("Bagre americano" não menciona peixe).
+// Mesmo concatenando com os ancestrais (ver refresh_ncm_descricao_hierarquica),
+// nome comercial/marca ("Filé Pescueiro Premium") não tem palavra em comum
+// com a nomenclatura oficial — os candidatos viravam ruído e o Gemini
+// corretamente devolvia null pra tudo.
+//
+// v2 (atual): não restringe mais o Gemini aos candidatos textuais. Ele PROPÕE
+// o código usando o próprio conhecimento de nomenclatura (reconhece que
+// "Pescueiro" é peixe, por ex.), e a gente VALIDA o código proposto contra a
+// tabela oficial (validar_ncm_leaf_batch) antes de aceitar — nunca grava um
+// código que não exista na tabela do Siscomex, mesmo vindo da IA. Sem
+// GEMINI_API_KEY configurada, cai pro comportamento antigo (candidatos
+// textuais fracos, humano decide).
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -36,31 +47,32 @@ interface NcmCandidato {
   score: number;
 }
 
-/** Pede ao Gemini pra escolher, entre os candidatos já buscados no banco oficial,
- *  qual NCM melhor descreve o produto. Nunca aceita um código fora da lista de
- *  candidatos — se o Gemini devolver algo que não está na lista, ou "null", o
- *  item cai de volta pra revisão manual. */
-async function escolherNcmComGemini(
+/** Pede pro Gemini PROPOR o código NCM usando o próprio conhecimento (não
+ *  restrito a candidatos de busca textual). Só retorna a proposta bruta —
+ *  quem chama tem que validar contra `validar_ncm_leaf_batch` antes de
+ *  aceitar, já que o Gemini pode propor um código que não existe. */
+async function proporNcmComGemini(
   descricao: string,
-  candidatos: NcmCandidato[],
+  candidatosFracos: NcmCandidato[],
   contexto: { segmento_atuacao?: string; setor_atuacao?: string },
 ): Promise<{ codigo: string; justificativa: string } | null> {
   if (!GEMINI_API_KEY) {
     console.log("[gemini] GEMINI_API_KEY não configurada — pulando IA");
     return null;
   }
-  if (!candidatos.length) return null;
 
   const segmento = contexto.segmento_atuacao || contexto.setor_atuacao;
-  const prompt = `Você é especialista em classificação fiscal NCM (Nomenclatura Comum do Mercosul).
-Escolha, ENTRE OS CANDIDATOS abaixo, o NCM que melhor descreve o produto pelo nome comercial dado
-pelo cliente. Nunca escolha um código fora da lista. Se nenhum candidato for um bom match, devolva
-ncm_escolhido null.
+  const pistas = candidatosFracos.length
+    ? `\nPistas de uma busca textual (podem não ser relevantes, use com cautela): ${candidatosFracos.map((c) => `${c.codigo} - ${c.descricao}`).join(" | ")}`
+    : "";
+  const prompt = `Você é especialista em classificação fiscal NCM (Nomenclatura Comum do Mercosul/Sistema
+Harmonizado) e conhece produtos e marcas comuns no comércio brasileiro.
+Proponha o código NCM de 8 dígitos que melhor classifica o produto abaixo (nome comercial dado pelo
+cliente, que pode ser uma marca ou nome popular — ex.: "Pescueiro" é peixe), usando seu próprio
+conhecimento. Se não tiver confiança nenhuma, devolva ncm_proposto null.
 ${segmento ? `Contexto: o cliente atua no segmento "${segmento}".` : ""}
 
-Produto (nome comercial): "${descricao}"
-Candidatos (código — descrição oficial):
-${candidatos.map((c) => `${c.codigo} — ${c.descricao}`).join("\n")}`;
+Produto (nome comercial): "${descricao}"${pistas}`;
 
   try {
     const res = await fetch(
@@ -75,10 +87,10 @@ ${candidatos.map((c) => `${c.codigo} — ${c.descricao}`).join("\n")}`;
             responseSchema: {
               type: "object",
               properties: {
-                ncm_escolhido: { type: "string", nullable: true },
+                ncm_proposto: { type: "string", nullable: true },
                 justificativa: { type: "string" },
               },
-              required: ["ncm_escolhido", "justificativa"],
+              required: ["ncm_proposto", "justificativa"],
             },
           },
         }),
@@ -94,14 +106,9 @@ ${candidatos.map((c) => `${c.codigo} — ${c.descricao}`).join("\n")}`;
       console.log(`[gemini] sem texto na resposta: ${JSON.stringify(data).slice(0, 500)}`);
       return null;
     }
-    const parsed = JSON.parse(texto) as { ncm_escolhido: string | null; justificativa: string };
-    if (!parsed.ncm_escolhido) return null;
-    const valido = candidatos.some((c) => c.codigo === parsed.ncm_escolhido);
-    if (!valido) {
-      console.log(`[gemini] devolveu código fora da lista de candidatos: ${parsed.ncm_escolhido}`);
-      return null;
-    }
-    return { codigo: parsed.ncm_escolhido, justificativa: parsed.justificativa };
+    const parsed = JSON.parse(texto) as { ncm_proposto: string | null; justificativa: string };
+    if (!parsed.ncm_proposto) return null;
+    return { codigo: parsed.ncm_proposto, justificativa: parsed.justificativa };
   } catch (err) {
     console.log(`[gemini] deu excecao: ${(err as Error).message}`);
     return null;
@@ -210,12 +217,20 @@ Deno.serve(async (req) => {
         });
         ncmCandidatos = candidatos ?? [];
 
-        const escolha = await escolherNcmComGemini(descricao, ncmCandidatos, contexto);
-        if (escolha) {
-          const candidato = ncmCandidatos.find((c) => c.codigo === escolha.codigo)!;
-          ncm = { codigo: candidato.codigo, descricao: candidato.descricao };
-          ncmFonteIa = escolha.justificativa;
-          avisos.push(`NCM sugerido por IA (Gemini) a partir da descrição — confira antes de confirmar: ${escolha.justificativa}`);
+        const proposta = await proporNcmComGemini(descricao, ncmCandidatos, contexto);
+        let ncmValidado: { codigo: string; descricao: string } | null = null;
+        if (proposta) {
+          const { data: validados } = await supabase.rpc("validar_ncm_leaf_batch", {
+            p_ncms: [proposta.codigo],
+          });
+          const validado = (validados as Array<{ codigo: string; descricao: string }> | null)?.[0];
+          if (validado) ncmValidado = { codigo: validado.codigo, descricao: validado.descricao };
+          else console.log(`[gemini] proposta "${proposta.codigo}" não existe na tabela oficial — descartada`);
+        }
+        if (ncmValidado) {
+          ncm = ncmValidado;
+          ncmFonteIa = proposta!.justificativa;
+          avisos.push(`NCM sugerido por IA (Gemini) a partir da descrição — confira antes de confirmar: ${proposta!.justificativa}`);
         } else {
           avisos.push(
             "NCM sugerido por descrição ainda é baixa confiança (busca textual, não entende sinônimo/marca). " +
