@@ -117,8 +117,24 @@ export function CobrancaTab() {
 
   const handleCopiar = async () => {
     if (selectedBoletos.length === 0) { toast.error('Selecione ao menos um boleto.'); return; }
-    await navigator.clipboard.writeText(mensagem);
-    toast.success('Mensagem copiada.');
+    // Tenta empacotar texto + imagem no mesmo item da área de transferência — quem decide o
+    // que fazer com os dois formatos ao colar é o app de destino (WhatsApp), não o navegador,
+    // então isso funciona só se o WhatsApp souber ler as duas partes de um Ctrl+V só. Se falhar
+    // por qualquer motivo (sem suporte, print não gerou), cai pro texto puro de sempre.
+    let copiouImagemJunto = false;
+    try {
+      const blob = await gerarPrintBlob();
+      if (blob && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'text/plain': new Blob([mensagem], { type: 'text/plain' }), 'image/png': blob }),
+        ]);
+        copiouImagemJunto = true;
+      }
+    } catch {
+      copiouImagemJunto = false;
+    }
+    if (!copiouImagemJunto) await navigator.clipboard.writeText(mensagem);
+    toast.success(copiouImagemJunto ? 'Texto e imagem copiados — cole (Ctrl+V) no WhatsApp.' : 'Mensagem copiada.');
     registrarLocal.mutate({ boleto_ids: selectedBoletos.map((b) => b.id), canal: 'copiar', mensagem });
   };
 
