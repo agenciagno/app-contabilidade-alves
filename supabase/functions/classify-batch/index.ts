@@ -73,6 +73,14 @@ Deno.serve(async (req) => {
     });
   }
 
+  // created_by referencia profiles(id), que é diferente de auth.users.id —
+  // profiles tem seu próprio id e um user_id separado apontando pro auth.users.
+  const { data: perfil } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", userData.user.id)
+    .maybeSingle();
+
   try {
     const body = await req.json().catch(() => ({}));
     const contactId: string | undefined = body.contact_id;
@@ -113,7 +121,7 @@ Deno.serve(async (req) => {
       .insert({
         company_id: companyId,
         contact_id: contactId,
-        created_by: userData.user.id,
+        created_by: perfil?.id ?? null,
         status: "processando",
         total_itens: itens.length,
         contexto: contact ?? {},

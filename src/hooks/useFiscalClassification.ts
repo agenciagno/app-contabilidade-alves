@@ -112,6 +112,16 @@ export function useConfirmarClassificacao() {
   return useMutation({
     mutationFn: async (input: ConfirmarInput) => {
       const { data: userData } = await supabase.auth.getUser();
+      // confirmado_por referencia profiles(id), diferente de auth.users.id.
+      let profileId: string | null = null;
+      if (userData?.user) {
+        const { data: perfil } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', userData.user.id)
+          .maybeSingle();
+        profileId = perfil?.id ?? null;
+      }
       const { error } = await supabase
         .from('fiscal_product_classifications')
         .update({
@@ -120,7 +130,7 @@ export function useConfirmarClassificacao() {
           cst_ibs_cbs: input.cstIbsCbs,
           csosn: input.csosn,
           status: 'confirmado',
-          confirmado_por: userData?.user?.id ?? null,
+          confirmado_por: profileId,
           confirmado_em: new Date().toISOString(),
         })
         .eq('id', input.id);
