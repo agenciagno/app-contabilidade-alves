@@ -125,27 +125,16 @@ export function CobrancaTab() {
 
   const suportaClipboardImagem = () => !!(navigator.clipboard && typeof ClipboardItem !== 'undefined' && reciboRef.current);
 
+  // Testado na prática (22/09): quando texto e imagem estão juntos na área de transferência,
+  // o WhatsApp sempre prioriza a imagem e descarta o texto (nem usa como legenda) — não dá pra
+  // combinar os dois num Ctrl+V só. Por isso "Copiar" volta a ser só texto; quem entrega
+  // imagem + texto como legenda é o botão WhatsApp (pré-preenche o texto na caixa ANTES de
+  // colar a imagem, aí o WhatsApp usa o que já estava digitado como legenda do anexo).
   const handleCopiar = () => {
     if (selectedBoletos.length === 0) { toast.error('Selecione ao menos um boleto.'); return; }
     const boletoIds = selectedBoletos.map((b) => b.id);
     const msg = mensagem;
-    // Tenta empacotar texto + imagem no mesmo item da área de transferência — quem decide o
-    // que fazer com os dois formatos ao colar é o app de destino (WhatsApp), não o navegador,
-    // então isso funciona só se o WhatsApp souber ler as duas partes de um Ctrl+V só.
-    if (suportaClipboardImagem()) {
-      navigator.clipboard.write([
-        new ClipboardItem({
-          'text/plain': Promise.resolve(new Blob([msg], { type: 'text/plain' })),
-          'image/png': gerarPrintBlobPromise(),
-        }),
-      ]).then(() => {
-        toast.success('Texto e imagem copiados — cole (Ctrl+V) no WhatsApp.');
-      }).catch(() => {
-        navigator.clipboard.writeText(msg).then(() => toast.success('Mensagem copiada.'));
-      });
-    } else {
-      navigator.clipboard.writeText(msg).then(() => toast.success('Mensagem copiada.'));
-    }
+    navigator.clipboard.writeText(msg).then(() => toast.success('Mensagem copiada.'));
     registrarLocal.mutate({ boleto_ids: boletoIds, canal: 'copiar', mensagem: msg });
   };
 
