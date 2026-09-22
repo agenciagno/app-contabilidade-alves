@@ -125,11 +125,11 @@ export function CobrancaTab() {
 
   const suportaClipboardImagem = () => !!(navigator.clipboard && typeof ClipboardItem !== 'undefined' && reciboRef.current);
 
-  // Testado na prática (22/09): quando texto e imagem estão juntos na área de transferência,
-  // o WhatsApp sempre prioriza a imagem e descarta o texto (nem usa como legenda) — não dá pra
-  // combinar os dois num Ctrl+V só. Por isso "Copiar" volta a ser só texto; quem entrega
-  // imagem + texto como legenda é o botão WhatsApp (pré-preenche o texto na caixa ANTES de
-  // colar a imagem, aí o WhatsApp usa o que já estava digitado como legenda do anexo).
+  // Testado na prática (22/09): quando texto e imagem estão juntos na área de transferência, o
+  // WhatsApp sempre prioriza a imagem e descarta o texto — não dá pra combinar os dois num
+  // Ctrl+V só. Fluxo em 2 passos: botão WhatsApp copia a imagem e abre a conversa (Ctrl+V lá
+  // anexa a imagem, com legenda vazia); "Copiar" copia só o texto, pra colar (Ctrl+V) direto
+  // na legenda da imagem que já está anexada.
   const handleCopiar = () => {
     if (selectedBoletos.length === 0) { toast.error('Selecione ao menos um boleto.'); return; }
     const boletoIds = selectedBoletos.map((b) => b.id);
@@ -146,17 +146,19 @@ export function CobrancaTab() {
     const msg = mensagem;
     const destino = destinoWhats;
     const numero = destino.replace(/\D/g, '');
+    // Sem "text=" de propósito — o texto agora entra pelo botão "Copiar", colado direto na
+    // legenda da imagem depois que ela for anexada aqui (ver comentário em handleCopiar).
     // web.whatsapp.com em vez de wa.me — o wa.me entrega esse link pro app Desktop, cujo
     // parser de URL corrompe emoji fora do plano básico (🗓️, 💰) mesmo com o texto chegando
     // corretamente codificado (round-trip de encodeURIComponent/decodeURIComponent confere).
-    const whatsappUrl = `https://web.whatsapp.com/send?phone=55${numero}&text=${encodeURIComponent(msg)}`;
+    const whatsappUrl = `https://web.whatsapp.com/send?phone=55${numero}`;
 
     const abrirEFinalizar = (imagemCopiada: boolean) => {
       window.open(whatsappUrl, '_blank');
       registrarLocal.mutate({ boleto_ids: boletoIds, canal: 'whatsapp', destino, mensagem: msg });
       toast.success(
         imagemCopiada
-          ? 'Imagem copiada — na conversa que abriu, dá um Ctrl+V pra anexar o print junto com o texto.'
+          ? 'Imagem copiada — na conversa que abriu, dá um Ctrl+V pra anexar. Depois usa o "Copiar" pra colar o texto na legenda.'
           : 'WhatsApp aberto — não deu pra copiar a imagem automaticamente aqui, baixei o arquivo pra anexar manualmente.',
       );
       setGerandoPrint(false);
