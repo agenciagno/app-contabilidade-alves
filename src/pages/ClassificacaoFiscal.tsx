@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Loader2, Search, CheckCircle2 } from 'lucide-react';
-import { PageHeader, DsAlert, DsBadge, tabsListClass, tabsTriggerClass } from '@/components/ds';
+import {
+  PageHeader, DsAlert, DsBadge, tabsListClass, tabsTriggerClass,
+  segmentedListClass, segmentedTriggerClass, MetricaFaixa, type MetricaFaixaItem,
+} from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,6 +28,13 @@ import {
 import { UploadLoteFiscal } from '@/components/fiscal/UploadLoteFiscal';
 import { getContactDisplayName } from '@/lib/contact-display';
 
+function statusClassificacao(r: ClassificarResultado): { label: string; tone: 'ok' | 'warn' | 'info' } {
+  const ambiguo = r.cclasstrib_candidatos.length > 0 || r.cest_candidatos.length > 1;
+  if (ambiguo) return { label: 'Ambíguo — revisar', tone: 'warn' };
+  if (r.ncm_via_ia) return { label: 'Sugerido por IA — confirmar', tone: 'info' };
+  return { label: 'Classificado', tone: 'ok' };
+}
+
 export default function ClassificacaoFiscal() {
   const { contacts } = useContacts();
   const classificar = useClassifyProduct();
@@ -33,6 +43,7 @@ export default function ClassificacaoFiscal() {
 
   const [aba, setAba] = useState('consultar');
   const [contactId, setContactId] = useState<string>('');
+  const [modoBusca, setModoBusca] = useState<'descricao' | 'ncm'>('descricao');
   const [ncmInput, setNcmInput] = useState('');
   const [descricaoInput, setDescricaoInput] = useState('');
   const [resultado, setResultado] = useState<ClassificarResultado | null>(null);
@@ -46,12 +57,18 @@ export default function ClassificacaoFiscal() {
     [contacts],
   );
 
-  const podeClassificar = ncmInput.trim().length > 0 || descricaoInput.trim().length > 0;
+  const podeClassificar = modoBusca === 'ncm'
+    ? ncmInput.trim().length > 0
+    : descricaoInput.trim().length > 0;
 
   const executar = () => {
     setConfirmado(false);
     classificar.mutate(
-      { ncm: ncmInput.trim() || undefined, descricao: descricaoInput.trim() || undefined, contactId: contactId || null },
+      {
+        ncm: modoBusca === 'ncm' ? ncmInput.trim() || undefined : undefined,
+        descricao: modoBusca === 'descricao' ? descricaoInput.trim() || undefined : undefined,
+        contactId: contactId || null,
+      },
       {
         onSuccess: (r) => {
           setResultado(r);
@@ -66,6 +83,7 @@ export default function ClassificacaoFiscal() {
   };
 
   const usarNcmCandidato = (codigo: string) => {
+    setModoBusca('ncm');
     setNcmInput(codigo);
     setDescricaoInput('');
     classificar.mutate(
@@ -143,25 +161,36 @@ export default function ClassificacaoFiscal() {
                 </p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Buscar por</Label>
+                <Tabs value={modoBusca} onValueChange={(v) => setModoBusca(v as 'descricao' | 'ncm')}>
+                  <TabsList className={segmentedListClass}>
+                    <TabsTrigger value="descricao" className={segmentedTriggerClass}>Descrição</TabsTrigger>
+                    <TabsTrigger value="ncm" className={segmentedTriggerClass}>NCM</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
+              {modoBusca === 'descricao' ? (
                 <div className="space-y-1.5">
-                  <Label>NCM (se já souber)</Label>
+                  <Label>Descrição do produto</Label>
+                  <Textarea
+                    placeholder="Ex.: Refrigerante Coca-Cola 1L"
+                    value={descricaoInput}
+                    onChange={(e) => setDescricaoInput(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label>Código NCM</Label>
                   <Input
                     placeholder="Ex.: 2202.10.00"
                     value={ncmInput}
                     onChange={(e) => setNcmInput(e.target.value)}
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>ou descrição do produto</Label>
-                  <Textarea
-                    placeholder="Ex.: Refrigerante Coca-Cola 1L"
-                    value={descricaoInput}
-                    onChange={(e) => setDescricaoInput(e.target.value)}
-                    rows={1}
-                  />
-                </div>
-              </div>
+              )}
 
               <Button onClick={executar} disabled={!podeClassificar || classificar.isPending}>
                 {classificar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
@@ -196,124 +225,140 @@ export default function ClassificacaoFiscal() {
                 </Card>
               )}
 
-              {resultado.ncm && (
-                <>
+              {resultado.ncm && (() => {
+                const status = statusClassificacao(resultado);
+                const itensFaixa: MetricaFaixaItem[] = [];
+                if (resultado.fonte !== 'acervo') {
+                  if (resultado.cclasstrib_sugerido) {
+                    itensFaixa.push({
+                      label: 'cClassTrib',
+                      valor: resultado.cclasstrib_sugerido.codigo,
+                      hint: resultado.cclasstrib_sugerido.nome || resultado.cclasstrib_sugerido.descricao,
+                    });
+                  }
+                  if (resultado.cst_ibs_cbs) {
+                    itensFaixa.push({ label: 'CST-IBS/CBS', valor: resultado.cst_ibs_cbs });
+                  }
+                  if (resultado.cest_candidatos.length === 1) {
+                    itensFaixa.push({
+                      label: 'CEST',
+                      valor: resultado.cest_candidatos[0].codigo,
+                      hint: resultado.cest_candidatos[0].descricao,
+                    });
+                  } else if (resultado.cest_candidatos.length === 0) {
+                    itensFaixa.push({ label: 'CEST', valor: 'Não sujeito a ST' });
+                  }
+                  if (resultado.csosn_sugerido.length === 1) {
+                    itensFaixa.push({
+                      label: 'CSOSN',
+                      valor: resultado.csosn_sugerido[0].codigo,
+                      hint: resultado.csosn_sugerido[0].descricao,
+                    });
+                  }
+                }
+
+                return (
                   <Card>
-                    <CardHeader><CardTitle className="text-base">NCM</CardTitle></CardHeader>
-                    <CardContent>
-                      <p className="text-sm"><span className="font-medium">{resultado.ncm.codigo}</span> — {resultado.ncm.descricao || '(via acervo)'}</p>
-                    </CardContent>
-                  </Card>
+                    <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+                      <div>
+                        <CardTitle className="text-base">Resultado da consulta</CardTitle>
+                        <p className="mt-2 text-metric-xl text-ink">{resultado.ncm.codigo}</p>
+                        <p className="text-sm text-muted-ink">{resultado.ncm.descricao || '(via acervo)'}</p>
+                      </div>
+                      <DsBadge tone={resultado.fonte === 'acervo' ? 'ok' : status.tone}>
+                        {resultado.fonte === 'acervo' ? 'Reaproveitado do acervo' : status.label}
+                      </DsBadge>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {resultado.fonte === 'acervo' ? (
+                        <DsAlert
+                          tone="ok"
+                          title="Reaproveitado do acervo — já classificado antes para outro produto/cliente"
+                        />
+                      ) : (
+                        <>
+                          {itensFaixa.length > 0 && <MetricaFaixa items={itensFaixa} />}
 
-                  {resultado.fonte === 'acervo' ? (
-                    <DsAlert
-                      tone="ok"
-                      title="Reaproveitado do acervo — já classificado antes para outro produto/cliente"
-                    />
-                  ) : (
-                    <>
-                      <Card>
-                        <CardHeader><CardTitle className="text-base">CEST</CardTitle></CardHeader>
-                        <CardContent>
-                          {resultado.cest_candidatos.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">Não sujeito a Substituição Tributária (nenhum CEST correlacionado).</p>
-                          ) : resultado.cest_candidatos.length === 1 ? (
-                            <p className="text-sm">
-                              <span className="font-medium">{resultado.cest_candidatos[0].codigo}</span> — {resultado.cest_candidatos[0].descricao}
-                            </p>
-                          ) : (
-                            <RadioGroup value={cestEscolhido} onValueChange={setCestEscolhido}>
-                              {resultado.cest_candidatos.map((c) => (
-                                <div key={c.codigo} className="flex items-start gap-2">
-                                  <RadioGroupItem value={c.codigo} id={`cest-${c.codigo}`} className="mt-1" />
-                                  <Label htmlFor={`cest-${c.codigo}`} className="text-sm font-normal">
-                                    <span className="font-medium">{c.codigo}</span> — {c.descricao}
-                                  </Label>
-                                </div>
-                              ))}
-                            </RadioGroup>
+                          {resultado.cclasstrib_sugerido?.fonte && (
+                            <p className="text-meta text-muted-ink-2">Base legal: {resultado.cclasstrib_sugerido.fonte}</p>
                           )}
-                        </CardContent>
-                      </Card>
+                          {resultado.cclasstrib_sugerido && (resultado.cclasstrib_sugerido.p_red_ibs || resultado.cclasstrib_sugerido.p_red_cbs) ? (
+                            <p className="text-meta text-muted-ink-2">
+                              Redução: IBS {resultado.cclasstrib_sugerido.p_red_ibs ?? 0}% · CBS {resultado.cclasstrib_sugerido.p_red_cbs ?? 0}%
+                            </p>
+                          ) : null}
 
-                      <Card>
-                        <CardHeader><CardTitle className="text-base">cClassTrib / CST-IBS/CBS</CardTitle></CardHeader>
-                        <CardContent className="space-y-3">
-                          {resultado.cclasstrib_sugerido && (
-                            <div className="rounded-md border border-line p-3">
-                              <div className="mb-1 flex items-center gap-2">
-                                <span className="font-medium text-sm">{resultado.cclasstrib_sugerido.codigo}</span>
-                                <DsBadge tone={resultado.cclasstrib_sugerido.confianca === 'alta' ? 'ok' : 'neutral'}>
-                                  {resultado.cclasstrib_sugerido.confianca === 'alta' ? 'Alta confiança' : 'Padrão'}
-                                </DsBadge>
-                                {resultado.cclasstrib_sugerido.cst_vinculado && (
-                                  <DsBadge tone="info">CST {resultado.cclasstrib_sugerido.cst_vinculado}</DsBadge>
-                                )}
-                              </div>
-                              <p className="text-sm">{resultado.cclasstrib_sugerido.nome || resultado.cclasstrib_sugerido.descricao}</p>
-                              <p className="mt-1 text-meta text-muted-ink-2">{resultado.cclasstrib_sugerido.fonte}</p>
-                              {(resultado.cclasstrib_sugerido.p_red_ibs || resultado.cclasstrib_sugerido.p_red_cbs) ? (
-                                <p className="mt-1 text-meta text-muted-ink-2">
-                                  Redução: IBS {resultado.cclasstrib_sugerido.p_red_ibs ?? 0}% · CBS {resultado.cclasstrib_sugerido.p_red_cbs ?? 0}%
-                                </p>
-                              ) : null}
+                          {(resultado.cest_candidatos.length > 1 || resultado.cclasstrib_candidatos.length > 0) && (
+                            <div className="space-y-4 rounded-md border border-line bg-bg-2 p-4">
+                              <p className="text-ui-strong text-ink">Revisar e escolher</p>
+                              {resultado.cest_candidatos.length > 1 && (
+                                <div className="space-y-1.5">
+                                  <Label>CEST</Label>
+                                  <RadioGroup value={cestEscolhido} onValueChange={setCestEscolhido}>
+                                    {resultado.cest_candidatos.map((c) => (
+                                      <div key={c.codigo} className="flex items-start gap-2">
+                                        <RadioGroupItem value={c.codigo} id={`cest-${c.codigo}`} className="mt-1" />
+                                        <Label htmlFor={`cest-${c.codigo}`} className="text-sm font-normal">
+                                          <span className="font-medium">{c.codigo}</span> — {c.descricao}
+                                        </Label>
+                                      </div>
+                                    ))}
+                                  </RadioGroup>
+                                </div>
+                              )}
+                              {resultado.cclasstrib_candidatos.length > 0 && (
+                                <div className="space-y-1.5">
+                                  <Label>cClassTrib</Label>
+                                  <RadioGroup value={cclasstribEscolhido} onValueChange={setCclasstribEscolhido}>
+                                    {resultado.cclasstrib_candidatos.map((c) => (
+                                      <div key={c.cclasstrib_codigo} className="flex items-start gap-2 rounded-md border border-line p-3">
+                                        <RadioGroupItem value={c.cclasstrib_codigo} id={`cc-${c.cclasstrib_codigo}`} className="mt-1" />
+                                        <Label htmlFor={`cc-${c.cclasstrib_codigo}`} className="text-sm font-normal">
+                                          <span className="font-medium">{c.cclasstrib_codigo}</span> — {c.cclasstrib_nome}
+                                          <p className="mt-1 text-meta text-muted-ink-2">
+                                            Anexo {c.anexo}, item {c.item_lei}: {c.descricao_lei}
+                                          </p>
+                                        </Label>
+                                      </div>
+                                    ))}
+                                  </RadioGroup>
+                                </div>
+                              )}
                             </div>
                           )}
 
-                          {resultado.cclasstrib_candidatos.length > 0 && (
-                            <RadioGroup value={cclasstribEscolhido} onValueChange={setCclasstribEscolhido}>
-                              {resultado.cclasstrib_candidatos.map((c) => (
-                                <div key={c.cclasstrib_codigo} className="flex items-start gap-2 rounded-md border border-line p-3">
-                                  <RadioGroupItem value={c.cclasstrib_codigo} id={`cc-${c.cclasstrib_codigo}`} className="mt-1" />
-                                  <Label htmlFor={`cc-${c.cclasstrib_codigo}`} className="text-sm font-normal">
-                                    <span className="font-medium">{c.cclasstrib_codigo}</span> — {c.cclasstrib_nome}
-                                    <p className="mt-1 text-meta text-muted-ink-2">
-                                      Anexo {c.anexo}, item {c.item_lei}: {c.descricao_lei}
-                                    </p>
-                                  </Label>
-                                </div>
-                              ))}
-                            </RadioGroup>
+                          {resultado.csosn_sugerido.length > 1 && (
+                            <div className="space-y-1.5">
+                              <Label>CSOSN (Simples Nacional / MEI)</Label>
+                              <RadioGroup value={csosnEscolhido} onValueChange={setCsosnEscolhido}>
+                                {resultado.csosn_sugerido.map((c) => (
+                                  <div key={c.codigo} className="flex items-start gap-2">
+                                    <RadioGroupItem value={c.codigo} id={`csosn-${c.codigo}`} className="mt-1" />
+                                    <Label htmlFor={`csosn-${c.codigo}`} className="text-sm font-normal">
+                                      <span className="font-medium">{c.codigo}</span> — {c.descricao}
+                                    </Label>
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                            </div>
                           )}
-                        </CardContent>
-                      </Card>
 
-                      {resultado.csosn_sugerido.length > 0 && (
-                        <Card>
-                          <CardHeader><CardTitle className="text-base">CSOSN (Simples Nacional / MEI)</CardTitle></CardHeader>
-                          <CardContent>
-                            <RadioGroup value={csosnEscolhido} onValueChange={setCsosnEscolhido}>
-                              {resultado.csosn_sugerido.map((c) => (
-                                <div key={c.codigo} className="flex items-start gap-2">
-                                  <RadioGroupItem value={c.codigo} id={`csosn-${c.codigo}`} className="mt-1" />
-                                  <Label htmlFor={`csosn-${c.codigo}`} className="text-sm font-normal">
-                                    <span className="font-medium">{c.codigo}</span> — {c.descricao}
-                                  </Label>
-                                </div>
-                              ))}
-                            </RadioGroup>
-                          </CardContent>
-                        </Card>
+                          <p className="text-meta text-muted-ink-2">
+                            CFOP de referência: <span className="font-medium text-ink">{resultado.cfop_referencia.codigo}</span> — {resultado.cfop_referencia.aviso}
+                          </p>
+                        </>
                       )}
 
-                      <Card>
-                        <CardHeader><CardTitle className="text-base">CFOP de referência</CardTitle></CardHeader>
-                        <CardContent>
-                          <p className="text-sm"><span className="font-medium">{resultado.cfop_referencia.codigo}</span> — {resultado.cfop_referencia.descricao}</p>
-                          <p className="mt-1 text-meta text-muted-ink-2">{resultado.cfop_referencia.aviso}</p>
-                        </CardContent>
-                      </Card>
-                    </>
-                  )}
-
-                  {resultado.classification_id && (
-                    <Button onClick={confirmarClassificacao} disabled={confirmar.isPending || confirmado}>
-                      {confirmado ? <CheckCircle2 className="h-4 w-4" /> : confirmar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      {confirmado ? 'Confirmado — no acervo da equipe' : 'Confirmar classificação'}
-                    </Button>
-                  )}
-                </>
-              )}
+                      {resultado.classification_id && (
+                        <Button onClick={confirmarClassificacao} disabled={confirmar.isPending || confirmado}>
+                          {confirmado ? <CheckCircle2 className="h-4 w-4" /> : confirmar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                          {confirmado ? 'Confirmado — no acervo da equipe' : 'Confirmar classificação'}
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })()}
             </div>
           )}
         </TabsContent>

@@ -358,6 +358,7 @@ Deno.serve(async (req) => {
     const resultado = {
       classification_id: classificationId,
       ncm,
+      ncm_via_ia: !!ncmFonteIa,
       cest_candidatos: cestCandidatos ?? [],
       cclasstrib_sugerido: cclasstribSugerido,
       cclasstrib_candidatos: cclasstribCandidatos,
