@@ -77,6 +77,7 @@ export interface ClassificarResultado {
   fonte?: 'acervo';
   resultado?: Record<string, unknown>;
   ncm: { codigo: string; descricao: string } | null;
+  ncm_posicao?: { codigo: string; descricao: string } | null;
   ncm_via_ia?: boolean;
   ncm_candidatos?: NcmCandidato[];
   cest_candidatos: CestCandidato[];

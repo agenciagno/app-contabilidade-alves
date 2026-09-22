@@ -247,6 +247,12 @@ Deno.serve(async (req) => {
       );
     }
 
+    // "Posição" do NCM (4 dígitos, ex. "02.08") — categoria macro acima do
+    // código de 8 dígitos, pra dar contexto (pedido do Gabriel vendo uma
+    // tabela de referência externa que mostra esse nível).
+    const { data: posicaoRows } = await supabase.rpc("find_ncm_posicao", { p_ncm: ncm.codigo });
+    const ncmPosicao = posicaoRows?.[0] ?? null;
+
     // ---- 2. Se veio do acervo, devolve direto (já confirmado antes) ----
     if (fonteAcervo) {
       let classificationId: string | null = null;
@@ -272,7 +278,7 @@ Deno.serve(async (req) => {
         classificationId = inserted?.id ?? null;
       }
       return new Response(
-        JSON.stringify({ fonte: "acervo", resultado: fonteAcervo, contexto, avisos, classification_id: classificationId }),
+        JSON.stringify({ fonte: "acervo", resultado: fonteAcervo, ncm_posicao: ncmPosicao, contexto, avisos, classification_id: classificationId }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -358,6 +364,7 @@ Deno.serve(async (req) => {
     const resultado = {
       classification_id: classificationId,
       ncm,
+      ncm_posicao: ncmPosicao,
       ncm_via_ia: !!ncmFonteIa,
       cest_candidatos: cestCandidatos ?? [],
       cclasstrib_sugerido: cclasstribSugerido,

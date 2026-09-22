@@ -267,7 +267,12 @@ export default function ClassificacaoFiscal() {
                     <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
                       <div>
                         <CardTitle className="text-base">Resultado da consulta</CardTitle>
-                        <p className="mt-2 text-metric-xl text-ink">{resultado.ncm.codigo}</p>
+                        {resultado.ncm_posicao && (
+                          <p className="mt-2 text-meta text-muted-ink-2">
+                            Posição {resultado.ncm_posicao.codigo} — {resultado.ncm_posicao.descricao}
+                          </p>
+                        )}
+                        <p className="text-metric-xl text-ink">{resultado.ncm.codigo}</p>
                         <p className="text-sm text-muted-ink">{resultado.ncm.descricao || '(via acervo)'}</p>
                       </div>
                       <DsBadge tone={resultado.fonte === 'acervo' ? 'ok' : status.tone}>
