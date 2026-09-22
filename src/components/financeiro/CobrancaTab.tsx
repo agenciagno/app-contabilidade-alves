@@ -97,13 +97,21 @@ export function CobrancaTab() {
     });
   };
 
-  // PNG (não JPEG) porque é o único formato que a Clipboard API aceita de forma confiável
-  // pra ClipboardItem em Chrome/Edge — precisa pro Ctrl+V direto no WhatsApp.
-  const gerarPrintBlob = async (): Promise<Blob | null> => {
-    if (!reciboRef.current) return null;
-    const html2canvas = (await import('html2canvas')).default;
-    const canvas = await html2canvas(reciboRef.current, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-    return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'));
+  // PNG (não JPEG) porque é o único formato que a Clipboard API aceita de forma confiável pra
+  // ClipboardItem em Chrome/Edge. Retorna a Promise sem esperar (nunca "await" isso antes de
+  // chamar clipboard.write) — o html2canvas demora o suficiente pra estourar a janela de
+  // "ativação transitória" do clique, e depois disso o Chrome recusa o write em silêncio (foi
+  // o que causava só o texto ir, sem imagem). O jeito certo é passar a Promise direto como
+  // valor do ClipboardItem: a API espera ela resolver por dentro, mas ainda conta como
+  // originada do clique.
+  const gerarPrintBlobPromise = (): Promise<Blob> => {
+    const el = reciboRef.current;
+    if (!el) return Promise.reject(new Error('Preview da cobrança não está pronto.'));
+    return import('html2canvas')
+      .then((mod) => mod.default(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true }))
+      .then((canvas) => new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Falha ao gerar a imagem.'))), 'image/png');
+      }));
   };
 
   const baixarBlob = (blob: Blob) => {
@@ -115,62 +123,67 @@ export function CobrancaTab() {
     URL.revokeObjectURL(url);
   };
 
-  const handleCopiar = async () => {
+  const suportaClipboardImagem = () => !!(navigator.clipboard && typeof ClipboardItem !== 'undefined' && reciboRef.current);
+
+  const handleCopiar = () => {
     if (selectedBoletos.length === 0) { toast.error('Selecione ao menos um boleto.'); return; }
+    const boletoIds = selectedBoletos.map((b) => b.id);
+    const msg = mensagem;
     // Tenta empacotar texto + imagem no mesmo item da área de transferência — quem decide o
     // que fazer com os dois formatos ao colar é o app de destino (WhatsApp), não o navegador,
-    // então isso funciona só se o WhatsApp souber ler as duas partes de um Ctrl+V só. Se falhar
-    // por qualquer motivo (sem suporte, print não gerou), cai pro texto puro de sempre.
-    let copiouImagemJunto = false;
-    try {
-      const blob = await gerarPrintBlob();
-      if (blob && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'text/plain': new Blob([mensagem], { type: 'text/plain' }), 'image/png': blob }),
-        ]);
-        copiouImagemJunto = true;
-      }
-    } catch {
-      copiouImagemJunto = false;
+    // então isso funciona só se o WhatsApp souber ler as duas partes de um Ctrl+V só.
+    if (suportaClipboardImagem()) {
+      navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': Promise.resolve(new Blob([msg], { type: 'text/plain' })),
+          'image/png': gerarPrintBlobPromise(),
+        }),
+      ]).then(() => {
+        toast.success('Texto e imagem copiados — cole (Ctrl+V) no WhatsApp.');
+      }).catch(() => {
+        navigator.clipboard.writeText(msg).then(() => toast.success('Mensagem copiada.'));
+      });
+    } else {
+      navigator.clipboard.writeText(msg).then(() => toast.success('Mensagem copiada.'));
     }
-    if (!copiouImagemJunto) await navigator.clipboard.writeText(mensagem);
-    toast.success(copiouImagemJunto ? 'Texto e imagem copiados — cole (Ctrl+V) no WhatsApp.' : 'Mensagem copiada.');
-    registrarLocal.mutate({ boleto_ids: selectedBoletos.map((b) => b.id), canal: 'copiar', mensagem });
+    registrarLocal.mutate({ boleto_ids: boletoIds, canal: 'copiar', mensagem: msg });
   };
 
-  const handleWhatsapp = async () => {
+  const handleWhatsapp = () => {
     if (selectedBoletos.length === 0) { toast.error('Selecione ao menos um boleto.'); return; }
     if (!destinoWhats.trim()) { toast.error('Informe o WhatsApp de destino.'); return; }
     setGerandoPrint(true);
-    try {
-      const blob = await gerarPrintBlob();
-      let imagemCopiada = false;
-      if (blob && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          imagemCopiada = true;
-        } catch {
-          imagemCopiada = false;
-        }
-      }
-      // Sem suporte a copiar imagem (ou falhou) — baixa o arquivo como alternativa.
-      if (!imagemCopiada && blob) baixarBlob(blob);
+    const boletoIds = selectedBoletos.map((b) => b.id);
+    const msg = mensagem;
+    const destino = destinoWhats;
+    const numero = destino.replace(/\D/g, '');
+    // web.whatsapp.com em vez de wa.me — o wa.me entrega esse link pro app Desktop, cujo
+    // parser de URL corrompe emoji fora do plano básico (🗓️, 💰) mesmo com o texto chegando
+    // corretamente codificado (round-trip de encodeURIComponent/decodeURIComponent confere).
+    const whatsappUrl = `https://web.whatsapp.com/send?phone=55${numero}&text=${encodeURIComponent(msg)}`;
 
-      const numero = destinoWhats.replace(/\D/g, '');
-      // web.whatsapp.com em vez de wa.me — o wa.me entrega esse link pro app Desktop, cujo
-      // parser de URL corrompe emoji fora do plano básico (🗓️, 💰) mesmo com o texto chegando
-      // corretamente codificado (round-trip de encodeURIComponent/decodeURIComponent confere).
-      window.open(`https://web.whatsapp.com/send?phone=55${numero}&text=${encodeURIComponent(mensagem)}`, '_blank');
-      registrarLocal.mutate({ boleto_ids: selectedBoletos.map((b) => b.id), canal: 'whatsapp', destino: destinoWhats, mensagem });
+    const abrirEFinalizar = (imagemCopiada: boolean) => {
+      window.open(whatsappUrl, '_blank');
+      registrarLocal.mutate({ boleto_ids: boletoIds, canal: 'whatsapp', destino, mensagem: msg });
       toast.success(
         imagemCopiada
           ? 'Imagem copiada — na conversa que abriu, dá um Ctrl+V pra anexar o print junto com o texto.'
           : 'WhatsApp aberto — não deu pra copiar a imagem automaticamente aqui, baixei o arquivo pra anexar manualmente.',
       );
-    } catch (e: any) {
-      toast.error(e?.message ?? 'Falha ao gerar o print.');
-    } finally {
       setGerandoPrint(false);
+    };
+
+    if (suportaClipboardImagem()) {
+      const printPromise = gerarPrintBlobPromise();
+      navigator.clipboard.write([new ClipboardItem({ 'image/png': printPromise })])
+        .then(() => abrirEFinalizar(true))
+        .catch(() => {
+          printPromise.then(baixarBlob).catch(() => {}).finally(() => abrirEFinalizar(false));
+        });
+    } else if (reciboRef.current) {
+      gerarPrintBlobPromise().then(baixarBlob).catch(() => {}).finally(() => abrirEFinalizar(false));
+    } else {
+      abrirEFinalizar(false);
     }
   };
 
