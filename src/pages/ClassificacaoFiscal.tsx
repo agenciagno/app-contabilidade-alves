@@ -255,6 +255,11 @@ export default function ClassificacaoFiscal() {
                       hint: resultado.csosn_sugerido[0].descricao,
                     });
                   }
+                  itensFaixa.push({
+                    label: 'CFOP de referência',
+                    valor: resultado.cfop_referencia.codigo,
+                    hint: resultado.cfop_referencia.aviso,
+                  });
                 }
 
                 return (
@@ -342,10 +347,6 @@ export default function ClassificacaoFiscal() {
                               </RadioGroup>
                             </div>
                           )}
-
-                          <p className="text-meta text-muted-ink-2">
-                            CFOP de referência: <span className="font-medium text-ink">{resultado.cfop_referencia.codigo}</span> — {resultado.cfop_referencia.aviso}
-                          </p>
                         </>
                       )}
 
