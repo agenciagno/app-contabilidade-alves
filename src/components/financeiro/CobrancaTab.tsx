@@ -141,7 +141,10 @@ export function CobrancaTab() {
       if (!imagemCopiada && blob) baixarBlob(blob);
 
       const numero = destinoWhats.replace(/\D/g, '');
-      window.open(`https://wa.me/55${numero}?text=${encodeURIComponent(mensagem)}`, '_blank');
+      // web.whatsapp.com em vez de wa.me — o wa.me entrega esse link pro app Desktop, cujo
+      // parser de URL corrompe emoji fora do plano básico (🗓️, 💰) mesmo com o texto chegando
+      // corretamente codificado (round-trip de encodeURIComponent/decodeURIComponent confere).
+      window.open(`https://web.whatsapp.com/send?phone=55${numero}&text=${encodeURIComponent(mensagem)}`, '_blank');
       registrarLocal.mutate({ boleto_ids: selectedBoletos.map((b) => b.id), canal: 'whatsapp', destino: destinoWhats, mensagem });
       toast.success(
         imagemCopiada
