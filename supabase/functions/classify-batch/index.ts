@@ -63,7 +63,12 @@ async function escolherNcmsComGemini(
   itens: ItemParaGemini[],
 ): Promise<Map<number, { codigo: string; justificativa: string }>> {
   const resultado = new Map<number, { codigo: string; justificativa: string }>();
-  if (!GEMINI_API_KEY || !itens.length) return resultado;
+  if (!GEMINI_API_KEY) {
+    console.log("[gemini] GEMINI_API_KEY não configurada — pulando IA");
+    return resultado;
+  }
+  if (!itens.length) return resultado;
+  console.log(`[gemini] ${itens.length} itens pra IA escolher`);
 
   const segmento = contexto.segmento_atuacao || contexto.setor_atuacao;
   const chunks: ItemParaGemini[][] = [];
@@ -113,23 +118,32 @@ ${chunk.map((it) => `${it.idx}. "${it.descricao}" — candidatos: ${it.candidato
           }),
         },
       );
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.log(`[gemini] chunk falhou: HTTP ${res.status} — ${await res.text()}`);
+        return;
+      }
       const data = await res.json();
       const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!texto) return;
+      if (!texto) {
+        console.log(`[gemini] chunk sem texto na resposta: ${JSON.stringify(data).slice(0, 500)}`);
+        return;
+      }
       const parsed = JSON.parse(texto) as {
         resultados: Array<{ idx: number; ncm_escolhido: string | null; justificativa: string }>;
       };
       const candidatosPorIdx = new Map(chunk.map((it) => [it.idx, it.candidatos]));
+      let resolvidosNoChunk = 0;
       for (const r of parsed.resultados ?? []) {
         if (!r.ncm_escolhido) continue;
         const validos = candidatosPorIdx.get(r.idx) ?? [];
         if (validos.some((c) => c.codigo === r.ncm_escolhido)) {
           resultado.set(r.idx, { codigo: r.ncm_escolhido, justificativa: r.justificativa });
+          resolvidosNoChunk += 1;
         }
       }
-    } catch {
-      // degrada: itens do chunk ficam sem resolução via IA, seguem pra revisão manual.
+      console.log(`[gemini] chunk de ${chunk.length} itens — ${resolvidosNoChunk} resolvidos`);
+    } catch (err) {
+      console.log(`[gemini] chunk deu excecao: ${(err as Error).message}`);
     }
   }
 

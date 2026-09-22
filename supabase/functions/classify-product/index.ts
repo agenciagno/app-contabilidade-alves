@@ -45,7 +45,11 @@ async function escolherNcmComGemini(
   candidatos: NcmCandidato[],
   contexto: { segmento_atuacao?: string; setor_atuacao?: string },
 ): Promise<{ codigo: string; justificativa: string } | null> {
-  if (!GEMINI_API_KEY || !candidatos.length) return null;
+  if (!GEMINI_API_KEY) {
+    console.log("[gemini] GEMINI_API_KEY não configurada — pulando IA");
+    return null;
+  }
+  if (!candidatos.length) return null;
 
   const segmento = contexto.segmento_atuacao || contexto.setor_atuacao;
   const prompt = `Você é especialista em classificação fiscal NCM (Nomenclatura Comum do Mercosul).
@@ -80,16 +84,26 @@ ${candidatos.map((c) => `${c.codigo} — ${c.descricao}`).join("\n")}`;
         }),
       },
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.log(`[gemini] falhou: HTTP ${res.status} — ${await res.text()}`);
+      return null;
+    }
     const data = await res.json();
     const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!texto) return null;
+    if (!texto) {
+      console.log(`[gemini] sem texto na resposta: ${JSON.stringify(data).slice(0, 500)}`);
+      return null;
+    }
     const parsed = JSON.parse(texto) as { ncm_escolhido: string | null; justificativa: string };
     if (!parsed.ncm_escolhido) return null;
     const valido = candidatos.some((c) => c.codigo === parsed.ncm_escolhido);
-    if (!valido) return null;
+    if (!valido) {
+      console.log(`[gemini] devolveu código fora da lista de candidatos: ${parsed.ncm_escolhido}`);
+      return null;
+    }
     return { codigo: parsed.ncm_escolhido, justificativa: parsed.justificativa };
-  } catch {
+  } catch (err) {
+    console.log(`[gemini] deu excecao: ${(err as Error).message}`);
     return null;
   }
 }
