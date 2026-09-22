@@ -75,3 +75,47 @@ export function useRegistrarNotificacaoLocalBoleto() {
     onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ['boleto-notifications', vars.boleto_id] }),
   });
 }
+
+/** Mesma coisa acima, mas registrando 1+ boletos de uma vez — aba Cobrança permite marcar
+ * vários boletos (de um cliente ou de vários) antes de copiar/abrir o WhatsApp. */
+export function useRegistrarNotificacaoLocalCobranca() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { boleto_ids: string[]; canal: 'whatsapp' | 'copiar'; destino?: string | null; mensagem: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = await supabase.from('profiles').select('id, company_id').eq('user_id', user!.id).single();
+      const rows = vars.boleto_ids.map((boletoId) => ({
+        boleto_id: boletoId,
+        company_id: profile?.company_id,
+        canal: vars.canal,
+        destino: vars.destino ?? null,
+        mensagem: vars.mensagem,
+        enviado_por: profile?.id ?? null,
+      }));
+      const { error } = await (supabase as any).from('boleto_client_notifications').insert(rows);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      for (const id of vars.boleto_ids) qc.invalidateQueries({ queryKey: ['boleto-notifications', id] });
+      qc.invalidateQueries({ queryKey: ['cobranca-boletos-vencidos'] });
+    },
+  });
+}
+
+/** Envia 1 e-mail cobrindo 1+ boletos, com destino explícito (não depende do e-mail cadastrado
+ * no contato) — usado na aba Cobrança quando 2+ clientes/boletos são cobrados juntos. */
+export function useNotificarCobrancaMultipla() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { boleto_ids: string[]; destino: string; assunto: string; mensagem: string }) => {
+      const { data, error } = await supabase.functions.invoke('boleto-notificar-cobranca', { body: vars });
+      if (error) throw new Error(await extrairErro(error));
+      if (!data?.success) throw new Error(data?.error ?? 'Falha ao enviar e-mail.');
+      return data;
+    },
+    onSuccess: (_d, vars) => {
+      for (const id of vars.boleto_ids) qc.invalidateQueries({ queryKey: ['boleto-notifications', id] });
+      qc.invalidateQueries({ queryKey: ['cobranca-boletos-vencidos'] });
+    },
+  });
+}

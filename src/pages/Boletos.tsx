@@ -25,7 +25,8 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PageHeader, StatCardRow, DsBadge, SearchField, DateField } from '@/components/ds';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHeader, StatCardRow, DsBadge, SearchField, DateField, tabsListClass, tabsTriggerClass } from '@/components/ds';
 import { useBoletoControls, type BoletoWithContact } from '@/hooks/useBoletoControls';
 import { BoletoGenerationDialog } from '@/components/financeiro/BoletoGenerationDialog';
 import { IndividualBoletoDialog } from '@/components/financeiro/IndividualBoletoDialog';
@@ -34,6 +35,7 @@ import { NotificarCobrancaDialog } from '@/components/financeiro/NotificarCobran
 import { LiquidarBoletoDialog } from '@/components/financeiro/LiquidarBoletoDialog';
 import { AlterarBoletoDialog } from '@/components/financeiro/AlterarBoletoDialog';
 import { MovimentacaoSyncDialog } from '@/components/financeiro/MovimentacaoSyncDialog';
+import { CobrancaTab } from '@/components/financeiro/CobrancaTab';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -239,13 +241,19 @@ export default function Boletos() {
         }
       />
 
-      {/*
-        Layout de 1 coluna, mesmo padrão de Transactions.tsx: KPIs em cards
-        no topo, filtros numa barra horizontal, tabela abaixo — substitui a
-        coluna lateral fixa + área principal de antes (15/09/2026, pedido
-        de Gabriel).
-      */}
-      <div className="space-y-4">
+      <Tabs defaultValue="controle" className="space-y-4">
+        <TabsList className={tabsListClass}>
+          <TabsTrigger value="controle" className={tabsTriggerClass}>Controle de boletos</TabsTrigger>
+          <TabsTrigger value="cobranca" className={tabsTriggerClass}>Cobrança</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="controle" className="mt-0 space-y-4">
+        {/*
+          Layout de 1 coluna, mesmo padrão de Transactions.tsx: KPIs em cards
+          no topo, filtros numa barra horizontal, tabela abaixo — substitui a
+          coluna lateral fixa + área principal de antes (15/09/2026, pedido
+          de Gabriel).
+        */}
         <StatCardRow
           items={[
             { label: 'Boletos gerados', value: kpis.total },
@@ -565,7 +573,12 @@ export default function Boletos() {
           </div>
           </>
           )}
-      </div>
+        </TabsContent>
+
+        <TabsContent value="cobranca" className="mt-0">
+          <CobrancaTab />
+        </TabsContent>
+      </Tabs>
 
       {/* Dialog: detalhes do boleto */}
       <Dialog open={!!detailsOf} onOpenChange={(o) => !o && setDetailsOf(null)}>
