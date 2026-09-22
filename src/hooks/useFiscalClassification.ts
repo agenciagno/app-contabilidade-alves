@@ -1,7 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/hooks/useCompany';
+
+// supabase-js não expõe o corpo da resposta em `data` quando a function
+// devolve um status não-2xx (só o `error` genérico "non-2xx status code") —
+// o detalhe real que a function mandou em { error: "..." } só existe dentro
+// de `error.context` (a Response bruta). Sem isso, todo erro de edge function
+// aparece igual pro usuário, sem pista do que houve.
+async function invocarFunction<T>(name: string, body: unknown): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(name, { body });
+  if (error) {
+    let mensagem: string | null = null;
+    if (error instanceof FunctionsHttpError) {
+      try {
+        const detalhe = await error.context.json();
+        mensagem = detalhe?.error ?? null;
+      } catch {
+        // corpo não era JSON — segue com a mensagem genérica do error abaixo.
+      }
+    }
+    throw new Error(mensagem ?? error.message);
+  }
+  if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+  return data as T;
+}
 
 export interface ClassificarInput {
   ncm?: string;
@@ -66,14 +90,10 @@ export interface ClassificarResultado {
 
 export function useClassifyProduct() {
   return useMutation({
-    mutationFn: async (input: ClassificarInput): Promise<ClassificarResultado> => {
-      const { data, error } = await supabase.functions.invoke('classify-product', {
-        body: { ncm: input.ncm, descricao: input.descricao, contact_id: input.contactId },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data as ClassificarResultado;
-    },
+    mutationFn: (input: ClassificarInput) =>
+      invocarFunction<ClassificarResultado>('classify-product', {
+        ncm: input.ncm, descricao: input.descricao, contact_id: input.contactId,
+      }),
   });
 }
 
@@ -176,14 +196,10 @@ export interface ClassificarLoteResultado {
 export function useClassifyBatch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: ClassificarLoteInput): Promise<ClassificarLoteResultado> => {
-      const { data, error } = await supabase.functions.invoke('classify-batch', {
-        body: { contact_id: input.contactId, itens: input.itens },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data as ClassificarLoteResultado;
-    },
+    mutationFn: (input: ClassificarLoteInput) =>
+      invocarFunction<ClassificarLoteResultado>('classify-batch', {
+        contact_id: input.contactId, itens: input.itens,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fiscal-classification-batches'] });
     },

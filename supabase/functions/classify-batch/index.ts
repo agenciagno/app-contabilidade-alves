@@ -1,13 +1,20 @@
 // Upload em lote: classifica uma planilha inteira de produtos de uma vez.
+//
+// Achado em produção (22/09/2026): a primeira versão fazia de 2 a 4 chamadas
+// RPC POR PRODUTO, em sequência. Com 268 produtos reais (nenhum com NCM
+// preenchido), isso deu timeout — cada chamada é 1 round-trip de rede/auth
+// além do tempo de query. Reescrita pra resolver em FASES, cada fase com uma
+// única chamada RPC em lote (funções `*_batch`, com LATERAL JOIN no banco) pra
+// todo o lote de uma vez, em vez de N idas ao banco.
+//
 // Mesma lógica de resolução do classify-product (NCM -> CEST -> cClassTrib via
-// Anexos da LC 214/2025 -> CSOSN), repetida aqui em vez de importada de um
-// módulo compartilhado — de propósito, pra não arriscar quebrar o
-// classify-product (já testado e em uso) ao refatorar os dois juntos.
+// Anexos da LC 214/2025 -> CSOSN) — duplicada aqui de propósito, não importada
+// de um módulo compartilhado, pra não arriscar quebrar o classify-product
+// (já testado e em uso) ao refatorar os dois juntos.
 //
 // Itens ambíguos (mais de um CEST ou cClassTrib candidato) não são decididos
 // sozinhos: a planilha de saída marca "AMBÍGUO — revisar" com os candidatos
-// listados, e o item entra no acervo como sugestão (não confirmado) — quem
-// resolve é a equipe, na tela de Consulta ou direto na planilha.
+// listados, e o item não entra no acervo — quem resolve é a equipe.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as XLSX from "npm:xlsx@0.18.5";
 
@@ -28,6 +35,17 @@ interface ItemEntrada {
   descricao?: string;
   ncm?: string;
   linha_original: Record<string, unknown>;
+}
+
+/** Agrupa linhas de uma função `*_batch` (todas têm query_idx 1-based) por índice. */
+function agruparPorIdx<T extends { query_idx: number }>(rows: T[] | null): Map<number, T[]> {
+  const map = new Map<number, T[]>();
+  for (const r of rows ?? []) {
+    const arr = map.get(r.query_idx) ?? [];
+    arr.push(r);
+    map.set(r.query_idx, arr);
+  }
+  return map;
 }
 
 Deno.serve(async (req) => {
@@ -88,7 +106,6 @@ Deno.serve(async (req) => {
       .select("name, tax_regime, setor_atuacao, segmento_atuacao, state")
       .eq("id", contactId)
       .maybeSingle();
-
     const regime = contact?.tax_regime as string | undefined;
 
     const { data: batch, error: batchErr } = await supabase
@@ -106,99 +123,192 @@ Deno.serve(async (req) => {
     if (batchErr) throw batchErr;
     const batchId = batch.id as string;
 
+    // Estado por item, indexado pela posição original na planilha.
+    interface EstadoItem {
+      descricao?: string;
+      ncmInformado?: string;
+      ncmResolvido?: { codigo: string; descricao: string };
+      fonteAcervo?: Record<string, unknown>;
+      ncmCandidatos?: Array<{ codigo: string; descricao: string }>;
+      semDescricaoNemNcm?: boolean;
+      ncmNaoEncontrado?: boolean;
+    }
+    const estados: EstadoItem[] = itens.map((item) => {
+      const descricao = item.descricao?.trim() || undefined;
+      const ncmInformado = item.ncm?.trim() || undefined;
+      return { descricao, ncmInformado, semDescricaoNemNcm: !descricao && !ncmInformado };
+    });
+
+    // ---- FASE 1: valida os NCMs já informados (1 chamada pro lote todo) ----
+    const idxComNcm: number[] = [];
+    const ncmsInformados: string[] = [];
+    estados.forEach((e, i) => {
+      if (e.ncmInformado) {
+        idxComNcm.push(i);
+        ncmsInformados.push(e.ncmInformado);
+      }
+    });
+    if (ncmsInformados.length) {
+      const { data: rows } = await supabase.rpc("find_ncm_exact_batch", { p_ncms: ncmsInformados });
+      const porIdx = agruparPorIdx(rows as Array<{ query_idx: number; codigo: string; descricao: string }>);
+      idxComNcm.forEach((origIdx, pos) => {
+        const match = porIdx.get(pos + 1)?.[0];
+        if (match) estados[origIdx].ncmResolvido = { codigo: match.codigo, descricao: match.descricao };
+        else estados[origIdx].ncmNaoEncontrado = true;
+      });
+    }
+
+    // ---- FASE 2: acervo, pra quem só tem descrição (1 chamada pro lote todo) ----
+    const idxSoDescricao: number[] = [];
+    const descricoesSoDescricao: string[] = [];
+    estados.forEach((e, i) => {
+      if (!e.ncmInformado && e.descricao) {
+        idxSoDescricao.push(i);
+        descricoesSoDescricao.push(normalizar(e.descricao));
+      }
+    });
+    if (idxSoDescricao.length && companyId) {
+      const { data: rows } = await supabase.rpc("search_acervo_by_text_batch", {
+        p_company_id: companyId,
+        p_queries: descricoesSoDescricao,
+        p_limit: 1,
+      });
+      const porIdx = agruparPorIdx(rows as Array<{ query_idx: number } & Record<string, unknown>>);
+      idxSoDescricao.forEach((origIdx, pos) => {
+        const hit = porIdx.get(pos + 1)?.[0] as { score: number } & Record<string, unknown> | undefined;
+        if (hit && hit.score > 0.5) estados[origIdx].fonteAcervo = hit;
+      });
+    }
+
+    // ---- FASE 3: candidatos de NCM por descrição, pra quem sobrou (1 chamada) ----
+    const idxPrecisaCandidatos: number[] = [];
+    const descricoesPrecisaCandidatos: string[] = [];
+    idxSoDescricao.forEach((origIdx) => {
+      if (!estados[origIdx].fonteAcervo) {
+        idxPrecisaCandidatos.push(origIdx);
+        descricoesPrecisaCandidatos.push(normalizar(estados[origIdx].descricao!));
+      }
+    });
+    if (idxPrecisaCandidatos.length) {
+      const { data: rows } = await supabase.rpc("search_ncm_by_text_batch", {
+        p_queries: descricoesPrecisaCandidatos,
+        p_limit: 3,
+      });
+      const porIdx = agruparPorIdx(rows as Array<{ query_idx: number; codigo: string; descricao: string }>);
+      idxPrecisaCandidatos.forEach((origIdx, pos) => {
+        estados[origIdx].ncmCandidatos = (porIdx.get(pos + 1) ?? []).map((c) => ({
+          codigo: c.codigo,
+          descricao: c.descricao,
+        }));
+      });
+    }
+
+    // ---- FASE 4: CEST + cClassTrib pra quem tem NCM resolvido (2 chamadas) ----
+    const idxComNcmResolvido: number[] = [];
+    const ncmsResolvidos: string[] = [];
+    const queriesCest: string[] = [];
+    estados.forEach((e, i) => {
+      if (e.ncmResolvido) {
+        idxComNcmResolvido.push(i);
+        ncmsResolvidos.push(e.ncmResolvido.codigo);
+        queriesCest.push(e.descricao ?? e.ncmResolvido.descricao);
+      }
+    });
+
+    type CestHit = { query_idx: number; codigo: string; descricao: string };
+    type CclasstribHit = {
+      query_idx: number; cclasstrib_codigo: string; cclasstrib_nome: string; anexo: string; item_lei: string;
+    };
+    let cestPorIdx = new Map<number, CestHit[]>();
+    let cclasstribPorIdx = new Map<number, CclasstribHit[]>();
+    if (idxComNcmResolvido.length) {
+      const [cestRes, ccRes] = await Promise.all([
+        supabase.rpc("find_cest_by_ncm_batch", { p_ncms: ncmsResolvidos, p_queries: queriesCest, p_limit: 5 }),
+        supabase.rpc("resolve_cclasstrib_by_ncm_batch", { p_ncms: ncmsResolvidos }),
+      ]);
+      cestPorIdx = agruparPorIdx(cestRes.data as CestHit[]);
+      cclasstribPorIdx = agruparPorIdx(ccRes.data as CclasstribHit[]);
+    }
+
+    // cClassTrib padrão + CST de todas as hipóteses especiais com exatamente 1
+    // hit — busca única em lote, feita aqui pra não precisar de mais uma
+    // chamada sequencial por item dentro do loop de montagem abaixo.
+    const codigosEspeciaisComHitUnico = Array.from(
+      new Set(
+        Array.from(cclasstribPorIdx.values())
+          .filter((hits) => hits.length === 1)
+          .map((hits) => hits[0].cclasstrib_codigo),
+      ),
+    );
+    const { data: cclasstribInfoRows } = await supabase
+      .from("cclasstrib_codes")
+      .select("codigo, nome, cst_vinculado")
+      .in("codigo", [...codigosEspeciaisComHitUnico, "000001"]);
+    const cclasstribInfoPorCodigo = new Map((cclasstribInfoRows ?? []).map((r) => [r.codigo, r]));
+    const padraoRow = cclasstribInfoPorCodigo.get("000001");
+
+    // ---- Monta as linhas de saída, na ordem original da planilha ----
     const linhasResultado: Array<Record<string, unknown>> = [];
     const registrosParaGravar: Array<Record<string, unknown>> = [];
     let confirmaveis = 0;
 
-    for (const item of itens) {
-      const descricao = item.descricao?.trim();
-      const ncmInformado = item.ncm?.trim();
+    itens.forEach((item, i) => {
+      const e = estados[i];
       const linha: Record<string, unknown> = { ...item.linha_original };
 
-      if (!descricao && !ncmInformado) {
+      if (e.semDescricaoNemNcm) {
         linha["Classificação — status"] = "sem descrição/NCM na linha";
         linhasResultado.push(linha);
-        continue;
+        return;
       }
 
-      // ---- 1. Resolve NCM ----
-      let ncm: { codigo: string; descricao: string } | null = null;
-      let fonteAcervo: Record<string, unknown> | null = null;
-
-      if (ncmInformado) {
-        const { data: rows } = await supabase.rpc("find_ncm_exact", { p_ncm: ncmInformado });
-        const match = rows?.[0];
-        if (match) ncm = { codigo: match.codigo, descricao: match.descricao };
-      } else if (descricao && companyId) {
-        const descNorm = normalizar(descricao);
-        const { data: acervo } = await supabase.rpc("search_acervo_by_text", {
-          p_company_id: companyId,
-          p_query: descNorm,
-          p_limit: 1,
-        });
-        if (acervo?.length && acervo[0].score > 0.5) {
-          fonteAcervo = acervo[0];
-          ncm = { codigo: acervo[0].ncm, descricao: "" };
-        }
-      }
-
-      if (!ncm && descricao) {
-        const { data: candidatos } = await supabase.rpc("search_ncm_by_text", {
-          p_query: normalizar(descricao),
-          p_limit: 3,
-        });
-        linha["Classificação — status"] = "NCM não identificado com confiança";
-        linha["Classificação — candidatos NCM"] = (candidatos ?? [])
-          .map((c: { codigo: string; descricao: string }) => `${c.codigo} — ${c.descricao}`)
-          .join(" | ");
-        linhasResultado.push(linha);
-        continue;
-      }
-      if (!ncm) {
-        linha["Classificação — status"] = `NCM "${ncmInformado}" não encontrado na base oficial`;
-        linhasResultado.push(linha);
-        continue;
-      }
-
-      if (fonteAcervo) {
+      if (e.fonteAcervo) {
+        const fa = e.fonteAcervo;
         linha["Classificação — status"] = "reaproveitado do acervo";
-        linha["NCM sugerido"] = fonteAcervo.ncm;
-        linha["CEST sugerido"] = fonteAcervo.cest;
-        linha["cClassTrib sugerido"] = fonteAcervo.cclasstrib;
-        linha["CST-IBS/CBS"] = fonteAcervo.cst_ibs_cbs;
-        linha["CSOSN sugerido"] = fonteAcervo.csosn;
-        linha["CFOP referência"] = fonteAcervo.cfop_referencia;
+        linha["NCM sugerido"] = fa.ncm;
+        linha["CEST sugerido"] = fa.cest;
+        linha["cClassTrib sugerido"] = fa.cclasstrib;
+        linha["CST-IBS/CBS"] = fa.cst_ibs_cbs;
+        linha["CSOSN sugerido"] = fa.csosn;
+        linha["CFOP referência"] = fa.cfop_referencia;
         linhasResultado.push(linha);
         registrosParaGravar.push({
           company_id: companyId,
           batch_id: batchId,
           source_contact_id: contactId,
-          descricao_produto: descricao ?? ncmInformado,
-          descricao_normalizada: normalizar(descricao ?? ncmInformado ?? ""),
-          ncm: fonteAcervo.ncm,
-          cest: fonteAcervo.cest,
-          cclasstrib: fonteAcervo.cclasstrib,
-          cst_ibs_cbs: fonteAcervo.cst_ibs_cbs,
-          csosn: fonteAcervo.csosn,
-          cfop_referencia: fonteAcervo.cfop_referencia,
+          descricao_produto: e.descricao ?? e.ncmInformado,
+          descricao_normalizada: normalizar(e.descricao ?? e.ncmInformado ?? ""),
+          ncm: fa.ncm,
+          cest: fa.cest,
+          cclasstrib: fa.cclasstrib,
+          cst_ibs_cbs: fa.cst_ibs_cbs,
+          csosn: fa.csosn,
+          cfop_referencia: fa.cfop_referencia,
           status: "sugestao_ia",
-          base_legal: { fonte: "acervo", acervo_id: fonteAcervo.id },
+          base_legal: { fonte: "acervo", acervo_id: fa.id },
         });
         confirmaveis += 1;
-        continue;
+        return;
       }
 
-      // ---- 2. CEST ----
-      const { data: cestCandidatos } = await supabase.rpc("find_cest_by_ncm", {
-        p_ncm: ncm.codigo,
-        p_query: descricao ?? ncm.descricao,
-        p_limit: 5,
-      });
+      if (e.ncmNaoEncontrado) {
+        linha["Classificação — status"] = `NCM "${e.ncmInformado}" não encontrado na base oficial`;
+        linhasResultado.push(linha);
+        return;
+      }
 
-      // ---- 3. cClassTrib (Anexos da LC 214/2025) ----
-      const { data: cclasstribHits } = await supabase.rpc("resolve_cclasstrib_by_ncm", {
-        p_ncm: ncm.codigo,
-      });
+      if (!e.ncmResolvido) {
+        linha["Classificação — status"] = "NCM não identificado com confiança";
+        linha["Classificação — candidatos NCM"] = (e.ncmCandidatos ?? [])
+          .map((c) => `${c.codigo} — ${c.descricao}`)
+          .join(" | ");
+        linhasResultado.push(linha);
+        return;
+      }
+
+      // NCM resolvido (informado ou validado) — CEST + cClassTrib.
+      const cestCandidatos = cestPorIdx.get(i) ?? [];
+      const cclasstribHits = cclasstribPorIdx.get(i) ?? [];
 
       let cclasstribCodigo: string | null = null;
       let cclasstribNome = "";
@@ -206,48 +316,35 @@ Deno.serve(async (req) => {
       let baseLegal: Record<string, unknown> = {};
       let ambiguo = false;
 
-      if (cclasstribHits?.length === 1) {
+      if (cclasstribHits.length === 1) {
         const hit = cclasstribHits[0];
+        const info = cclasstribInfoPorCodigo.get(hit.cclasstrib_codigo);
         cclasstribCodigo = hit.cclasstrib_codigo;
         cclasstribNome = hit.cclasstrib_nome;
+        cstFinal = info?.cst_vinculado ?? null;
         baseLegal = { anexo: hit.anexo, item: hit.item_lei };
-        const { data: full } = await supabase
-          .from("cclasstrib_codes")
-          .select("cst_vinculado")
-          .eq("codigo", hit.cclasstrib_codigo)
-          .maybeSingle();
-        cstFinal = full?.cst_vinculado ?? null;
-      } else if (cclasstribHits?.length && cclasstribHits.length > 1) {
+      } else if (cclasstribHits.length > 1) {
         ambiguo = true;
-        cclasstribNome = cclasstribHits
-          .map((h: { cclasstrib_codigo: string; cclasstrib_nome: string }) => `${h.cclasstrib_codigo} — ${h.cclasstrib_nome}`)
-          .join(" | ");
+        cclasstribNome = cclasstribHits.map((h) => `${h.cclasstrib_codigo} — ${h.cclasstrib_nome}`).join(" | ");
       } else {
-        const { data: padrao } = await supabase
-          .from("cclasstrib_codes")
-          .select("codigo, nome, cst_vinculado")
-          .eq("codigo", "000001")
-          .maybeSingle();
-        cclasstribCodigo = padrao?.codigo ?? "000001";
-        cclasstribNome = padrao?.nome ?? "Tributação integral";
-        cstFinal = padrao?.cst_vinculado ?? "000";
+        cclasstribCodigo = padraoRow?.codigo ?? "000001";
+        cclasstribNome = padraoRow?.nome ?? "Tributação integral";
+        cstFinal = padraoRow?.cst_vinculado ?? "000";
       }
 
-      // ---- 4. CSOSN ----
-      let csosnSugerido: string | null = null;
-      if (regime === "simples_nacional" || regime === "mei") {
-        const temST = (cestCandidatos ?? []).length > 0;
-        csosnSugerido = temST ? "201" : "101";
-      }
-
-      const cestAmbiguo = (cestCandidatos ?? []).length > 1;
-      const cestUnico = (cestCandidatos ?? []).length === 1 ? cestCandidatos[0].codigo : null;
+      const cestAmbiguo = cestCandidatos.length > 1;
+      const cestUnico = cestCandidatos.length === 1 ? cestCandidatos[0].codigo : null;
       const cestTexto = cestAmbiguo
-        ? (cestCandidatos ?? []).map((c: { codigo: string; descricao: string }) => `${c.codigo} — ${c.descricao}`).join(" | ")
+        ? cestCandidatos.map((c) => `${c.codigo} — ${c.descricao}`).join(" | ")
         : cestUnico ?? "(sem CEST — não sujeito a ST)";
 
+      let csosnSugerido: string | null = null;
+      if (regime === "simples_nacional" || regime === "mei") {
+        csosnSugerido = cestCandidatos.length > 0 ? "201" : "101";
+      }
+
       linha["Classificação — status"] = ambiguo || cestAmbiguo ? "AMBÍGUO — revisar" : "ok";
-      linha["NCM sugerido"] = ncm.codigo;
+      linha["NCM sugerido"] = e.ncmResolvido.codigo;
       linha["CEST sugerido"] = cestTexto;
       linha["cClassTrib sugerido"] = ambiguo ? cclasstribNome : `${cclasstribCodigo} — ${cclasstribNome}`;
       linha["CST-IBS/CBS"] = cstFinal ?? "";
@@ -260,9 +357,9 @@ Deno.serve(async (req) => {
           company_id: companyId,
           batch_id: batchId,
           source_contact_id: contactId,
-          descricao_produto: descricao ?? ncm.codigo,
-          descricao_normalizada: normalizar(descricao ?? ncm.codigo),
-          ncm: ncm.codigo,
+          descricao_produto: e.descricao ?? e.ncmResolvido.codigo,
+          descricao_normalizada: normalizar(e.descricao ?? e.ncmResolvido.codigo),
+          ncm: e.ncmResolvido.codigo,
           cest: cestUnico,
           cclasstrib: cclasstribCodigo,
           cst_ibs_cbs: cstFinal,
@@ -273,7 +370,7 @@ Deno.serve(async (req) => {
         });
         confirmaveis += 1;
       }
-    }
+    });
 
     if (registrosParaGravar.length) {
       const TAMANHO_LOTE = 500;
