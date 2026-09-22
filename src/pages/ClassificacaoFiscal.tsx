@@ -23,6 +23,7 @@ import {
   type ClassificarResultado,
 } from '@/hooks/useFiscalClassification';
 import { UploadLoteFiscal } from '@/components/fiscal/UploadLoteFiscal';
+import { getContactDisplayName } from '@/lib/contact-display';
 
 export default function ClassificacaoFiscal() {
   const { contacts } = useContacts();
@@ -40,7 +41,10 @@ export default function ClassificacaoFiscal() {
   const [csosnEscolhido, setCsosnEscolhido] = useState<string>('');
   const [confirmado, setConfirmado] = useState(false);
 
-  const clientes = useMemo(() => contacts.filter((c) => c.is_active), [contacts]);
+  const clientes = useMemo(
+    () => contacts.filter((c) => c.is_active && c.type === 'cliente'),
+    [contacts],
+  );
 
   const podeClassificar = ncmInput.trim().length > 0 || descricaoInput.trim().length > 0;
 
@@ -130,7 +134,7 @@ export default function ClassificacaoFiscal() {
                   </SelectTrigger>
                   <SelectContent>
                     {clientes.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>{getContactDisplayName(c)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -341,7 +345,7 @@ export default function ClassificacaoFiscal() {
                   {historico.map((h) => (
                     <TableRow key={h.id}>
                       <TableCell className="max-w-[240px] truncate font-medium">{h.descricao_produto}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{h.contacts?.name ?? '—'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{getContactDisplayName(h.contacts) || '—'}</TableCell>
                       <TableCell className="text-sm">{h.ncm ?? '—'}</TableCell>
                       <TableCell className="text-sm">{h.cest ?? '—'}</TableCell>
                       <TableCell className="text-sm">{h.cclasstrib ?? '—'}</TableCell>

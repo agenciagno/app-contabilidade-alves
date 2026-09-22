@@ -115,6 +115,15 @@ export function useConfirmarClassificacao() {
   });
 }
 
+export interface ContactNameFields {
+  name: string;
+  display_name: string | null;
+  nome_fantasia: string | null;
+  razao_social: string | null;
+}
+
+const CONTACT_NAME_SELECT = 'name, display_name, nome_fantasia, razao_social';
+
 export interface FiscalClassificationRow {
   id: string;
   descricao_produto: string;
@@ -126,7 +135,7 @@ export interface FiscalClassificationRow {
   status: 'sugestao_ia' | 'confirmado';
   created_at: string;
   source_contact_id: string | null;
-  contacts?: { name: string } | null;
+  contacts?: ContactNameFields | null;
 }
 
 export function useFiscalClassificationHistory() {
@@ -139,7 +148,7 @@ export function useFiscalClassificationHistory() {
     queryFn: async (): Promise<FiscalClassificationRow[]> => {
       const { data, error } = await supabase
         .from('fiscal_product_classifications')
-        .select('*, contacts:source_contact_id(name)')
+        .select(`*, contacts:source_contact_id(${CONTACT_NAME_SELECT})`)
         .eq('company_id', companyId!)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -189,7 +198,7 @@ export interface FiscalBatchRow {
   itens_confirmados: number;
   arquivo_resultado_path: string | null;
   created_at: string;
-  contacts?: { name: string } | null;
+  contacts?: ContactNameFields | null;
 }
 
 export function useFiscalClassificationBatches() {
@@ -202,7 +211,7 @@ export function useFiscalClassificationBatches() {
     queryFn: async (): Promise<FiscalBatchRow[]> => {
       const { data, error } = await supabase
         .from('fiscal_classification_batches')
-        .select('*, contacts:contact_id(name)')
+        .select(`*, contacts:contact_id(${CONTACT_NAME_SELECT})`)
         .eq('company_id', companyId!)
         .order('created_at', { ascending: false })
         .limit(50);

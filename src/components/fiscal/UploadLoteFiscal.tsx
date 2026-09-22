@@ -19,6 +19,7 @@ import { useContacts } from '@/hooks/useContacts';
 import {
   baixarPlanilhaLote, useClassifyBatch, useFiscalClassificationBatches,
 } from '@/hooks/useFiscalClassification';
+import { getContactDisplayName } from '@/lib/contact-display';
 
 const STATUS_LABEL: Record<string, string> = {
   processando: 'Processando',
@@ -48,7 +49,10 @@ export function UploadLoteFiscal() {
   const [colNcm, setColNcm] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const clientes = useMemo(() => contacts.filter((c) => c.is_active), [contacts]);
+  const clientes = useMemo(
+    () => contacts.filter((c) => c.is_active && c.type === 'cliente'),
+    [contacts],
+  );
   const podeProcessar = contactId && colDescricao && rows.length > 0 && !classificarLote.isPending;
 
   const handleFile = async (file: File) => {
@@ -104,7 +108,7 @@ export function UploadLoteFiscal() {
               </SelectTrigger>
               <SelectContent>
                 {clientes.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>{getContactDisplayName(c)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -207,7 +211,7 @@ export function UploadLoteFiscal() {
               <TableBody>
                 {lotes.map((l) => (
                   <TableRow key={l.id}>
-                    <TableCell className="font-medium">{l.contacts?.name ?? '—'}</TableCell>
+                    <TableCell className="font-medium">{getContactDisplayName(l.contacts) || '—'}</TableCell>
                     <TableCell className="text-sm">{l.total_itens}</TableCell>
                     <TableCell>
                       <DsBadge tone={l.status === 'concluido' ? 'ok' : l.status === 'erro' ? 'danger' : 'neutral'}>
