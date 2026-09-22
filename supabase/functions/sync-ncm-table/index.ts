@@ -84,6 +84,11 @@ Deno.serve(async (req) => {
       processados += lote.length;
     }
 
+    // Recalcula a descrição com contexto hierárquico (usada na busca por
+    // descrição livre do módulo de Classificação Fiscal) — depende dos
+    // códigos recém-sincronizados, então só faz sentido rodar depois do upsert.
+    await supabase.rpc("refresh_ncm_descricao_hierarquica");
+
     return new Response(
       JSON.stringify({
         ok: true,
