@@ -22,6 +22,7 @@ import {
   useClassifyProduct, useConfirmarClassificacao, useFiscalClassificationHistory,
   type ClassificarResultado,
 } from '@/hooks/useFiscalClassification';
+import { UploadLoteFiscal } from '@/components/fiscal/UploadLoteFiscal';
 
 export default function ClassificacaoFiscal() {
   const { contacts } = useContacts();
@@ -108,6 +109,7 @@ export default function ClassificacaoFiscal() {
       <Tabs value={aba} onValueChange={setAba}>
         <TabsList className={tabsListClass}>
           <TabsTrigger value="consultar" className={tabsTriggerClass}>Consultar</TabsTrigger>
+          <TabsTrigger value="lote" className={tabsTriggerClass}>Upload em Lote</TabsTrigger>
           <TabsTrigger value="historico" className={tabsTriggerClass}>
             Histórico
             {historico.length > 0 && <span className="text-muted-ink">({historico.length})</span>}
@@ -310,6 +312,10 @@ export default function ClassificacaoFiscal() {
               )}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="lote" className="mt-4">
+          <UploadLoteFiscal />
         </TabsContent>
 
         <TabsContent value="historico" className="mt-4">

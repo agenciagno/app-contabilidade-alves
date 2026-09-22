@@ -150,3 +150,74 @@ export function useFiscalClassificationHistory() {
 
   return { historico: query.data ?? [], ...query };
 }
+
+export interface ClassificarLoteInput {
+  contactId: string;
+  itens: Array<{ descricao?: string; ncm?: string; linha_original: Record<string, unknown> }>;
+}
+
+export interface ClassificarLoteResultado {
+  batch_id: string;
+  total_itens: number;
+  resolvidos_automaticamente: number;
+  precisam_revisao: number;
+  arquivo_resultado_path: string;
+}
+
+export function useClassifyBatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ClassificarLoteInput): Promise<ClassificarLoteResultado> => {
+      const { data, error } = await supabase.functions.invoke('classify-batch', {
+        body: { contact_id: input.contactId, itens: input.itens },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data as ClassificarLoteResultado;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fiscal-classification-batches'] });
+    },
+  });
+}
+
+export interface FiscalBatchRow {
+  id: string;
+  contact_id: string | null;
+  status: 'processando' | 'concluido' | 'erro';
+  total_itens: number;
+  itens_confirmados: number;
+  arquivo_resultado_path: string | null;
+  created_at: string;
+  contacts?: { name: string } | null;
+}
+
+export function useFiscalClassificationBatches() {
+  const { company } = useCompany();
+  const companyId = company?.id as string | undefined;
+
+  const query = useQuery({
+    queryKey: ['fiscal-classification-batches', companyId],
+    enabled: !!companyId,
+    queryFn: async (): Promise<FiscalBatchRow[]> => {
+      const { data, error } = await supabase
+        .from('fiscal_classification_batches')
+        .select('*, contacts:contact_id(name)')
+        .eq('company_id', companyId!)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []) as unknown as FiscalBatchRow[];
+    },
+  });
+
+  return { lotes: query.data ?? [], ...query };
+}
+
+export async function baixarPlanilhaLote(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from('fiscal-classifications')
+    .createSignedUrl(path, 60);
+  if (error) throw error;
+  return data.signedUrl;
+}
