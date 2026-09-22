@@ -13,9 +13,12 @@
 // humano, com o contexto real do produto. Se não bate em nenhum, a sugestão é o
 // código padrão "000001 - Tributação integral", que é a regra geral da reforma.
 //
-// Busca por descrição livre (sem NCM) ainda é fraca — trigram não entende que
-// "Coca-Cola" é um "refrigerante". Funciona (retorna candidatos rankeados), mas
-// com aviso de baixa confiança até integrar um LLM restrito à base oficial.
+// Busca por descrição livre (sem NCM): trigram sozinho não entende que
+// "Coca-Cola" é um "refrigerante" — por isso, quando a busca textual devolve
+// candidatos mas nenhum com score alto o bastante pra decidir, pedimos pro
+// Gemini escolher UM deles (nunca inventar código fora da lista de
+// candidatos oficiais). Sem GEMINI_API_KEY configurada, cai de volta pro
+// comportamento antigo (devolve candidatos, humano decide).
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -23,6 +26,73 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+const GEMINI_MODEL = "gemini-flash-latest";
+
+interface NcmCandidato {
+  codigo: string;
+  descricao: string;
+  score: number;
+}
+
+/** Pede ao Gemini pra escolher, entre os candidatos já buscados no banco oficial,
+ *  qual NCM melhor descreve o produto. Nunca aceita um código fora da lista de
+ *  candidatos — se o Gemini devolver algo que não está na lista, ou "null", o
+ *  item cai de volta pra revisão manual. */
+async function escolherNcmComGemini(
+  descricao: string,
+  candidatos: NcmCandidato[],
+  contexto: { segmento_atuacao?: string; setor_atuacao?: string },
+): Promise<{ codigo: string; justificativa: string } | null> {
+  if (!GEMINI_API_KEY || !candidatos.length) return null;
+
+  const segmento = contexto.segmento_atuacao || contexto.setor_atuacao;
+  const prompt = `Você é especialista em classificação fiscal NCM (Nomenclatura Comum do Mercosul).
+Escolha, ENTRE OS CANDIDATOS abaixo, o NCM que melhor descreve o produto pelo nome comercial dado
+pelo cliente. Nunca escolha um código fora da lista. Se nenhum candidato for um bom match, devolva
+ncm_escolhido null.
+${segmento ? `Contexto: o cliente atua no segmento "${segmento}".` : ""}
+
+Produto (nome comercial): "${descricao}"
+Candidatos (código — descrição oficial):
+${candidatos.map((c) => `${c.codigo} — ${c.descricao}`).join("\n")}`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "object",
+              properties: {
+                ncm_escolhido: { type: "string", nullable: true },
+                justificativa: { type: "string" },
+              },
+              required: ["ncm_escolhido", "justificativa"],
+            },
+          },
+        }),
+      },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!texto) return null;
+    const parsed = JSON.parse(texto) as { ncm_escolhido: string | null; justificativa: string };
+    if (!parsed.ncm_escolhido) return null;
+    const valido = candidatos.some((c) => c.codigo === parsed.ncm_escolhido);
+    if (!valido) return null;
+    return { codigo: parsed.ncm_escolhido, justificativa: parsed.justificativa };
+  } catch {
+    return null;
+  }
+}
 
 const CFOP_REFERENCIA = {
   codigo: "5102",
@@ -95,6 +165,7 @@ Deno.serve(async (req) => {
     let ncm: { codigo: string; descricao: string } | null = null;
     let ncmCandidatos: Array<{ codigo: string; descricao: string; score: number }> = [];
     let fonteAcervo: Record<string, unknown> | null = null;
+    let ncmFonteIa: string | null = null;
 
     if (ncmInformado) {
       const { data: rows } = await supabase.rpc("find_ncm_exact", { p_ncm: ncmInformado });
@@ -124,10 +195,19 @@ Deno.serve(async (req) => {
           p_limit: 8,
         });
         ncmCandidatos = candidatos ?? [];
-        avisos.push(
-          "NCM sugerido por descrição ainda é baixa confiança (busca textual, não entende sinônimo/marca). " +
-            "Revise os candidatos ou informe o NCM diretamente.",
-        );
+
+        const escolha = await escolherNcmComGemini(descricao, ncmCandidatos, contexto);
+        if (escolha) {
+          const candidato = ncmCandidatos.find((c) => c.codigo === escolha.codigo)!;
+          ncm = { codigo: candidato.codigo, descricao: candidato.descricao };
+          ncmFonteIa = escolha.justificativa;
+          avisos.push(`NCM sugerido por IA (Gemini) a partir da descrição — confira antes de confirmar: ${escolha.justificativa}`);
+        } else {
+          avisos.push(
+            "NCM sugerido por descrição ainda é baixa confiança (busca textual, não entende sinônimo/marca). " +
+              "Revise os candidatos ou informe o NCM diretamente.",
+          );
+        }
       }
     }
 
@@ -239,7 +319,7 @@ Deno.serve(async (req) => {
           cst_ibs_cbs: cclasstribSugerido?.cst_vinculado ?? null,
           cfop_referencia: CFOP_REFERENCIA.codigo,
           status: "sugestao_ia",
-          base_legal: baseLegal,
+          base_legal: ncmFonteIa ? { ...baseLegal, ncm_fonte_ia: "gemini", ncm_motivo_ia: ncmFonteIa } : baseLegal,
         })
         .select("id")
         .single();

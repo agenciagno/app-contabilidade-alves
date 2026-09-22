@@ -15,6 +15,15 @@
 // Itens ambíguos (mais de um CEST ou cClassTrib candidato) não são decididos
 // sozinhos: a planilha de saída marca "AMBÍGUO — revisar" com os candidatos
 // listados, e o item não entra no acervo — quem resolve é a equipe.
+//
+// Gemini (22/09/2026): quando a busca textual (FASE 3) devolve candidatos mas
+// nenhum score alto o bastante pra decidir sozinha, pedimos pro Gemini
+// escolher UM candidato dentre os já buscados no banco oficial — nunca aceita
+// código fora da lista de candidatos. Pra não reintroduzir o mesmo problema
+// de N chamadas sequenciais que causou o timeout original, o lote inteiro vai
+// em poucas chamadas ao Gemini (chunks de ~40 itens, com concorrência
+// limitada), não uma por item. Sem GEMINI_API_KEY configurada, esses itens
+// simplesmente caem no comportamento antigo (vão pra revisão manual).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as XLSX from "npm:xlsx@0.18.5";
 
@@ -27,8 +36,107 @@ const corsHeaders = {
 const CFOP_REFERENCIA_CODIGO = "5102";
 const MAX_ITENS = 3000;
 
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+const GEMINI_MODEL = "gemini-flash-latest";
+const GEMINI_TAMANHO_CHUNK = 40;
+const GEMINI_CONCORRENCIA = 4;
+
 function normalizar(txt: string): string {
   return txt.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+interface CandidatoNcm {
+  codigo: string;
+  descricao: string;
+}
+
+interface ItemParaGemini {
+  idx: number;
+  descricao: string;
+  candidatos: CandidatoNcm[];
+}
+
+/** Resolve, em poucas chamadas (chunks), qual candidato de NCM o Gemini escolhe
+ *  pra cada item — nunca aceita código fora da lista de candidatos daquele item. */
+async function escolherNcmsComGemini(
+  contexto: { segmento_atuacao?: string; setor_atuacao?: string },
+  itens: ItemParaGemini[],
+): Promise<Map<number, { codigo: string; justificativa: string }>> {
+  const resultado = new Map<number, { codigo: string; justificativa: string }>();
+  if (!GEMINI_API_KEY || !itens.length) return resultado;
+
+  const segmento = contexto.segmento_atuacao || contexto.setor_atuacao;
+  const chunks: ItemParaGemini[][] = [];
+  for (let i = 0; i < itens.length; i += GEMINI_TAMANHO_CHUNK) {
+    chunks.push(itens.slice(i, i + GEMINI_TAMANHO_CHUNK));
+  }
+
+  async function processarChunk(chunk: ItemParaGemini[]) {
+    const prompt = `Você é especialista em classificação fiscal NCM (Nomenclatura Comum do Mercosul).
+Para cada produto abaixo (nome comercial dado pelo cliente), escolha, ENTRE OS CANDIDATOS listados,
+o NCM que melhor descreve o produto. Nunca escolha um código fora da lista de candidatos daquele
+item. Se nenhum candidato for um bom match, devolva ncm_escolhido null pra esse item.
+${segmento ? `Contexto: o cliente atua no segmento "${segmento}".` : ""}
+
+Produtos:
+${chunk.map((it) => `${it.idx}. "${it.descricao}" — candidatos: ${it.candidatos.map((c) => `${c.codigo} (${c.descricao})`).join(" | ")}`).join("\n")}`;
+
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY! },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "object",
+                properties: {
+                  resultados: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        idx: { type: "integer" },
+                        ncm_escolhido: { type: "string", nullable: true },
+                        justificativa: { type: "string" },
+                      },
+                      required: ["idx", "ncm_escolhido", "justificativa"],
+                    },
+                  },
+                },
+                required: ["resultados"],
+              },
+            },
+          }),
+        },
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!texto) return;
+      const parsed = JSON.parse(texto) as {
+        resultados: Array<{ idx: number; ncm_escolhido: string | null; justificativa: string }>;
+      };
+      const candidatosPorIdx = new Map(chunk.map((it) => [it.idx, it.candidatos]));
+      for (const r of parsed.resultados ?? []) {
+        if (!r.ncm_escolhido) continue;
+        const validos = candidatosPorIdx.get(r.idx) ?? [];
+        if (validos.some((c) => c.codigo === r.ncm_escolhido)) {
+          resultado.set(r.idx, { codigo: r.ncm_escolhido, justificativa: r.justificativa });
+        }
+      }
+    } catch {
+      // degrada: itens do chunk ficam sem resolução via IA, seguem pra revisão manual.
+    }
+  }
+
+  for (let i = 0; i < chunks.length; i += GEMINI_CONCORRENCIA) {
+    await Promise.all(chunks.slice(i, i + GEMINI_CONCORRENCIA).map(processarChunk));
+  }
+  return resultado;
 }
 
 interface ItemEntrada {
@@ -140,6 +248,7 @@ Deno.serve(async (req) => {
       ncmCandidatos?: Array<{ codigo: string; descricao: string }>;
       semDescricaoNemNcm?: boolean;
       ncmNaoEncontrado?: boolean;
+      motivoIa?: string;
     }
     const estados: EstadoItem[] = itens.map((item) => {
       const descricao = item.descricao?.trim() || undefined;
@@ -210,6 +319,24 @@ Deno.serve(async (req) => {
         }));
       });
     }
+
+    // ---- FASE 3.5: Gemini escolhe entre os candidatos, quando a busca textual não bastou ----
+    const itensParaGemini: ItemParaGemini[] = idxPrecisaCandidatos
+      .filter((origIdx) => (estados[origIdx].ncmCandidatos ?? []).length > 0)
+      .map((origIdx) => ({
+        idx: origIdx,
+        descricao: estados[origIdx].descricao!,
+        candidatos: estados[origIdx].ncmCandidatos!,
+      }));
+    const escolhasGemini = await escolherNcmsComGemini(
+      { segmento_atuacao: contact?.segmento_atuacao, setor_atuacao: contact?.setor_atuacao },
+      itensParaGemini,
+    );
+    escolhasGemini.forEach((escolha, origIdx) => {
+      const candidato = estados[origIdx].ncmCandidatos!.find((c) => c.codigo === escolha.codigo)!;
+      estados[origIdx].ncmResolvido = { codigo: candidato.codigo, descricao: candidato.descricao };
+      estados[origIdx].motivoIa = escolha.justificativa;
+    });
 
     // ---- FASE 4: CEST + cClassTrib pra quem tem NCM resolvido (2 chamadas) ----
     const idxComNcmResolvido: number[] = [];
@@ -306,7 +433,9 @@ Deno.serve(async (req) => {
       }
 
       if (!e.ncmResolvido) {
-        linha["Classificação — status"] = "NCM não identificado com confiança";
+        linha["Classificação — status"] = GEMINI_API_KEY && (e.ncmCandidatos ?? []).length
+          ? "NCM não identificado com confiança (IA também não confirmou)"
+          : "NCM não identificado com confiança";
         linha["Classificação — candidatos NCM"] = (e.ncmCandidatos ?? [])
           .map((c) => `${c.codigo} — ${c.descricao}`)
           .join(" | ");
@@ -351,13 +480,16 @@ Deno.serve(async (req) => {
         csosnSugerido = cestCandidatos.length > 0 ? "201" : "101";
       }
 
-      linha["Classificação — status"] = ambiguo || cestAmbiguo ? "AMBÍGUO — revisar" : "ok";
+      linha["Classificação — status"] = ambiguo || cestAmbiguo
+        ? "AMBÍGUO — revisar"
+        : e.motivoIa ? "sugerido por IA (Gemini) — confirmar" : "ok";
       linha["NCM sugerido"] = e.ncmResolvido.codigo;
       linha["CEST sugerido"] = cestTexto;
       linha["cClassTrib sugerido"] = ambiguo ? cclasstribNome : `${cclasstribCodigo} — ${cclasstribNome}`;
       linha["CST-IBS/CBS"] = cstFinal ?? "";
       linha["CSOSN sugerido"] = csosnSugerido ?? "";
       linha["CFOP referência"] = `${CFOP_REFERENCIA_CODIGO} (referência — confirmar na emissão)`;
+      if (e.motivoIa) linha["Classificação — IA (motivo)"] = e.motivoIa;
       linhasResultado.push(linha);
 
       if (!ambiguo && !cestAmbiguo) {
@@ -374,7 +506,7 @@ Deno.serve(async (req) => {
           csosn: csosnSugerido,
           cfop_referencia: CFOP_REFERENCIA_CODIGO,
           status: "sugestao_ia",
-          base_legal: baseLegal,
+          base_legal: e.motivoIa ? { ...baseLegal, ncm_fonte_ia: "gemini", ncm_motivo_ia: e.motivoIa } : baseLegal,
         });
         confirmaveis += 1;
       }
