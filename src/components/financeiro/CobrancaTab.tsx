@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { Check, ChevronDown, Copy, Loader2, Mail, MessageCircle, X } from 'lucide-react';
+import { Check, ChevronDown, Copy, Image as ImageIcon, Loader2, Mail, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,11 +25,10 @@ export function CobrancaTab() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
   const [uncheckedBoletoIds, setUncheckedBoletoIds] = useState<Set<string>>(new Set());
-  const [destinoWhats, setDestinoWhats] = useState('');
   const [destinoEmail, setDestinoEmail] = useState('');
   const [mensagem, setMensagem] = useState('');
   const [enviandoEmail, setEnviandoEmail] = useState(false);
-  const [gerandoPrint, setGerandoPrint] = useState(false);
+  const [copiandoImagem, setCopiandoImagem] = useState(false);
   const reciboRef = useRef<HTMLDivElement>(null);
 
   const registrarLocal = useRegistrarNotificacaoLocalCobranca();
@@ -65,7 +64,6 @@ export function CobrancaTab() {
   useEffect(() => {
     if (selectedContacts.length === 1) {
       const c = selectedContacts[0];
-      setDestinoWhats(c.whatsapp_cobranca || c.whatsapp || c.phone || '');
       setDestinoEmail(c.email_cobranca || c.email || '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,55 +125,37 @@ export function CobrancaTab() {
 
   // Testado na prática (22/09): quando texto e imagem estão juntos na área de transferência, o
   // WhatsApp sempre prioriza a imagem e descarta o texto — não dá pra combinar os dois num
-  // Ctrl+V só. Fluxo em 2 passos: botão WhatsApp copia a imagem e abre a conversa (Ctrl+V lá
-  // anexa a imagem, com legenda vazia); "Copiar" copia só o texto, pra colar (Ctrl+V) direto
-  // na legenda da imagem que já está anexada.
-  const handleCopiar = () => {
+  // Ctrl+V só, nem tem como abrir o WhatsApp com a imagem já anexada (a Web API não permite
+  // pré-anexar arquivo por link). Por isso 2 botões desacoplados, sem abrir nada sozinho — o
+  // Gabriel abre o WhatsApp por conta própria e cola cada parte onde quiser: "Copiar texto"
+  // pega a mensagem; "Copiar imagem" pega o print pra colar (Ctrl+V) como anexo/legenda.
+  const handleCopiarTexto = () => {
     if (selectedBoletos.length === 0) { toast.error('Selecione ao menos um boleto.'); return; }
     const boletoIds = selectedBoletos.map((b) => b.id);
     const msg = mensagem;
-    navigator.clipboard.writeText(msg).then(() => toast.success('Mensagem copiada.'));
+    navigator.clipboard.writeText(msg).then(() => toast.success('Texto copiado.'));
     registrarLocal.mutate({ boleto_ids: boletoIds, canal: 'copiar', mensagem: msg });
   };
 
-  const handleWhatsapp = () => {
+  const handleCopiarImagem = () => {
     if (selectedBoletos.length === 0) { toast.error('Selecione ao menos um boleto.'); return; }
-    if (!destinoWhats.trim()) { toast.error('Informe o WhatsApp de destino.'); return; }
-    setGerandoPrint(true);
+    if (!suportaClipboardImagem()) { toast.error('Esse navegador não suporta copiar imagem pra área de transferência.'); return; }
+    setCopiandoImagem(true);
     const boletoIds = selectedBoletos.map((b) => b.id);
     const msg = mensagem;
-    const destino = destinoWhats;
-    const numero = destino.replace(/\D/g, '');
-    // Sem "text=" de propósito — o texto agora entra pelo botão "Copiar", colado direto na
-    // legenda da imagem depois que ela for anexada aqui (ver comentário em handleCopiar).
-    // web.whatsapp.com em vez de wa.me — o wa.me entrega esse link pro app Desktop, cujo
-    // parser de URL corrompe emoji fora do plano básico (🗓️, 💰) mesmo com o texto chegando
-    // corretamente codificado (round-trip de encodeURIComponent/decodeURIComponent confere).
-    const whatsappUrl = `https://web.whatsapp.com/send?phone=55${numero}`;
-
-    const abrirEFinalizar = (imagemCopiada: boolean) => {
-      window.open(whatsappUrl, '_blank');
-      registrarLocal.mutate({ boleto_ids: boletoIds, canal: 'whatsapp', destino, mensagem: msg });
-      toast.success(
-        imagemCopiada
-          ? 'Imagem copiada — na conversa que abriu, dá um Ctrl+V pra anexar. Depois usa o "Copiar" pra colar o texto na legenda.'
-          : 'WhatsApp aberto — não deu pra copiar a imagem automaticamente aqui, baixei o arquivo pra anexar manualmente.',
-      );
-      setGerandoPrint(false);
-    };
-
-    if (suportaClipboardImagem()) {
-      const printPromise = gerarPrintBlobPromise();
-      navigator.clipboard.write([new ClipboardItem({ 'image/png': printPromise })])
-        .then(() => abrirEFinalizar(true))
-        .catch(() => {
-          printPromise.then(baixarBlob).catch(() => {}).finally(() => abrirEFinalizar(false));
-        });
-    } else if (reciboRef.current) {
-      gerarPrintBlobPromise().then(baixarBlob).catch(() => {}).finally(() => abrirEFinalizar(false));
-    } else {
-      abrirEFinalizar(false);
-    }
+    const printPromise = gerarPrintBlobPromise();
+    navigator.clipboard.write([new ClipboardItem({ 'image/png': printPromise })])
+      .then(() => {
+        toast.success('Imagem copiada — cole (Ctrl+V) no WhatsApp.');
+        registrarLocal.mutate({ boleto_ids: boletoIds, canal: 'copiar', mensagem: msg });
+      })
+      .catch(() => {
+        // Falhou copiar direto (ex. navegador sem suporte real apesar de ter a API) — baixa
+        // o arquivo como alternativa, pra anexar manualmente.
+        printPromise.then(baixarBlob).catch(() => {});
+        toast.error('Não deu pra copiar a imagem — baixei o arquivo pra você anexar manualmente.');
+      })
+      .finally(() => setCopiandoImagem(false));
   };
 
   const handleEmail = async () => {
@@ -318,15 +298,9 @@ export function CobrancaTab() {
         {/* Destino + mensagem + ações */}
         {selectedContacts.length > 0 && (
           <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label className="text-ink">WhatsApp de destino</Label>
-                <Input value={destinoWhats} onChange={(e) => setDestinoWhats(e.target.value)} placeholder="DDD + número" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-ink">E-mail de destino</Label>
-                <Input value={destinoEmail} onChange={(e) => setDestinoEmail(e.target.value)} placeholder="email@cliente.com.br" />
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-ink">E-mail de destino</Label>
+              <Input value={destinoEmail} onChange={(e) => setDestinoEmail(e.target.value)} placeholder="email@cliente.com.br" className="max-w-md" />
             </div>
 
             <div className="space-y-1.5">
@@ -335,12 +309,12 @@ export function CobrancaTab() {
             </div>
 
             <div className="grid grid-cols-3 gap-2">
-              <Button variant="outline" className="gap-1.5" onClick={handleCopiar}>
-                <Copy className="h-3.5 w-3.5" /> Copiar
+              <Button variant="outline" className="gap-1.5" onClick={handleCopiarTexto}>
+                <Copy className="h-3.5 w-3.5" /> Copiar texto
               </Button>
-              <Button variant="outline" className="gap-1.5" onClick={handleWhatsapp} disabled={gerandoPrint}>
-                {gerandoPrint ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
-                WhatsApp
+              <Button variant="outline" className="gap-1.5" onClick={handleCopiarImagem} disabled={copiandoImagem}>
+                {copiandoImagem ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
+                Copiar imagem
               </Button>
               <Button variant="outline" className="gap-1.5" onClick={handleEmail} disabled={enviandoEmail}>
                 {enviandoEmail ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
