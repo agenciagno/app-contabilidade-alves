@@ -59,6 +59,7 @@ export const MODULE_TREE: ModuleNode[] = [
   { key: 'parcelamentos', label: 'Parcelamentos' },
   { key: 'certidoes', label: 'Certidões' },
   { key: 'processos', label: 'Processos' },
+  { key: 'classificacao_fiscal', label: 'Classificação Fiscal' },
   { key: 'score_fiscal', label: 'Score Fiscal' },
   { key: 'analise_fiscal', label: 'Análise Fiscal' },
   { key: 'simulador_tributario', label: 'Simulador Tributário' },

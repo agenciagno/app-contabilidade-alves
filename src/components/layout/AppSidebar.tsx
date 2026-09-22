@@ -36,6 +36,7 @@ import {
   FileSearch,
   Calculator,
   Stethoscope,
+  PackageSearch,
   FolderOpen,
   FileSignature,
   BadgeCheck,
@@ -87,6 +88,7 @@ const iconMap: Record<string, LucideIcon> = {
   'users-round': UsersRound,
   'building-2': Building2,
   'tags': Tags,
+  'package-search': PackageSearch,
   'file-bar-chart': FileBarChart,
   'send': Send,
   'file-check': FileCheck,
@@ -278,6 +280,14 @@ export const menuEntries: MenuEntry[] = [
   },
 
   { kind: 'section', label: 'Diagnóstico Fiscal' },
+  {
+    kind: 'simple',
+    title: 'Classificação Fiscal',
+    url: '/classificacao-fiscal',
+    icon: PackageSearch,
+    iconName: 'package-search',
+    moduleKey: 'classificacao_fiscal',
+  },
   {
     kind: 'simple',
     title: 'Score Fiscal',

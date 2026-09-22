@@ -140,24 +140,30 @@ Deno.serve(async (req) => {
 
     // ---- 2. Se veio do acervo, devolve direto (já confirmado antes) ----
     if (fonteAcervo) {
+      let classificationId: string | null = null;
       if (gravar) {
-        await supabase.from("fiscal_product_classifications").insert({
-          company_id: companyId,
-          source_contact_id: contactId ?? null,
-          descricao_produto: descricao ?? ncmInformado,
-          descricao_normalizada: normalizar(descricao ?? ncmInformado ?? ""),
-          ncm: fonteAcervo.ncm,
-          cest: fonteAcervo.cest,
-          cclasstrib: fonteAcervo.cclasstrib,
-          cst_ibs_cbs: fonteAcervo.cst_ibs_cbs,
-          csosn: fonteAcervo.csosn,
-          cfop_referencia: fonteAcervo.cfop_referencia,
-          status: "sugestao_ia",
-          base_legal: { fonte: "acervo", acervo_id: fonteAcervo.id },
-        });
+        const { data: inserted } = await supabase
+          .from("fiscal_product_classifications")
+          .insert({
+            company_id: companyId,
+            source_contact_id: contactId ?? null,
+            descricao_produto: descricao ?? ncmInformado,
+            descricao_normalizada: normalizar(descricao ?? ncmInformado ?? ""),
+            ncm: fonteAcervo.ncm,
+            cest: fonteAcervo.cest,
+            cclasstrib: fonteAcervo.cclasstrib,
+            cst_ibs_cbs: fonteAcervo.cst_ibs_cbs,
+            csosn: fonteAcervo.csosn,
+            cfop_referencia: fonteAcervo.cfop_referencia,
+            status: "sugestao_ia",
+            base_legal: { fonte: "acervo", acervo_id: fonteAcervo.id },
+          })
+          .select("id")
+          .single();
+        classificationId = inserted?.id ?? null;
       }
       return new Response(
-        JSON.stringify({ fonte: "acervo", resultado: fonteAcervo, contexto, avisos }),
+        JSON.stringify({ fonte: "acervo", resultado: fonteAcervo, contexto, avisos, classification_id: classificationId }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -218,7 +224,30 @@ Deno.serve(async (req) => {
       }
     }
 
+    let classificationId: string | null = null;
+    if (gravar) {
+      const { data: inserted } = await supabase
+        .from("fiscal_product_classifications")
+        .insert({
+          company_id: companyId,
+          source_contact_id: contactId ?? null,
+          descricao_produto: descricao ?? ncmInformado,
+          descricao_normalizada: normalizar(descricao ?? ncmInformado ?? ""),
+          ncm: ncm.codigo,
+          cest: cestCandidatos?.length === 1 ? cestCandidatos[0].codigo : null,
+          cclasstrib: cclasstribSugerido?.codigo ?? null,
+          cst_ibs_cbs: cclasstribSugerido?.cst_vinculado ?? null,
+          cfop_referencia: CFOP_REFERENCIA.codigo,
+          status: "sugestao_ia",
+          base_legal: baseLegal,
+        })
+        .select("id")
+        .single();
+      classificationId = inserted?.id ?? null;
+    }
+
     const resultado = {
+      classification_id: classificationId,
       ncm,
       cest_candidatos: cestCandidatos ?? [],
       cclasstrib_sugerido: cclasstribSugerido,
@@ -229,22 +258,6 @@ Deno.serve(async (req) => {
       contexto,
       avisos,
     };
-
-    if (gravar) {
-      await supabase.from("fiscal_product_classifications").insert({
-        company_id: companyId,
-        source_contact_id: contactId ?? null,
-        descricao_produto: descricao ?? ncmInformado,
-        descricao_normalizada: normalizar(descricao ?? ncmInformado ?? ""),
-        ncm: ncm.codigo,
-        cest: cestCandidatos?.length === 1 ? cestCandidatos[0].codigo : null,
-        cclasstrib: cclasstribSugerido?.codigo ?? null,
-        cst_ibs_cbs: cclasstribSugerido?.cst_vinculado ?? null,
-        cfop_referencia: CFOP_REFERENCIA.codigo,
-        status: "sugestao_ia",
-        base_legal: baseLegal,
-      });
-    }
 
     return new Response(JSON.stringify(resultado), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

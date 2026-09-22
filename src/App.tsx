@@ -58,6 +58,7 @@ const Faturas = lazy(() => import("@/pages/Faturas"));
 const Equipe = lazy(() => import("@/pages/Equipe"));
 const ReformaTributariaCalculadora = lazy(() => import("@/pages/ReformaTributariaCalculadora"));
 const CadastroCertificados = lazy(() => import("@/pages/CadastroCertificados"));
+const ClassificacaoFiscal = lazy(() => import("@/pages/ClassificacaoFiscal"));
 
 const RouteFallback = () => (
   <div className="flex h-screen w-full items-center justify-center">
@@ -171,6 +172,7 @@ const App = () => (
               <Route path="/processos" element={<AppLayout><ModuleGuard moduleName="processos"><EmBreve moduleKey="processos" /></ModuleGuard></AppLayout>} />
 
               {/* Diagnóstico Fiscal */}
+              <Route path="/classificacao-fiscal" element={<AppLayout><ModuleGuard moduleName="classificacao_fiscal"><ClassificacaoFiscal /></ModuleGuard></AppLayout>} />
               <Route path="/score-fiscal" element={<AppLayout><ModuleGuard moduleName="score_fiscal"><EmBreve moduleKey="score_fiscal" /></ModuleGuard></AppLayout>} />
               <Route path="/analise-fiscal" element={<AppLayout><ModuleGuard moduleName="analise_fiscal"><EmBreve moduleKey="analise_fiscal" /></ModuleGuard></AppLayout>} />
               <Route path="/simulador-tributario" element={<AppLayout><ModuleGuard moduleName="simulador_tributario"><EmBreve moduleKey="simulador_tributario" /></ModuleGuard></AppLayout>} />
