@@ -31,6 +31,15 @@
 // "pecuária" pra um cliente cujo CNAE é "Criação de peixes em água doce") e
 // pistas extras da própria planilha (categoria, marca, unidade) entram no
 // prompt do Gemini quando disponíveis.
+//
+// Rate limit do Gemini (23/09/2026): lote real de 268 itens voltou "0
+// resolvidos" — causa raiz não era mais o problema de nomenclatura hierárquica
+// (já resolvido), era a chave estar no tier gratuito (5 requisições/minuto) e
+// o código mandar até 4 chunks em paralelo: todo chunk voltava 429
+// RESOURCE_EXHAUSTED ou 503 UNAVAILABLE, nenhuma proposta era aceita. Fix:
+// chamadas ao Gemini agora são sequenciais (nunca em paralelo) com espera
+// mínima entre elas pra respeitar 5 RPM, e com retry/backoff em 429/503 (lendo
+// o retryDelay que a própria API sugere) antes de desistir do chunk.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as XLSX from "npm:xlsx@0.18.5";
 
@@ -45,8 +54,23 @@ const MAX_ITENS = 3000;
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const GEMINI_MODEL = "gemini-flash-latest";
-const GEMINI_TAMANHO_CHUNK = 40;
-const GEMINI_CONCORRENCIA = 4;
+// Tier gratuito do Gemini = 5 requisições/minuto. Chunk maior => menos
+// requisições no total; intervalo com margem de segurança sobre 60s/5=12s;
+// SEM concorrência — chamadas em paralelo é o que causava o 429 em massa.
+const GEMINI_TAMANHO_CHUNK = 80;
+const GEMINI_INTERVALO_MS = 13_000;
+const GEMINI_MAX_TENTATIVAS = 3;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** A própria API do Gemini devolve o tempo de espera sugerido em erro 429
+ *  (ex.: "retryDelay": "32s") — usa isso quando disponível, senão backoff fixo. */
+function extrairRetryDelayMs(corpoErro: string): number | null {
+  const match = corpoErro.match(/"retryDelay"\s*:\s*"(\d+)s"/);
+  return match ? Number(match[1]) * 1000 + 1000 : null;
+}
 
 type CampoKey = "ncm" | "cest" | "cclasstrib" | "cst" | "csosn" | "cfop";
 const TODOS_CAMPOS: CampoKey[] = ["ncm", "cest", "cclasstrib", "cst", "csosn", "cfop"];
@@ -148,65 +172,81 @@ ${linhaContexto}
 Produtos:
 ${chunk.map(formatarItem).join("\n")}`;
 
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY! },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: "object",
-                properties: {
-                  resultados: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        idx: { type: "integer" },
-                        ncm_proposto: { type: "string", nullable: true },
-                        justificativa: { type: "string" },
+    for (let tentativa = 1; tentativa <= GEMINI_MAX_TENTATIVAS; tentativa++) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY! },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: "object",
+                  properties: {
+                    resultados: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          idx: { type: "integer" },
+                          ncm_proposto: { type: "string", nullable: true },
+                          justificativa: { type: "string" },
+                        },
+                        required: ["idx", "ncm_proposto", "justificativa"],
                       },
-                      required: ["idx", "ncm_proposto", "justificativa"],
                     },
                   },
+                  required: ["resultados"],
                 },
-                required: ["resultados"],
               },
-            },
-          }),
-        },
-      );
-      if (!res.ok) {
-        console.log(`[gemini] chunk falhou: HTTP ${res.status} — ${await res.text()}`);
+            }),
+          },
+        );
+        if (!res.ok) {
+          const corpoErro = await res.text();
+          if ((res.status === 429 || res.status === 503) && tentativa < GEMINI_MAX_TENTATIVAS) {
+            const espera = extrairRetryDelayMs(corpoErro) ?? tentativa * 15_000;
+            console.log(`[gemini] chunk HTTP ${res.status} (tentativa ${tentativa}/${GEMINI_MAX_TENTATIVAS}) — aguardando ${espera}ms e tentando de novo`);
+            await sleep(espera);
+            continue;
+          }
+          console.log(`[gemini] chunk falhou definitivamente: HTTP ${res.status} — ${corpoErro}`);
+          return;
+        }
+        const data = await res.json();
+        const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!texto) {
+          console.log(`[gemini] chunk sem texto na resposta: ${JSON.stringify(data).slice(0, 500)}`);
+          return;
+        }
+        const parsed = JSON.parse(texto) as {
+          resultados: Array<{ idx: number; ncm_proposto: string | null; justificativa: string }>;
+        };
+        let propostasNoChunk = 0;
+        for (const r of parsed.resultados ?? []) {
+          if (!r.ncm_proposto) continue;
+          propostas.push({ idx: r.idx, ncmProposto: r.ncm_proposto, justificativa: r.justificativa });
+          propostasNoChunk += 1;
+        }
+        console.log(`[gemini] chunk de ${chunk.length} itens — ${propostasNoChunk} propostas (a validar)`);
+        return;
+      } catch (err) {
+        console.log(`[gemini] chunk deu excecao: ${(err as Error).message}`);
         return;
       }
-      const data = await res.json();
-      const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!texto) {
-        console.log(`[gemini] chunk sem texto na resposta: ${JSON.stringify(data).slice(0, 500)}`);
-        return;
-      }
-      const parsed = JSON.parse(texto) as {
-        resultados: Array<{ idx: number; ncm_proposto: string | null; justificativa: string }>;
-      };
-      let propostasNoChunk = 0;
-      for (const r of parsed.resultados ?? []) {
-        if (!r.ncm_proposto) continue;
-        propostas.push({ idx: r.idx, ncmProposto: r.ncm_proposto, justificativa: r.justificativa });
-        propostasNoChunk += 1;
-      }
-      console.log(`[gemini] chunk de ${chunk.length} itens — ${propostasNoChunk} propostas (a validar)`);
-    } catch (err) {
-      console.log(`[gemini] chunk deu excecao: ${(err as Error).message}`);
     }
   }
 
-  for (let i = 0; i < chunks.length; i += GEMINI_CONCORRENCIA) {
-    await Promise.all(chunks.slice(i, i + GEMINI_CONCORRENCIA).map(processarChunk));
+  // Sequencial, nunca em paralelo — tier gratuito só permite 5 req/min, e
+  // rodar em paralelo foi exatamente o que causou o "0 resolvidos" em
+  // produção (todo chunk batendo 429 de uma vez). Espera entre chunks pra
+  // ficar com margem sobre o limite.
+  for (let i = 0; i < chunks.length; i++) {
+    await processarChunk(chunks[i]);
+    if (i < chunks.length - 1) await sleep(GEMINI_INTERVALO_MS);
   }
   return propostas;
 }

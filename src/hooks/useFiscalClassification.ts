@@ -99,10 +99,15 @@ export function useClassifyProduct() {
 
 export interface ConfirmarInput {
   id: string;
+  ncm: string | null;
   cest: string | null;
   cclasstrib: string | null;
   cstIbsCbs: string | null;
   csosn: string | null;
+  // Quando a confirmação vem de uma correção manual (não do valor sugerido
+  // originalmente), fica registrado — é o que diferencia "a sugestão estava
+  // certa" de "o usuário teve que corrigir", sinal útil pra acervo/auditoria.
+  corrigidoManualmente?: boolean;
 }
 
 export function useConfirmarClassificacao() {
@@ -125,6 +130,7 @@ export function useConfirmarClassificacao() {
       const { error } = await supabase
         .from('fiscal_product_classifications')
         .update({
+          ncm: input.ncm,
           cest: input.cest,
           cclasstrib: input.cclasstrib,
           cst_ibs_cbs: input.cstIbsCbs,
@@ -132,13 +138,18 @@ export function useConfirmarClassificacao() {
           status: 'confirmado',
           confirmado_por: profileId,
           confirmado_em: new Date().toISOString(),
+          ...(input.corrigidoManualmente ? { corrigido_manualmente: true } : {}),
         })
         .eq('id', input.id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, input) => {
       queryClient.invalidateQueries({ queryKey: ['fiscal-classifications-history'] });
-      toast({ title: 'Classificação confirmada — entra no acervo da equipe' });
+      toast({
+        title: input.corrigidoManualmente
+          ? 'Correção salva — entra no acervo da equipe'
+          : 'Classificação confirmada — entra no acervo da equipe',
+      });
     },
     onError: (e: Error) =>
       toast({ title: 'Erro ao confirmar', description: e.message, variant: 'destructive' }),

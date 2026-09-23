@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, Search, CheckCircle2 } from 'lucide-react';
+import { Loader2, Search, CheckCircle2, Pencil } from 'lucide-react';
 import {
   PageHeader, DsAlert, DsBadge, tabsListClass, tabsTriggerClass,
   segmentedListClass, segmentedTriggerClass, MetricaFaixa, type MetricaFaixaItem,
@@ -51,6 +51,12 @@ export default function ClassificacaoFiscal() {
   const [cclasstribEscolhido, setCclasstribEscolhido] = useState<string>('');
   const [csosnEscolhido, setCsosnEscolhido] = useState<string>('');
   const [confirmado, setConfirmado] = useState(false);
+  const [corrigindo, setCorrigindo] = useState(false);
+  const [ncmCorrigido, setNcmCorrigido] = useState('');
+  const [cestCorrigido, setCestCorrigido] = useState('');
+  const [cclasstribCorrigido, setCclasstribCorrigido] = useState('');
+  const [cstCorrigido, setCstCorrigido] = useState('');
+  const [csosnCorrigido, setCsosnCorrigido] = useState('');
 
   const clientes = useMemo(
     () => contacts.filter((c) => c.is_active && c.type === 'cliente'),
@@ -63,6 +69,7 @@ export default function ClassificacaoFiscal() {
 
   const executar = () => {
     setConfirmado(false);
+    setCorrigindo(false);
     classificar.mutate(
       {
         ncm: modoBusca === 'ncm' ? ncmInput.trim() || undefined : undefined,
@@ -86,6 +93,8 @@ export default function ClassificacaoFiscal() {
     setModoBusca('ncm');
     setNcmInput(codigo);
     setDescricaoInput('');
+    setConfirmado(false);
+    setCorrigindo(false);
     classificar.mutate(
       { ncm: codigo, contactId: contactId || null },
       {
@@ -111,12 +120,44 @@ export default function ClassificacaoFiscal() {
     confirmar.mutate(
       {
         id: resultado.classification_id,
+        ncm: resultado.ncm?.codigo ?? null,
         cest: cestEscolhido || null,
         cclasstrib: cclasstribEscolhido || null,
         cstIbsCbs: cstFinal,
         csosn: csosnEscolhido || null,
       },
       { onSuccess: () => setConfirmado(true) },
+    );
+  };
+
+  const abrirCorrecao = () => {
+    if (!resultado) return;
+    setNcmCorrigido(resultado.ncm?.codigo ?? '');
+    setCestCorrigido(cestEscolhido || (resultado.cest_candidatos.length === 0 ? '' : cestEscolhido));
+    setCclasstribCorrigido(cclasstribEscolhido || resultado.cclasstrib_sugerido?.codigo || '');
+    setCstCorrigido(cstFinal ?? '');
+    setCsosnCorrigido(csosnEscolhido || '');
+    setCorrigindo(true);
+  };
+
+  const salvarCorrecao = () => {
+    if (!resultado?.classification_id) return;
+    confirmar.mutate(
+      {
+        id: resultado.classification_id,
+        ncm: ncmCorrigido.trim() || null,
+        cest: cestCorrigido.trim() || null,
+        cclasstrib: cclasstribCorrigido.trim() || null,
+        cstIbsCbs: cstCorrigido.trim() || null,
+        csosn: csosnCorrigido.trim() || null,
+        corrigidoManualmente: true,
+      },
+      {
+        onSuccess: () => {
+          setConfirmado(true);
+          setCorrigindo(false);
+        },
+      },
     );
   };
 
@@ -350,11 +391,58 @@ export default function ClassificacaoFiscal() {
                         </div>
                       )}
 
-                      {resultado.classification_id && (
-                        <Button onClick={confirmarClassificacao} disabled={confirmar.isPending || confirmado}>
-                          {confirmado ? <CheckCircle2 className="h-4 w-4" /> : confirmar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                          {confirmado ? 'Confirmado — no acervo da equipe' : 'Confirmar classificação'}
-                        </Button>
+                      {resultado.classification_id && corrigindo && (
+                        <div className="space-y-4 rounded-md border border-line bg-bg-2 p-4">
+                          <p className="text-ui-strong text-ink">Sugerir correção</p>
+                          <p className="text-meta text-muted-ink-2">
+                            Ajuste os valores abaixo — o que for salvo aqui entra no acervo da equipe no lugar da sugestão original.
+                          </p>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                              <Label>NCM</Label>
+                              <Input value={ncmCorrigido} onChange={(e) => setNcmCorrigido(e.target.value)} />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>CEST</Label>
+                              <Input value={cestCorrigido} onChange={(e) => setCestCorrigido(e.target.value)} />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>cClassTrib</Label>
+                              <Input value={cclasstribCorrigido} onChange={(e) => setCclasstribCorrigido(e.target.value)} />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>CST-IBS/CBS</Label>
+                              <Input value={cstCorrigido} onChange={(e) => setCstCorrigido(e.target.value)} />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>CSOSN</Label>
+                              <Input value={csosnCorrigido} onChange={(e) => setCsosnCorrigido(e.target.value)} />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button onClick={salvarCorrecao} disabled={confirmar.isPending}>
+                              {confirmar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                              Salvar correção
+                            </Button>
+                            <Button variant="outline" onClick={() => setCorrigindo(false)} disabled={confirmar.isPending}>
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {resultado.classification_id && !corrigindo && (
+                        <div className="flex gap-2">
+                          <Button onClick={confirmarClassificacao} disabled={confirmar.isPending || confirmado}>
+                            {confirmado ? <CheckCircle2 className="h-4 w-4" /> : confirmar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            {confirmado ? 'Confirmado — no acervo da equipe' : 'Confirmar'}
+                          </Button>
+                          {!confirmado && (
+                            <Button variant="outline" onClick={abrirCorrecao} disabled={confirmar.isPending}>
+                              <Pencil className="h-4 w-4" /> Sugerir correção
+                            </Button>
+                          )}
+                        </div>
                       )}
                     </CardContent>
                   </Card>

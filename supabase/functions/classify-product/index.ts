@@ -40,6 +40,19 @@ const corsHeaders = {
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const GEMINI_MODEL = "gemini-flash-latest";
+const GEMINI_MAX_TENTATIVAS = 3;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Ver comentário equivalente em classify-batch/index.ts — mesma causa raiz
+ *  (rate limit do tier gratuito), aqui só 1 chamada por vez, então o risco é
+ *  menor, mas 503 "model overloaded" pode acontecer independente disso. */
+function extrairRetryDelayMs(corpoErro: string): number | null {
+  const match = corpoErro.match(/"retryDelay"\s*:\s*"(\d+)s"/);
+  return match ? Number(match[1]) * 1000 + 1000 : null;
+}
 
 interface NcmCandidato {
   codigo: string;
@@ -82,45 +95,55 @@ ${linhaContexto}
 
 Produto (nome comercial): "${descricao}"${pistas}`;
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "object",
-              properties: {
-                ncm_proposto: { type: "string", nullable: true },
-                justificativa: { type: "string" },
+  for (let tentativa = 1; tentativa <= GEMINI_MAX_TENTATIVAS; tentativa++) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "object",
+                properties: {
+                  ncm_proposto: { type: "string", nullable: true },
+                  justificativa: { type: "string" },
+                },
+                required: ["ncm_proposto", "justificativa"],
               },
-              required: ["ncm_proposto", "justificativa"],
             },
-          },
-        }),
-      },
-    );
-    if (!res.ok) {
-      console.log(`[gemini] falhou: HTTP ${res.status} — ${await res.text()}`);
+          }),
+        },
+      );
+      if (!res.ok) {
+        const corpoErro = await res.text();
+        if ((res.status === 429 || res.status === 503) && tentativa < GEMINI_MAX_TENTATIVAS) {
+          const espera = extrairRetryDelayMs(corpoErro) ?? tentativa * 5_000;
+          console.log(`[gemini] HTTP ${res.status} (tentativa ${tentativa}/${GEMINI_MAX_TENTATIVAS}) — aguardando ${espera}ms`);
+          await sleep(espera);
+          continue;
+        }
+        console.log(`[gemini] falhou definitivamente: HTTP ${res.status} — ${corpoErro}`);
+        return null;
+      }
+      const data = await res.json();
+      const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!texto) {
+        console.log(`[gemini] sem texto na resposta: ${JSON.stringify(data).slice(0, 500)}`);
+        return null;
+      }
+      const parsed = JSON.parse(texto) as { ncm_proposto: string | null; justificativa: string };
+      if (!parsed.ncm_proposto) return null;
+      return { codigo: parsed.ncm_proposto, justificativa: parsed.justificativa };
+    } catch (err) {
+      console.log(`[gemini] deu excecao: ${(err as Error).message}`);
       return null;
     }
-    const data = await res.json();
-    const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!texto) {
-      console.log(`[gemini] sem texto na resposta: ${JSON.stringify(data).slice(0, 500)}`);
-      return null;
-    }
-    const parsed = JSON.parse(texto) as { ncm_proposto: string | null; justificativa: string };
-    if (!parsed.ncm_proposto) return null;
-    return { codigo: parsed.ncm_proposto, justificativa: parsed.justificativa };
-  } catch (err) {
-    console.log(`[gemini] deu excecao: ${(err as Error).message}`);
-    return null;
   }
+  return null;
 }
 
 const CFOP_REFERENCIA = {
