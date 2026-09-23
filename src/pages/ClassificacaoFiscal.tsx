@@ -228,123 +228,84 @@ export default function ClassificacaoFiscal() {
               {resultado.ncm && (() => {
                 const status = statusClassificacao(resultado);
                 const itensFaixa: MetricaFaixaItem[] = [];
-                if (resultado.fonte !== 'acervo') {
-                  if (resultado.cclasstrib_sugerido) {
-                    itensFaixa.push({
-                      label: 'cClassTrib',
-                      valor: resultado.cclasstrib_sugerido.codigo,
-                      hint: resultado.cclasstrib_sugerido.nome || resultado.cclasstrib_sugerido.descricao,
-                    });
-                  }
-                  if (resultado.cst_ibs_cbs) {
-                    itensFaixa.push({ label: 'CST-IBS/CBS', valor: resultado.cst_ibs_cbs });
-                  }
-                  if (resultado.cest_candidatos.length === 1) {
-                    itensFaixa.push({
-                      label: 'CEST',
-                      valor: resultado.cest_candidatos[0].codigo,
-                      hint: resultado.cest_candidatos[0].descricao,
-                    });
-                  } else if (resultado.cest_candidatos.length === 0) {
-                    itensFaixa.push({ label: 'CEST', valor: 'Não sujeito a ST' });
-                  }
-                  if (resultado.csosn_sugerido.length === 1) {
-                    itensFaixa.push({
-                      label: 'CSOSN',
-                      valor: resultado.csosn_sugerido[0].codigo,
-                      hint: resultado.csosn_sugerido[0].descricao,
-                    });
-                  }
+                if (resultado.cclasstrib_sugerido) {
                   itensFaixa.push({
-                    label: 'CFOP de referência',
-                    valor: resultado.cfop_referencia.codigo,
-                    hint: resultado.cfop_referencia.aviso,
+                    label: 'cClassTrib',
+                    valor: resultado.cclasstrib_sugerido.codigo,
+                    hint: resultado.cclasstrib_sugerido.nome || resultado.cclasstrib_sugerido.descricao,
                   });
                 }
+                if (resultado.cst_ibs_cbs) {
+                  itensFaixa.push({ label: 'CST-IBS/CBS', valor: resultado.cst_ibs_cbs });
+                }
+                if (resultado.cest_candidatos.length === 1) {
+                  itensFaixa.push({
+                    label: 'CEST',
+                    valor: resultado.cest_candidatos[0].codigo,
+                    hint: resultado.cest_candidatos[0].descricao,
+                  });
+                } else if (resultado.cest_candidatos.length === 0) {
+                  itensFaixa.push({ label: 'CEST', valor: 'Não sujeito a ST' });
+                }
+                if (resultado.csosn_sugerido.length === 1) {
+                  itensFaixa.push({
+                    label: 'CSOSN',
+                    valor: resultado.csosn_sugerido[0].codigo,
+                    hint: resultado.csosn_sugerido[0].descricao,
+                  });
+                }
+                itensFaixa.push({
+                  label: 'CFOP de referência',
+                  valor: resultado.cfop_referencia.codigo,
+                  hint: resultado.cfop_referencia.aviso,
+                });
 
                 return (
                   <Card>
-                    <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
-                      <div>
+                    <CardHeader className="flex-row items-start justify-between gap-3 space-y-0 pb-4">
+                      <div className="space-y-3">
                         <CardTitle className="text-base">Resultado da consulta</CardTitle>
-                        {resultado.ncm_posicao && (
-                          <p className="mt-2 text-meta text-muted-ink-2">
-                            Posição {resultado.ncm_posicao.codigo} — {resultado.ncm_posicao.descricao}
-                          </p>
+                        {resultado.ncm_hierarquia && resultado.ncm_hierarquia.length > 0 && (
+                          <div className="space-y-0.5">
+                            {resultado.ncm_hierarquia.map((h) => (
+                              <p key={h.codigo} className="text-sm text-muted-ink">
+                                <span className="font-medium">{h.codigo}</span> — {h.descricao}
+                              </p>
+                            ))}
+                          </div>
                         )}
-                        <p className="text-metric-xl text-ink">{resultado.ncm.codigo}</p>
-                        <p className="text-sm text-muted-ink">{resultado.ncm.descricao || '(via acervo)'}</p>
+                        <div>
+                          <p className="text-metric-xl text-ink">{resultado.ncm.codigo}</p>
+                          <p className="mt-0.5 text-sm text-muted-ink">{resultado.ncm.descricao}</p>
+                        </div>
                       </div>
-                      <DsBadge tone={resultado.fonte === 'acervo' ? 'ok' : status.tone}>
-                        {resultado.fonte === 'acervo' ? 'Reaproveitado do acervo' : status.label}
-                      </DsBadge>
+                      <DsBadge tone={status.tone}>{status.label}</DsBadge>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      {resultado.fonte === 'acervo' ? (
-                        <DsAlert
-                          tone="ok"
-                          title="Reaproveitado do acervo — já classificado antes para outro produto/cliente"
-                        />
-                      ) : (
-                        <>
-                          {itensFaixa.length > 0 && <MetricaFaixa items={itensFaixa} />}
+                    <CardContent className="space-y-5">
+                      {itensFaixa.length > 0 && (
+                        <MetricaFaixa items={itensFaixa} labelClassName="text-xs font-bold text-ink" />
+                      )}
 
-                          {resultado.cclasstrib_sugerido?.fonte && (
-                            <p className="text-meta text-muted-ink-2">Base legal: {resultado.cclasstrib_sugerido.fonte}</p>
-                          )}
-                          {resultado.cclasstrib_sugerido && (resultado.cclasstrib_sugerido.p_red_ibs || resultado.cclasstrib_sugerido.p_red_cbs) ? (
-                            <p className="text-meta text-muted-ink-2">
-                              Redução: IBS {resultado.cclasstrib_sugerido.p_red_ibs ?? 0}% · CBS {resultado.cclasstrib_sugerido.p_red_cbs ?? 0}%
-                            </p>
-                          ) : null}
+                      {resultado.cclasstrib_sugerido?.fonte && (
+                        <p className="text-sm text-muted-ink">Base legal: {resultado.cclasstrib_sugerido.fonte}</p>
+                      )}
+                      {resultado.cclasstrib_sugerido && (resultado.cclasstrib_sugerido.p_red_ibs || resultado.cclasstrib_sugerido.p_red_cbs) ? (
+                        <p className="text-sm text-muted-ink">
+                          Redução: IBS {resultado.cclasstrib_sugerido.p_red_ibs ?? 0}% · CBS {resultado.cclasstrib_sugerido.p_red_cbs ?? 0}%
+                        </p>
+                      ) : null}
 
-                          {(resultado.cest_candidatos.length > 1 || resultado.cclasstrib_candidatos.length > 0) && (
-                            <div className="space-y-4 rounded-md border border-line bg-bg-2 p-4">
-                              <p className="text-ui-strong text-ink">Revisar e escolher</p>
-                              {resultado.cest_candidatos.length > 1 && (
-                                <div className="space-y-1.5">
-                                  <Label>CEST</Label>
-                                  <RadioGroup value={cestEscolhido} onValueChange={setCestEscolhido}>
-                                    {resultado.cest_candidatos.map((c) => (
-                                      <div key={c.codigo} className="flex items-start gap-2">
-                                        <RadioGroupItem value={c.codigo} id={`cest-${c.codigo}`} className="mt-1" />
-                                        <Label htmlFor={`cest-${c.codigo}`} className="text-sm font-normal">
-                                          <span className="font-medium">{c.codigo}</span> — {c.descricao}
-                                        </Label>
-                                      </div>
-                                    ))}
-                                  </RadioGroup>
-                                </div>
-                              )}
-                              {resultado.cclasstrib_candidatos.length > 0 && (
-                                <div className="space-y-1.5">
-                                  <Label>cClassTrib</Label>
-                                  <RadioGroup value={cclasstribEscolhido} onValueChange={setCclasstribEscolhido}>
-                                    {resultado.cclasstrib_candidatos.map((c) => (
-                                      <div key={c.cclasstrib_codigo} className="flex items-start gap-2 rounded-md border border-line p-3">
-                                        <RadioGroupItem value={c.cclasstrib_codigo} id={`cc-${c.cclasstrib_codigo}`} className="mt-1" />
-                                        <Label htmlFor={`cc-${c.cclasstrib_codigo}`} className="text-sm font-normal">
-                                          <span className="font-medium">{c.cclasstrib_codigo}</span> — {c.cclasstrib_nome}
-                                          <p className="mt-1 text-meta text-muted-ink-2">
-                                            Anexo {c.anexo}, item {c.item_lei}: {c.descricao_lei}
-                                          </p>
-                                        </Label>
-                                      </div>
-                                    ))}
-                                  </RadioGroup>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {resultado.csosn_sugerido.length > 1 && (
+                      {(resultado.cest_candidatos.length > 1 || resultado.cclasstrib_candidatos.length > 0) && (
+                        <div className="space-y-4 rounded-md border border-line bg-bg-2 p-4">
+                          <p className="text-ui-strong text-ink">Revisar e escolher</p>
+                          {resultado.cest_candidatos.length > 1 && (
                             <div className="space-y-1.5">
-                              <Label>CSOSN (Simples Nacional / MEI)</Label>
-                              <RadioGroup value={csosnEscolhido} onValueChange={setCsosnEscolhido}>
-                                {resultado.csosn_sugerido.map((c) => (
+                              <Label>CEST</Label>
+                              <RadioGroup value={cestEscolhido} onValueChange={setCestEscolhido}>
+                                {resultado.cest_candidatos.map((c) => (
                                   <div key={c.codigo} className="flex items-start gap-2">
-                                    <RadioGroupItem value={c.codigo} id={`csosn-${c.codigo}`} className="mt-1" />
-                                    <Label htmlFor={`csosn-${c.codigo}`} className="text-sm font-normal">
+                                    <RadioGroupItem value={c.codigo} id={`cest-${c.codigo}`} className="mt-1" />
+                                    <Label htmlFor={`cest-${c.codigo}`} className="text-sm font-normal">
                                       <span className="font-medium">{c.codigo}</span> — {c.descricao}
                                     </Label>
                                   </div>
@@ -352,7 +313,41 @@ export default function ClassificacaoFiscal() {
                               </RadioGroup>
                             </div>
                           )}
-                        </>
+                          {resultado.cclasstrib_candidatos.length > 0 && (
+                            <div className="space-y-1.5">
+                              <Label>cClassTrib</Label>
+                              <RadioGroup value={cclasstribEscolhido} onValueChange={setCclasstribEscolhido}>
+                                {resultado.cclasstrib_candidatos.map((c) => (
+                                  <div key={c.cclasstrib_codigo} className="flex items-start gap-2 rounded-md border border-line p-3">
+                                    <RadioGroupItem value={c.cclasstrib_codigo} id={`cc-${c.cclasstrib_codigo}`} className="mt-1" />
+                                    <Label htmlFor={`cc-${c.cclasstrib_codigo}`} className="text-sm font-normal">
+                                      <span className="font-medium">{c.cclasstrib_codigo}</span> — {c.cclasstrib_nome}
+                                      <p className="mt-1 text-meta text-muted-ink-2">
+                                        Anexo {c.anexo}, item {c.item_lei}: {c.descricao_lei}
+                                      </p>
+                                    </Label>
+                                  </div>
+                                ))}
+                              </RadioGroup>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {resultado.csosn_sugerido.length > 1 && (
+                        <div className="space-y-1.5">
+                          <Label>CSOSN (Simples Nacional / MEI)</Label>
+                          <RadioGroup value={csosnEscolhido} onValueChange={setCsosnEscolhido}>
+                            {resultado.csosn_sugerido.map((c) => (
+                              <div key={c.codigo} className="flex items-start gap-2">
+                                <RadioGroupItem value={c.codigo} id={`csosn-${c.codigo}`} className="mt-1" />
+                                <Label htmlFor={`csosn-${c.codigo}`} className="text-sm font-normal">
+                                  <span className="font-medium">{c.codigo}</span> — {c.descricao}
+                                </Label>
+                              </div>
+                            ))}
+                          </RadioGroup>
+                        </div>
                       )}
 
                       {resultado.classification_id && (

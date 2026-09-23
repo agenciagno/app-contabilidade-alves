@@ -337,7 +337,7 @@ Deno.serve(async (req) => {
       descricao?: string;
       ncmInformado?: string;
       ncmResolvido?: { codigo: string; descricao: string };
-      fonteAcervo?: Record<string, unknown>;
+      fonteAcervoId?: string;
       ncmCandidatos?: Array<{ codigo: string; descricao: string }>;
       semDescricaoNemNcm?: boolean;
       ncmNaoEncontrado?: boolean;
@@ -378,6 +378,10 @@ Deno.serve(async (req) => {
       }
 
       // ---- FASE 2: acervo, pra quem só tem descrição (1 chamada pro lote todo) ----
+      // Não é mais um atalho visível — só dá a fonte do NCM, que entra no
+      // mesmo pipeline de CEST/cClassTrib da FASE 4 junto com todo mundo
+      // (evita herdar CEST/cClassTrib desatualizado, e não expõe "acervo"
+      // na planilha de saída).
       const idxSoDescricao: number[] = [];
       const descricoesSoDescricao: string[] = [];
       estados.forEach((e, i) => {
@@ -393,17 +397,35 @@ Deno.serve(async (req) => {
           p_limit: 1,
         });
         const porIdx = agruparPorIdx(rows as Array<{ query_idx: number } & Record<string, unknown>>);
+        const idxComAcervoHit: number[] = [];
+        const ncmsAcervoHit: string[] = [];
+        const acervoIdPorOrigIdx = new Map<number, string>();
         idxSoDescricao.forEach((origIdx, pos) => {
-          const hit = porIdx.get(pos + 1)?.[0] as { score: number } & Record<string, unknown> | undefined;
-          if (hit && hit.score > 0.5) estados[origIdx].fonteAcervo = hit;
+          const hit = porIdx.get(pos + 1)?.[0] as { score: number; ncm: string; id: string } & Record<string, unknown> | undefined;
+          if (hit && hit.score > 0.5) {
+            idxComAcervoHit.push(origIdx);
+            ncmsAcervoHit.push(hit.ncm);
+            acervoIdPorOrigIdx.set(origIdx, hit.id);
+          }
         });
+        if (ncmsAcervoHit.length) {
+          const { data: validados } = await supabase.rpc("find_ncm_exact_batch", { p_ncms: ncmsAcervoHit });
+          const validadosPorIdx = agruparPorIdx(validados as Array<{ query_idx: number; codigo: string; descricao: string }>);
+          idxComAcervoHit.forEach((origIdx, pos) => {
+            const match = validadosPorIdx.get(pos + 1)?.[0];
+            if (match) {
+              estados[origIdx].ncmResolvido = { codigo: match.codigo, descricao: match.descricao };
+              estados[origIdx].fonteAcervoId = acervoIdPorOrigIdx.get(origIdx);
+            }
+          });
+        }
       }
 
       // ---- FASE 3: candidatos de NCM por descrição, pra quem sobrou (1 chamada) ----
       const idxPrecisaCandidatos: number[] = [];
       const descricoesPrecisaCandidatos: string[] = [];
       idxSoDescricao.forEach((origIdx) => {
-        if (!estados[origIdx].fonteAcervo) {
+        if (!estados[origIdx].ncmResolvido) {
           idxPrecisaCandidatos.push(origIdx);
           descricoesPrecisaCandidatos.push(normalizar(estados[origIdx].descricao!));
         }
@@ -549,34 +571,6 @@ Deno.serve(async (req) => {
         return;
       }
 
-      if (e.fonteAcervo) {
-        const fa = e.fonteAcervo;
-        escreverCampo(linha, item.linha_original, "ncm", fa.ncm);
-        escreverCampo(linha, item.linha_original, "cest", fa.cest);
-        escreverCampo(linha, item.linha_original, "cclasstrib", fa.cclasstrib);
-        escreverCampo(linha, item.linha_original, "cst", fa.cst_ibs_cbs);
-        escreverCampo(linha, item.linha_original, "csosn", fa.csosn);
-        escreverCampo(linha, item.linha_original, "cfop", fa.cfop_referencia);
-        linhasResultado.push(linha);
-        registrosParaGravar.push({
-          company_id: companyId,
-          batch_id: batchId,
-          source_contact_id: contactId,
-          descricao_produto: e.descricao ?? e.ncmInformado,
-          descricao_normalizada: normalizar(e.descricao ?? e.ncmInformado ?? ""),
-          ncm: fa.ncm,
-          cest: fa.cest,
-          cclasstrib: fa.cclasstrib,
-          cst_ibs_cbs: fa.cst_ibs_cbs,
-          csosn: fa.csosn,
-          cfop_referencia: fa.cfop_referencia,
-          status: "sugestao_ia",
-          base_legal: { fonte: "acervo", acervo_id: fa.id },
-        });
-        confirmaveis += 1;
-        return;
-      }
-
       if (e.ncmNaoEncontrado) {
         linhasResultado.push(linha);
         return;
@@ -655,7 +649,11 @@ Deno.serve(async (req) => {
           csosn: csosnSugerido,
           cfop_referencia: CFOP_REFERENCIA_CODIGO,
           status: "sugestao_ia",
-          base_legal: e.motivoIa ? { ...baseLegal, ncm_fonte_ia: "gemini", ncm_motivo_ia: e.motivoIa } : baseLegal,
+          base_legal: {
+            ...baseLegal,
+            ...(e.motivoIa ? { ncm_fonte_ia: "gemini", ncm_motivo_ia: e.motivoIa } : {}),
+            ...(e.fonteAcervoId ? { ncm_fonte_acervo: true, acervo_id: e.fonteAcervoId } : {}),
+          },
         });
         confirmaveis += 1;
       }

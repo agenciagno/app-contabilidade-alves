@@ -18,18 +18,18 @@
 // de testar: descrição oficial do NCM é hierárquica — o termo genérico
 // ("peixe", "filé") só aparece no nível do capítulo/posição, não no código de
 // 8 dígitos que classifica de fato ("Bagre americano" não menciona peixe).
-// Mesmo concatenando com os ancestrais (ver refresh_ncm_descricao_hierarquica),
-// nome comercial/marca ("Filé Pescueiro Premium") não tem palavra em comum
-// com a nomenclatura oficial — os candidatos viravam ruído e o Gemini
-// corretamente devolvia null pra tudo.
-//
 // v2 (atual): não restringe mais o Gemini aos candidatos textuais. Ele PROPÕE
 // o código usando o próprio conhecimento de nomenclatura (reconhece que
 // "Pescueiro" é peixe, por ex.), e a gente VALIDA o código proposto contra a
-// tabela oficial (validar_ncm_leaf_batch) antes de aceitar — nunca grava um
-// código que não exista na tabela do Siscomex, mesmo vindo da IA. Sem
-// GEMINI_API_KEY configurada, cai pro comportamento antigo (candidatos
-// textuais fracos, humano decide).
+// tabela oficial (validar_ncm_leaf_batch) antes de aceitar.
+//
+// Acervo (23/09/2026): deixou de ser um "atalho visível" (branch que devolvia
+// direto os valores antigos de CEST/cClassTrib salvos, com um aviso "veio do
+// acervo" na tela). Agora é só mais uma FONTE de NCM (junto com "informado
+// direto" e "Gemini") — quando bate, o NCM do acervo entra no mesmo pipeline
+// de CEST/cClassTrib/CSOSN de todo mundo, recalculado do zero. Isso evita
+// herdar um valor desatualizado se a lei mudar, e não expõe "acervo" como
+// conceito pro usuário — ele só melhora a precisão por trás, como pedido.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -190,11 +190,13 @@ Deno.serve(async (req) => {
 
     const avisos: string[] = [];
 
-    // ---- 1. Resolve NCM ----
+    // ---- 1. Resolve NCM — três fontes possíveis: informado direto, acervo
+    // (silenciosa — só um atalho de precisão, não aparece pro usuário) ou
+    // proposta do Gemini (validada contra a tabela oficial). ----
     let ncm: { codigo: string; descricao: string } | null = null;
     let ncmCandidatos: Array<{ codigo: string; descricao: string; score: number }> = [];
-    let fonteAcervo: Record<string, unknown> | null = null;
     let ncmFonteIa: string | null = null;
+    let ncmFonteAcervoId: string | null = null;
 
     if (ncmInformado) {
       const { data: rows } = await supabase.rpc("find_ncm_exact", { p_ncm: ncmInformado });
@@ -214,8 +216,12 @@ Deno.serve(async (req) => {
           p_limit: 1,
         });
         if (acervo?.length && acervo[0].score > 0.5) {
-          fonteAcervo = acervo[0];
-          ncm = { codigo: acervo[0].ncm, descricao: "" };
+          const { data: rows } = await supabase.rpc("find_ncm_exact", { p_ncm: acervo[0].ncm });
+          const match = rows?.[0];
+          if (match) {
+            ncm = { codigo: match.codigo, descricao: match.descricao };
+            ncmFonteAcervoId = acervo[0].id as string;
+          }
         }
       }
       if (!ncm) {
@@ -259,50 +265,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    // "Posição" do NCM (4 dígitos, ex. "02.08") — categoria macro acima do
-    // código de 8 dígitos, pra dar contexto (pedido do Gabriel vendo uma
-    // tabela de referência externa que mostra esse nível).
-    const { data: posicaoRows } = await supabase.rpc("find_ncm_posicao", { p_ncm: ncm.codigo });
-    const ncmPosicao = posicaoRows?.[0] ?? null;
+    // Trilha hierárquica (capítulo/posição/subposição) do NCM resolvido —
+    // pedido do Gabriel pra mostrar a estrutura real do código, não um texto
+    // genérico sobre "o que cada par de dígitos significa".
+    const { data: hierarquiaRows } = await supabase.rpc("find_ncm_hierarquia", { p_ncm: ncm.codigo });
+    const ncmHierarquia = (hierarquiaRows ?? []) as Array<{ codigo: string; descricao: string; nivel: number }>;
 
-    // ---- 2. Se veio do acervo, devolve direto (já confirmado antes) ----
-    if (fonteAcervo) {
-      let classificationId: string | null = null;
-      if (gravar) {
-        const { data: inserted } = await supabase
-          .from("fiscal_product_classifications")
-          .insert({
-            company_id: companyId,
-            source_contact_id: contactId ?? null,
-            descricao_produto: descricao ?? ncmInformado,
-            descricao_normalizada: normalizar(descricao ?? ncmInformado ?? ""),
-            ncm: fonteAcervo.ncm,
-            cest: fonteAcervo.cest,
-            cclasstrib: fonteAcervo.cclasstrib,
-            cst_ibs_cbs: fonteAcervo.cst_ibs_cbs,
-            csosn: fonteAcervo.csosn,
-            cfop_referencia: fonteAcervo.cfop_referencia,
-            status: "sugestao_ia",
-            base_legal: { fonte: "acervo", acervo_id: fonteAcervo.id },
-          })
-          .select("id")
-          .single();
-        classificationId = inserted?.id ?? null;
-      }
-      return new Response(
-        JSON.stringify({ fonte: "acervo", resultado: fonteAcervo, ncm_posicao: ncmPosicao, contexto, avisos, classification_id: classificationId }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // ---- 3. CEST candidatos (por correlação com NCM) ----
+    // ---- 2. CEST candidatos (por correlação com NCM) ----
     const { data: cestCandidatos } = await supabase.rpc("find_cest_by_ncm", {
       p_ncm: ncm.codigo,
       p_query: descricao ?? ncm.descricao,
       p_limit: 5,
     });
 
-    // ---- 4. cClassTrib: resolve pelos Anexos da LC 214/2025 (determinístico) ----
+    // ---- 3. cClassTrib: resolve pelos Anexos da LC 214/2025 (determinístico) ----
     const { data: cclasstribHits } = await supabase.rpc("resolve_cclasstrib_by_ncm", {
       p_ncm: ncm.codigo,
     });
@@ -335,7 +311,7 @@ Deno.serve(async (req) => {
       cclasstribSugerido = { ...padrao, confianca: "padrão", fonte: "Nenhuma hipótese especial da reforma encontrada para este NCM — tributação integral (regra geral)." };
     }
 
-    // ---- 5. CSOSN (só se Simples Nacional / MEI) ----
+    // ---- 4. CSOSN (só se Simples Nacional / MEI) ----
     let csosnSugerido: Array<Record<string, unknown>> = [];
     const regime = contexto.tax_regime as string | undefined;
     if (regime === "simples_nacional" || regime === "mei") {
@@ -353,6 +329,11 @@ Deno.serve(async (req) => {
 
     let classificationId: string | null = null;
     if (gravar) {
+      const baseLegalFinal = {
+        ...baseLegal,
+        ...(ncmFonteIa ? { ncm_fonte_ia: "gemini", ncm_motivo_ia: ncmFonteIa } : {}),
+        ...(ncmFonteAcervoId ? { ncm_fonte_acervo: true, acervo_id: ncmFonteAcervoId } : {}),
+      };
       const { data: inserted } = await supabase
         .from("fiscal_product_classifications")
         .insert({
@@ -366,7 +347,7 @@ Deno.serve(async (req) => {
           cst_ibs_cbs: cclasstribSugerido?.cst_vinculado ?? null,
           cfop_referencia: CFOP_REFERENCIA.codigo,
           status: "sugestao_ia",
-          base_legal: ncmFonteIa ? { ...baseLegal, ncm_fonte_ia: "gemini", ncm_motivo_ia: ncmFonteIa } : baseLegal,
+          base_legal: baseLegalFinal,
         })
         .select("id")
         .single();
@@ -376,7 +357,7 @@ Deno.serve(async (req) => {
     const resultado = {
       classification_id: classificationId,
       ncm,
-      ncm_posicao: ncmPosicao,
+      ncm_hierarquia: ncmHierarquia,
       ncm_via_ia: !!ncmFonteIa,
       cest_candidatos: cestCandidatos ?? [],
       cclasstrib_sugerido: cclasstribSugerido,

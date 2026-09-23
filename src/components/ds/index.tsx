@@ -470,7 +470,9 @@ const barraTom = {
   action: 'bg-action',
 } as const;
 
-export function MetricaFaixa({ items, className }: { items: MetricaFaixaItem[]; className?: string }) {
+export function MetricaFaixa({
+  items, className, labelClassName,
+}: { items: MetricaFaixaItem[]; className?: string; labelClassName?: string }) {
   return (
     <div className={cn('grid grid-cols-1 overflow-hidden rounded-lg border border-line bg-paper sm:grid-cols-2 xl:grid-cols-4', className)}>
       {items.map((m, i) => (
@@ -486,7 +488,7 @@ export function MetricaFaixa({ items, className }: { items: MetricaFaixaItem[]; 
         >
           <div className="flex items-center gap-2 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:text-muted-ink-2">
             {m.icon}
-            <span className="text-kicker uppercase text-muted-ink-2">{m.label}</span>
+            <span className={cn('text-kicker uppercase text-muted-ink-2', labelClassName)}>{m.label}</span>
           </div>
           <p className="text-metric-xl text-ink">{m.valor}</p>
           {m.hint && <p className="text-meta text-muted-ink">{m.hint}</p>}
