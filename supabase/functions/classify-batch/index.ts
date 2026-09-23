@@ -40,6 +40,17 @@
 // chamadas ao Gemini agora são sequenciais (nunca em paralelo) com espera
 // mínima entre elas pra respeitar 5 RPM, e com retry/backoff em 429/503 (lendo
 // o retryDelay que a própria API sugere) antes de desistir do chunk.
+//
+// Cota DIÁRIA (23/09/2026, mesmo dia): o retry acima causou um problema pior —
+// a mensagem de erro do Gemini revelou que o tier gratuito também tem uma cota
+// de só 20 requisições/DIA (não é só 5/minuto). Ficar tentando de novo com
+// espera de até 59s por tentativa, várias vezes, fez a função ultrapassar o
+// tempo de execução permitido (erro 504/546 — timeout de infraestrutura, pior
+// que simplesmente falhar rápido). Fix: quando o erro 429 é especificamente de
+// cota diária (não de cota por minuto), não faz sentido esperar e tentar de
+// novo — a cota só reseta no dia seguinte. Desiste imediatamente desse chunk
+// E de todos os chunks restantes (circuit breaker), devolvendo o lote com o
+// que já foi resolvido em vez de travar a função até dar timeout.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as XLSX from "npm:xlsx@0.18.5";
 
@@ -70,6 +81,13 @@ function sleep(ms: number): Promise<void> {
 function extrairRetryDelayMs(corpoErro: string): number | null {
   const match = corpoErro.match(/"retryDelay"\s*:\s*"(\d+)s"/);
   return match ? Number(match[1]) * 1000 + 1000 : null;
+}
+
+/** 429 de cota DIÁRIA (quotaId contém "PerDay") não vale retry — só reseta no
+ *  dia seguinte, e ficar esperando/tentando de novo é o que causou o timeout
+ *  de infraestrutura (504/546). */
+function eCotaDiariaEsgotada(corpoErro: string): boolean {
+  return /PerDay/i.test(corpoErro);
 }
 
 type CampoKey = "ncm" | "cest" | "cclasstrib" | "cst" | "csosn" | "cfop";
@@ -161,7 +179,9 @@ async function proporNcmsComGemini(
     return `${it.idx}. "${it.descricao}"${extras ? ` (${extras})` : ""}`;
   }
 
-  async function processarChunk(chunk: ItemParaGemini[]) {
+  /** Devolve true se a cota DIÁRIA esgotou — sinal pra quem chama parar de
+   *  tentar chunks seguintes (retry não ajuda, só atrasa até dar timeout). */
+  async function processarChunk(chunk: ItemParaGemini[]): Promise<{ cotaDiariaEsgotada: boolean }> {
     const prompt = `Você é especialista em classificação fiscal NCM (Nomenclatura Comum do Mercosul/Sistema
 Harmonizado) e conhece produtos e marcas comuns no comércio brasileiro.
 Para cada produto abaixo (nome comercial dado pelo cliente), proponha o código NCM de 8 dígitos que
@@ -207,20 +227,27 @@ ${chunk.map(formatarItem).join("\n")}`;
         );
         if (!res.ok) {
           const corpoErro = await res.text();
+          if (res.status === 429 && eCotaDiariaEsgotada(corpoErro)) {
+            console.log(`[gemini] cota DIÁRIA esgotada — parando de tentar (só reseta no dia seguinte): ${corpoErro}`);
+            return { cotaDiariaEsgotada: true };
+          }
           if ((res.status === 429 || res.status === 503) && tentativa < GEMINI_MAX_TENTATIVAS) {
-            const espera = extrairRetryDelayMs(corpoErro) ?? tentativa * 15_000;
+            // Cap no tempo de espera — a função tem orçamento de execução
+            // limitado; esperar o retryDelay integral (podia passar de 1 min)
+            // foi o que causou o timeout de infraestrutura (504/546).
+            const espera = Math.min(extrairRetryDelayMs(corpoErro) ?? tentativa * 8_000, 15_000);
             console.log(`[gemini] chunk HTTP ${res.status} (tentativa ${tentativa}/${GEMINI_MAX_TENTATIVAS}) — aguardando ${espera}ms e tentando de novo`);
             await sleep(espera);
             continue;
           }
           console.log(`[gemini] chunk falhou definitivamente: HTTP ${res.status} — ${corpoErro}`);
-          return;
+          return { cotaDiariaEsgotada: false };
         }
         const data = await res.json();
         const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!texto) {
           console.log(`[gemini] chunk sem texto na resposta: ${JSON.stringify(data).slice(0, 500)}`);
-          return;
+          return { cotaDiariaEsgotada: false };
         }
         const parsed = JSON.parse(texto) as {
           resultados: Array<{ idx: number; ncm_proposto: string | null; justificativa: string }>;
@@ -232,20 +259,22 @@ ${chunk.map(formatarItem).join("\n")}`;
           propostasNoChunk += 1;
         }
         console.log(`[gemini] chunk de ${chunk.length} itens — ${propostasNoChunk} propostas (a validar)`);
-        return;
+        return { cotaDiariaEsgotada: false };
       } catch (err) {
         console.log(`[gemini] chunk deu excecao: ${(err as Error).message}`);
-        return;
+        return { cotaDiariaEsgotada: false };
       }
     }
+    return { cotaDiariaEsgotada: false };
   }
 
   // Sequencial, nunca em paralelo — tier gratuito só permite 5 req/min, e
   // rodar em paralelo foi exatamente o que causou o "0 resolvidos" em
   // produção (todo chunk batendo 429 de uma vez). Espera entre chunks pra
-  // ficar com margem sobre o limite.
+  // ficar com margem sobre o limite. Para na hora se a cota diária esgotar.
   for (let i = 0; i < chunks.length; i++) {
-    await processarChunk(chunks[i]);
+    const { cotaDiariaEsgotada } = await processarChunk(chunks[i]);
+    if (cotaDiariaEsgotada) break;
     if (i < chunks.length - 1) await sleep(GEMINI_INTERVALO_MS);
   }
   return propostas;

@@ -54,6 +54,12 @@ function extrairRetryDelayMs(corpoErro: string): number | null {
   return match ? Number(match[1]) * 1000 + 1000 : null;
 }
 
+/** 429 de cota DIÁRIA (quotaId contém "PerDay") não vale retry — só reseta no
+ *  dia seguinte. Ver comentário equivalente em classify-batch/index.ts. */
+function eCotaDiariaEsgotada(corpoErro: string): boolean {
+  return /PerDay/i.test(corpoErro);
+}
+
 interface NcmCandidato {
   codigo: string;
   descricao: string;
@@ -120,8 +126,12 @@ Produto (nome comercial): "${descricao}"${pistas}`;
       );
       if (!res.ok) {
         const corpoErro = await res.text();
+        if (res.status === 429 && eCotaDiariaEsgotada(corpoErro)) {
+          console.log(`[gemini] cota DIÁRIA esgotada — desistindo (só reseta no dia seguinte): ${corpoErro}`);
+          return null;
+        }
         if ((res.status === 429 || res.status === 503) && tentativa < GEMINI_MAX_TENTATIVAS) {
-          const espera = extrairRetryDelayMs(corpoErro) ?? tentativa * 5_000;
+          const espera = Math.min(extrairRetryDelayMs(corpoErro) ?? tentativa * 5_000, 10_000);
           console.log(`[gemini] HTTP ${res.status} (tentativa ${tentativa}/${GEMINI_MAX_TENTATIVAS}) — aguardando ${espera}ms`);
           await sleep(espera);
           continue;
