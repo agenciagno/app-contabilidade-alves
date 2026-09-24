@@ -139,11 +139,12 @@ export default function Contacts() {
     }).sort((a, b) => getContactDisplayName(a).localeCompare(getContactDisplayName(b), 'pt-BR', { sensitivity: 'base' }));
   }, [contacts, searchTerm]);
 
-  // Aba Colaboradores: todo contato marcado como colaborador (inclui Ex-Colaborador, que também aparece em Arquivados).
+  // Aba Colaboradores: contato marcado como colaborador com status Ativo (Ex-Colaborador fica em Arquivados).
   const colaboradorContacts = useMemo(() => {
     const q = searchTerm.toLowerCase();
     return contacts.filter(c => {
       if (!(c.categorias || []).some(x => (x || '').toLowerCase() === 'colaborador')) return false;
+      if (c.status_cliente !== 'Ativo') return false;
       if (!q) return true;
       return (
         c.name.toLowerCase().includes(q) ||
