@@ -95,13 +95,14 @@ export default function Contacts() {
       let matchesRegime = true;
       if (filterRegime !== 'all') {
         const regime = ((c as any).tax_regime || '').toString().toLowerCase().trim();
+        // 'nao_aplica' é o valor gravado para "Pessoa Física" (TAX_REGIMES) — o filtro tem que
+        // seguir o regime que o card mostra, não a categoria, senão PF cai em "Isento".
         if (filterRegime === 'pessoa_fisica') {
-          const cats = (c.categorias || []).map(x => (x || '').toLowerCase());
-          matchesRegime = cats.includes('pessoa_fisica');
+          matchesRegime = regime === 'nao_aplica';
         } else if (filterRegime === 'ausente') {
           matchesRegime = regime === '';
-        } else if (filterRegime === 'nao_aplica') {
-          matchesRegime = regime === 'nao_aplica' || regime === 'isento';
+        } else if (filterRegime === 'isento') {
+          matchesRegime = regime === 'isento';
         } else {
           matchesRegime = regime === filterRegime;
         }
@@ -137,6 +138,66 @@ export default function Contacts() {
       );
     }).sort((a, b) => getContactDisplayName(a).localeCompare(getContactDisplayName(b), 'pt-BR', { sensitivity: 'base' }));
   }, [contacts, searchTerm]);
+
+  // Aba Colaboradores: todo contato marcado como colaborador (inclui Ex-Colaborador, que também aparece em Arquivados).
+  const colaboradorContacts = useMemo(() => {
+    const q = searchTerm.toLowerCase();
+    return contacts.filter(c => {
+      if (!(c.categorias || []).some(x => (x || '').toLowerCase() === 'colaborador')) return false;
+      if (!q) return true;
+      return (
+        c.name.toLowerCase().includes(q) ||
+        (getContactDisplayName(c) || '').toLowerCase().includes(q) ||
+        (c.razao_social || '').toLowerCase().includes(q) ||
+        (c.nome_fantasia || '').toLowerCase().includes(q) ||
+        (c.document || '').toLowerCase().includes(q)
+      );
+    }).sort((a, b) => getContactDisplayName(a).localeCompare(getContactDisplayName(b), 'pt-BR', { sensitivity: 'base' }));
+  }, [contacts, searchTerm]);
+
+  // Conteúdo compartilhado pelas abas simples (Colaboradores e Arquivados): busca + cards/lista.
+  const renderSimpleList = (list: Contact[], emptyMessage: string, label: string) => (
+    <div className="space-y-6">
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por nome ou CNPJ..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          className="pl-9 h-9 bg-card border-border"
+        />
+      </div>
+
+      {list.length === 0 ? (
+        <Card className="bg-card">
+          <CardContent className="text-muted-foreground text-center py-16">
+            {emptyMessage}
+          </CardContent>
+        </Card>
+      ) : viewMode === 'card' ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {list.map(contact => <ContactCard key={contact.id} contact={contact} />)}
+        </div>
+      ) : (
+        <Card className="bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>CPF/CNPJ</TableHead>
+                <TableHead>Telefone</TableHead>
+                <TableHead>E-mail</TableHead>
+                <TableHead className="w-10">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <ContactTableSection contacts={list} label={label} showCheckbox={false} />
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+    </div>
+  );
 
   const activeContacts = filteredContacts.filter(c => c.is_active);
   const inactiveContacts = filteredContacts.filter(c => !c.is_active);
@@ -360,6 +421,13 @@ export default function Contacts() {
             Saída de Clientes
           </TabsTrigger>
           <TabsTrigger
+            value="colaboradores"
+            className="h-11 gap-[7px] rounded-none border-b-2 border-transparent px-3.5 text-nav text-muted-ink data-[state=active]:border-ink data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-none"
+          >
+            <Users className="h-4 w-4" strokeWidth={1.75} />
+            Colaboradores ({colaboradorContacts.length})
+          </TabsTrigger>
+          <TabsTrigger
             value="arquivados"
             className="h-11 gap-[7px] rounded-none border-b-2 border-transparent px-3.5 text-nav text-muted-ink data-[state=active]:border-ink data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-none"
           >
@@ -432,7 +500,7 @@ export default function Contacts() {
                   <SelectItem value="lucro_real">Lucro Real</SelectItem>
                   <SelectItem value="mei">MEI</SelectItem>
                   <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
-                  <SelectItem value="nao_aplica">Isento / Não contribuinte</SelectItem>
+                  <SelectItem value="isento">Isento</SelectItem>
                   <SelectItem value="ausente">Ausente / Não informado</SelectItem>
 
                 </SelectContent>
@@ -567,47 +635,12 @@ export default function Contacts() {
           <SaidaClientesTab />
         </TabsContent>
 
-        <TabsContent value="arquivados">
-          <div className="space-y-6">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome ou CNPJ..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="pl-9 h-9 bg-card border-border"
-              />
-            </div>
+        <TabsContent value="colaboradores">
+          {renderSimpleList(colaboradorContacts, 'Nenhum contato marcado como colaborador', 'Colaboradores')}
+        </TabsContent>
 
-            {archivedContacts.length === 0 ? (
-              <Card className="bg-card">
-                <CardContent className="text-muted-foreground text-center py-16">
-                  Nenhum contato arquivado (status Baixada, Ex-cliente ou Ex-Colaborador)
-                </CardContent>
-              </Card>
-            ) : viewMode === 'card' ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {archivedContacts.map(contact => <ContactCard key={contact.id} contact={contact} />)}
-              </div>
-            ) : (
-              <Card className="bg-card">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>CPF/CNPJ</TableHead>
-                      <TableHead>Telefone</TableHead>
-                      <TableHead>E-mail</TableHead>
-                      <TableHead className="w-10">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <ContactTableSection contacts={archivedContacts} label="Arquivados" showCheckbox={false} />
-                  </TableBody>
-                </Table>
-              </Card>
-            )}
-          </div>
+        <TabsContent value="arquivados">
+          {renderSimpleList(archivedContacts, 'Nenhum contato arquivado (status Baixada, Ex-cliente ou Ex-Colaborador)', 'Arquivados')}
         </TabsContent>
       </Tabs>
 
