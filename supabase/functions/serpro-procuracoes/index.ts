@@ -17,7 +17,8 @@ import { criarSerpro, onlyDigits, sleep } from "../_shared/serpro-core.ts";
 //                 duas vezes se uma rodada for interrompida), salvo `forcar`.
 //
 // Grava em serpro_procuracoes (fonte integra_procuracoes): uma linha por código de procuração, com status e data de expiração.
-// Códigos base marcados "ausente" quando não aparecem; nomes que não reconhecemos ficam numa linha "OUTROS" para auditoria.
+// Códigos base marcados "ausente" quando não aparecem; "TODOS" (procuração para todos os serviços) vale para todos os códigos;
+// nomes que não reconhecemos ficam numa linha "OUTROS" e a resposta bruta numa linha "BRUTO", para auditoria sem nova cobrança.
 // ---------------------------------------------------------------------------
 
 const COMPANY_ID = "5cd08fcd-c095-4f08-b3a8-c02b9bf1034e";
@@ -75,17 +76,30 @@ async function mapearCliente(c: { id: string; document: string }, uid: string, o
   const hoje = hojeBR();
   const porCodigo = new Map<string, { expira: string | null; nomes: Set<string> }>();
   const outros = new Set<string>();
+  // Achado da 1ª rodada real (30/09/2026): o Serpro devolve "TODOS" quando o cliente outorgou procuração para TODOS os serviços
+  // (não aparece na documentação). Vale para todos os códigos, com a expiração daquela procuração.
+  let todos = false;
+  let todosExpira: string | null = null;
+  const soma = (codigo: string, nome: string, expira: string | null) => {
+    const cur = porCodigo.get(codigo) ?? { expira: null, nomes: new Set<string>() };
+    cur.nomes.add(nome);
+    if (expira && (!cur.expira || expira > cur.expira)) cur.expira = expira; // várias procurações do mesmo código: vale a mais longa
+    porCodigo.set(codigo, cur);
+  };
   for (const proc of lista) {
     const expira = aaaammdd(proc.dtexpiracao);
     for (const nome of proc.sistemas ?? []) {
+      if (/^\s*todos\b/i.test(nome)) {
+        todos = true;
+        if (expira && (!todosExpira || expira > todosExpira)) todosExpira = expira;
+        continue;
+      }
       const p = PADROES.find((x) => x.re.test(nome));
       if (!p) { outros.add(nome); continue; }
-      const cur = porCodigo.get(p.codigo) ?? { expira: null, nomes: new Set<string>() };
-      cur.nomes.add(nome);
-      if (expira && (!cur.expira || expira > cur.expira)) cur.expira = expira; // várias procurações do mesmo código: vale a mais longa
-      porCodigo.set(p.codigo, cur);
+      soma(p.codigo, nome, expira);
     }
   }
+  if (todos) for (const p of PADROES) soma(p.codigo, "TODOS", todosExpira);
 
   const agora = new Date().toISOString();
   const linhas: Linha[] = [];
@@ -104,6 +118,8 @@ async function mapearCliente(c: { id: string; document: string }, uid: string, o
   if (outros.size) {
     linhas.push({ contact_id: c.id, company_id: COMPANY_ID, codigo_procuracao: "OUTROS", status: "ativa", data_fim: null, verificado_em: agora, fonte: "integra_procuracoes", resposta: { sistemas: [...outros] } });
   }
+  // Resposta bruta guardada (nomes e datas): se o mapeamento de nomes precisar de ajuste, reprocessa sem nova consulta cobrada.
+  linhas.push({ contact_id: c.id, company_id: COMPANY_ID, codigo_procuracao: "BRUTO", status: "ativa", data_fim: null, verificado_em: agora, fonte: "integra_procuracoes", resposta: { lista } });
 
   // Confronto com a sonda da Caixa Postal (E0601): as duas fontes devem concordar.
   const { data: antes } = await supabase.from("serpro_procuracoes").select("status,fonte").eq("contact_id", c.id).eq("codigo_procuracao", "00006").maybeSingle();
