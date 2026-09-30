@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { criarSerpro, onlyDigits, sleep } from "../_shared/serpro-core.ts";
+import { criarSerpro, jwtRole, onlyDigits, sleep } from "../_shared/serpro-core.ts";
 
 // ---------------------------------------------------------------------------
 // Mapa de procurações (Serpro Integra Contador, PROCURACOES.OBTERPROCURACAO41) — F4 Onda 2, passo 1, 30/09/2026.
@@ -15,6 +15,8 @@ import { criarSerpro, onlyDigits, sleep } from "../_shared/serpro-core.ts";
 //   mapear_lote   { offset, limite (<= 60), confirmar: true, forcar? }
 //                 só administrador, em fatias (a tela chama até acabar). Pula quem já foi mapeado nas últimas 12 h (evita cobrar
 //                 duas vezes se uma rodada for interrompida), salvo `forcar`.
+//   rotina_vencimentos   aviso interno semanal (segunda 08:00, pg_cron) das procurações que vencem em até 60 dias ou já venceram.
+//                 NÃO chama o Serpro: só lê o que já foi mapeado. Um aviso por semana (trava de 6 dias), para admins e quem tem o módulo.
 //
 // Grava em serpro_procuracoes (fonte integra_procuracoes): uma linha por código de procuração, com status e data de expiração.
 // Códigos base marcados "ausente" quando não aparecem; "TODOS" (procuração para todos os serviços) vale para todos os códigos;
@@ -173,10 +175,54 @@ async function mapearLote(payload: any, uid: string) {
   return json({ ok: true, total: alvo.length, offset, processados: fatia.length, mapeados: ok, pulados_recentes: puladas, erros, divergencias_00006: divergencias, falhas: falhas.slice(0, 5), proximo_offset: proximo < alvo.length ? proximo : null });
 }
 
+const DIAS_AVISO = 60;
+const dataBR = (iso: string) => iso.split("-").reverse().join("/");
+
+// Um aviso por rodada (não um por cliente). Vai para admins e para quem tem o módulo dashboard_federal.
+async function rotinaVencimentos(forcar: boolean) {
+  const hoje = hojeBR();
+  const limite = new Date(Date.now() - 3 * 3600_000 + DIAS_AVISO * 86400_000).toISOString().slice(0, 10);
+  if (!forcar) {
+    const desde = new Date(Date.now() - 6 * 86400_000).toISOString();
+    const { data: recente } = await supabase.from("notifications").select("id").eq("company_id", COMPANY_ID).eq("type", "serpro_procuracao").gte("created_at", desde).limit(1);
+    if (recente?.length) return json({ ok: true, pulado: "já avisou nos últimos 6 dias" });
+  }
+  const { data: contatos } = await supabase.from("contacts").select("id,name,display_name").eq("company_id", COMPANY_ID).eq("status_cliente", STATUS_MONITORADO).limit(1000);
+  const nomes = new Map((contatos ?? []).map((c: any) => [c.id as string, (c.display_name || c.name) as string]));
+  if (!nomes.size) return json({ ok: true, avisos: 0 });
+
+  // Menor data de fim entre os códigos base ainda ativos: é quando o acesso deste cliente começa a falhar.
+  const { data: linhas } = await supabase.from("serpro_procuracoes").select("contact_id,data_fim")
+    .eq("company_id", COMPANY_ID).eq("fonte", "integra_procuracoes").in("codigo_procuracao", CODIGOS_BASE).eq("status", "ativa")
+    .not("data_fim", "is", null).lte("data_fim", limite).in("contact_id", [...nomes.keys()]);
+  const fim = new Map<string, string>();
+  for (const l of linhas ?? []) { const cur = fim.get(l.contact_id); if (!cur || l.data_fim < cur) fim.set(l.contact_id, l.data_fim); }
+  if (!fim.size) return json({ ok: true, avisos: 0 });
+
+  const lista = [...fim.entries()].sort((a, b) => a[1].localeCompare(b[1])); // mais urgentes primeiro
+  const vencidas = lista.filter(([, d]) => d < hoje).length;
+  const corpo = lista.slice(0, 5).map(([id, d]) => `${nomes.get(id)} (${d < hoje ? "venceu em " : ""}${dataBR(d)})`).join(", ") + (lista.length > 5 ? ` e mais ${lista.length - 5}` : "");
+  const { data: alvos } = await supabase.from("profiles").select("user_id")
+    .eq("company_id", COMPANY_ID).eq("status_active", true).or("role.in.(admin,super_admin),allowed_modules.cs.{dashboard_federal}");
+  if (!alvos?.length) return json({ ok: true, avisos: 0 });
+  const { error } = await supabase.from("notifications").insert(alvos.map((t: { user_id: string }) => ({
+    user_id: t.user_id, company_id: COMPANY_ID, type: "serpro_procuracao",
+    title: lista.length === 1 ? (vencidas ? "1 procuração vencida" : "1 procuração vencendo") : `${lista.length} procurações vencendo${vencidas ? ` ou vencidas (${vencidas})` : ""}`,
+    body: corpo, action_url: "/dashboard-federal/procuracoes",
+  })));
+  if (error) return json({ ok: false, error: error.message }, 500);
+  return json({ ok: true, clientes: lista.length, vencidas, destinatarios: alvos.length });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   const payload = await req.json().catch(() => ({}));
+
+  // Cron chama com a chave anon (padrão do projeto). Só o aviso de vencimentos aceita isso: não faz nenhuma chamada ao Serpro e tem trava de 6 dias.
+  if (payload.action === "rotina_vencimentos" && (bearer === Deno.env.get("SUPABASE_ANON_KEY") || jwtRole(bearer) === "anon")) {
+    return await rotinaVencimentos(false);
+  }
   const { data: userData } = await supabase.auth.getUser(bearer);
   const uid = userData?.user?.id;
   if (!uid) return json({ error: "Não autenticado" }, 401);
@@ -190,6 +236,9 @@ Deno.serve(async (req) => {
     case "mapear_lote":
       if (!admin) return json({ error: "Só administradores rodam o mapa completo" }, 403);
       return await mapearLote(payload, uid);
-    default: return json({ error: "action inválida (mapear | mapear_lote)" }, 400);
+    case "rotina_vencimentos":
+      if (!admin) return json({ error: "Só administradores rodam o aviso manualmente" }, 403);
+      return await rotinaVencimentos(payload.forcar === true);
+    default: return json({ error: "action inválida (mapear | mapear_lote | rotina_vencimentos)" }, 400);
   }
 });

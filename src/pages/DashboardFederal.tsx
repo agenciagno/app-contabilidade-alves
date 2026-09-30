@@ -15,6 +15,7 @@ import { competenciaPadrao, rotuloCompetencia, useMatrizPagamentos } from '@/hoo
 import { anoDe, declaracaoVigente, statusDas, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
 import { faturamentoVigente, nivelLimite, nivelSublimite, useFaturamentoAno } from '@/hooks/useSerproFaturamento';
 import { statusDefis, useMatrizDefis } from '@/hooks/useSerproDefis';
+import { useProcuracoes, vencendo as procVencendo } from '@/hooks/useSerproProcuracoes';
 
 type Tom = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
 
@@ -54,6 +55,7 @@ export default function DashboardFederal() {
   const { data: simples = [], isLoading: carregandoSn } = useMatrizPgdasd(anoDe(competencia));
   const { data: leituras = [], isLoading: carregandoFat } = useFaturamentoAno(anoDe(competencia));
   const { data: defis = [], isLoading: carregandoDefis } = useMatrizDefis();
+  const { data: procuracoes = [], isLoading: carregandoProc } = useProcuracoes();
 
   const ativos = useMemo<CartaoAtivo[]>(() => {
     const selos = clientes.map((c) => seloCaixa(c).estado);
@@ -75,6 +77,10 @@ export default function DashboardFederal() {
     const fatAcima = fatConfiaveis.filter((f) => nivelLimite(f) === 'acima' || nivelSublimite(f) === 'acima').length;
     const fatPertoSub = fatConfiaveis.filter((f) => nivelSublimite(f) === 'perto').length;
     const fatFatorR = fatConfiaveis.filter((f) => f.fator_r_aplica === true).length;
+    const pcCompletas = procuracoes.filter((l) => l.situacao === 'total').length;
+    const pcSem = procuracoes.filter((l) => l.situacao === 'sem' || l.situacao === 'vencida').length;
+    const pcVencendo = procuracoes.filter((l) => l.situacao !== 'vencida' && procVencendo(l)).length;
+    const pcNaoMapeados = procuracoes.filter((l) => l.situacao === 'nao_mapeado').length;
     const anoDefis = new Date().getFullYear() - 1;
     const dfStatus = defis.filter((l) => !l.filial).map((l) => statusDefis(l, anoDefis));
     const dfConsultados = defis.filter((l) => !l.filial && l.consultadoEm).length;
@@ -118,17 +124,18 @@ export default function DashboardFederal() {
         linhas: [`${abertas.length} em aberto`, `${abertas.filter((m) => m.situacao === 'nova').length} novas sem responsável`],
       },
       {
-        titulo: 'Procurações', icone: ShieldCheck, to: '/mensagens?selo=sem_procuracao', tom: semProc > 0 ? 'warn' : 'ok',
-        linhas: [`${clientes.length - semProc} com procuração (Caixa Postal)`, `${semProc} sem procuração`],
+        titulo: 'Procurações', icone: ShieldCheck, to: '/dashboard-federal/procuracoes',
+        tom: pcNaoMapeados === procuracoes.length ? 'neutral' : pcSem > 0 || pcVencendo > 0 ? 'warn' : 'ok',
+        linhas: [`${pcCompletas} completas · ${pcSem} sem procuração ou vencidas`, `${pcVencendo} vencem em 60 dias · ${pcNaoMapeados} não mapeadas`],
       },
       {
         titulo: 'Certificados', icone: BadgeCheck, to: '/cadastros/certificados', tom: vencidos > 0 ? 'danger' : aVencer > 0 ? 'warn' : 'ok',
         linhas: [`${vencidos} vencidos`, `${aVencer} vencem em 30 dias · ${certificados.length} no total`],
       },
     ];
-  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, competencia]);
+  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, competencia]);
 
-  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis;
+  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc;
 
   return (
     <div className="space-y-6">
