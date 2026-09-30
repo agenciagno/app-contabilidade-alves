@@ -4,7 +4,7 @@ import { useAudience, type Audience } from '@/hooks/useAudience';
 
 /**
  * Guard de rota por audiência, para rotas SEM chave de módulo (Tech: Clientes
- * Externos, LGPD, Agente IA). Rotas com módulo usam o ModuleGuard, que já
+ * Externos, LGPD, Consumo Serpro). Rotas com módulo usam o ModuleGuard, que já
  * checa audiência via MODULE_AUDIENCE.
  *
  * Não substitui checagem de papel — as telas continuam se defendendo

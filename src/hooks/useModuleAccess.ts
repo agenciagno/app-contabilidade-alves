@@ -22,7 +22,7 @@ export interface RoleGated {
   internalOnly?: boolean;
   /**
    * Audiência do item de menu que NÃO tem chave de módulo/submódulo própria
-   * (ex.: Clientes Externos, LGPD, Agente IA no grupo Tech). Itens com chave
+   * (ex.: Clientes Externos, LGPD, Consumo Serpro no grupo Tech). Itens com chave
    * usam MODULE_AUDIENCE; ausente = visível nas duas visões.
    */
   audience?: ModuleAudience;

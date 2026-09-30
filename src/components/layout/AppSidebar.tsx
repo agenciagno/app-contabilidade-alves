@@ -188,14 +188,12 @@ export const menuEntries: MenuEntry[] = [
     icon: Send,
     moduleKey: 'tech',
     items: [
-      // Audiência por item (decisão Gabriel 10/08): Disparos e Agente IA são da
-      // operação interna; Clientes Externos e LGPD vivem na visão do produto;
+      // Audiência por item (decisão Gabriel 10/08): Consumo Serpro é da operação
+      // interna; Clientes Externos e LGPD vivem na visão do produto;
       // Central de Notificações existe nas duas.
-      { title: 'Disparos', url: '/disparos', icon: Send, iconName: 'send', subKey: 'tech_disparos', audience: 'internal' },
       { title: 'Clientes Externos', url: '/tech/clientes-externos', icon: Building2, iconName: 'building-2', requireSuperAdmin: true, audience: 'external' },
       { title: 'Canais de Suporte', url: '/tech/suporte-canais', icon: MessageSquare, iconName: 'message-square', requireSuperAdmin: true, audience: 'external' },
       { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check', requireAdmin: true, audience: 'external' },
-      { title: 'Agente IA', url: '/tech/agente-ia', icon: Bot, iconName: 'bot', requireAdmin: true, audience: 'internal' },
       { title: 'Consumo Serpro', url: '/tech/consumo-serpro', icon: Gauge, iconName: 'gauge', requireAdmin: true, audience: 'internal' },
       { title: 'Central de Notificações', url: '/central-notificacoes', icon: BellRing, iconName: 'bell-ring', requireSuperAdmin: true },
     ],
@@ -241,19 +239,19 @@ export const menuEntries: MenuEntry[] = [
   { kind: 'section', label: 'Monitoramento' },
   {
     kind: 'simple',
-    title: 'Mensagens',
-    url: '/mensagens',
-    icon: MessageSquare,
-    iconName: 'message-square',
-    moduleKey: 'mensagens',
-  },
-  {
-    kind: 'simple',
     title: 'Dashboard Federal',
     url: '/dashboard-federal',
     icon: Landmark,
     iconName: 'landmark',
     moduleKey: 'dashboard_federal',
+  },
+  {
+    kind: 'simple',
+    title: 'Mensagens e-CAC',
+    url: '/mensagens',
+    icon: MessageSquare,
+    iconName: 'message-square',
+    moduleKey: 'mensagens',
   },
   {
     kind: 'simple',

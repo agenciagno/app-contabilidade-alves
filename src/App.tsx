@@ -31,7 +31,6 @@ const Categories = lazy(() => import("@/pages/Categories"));
 const ClientCategories = lazy(() => import("@/pages/ClientCategories"));
 const DRE = lazy(() => import("@/pages/DRE"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
-const CrmDispatches = lazy(() => import("@/pages/CrmDispatches"));
 const ClientReport = lazy(() => import("@/pages/ClientReport"));
 const Boletos = lazy(() => import("@/pages/Boletos"));
 const ConciliacaoSicoob = lazy(() => import("@/pages/ConciliacaoSicoob"));
@@ -49,7 +48,6 @@ const TechClientesExternos = lazy(() => import("@/pages/TechClientesExternos"));
 const TechClienteExternoDetalhe = lazy(() => import("@/pages/TechClienteExternoDetalhe"));
 const TechSuporteCanais = lazy(() => import("@/pages/TechSuporteCanais"));
 const TechLGPD = lazy(() => import("@/pages/TechLGPD"));
-const TechAgenteIA = lazy(() => import("@/pages/TechAgenteIA"));
 const CentralNotificacoes = lazy(() => import("@/pages/CentralNotificacoes"));
 const MetasOrcamentos = lazy(() => import("@/pages/MetasOrcamentos"));
 const MinhaConta = lazy(() => import("@/pages/MinhaConta"));
@@ -124,7 +122,6 @@ const App = () => (
               <Route path="/dre" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_dre"><DRE /></ModuleGuard></AppLayout>} />
               
               <Route path="/configuracoes" element={<AppLayout><ModuleGuard moduleName="configuracoes" internalOnly><SettingsPage /></ModuleGuard></AppLayout>} />
-              <Route path="/disparos" element={<AppLayout><ModuleGuard moduleName="tech" subModule="tech_disparos"><CrmDispatches /></ModuleGuard></AppLayout>} />
               <Route path="/relatorio-clientes" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="contatos"><ClientReport /></ModuleGuard></AppLayout>} />
 
               <Route path="/boletos" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_boletos"><Boletos /></ModuleGuard></AppLayout>} />
@@ -137,7 +134,7 @@ const App = () => (
 
               <Route path="/acessos" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="acessos"><CofreGlobal /></ModuleGuard></AppLayout>} />
               {/* Audiência por rota Tech (decisão Gabriel 10/08): Clientes Externos
-                  e LGPD vivem no Sistema Externo; Agente IA no Interno. As telas
+                  e LGPD vivem no Sistema Externo; Consumo Serpro no Interno. As telas
                   continuam checando papel (super admin/admin) por conta própria. */}
               <Route path="/tech/clientes-externos" element={<AppLayout><AudienceGuard audience="external"><TechClientesExternos /></AudienceGuard></AppLayout>} />
               <Route path="/tech/clientes-externos/:id" element={<AppLayout><AudienceGuard audience="external"><TechClienteExternoDetalhe /></AudienceGuard></AppLayout>} />
@@ -146,7 +143,6 @@ const App = () => (
               <Route path="/admin/provisionar-cliente" element={<Navigate to="/tech/clientes-externos" replace />} />
               <Route path="/tech/operacao" element={<Navigate to="/tech/clientes-externos" replace />} />
               <Route path="/tech/lgpd" element={<AppLayout><AudienceGuard audience="external"><TechLGPD /></AudienceGuard></AppLayout>} />
-              <Route path="/tech/agente-ia" element={<AppLayout><AudienceGuard audience="internal"><TechAgenteIA /></AudienceGuard></AppLayout>} />
               <Route path="/tech/consumo-serpro" element={<AppLayout><AudienceGuard audience="internal"><TechConsumoSerpro /></AudienceGuard></AppLayout>} />
               <Route path="/central-notificacoes" element={<AppLayout><CentralNotificacoes /></AppLayout>} />
 
@@ -170,9 +166,10 @@ const App = () => (
               <Route path="/fiscal/agenda" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_agenda" requireAdmin><EmBreve moduleKey="fiscal_agenda" /></ModuleGuard></AppLayout>} />
 
               {/* Monitoramento */}
-              <Route path="/mensagens" element={<AppLayout><ModuleGuard moduleName="mensagens"><EmBreve moduleKey="mensagens" /></ModuleGuard></AppLayout>} />
+              <Route path="/mensagens" element={<AppLayout><ModuleGuard moduleName="mensagens"><MensagensEcac /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><DashboardFederal /></ModuleGuard></AppLayout>} />
-              <Route path="/dashboard-federal/mensagens" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><MensagensEcac /></ModuleGuard></AppLayout>} />
+              {/* Rota antiga: a tela mudou para /mensagens; atalho fixado e link salvo continuam funcionando. */}
+              <Route path="/dashboard-federal/mensagens" element={<Navigate to="/mensagens" replace />} />
               <Route path="/dashboard-federal/intimacoes" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><TermosIntimacao /></ModuleGuard></AppLayout>} />
               <Route path="/parcelamentos" element={<AppLayout><ModuleGuard moduleName="parcelamentos"><EmBreve moduleKey="parcelamentos" /></ModuleGuard></AppLayout>} />
               <Route path="/certidoes" element={<AppLayout><ModuleGuard moduleName="certidoes"><EmBreve moduleKey="certidoes" /></ModuleGuard></AppLayout>} />

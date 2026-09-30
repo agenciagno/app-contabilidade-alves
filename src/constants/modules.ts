@@ -54,8 +54,8 @@ export const MODULE_TREE: ModuleNode[] = [
       { key: 'fiscal_agenda', label: 'Agenda' },
     ],
   },
-  { key: 'mensagens', label: 'Mensagens' },
   { key: 'dashboard_federal', label: 'Dashboard Federal' },
+  { key: 'mensagens', label: 'Mensagens e-CAC' },
   { key: 'parcelamentos', label: 'Parcelamentos' },
   { key: 'certidoes', label: 'Certidões' },
   { key: 'processos', label: 'Processos' },
@@ -158,10 +158,9 @@ export const MODULE_AUDIENCE: Record<string, ModuleAudience> = {
   financeiro_categorias: 'external',
 
   // Tech: o grupo existe nos dois mundos; cada item declara o seu lado.
-  // (Clientes Externos, LGPD e Agente IA não têm chave de submódulo — a
+  // (Clientes Externos, LGPD e Consumo Serpro não têm chave de submódulo — a
   // audiência deles vive no item do menu e no guard da rota.)
   tech: 'both',
-  tech_disparos: 'internal',
 
   // Cadastro: na visão externa só existem C&F (acima) e Equipe.
   cadastro: 'both',
@@ -265,14 +264,12 @@ export const SUB_MODULES_BY_PARENT: Record<string, string[]> = MODULE_TREE.reduc
 }, {} as Record<string, string[]>);
 
 /**
- * Chaves antigas que continuam valendo. `contatos` nasceu como `clientes`;
- * `tech_disparos` nasceu como `clientes_disparos`.
+ * Chaves antigas que continuam valendo. `contatos` nasceu como `clientes`.
  */
 export const LEGACY_MODULE_ALIASES: Record<string, string[]> = {
   contatos: ['clientes'],
 };
 export const LEGACY_SUBMODULE_ALIASES: Record<string, string[]> = {
-  tech_disparos: ['clientes_disparos'],
   contatos: ['clientes'],
 };
 
@@ -290,7 +287,7 @@ export const DEFAULT_PLAN_MODULES: string[] = [
 /** Para onde mandar quem cai numa rota sem permissão. */
 export const MODULE_ROUTE_MAP: Record<string, string> = {
   home: '/',
-  tech: '/disparos',
+  tech: '/central-notificacoes',
   financeiro: '/painel-financeiro',
   fiscal: '/fiscal/tarefas',
   cadastro: '/contatos',
@@ -353,11 +350,6 @@ export const EM_BREVE: Record<string, EmBreveInfo> = {
   fiscal_agenda: {
     titulo: 'Agenda',
     descricao: 'Agenda de compromissos da equipe.',
-  },
-  mensagens: {
-    titulo: 'Mensagens',
-    descricao: 'Atendimento de WhatsApp dentro do sistema, sobre a base do Chatwoot.',
-    fase: 'F3 · Chatwoot + Agente IA',
   },
   parcelamentos: {
     titulo: 'Parcelamentos',
