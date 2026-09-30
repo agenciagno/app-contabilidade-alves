@@ -4759,6 +4759,119 @@ export type Database = {
           },
         ]
       }
+      serpro_faturamento: {
+        Row: {
+          aplicado_fiscal_em: string | null
+          aplicado_por: string | null
+          avisos: string[]
+          company_id: string
+          confiavel: boolean
+          contact_id: string
+          created_at: string
+          dados: Json | null
+          declaracao_id: string | null
+          fator_r_aplica: boolean | null
+          fator_r_texto: string | null
+          id: string
+          lido_em: string
+          limite_total: number | null
+          numero_declaracao: string
+          periodo_apuracao: string
+          rba_total: number | null
+          rbaa_total: number | null
+          rbt12_total: number | null
+          regime_apuracao: string | null
+          rpa_total: number | null
+          sublimite: number | null
+          tipo: string | null
+          transmitida_em: string | null
+          updated_at: string
+        }
+        Insert: {
+          aplicado_fiscal_em?: string | null
+          aplicado_por?: string | null
+          avisos?: string[]
+          company_id: string
+          confiavel?: boolean
+          contact_id: string
+          created_at?: string
+          dados?: Json | null
+          declaracao_id?: string | null
+          fator_r_aplica?: boolean | null
+          fator_r_texto?: string | null
+          id?: string
+          lido_em?: string
+          limite_total?: number | null
+          numero_declaracao: string
+          periodo_apuracao: string
+          rba_total?: number | null
+          rbaa_total?: number | null
+          rbt12_total?: number | null
+          regime_apuracao?: string | null
+          rpa_total?: number | null
+          sublimite?: number | null
+          tipo?: string | null
+          transmitida_em?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aplicado_fiscal_em?: string | null
+          aplicado_por?: string | null
+          avisos?: string[]
+          company_id?: string
+          confiavel?: boolean
+          contact_id?: string
+          created_at?: string
+          dados?: Json | null
+          declaracao_id?: string | null
+          fator_r_aplica?: boolean | null
+          fator_r_texto?: string | null
+          id?: string
+          lido_em?: string
+          limite_total?: number | null
+          numero_declaracao?: string
+          periodo_apuracao?: string
+          rba_total?: number | null
+          rbaa_total?: number | null
+          rbt12_total?: number | null
+          regime_apuracao?: string | null
+          rpa_total?: number | null
+          sublimite?: number | null
+          tipo?: string | null
+          transmitida_em?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_faturamento_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_faturamento_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_faturamento_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+          {
+            foreignKeyName: "serpro_faturamento_declaracao_id_fkey"
+            columns: ["declaracao_id"]
+            isOneToOne: false
+            referencedRelation: "serpro_pgdasd_declaracoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       serpro_pagamentos: {
         Row: {
           chave: string

@@ -13,6 +13,7 @@ import { diasParaVencer, useCertificates } from '@/hooks/useCertificates';
 import { STATUS_MONITORADO, seloCaixa, useClientesCaixa, useMensagensCriticas } from '@/hooks/useSerproCaixaPostal';
 import { competenciaPadrao, rotuloCompetencia, useMatrizPagamentos } from '@/hooks/useSerproPagamentos';
 import { anoDe, declaracaoVigente, statusDas, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
+import { faturamentoVigente, nivelLimite, nivelSublimite, useFaturamentoAno } from '@/hooks/useSerproFaturamento';
 
 type Tom = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
 
@@ -33,9 +34,6 @@ interface CartaoEmBreve {
 
 // Cartões que ainda não têm dado: acendem conforme cada onda do Integra Contador entra (relatório serpro-integra-contador-oportunidades-set2026).
 const EM_BREVE: CartaoEmBreve[] = [
-  { titulo: 'Faturamento', icone: BarChart3, onda: 'Onda 2', fonte: 'Últimos 12 meses (Simples)' },
-  { titulo: 'Sublimite do Simples', icone: Gauge, onda: 'Onda 2', fonte: 'Receita acumulada x limite' },
-  { titulo: 'Fator R', icone: Percent, onda: 'Onda 2', fonte: 'Folha sobre receita' },
   { titulo: 'DEFIS', icone: ClipboardList, onda: 'Onda 2', fonte: 'Entregues e pendentes' },
   { titulo: 'Situação fiscal', icone: Landmark, onda: 'Onda 3', fonte: 'Pendências e regulares' },
   { titulo: 'Parcelamentos', icone: CreditCard, onda: 'Onda 3', fonte: 'Parcela do mês e guia' },
@@ -54,6 +52,7 @@ export default function DashboardFederal() {
   const competencia = competenciaPadrao();
   const { data: pagamentos = [], isLoading: carregandoPag } = useMatrizPagamentos(competencia);
   const { data: simples = [], isLoading: carregandoSn } = useMatrizPgdasd(anoDe(competencia));
+  const { data: leituras = [], isLoading: carregandoFat } = useFaturamentoAno(anoDe(competencia));
 
   const ativos = useMemo<CartaoAtivo[]>(() => {
     const selos = clientes.map((c) => seloCaixa(c).estado);
@@ -69,6 +68,12 @@ export default function DashboardFederal() {
     const snPagos = snConsultados.filter((l) => statusDas(l, competencia) === 'pago').length;
     const snNaoPagos = snConsultados.filter((l) => ['nao_pago', 'parcial'].includes(statusDas(l, competencia))).length;
     const snTotal = simples.filter((l) => !l.filial).length;
+    const fatLidos = simples.filter((l) => !l.filial).map((l) => faturamentoVigente(l, leituras, competencia)).filter((f): f is NonNullable<typeof f> => !!f);
+    const fatConfiaveis = fatLidos.filter((f) => f.confiavel);
+    const fatAtencao = fatConfiaveis.filter((f) => ['atencao', 'critico'].includes(nivelLimite(f) ?? '')).length;
+    const fatAcima = fatConfiaveis.filter((f) => nivelLimite(f) === 'acima' || nivelSublimite(f) === 'acima').length;
+    const fatPertoSub = fatConfiaveis.filter((f) => nivelSublimite(f) === 'perto').length;
+    const fatFatorR = fatConfiaveis.filter((f) => f.fator_r_aplica === true).length;
     return [
       {
         titulo: 'Mensagens e-CAC', icone: Mail, to: '/mensagens', tom: comMensagem > 0 ? 'warn' : 'ok',
@@ -87,6 +92,18 @@ export default function DashboardFederal() {
         linhas: [`${snPagos} pagos · ${snNaoPagos} não pagos`, `em ${rotuloCompetencia(competencia)}, entre os consultados`],
       },
       {
+        titulo: 'Faturamento', icone: BarChart3, to: '/dashboard-federal/faturamento', tom: fatConfiaveis.length === 0 ? 'neutral' : fatAcima > 0 ? 'danger' : fatAtencao > 0 ? 'warn' : 'ok',
+        linhas: [`${fatLidos.length} declarações lidas em ${rotuloCompetencia(competencia)}`, `${fatAtencao} em atenção ou crítico (80% do limite)`],
+      },
+      {
+        titulo: 'Sublimite do Simples', icone: Gauge, to: '/dashboard-federal/faturamento?filtro=sublimite', tom: fatConfiaveis.length === 0 ? 'neutral' : fatAcima > 0 ? 'danger' : fatPertoSub > 0 ? 'warn' : 'ok',
+        linhas: [`${fatAcima} acima do limite ou sublimite`, `${fatPertoSub} perto do sublimite`],
+      },
+      {
+        titulo: 'Fator R', icone: Percent, to: '/dashboard-federal/faturamento?filtro=fator_r', tom: fatFatorR > 0 ? 'info' : 'neutral',
+        linhas: [`${fatFatorR} com fator r na declaração`, 'valor como a Receita escreve no PDF'],
+      },
+      {
         titulo: 'Termos de intimação', icone: Gavel, to: '/dashboard-federal/intimacoes', tom: abertas.length > 0 ? 'danger' : 'ok',
         linhas: [`${abertas.length} em aberto`, `${abertas.filter((m) => m.situacao === 'nova').length} novas sem responsável`],
       },
@@ -99,9 +116,9 @@ export default function DashboardFederal() {
         linhas: [`${vencidos} vencidos`, `${aVencer} vencem em 30 dias · ${certificados.length} no total`],
       },
     ];
-  }, [clientes, criticas, certificados, pagamentos, simples, competencia]);
+  }, [clientes, criticas, certificados, pagamentos, simples, leituras, competencia]);
 
-  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn;
+  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat;
 
   return (
     <div className="space-y-6">
@@ -113,7 +130,7 @@ export default function DashboardFederal() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {carregando
-          ? Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
+          ? Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
           : ativos.map((c) => {
             const Icone = c.icone;
             return (

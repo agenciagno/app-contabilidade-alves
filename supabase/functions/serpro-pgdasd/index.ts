@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { criarSerpro, onlyDigits } from "../_shared/serpro-core.ts";
 import { lerIndicePgdasd, pega } from "../_shared/pgdasd-indice.ts";
+import { lerDeclaracaoPgdasd, type DeclaracaoPgdasd } from "../_shared/pgdasd-extrair.ts";
 
 // ---------------------------------------------------------------------------
 // PGDAS-D e DAS (Serpro Integra Contador, Simples Nacional) — F4 Onda 2, passo 2, 30/09/2026. Só leitura + emissão de DAS.
@@ -17,6 +18,11 @@ import { lerIndicePgdasd, pega } from "../_shared/pgdasd-indice.ts";
 //   gerar_das    { contact_id, periodo, confirmar_emissao: true, dataConsolidacao?, novo? }  GERARDAS12 (Emitir): gera o DAS do mês.
 //                                                    Só com confirmação explícita; se já há DAS gerado aqui e ainda no prazo, devolve o
 //                                                    arquivo guardado em vez de emitir outro.
+//   ler_faturamento { contact_id, periodo }          Passo 3: lê o PDF da declaração do mês (regra fixa de texto, sem IA) e grava em
+//                                                    serpro_faturamento (receita do mês, RBT12, RBA, limite, sublimite, fator r, regime).
+//                                                    Se o PDF já está guardado, não chama o Serpro (custo zero); se não, baixa antes.
+//   aplicar_faturamento { faturamento_id }           Só administrador e só leitura confiável: copia a receita mensal (13 meses) para
+//                                                    client_revenue com fonte "rfb". Nunca sobrescreve lançamento manual.
 //   link         { tipo, id }                        link assinado (10 min) de um PDF já guardado (sem chamada ao Serpro).
 //   publicar     { tabela: "das" | "declaracao", id, visivel_portal }
 //
@@ -33,7 +39,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-const { serpro } = criarSerpro(supabase, COMPANY_ID);
+const { serpro, MODE } = criarSerpro(supabase, COMPANY_ID);
 
 const hojeBR = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 const anoBR = () => Number(hojeBR().slice(0, 4));
@@ -256,6 +262,117 @@ async function gerarDas(payload: any, uid: string) {
   return json({ ok: true, url, numero_das: numero, vencimento: campos.vencimento, valor_total: campos.valor_total, id });
 }
 
+// ---------- faturamento (passo 3) ----------
+/** Texto do PDF guardado. `unpdf` é carregado só aqui: se a biblioteca falhar, o resto da função continua funcionando. */
+async function textoDoPdf(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(BUCKET).download(path);
+  if (error || !data) throw new Error("PDF não encontrado no armazenamento");
+  const bytes = new Uint8Array(await data.arrayBuffer());
+  const { extractText, getDocumentProxy } = await import("npm:unpdf@1.8.1");
+  const pdf = await getDocumentProxy(bytes);
+  const { text } = await extractText(pdf, { mergePages: true });
+  return text;
+}
+
+interface DeclaracaoBase { id: string; contact_id: string; numero_declaracao: string; periodo_apuracao: string; tipo: string; transmitida_em: string | null; declaracao_path: string | null }
+
+async function declaracaoDoPeriodo(contactId: string, periodo: string): Promise<DeclaracaoBase | null> {
+  const { data } = await supabase.from("serpro_pgdasd_declaracoes").select("id,contact_id,numero_declaracao,periodo_apuracao,tipo,transmitida_em,declaracao_path")
+    .eq("contact_id", contactId).eq("periodo_apuracao", periodo).order("transmitida_em", { ascending: false }).limit(1).maybeSingle();
+  return (data as DeclaracaoBase | null) ?? null;
+}
+
+/** Lê o PDF da declaração, confere com o que o índice disse e grava. Nunca inventa número: o que não fecha vira aviso e `confiavel` = false. */
+async function lerEGravar(decl: DeclaracaoBase, cnpj: string) {
+  const d: DeclaracaoPgdasd = lerDeclaracaoPgdasd(await textoDoPdf(decl.declaracao_path!));
+  const avisos = [...d.avisos];
+  let confiavel = d.confiavel;
+  const barra = (texto: string) => { avisos.push(texto); confiavel = false; };
+  if (d.numero_declaracao && d.numero_declaracao !== decl.numero_declaracao) barra(`o PDF é da declaração ${d.numero_declaracao}, não da ${decl.numero_declaracao}`);
+  if (d.periodo_apuracao && d.periodo_apuracao !== decl.periodo_apuracao.slice(0, 7)) barra(`o PDF é do período ${d.periodo_apuracao}, não de ${decl.periodo_apuracao.slice(0, 7)}`);
+  // O trial devolve CNPJ fictício: a conferência do CNPJ só vale em produção.
+  if (MODE === "producao" && d.cnpj_matriz && onlyDigits(d.cnpj_matriz) !== cnpj) barra("o CNPJ do PDF não é o do cliente");
+
+  const linha = {
+    company_id: COMPANY_ID, contact_id: decl.contact_id, declaracao_id: decl.id,
+    periodo_apuracao: decl.periodo_apuracao, numero_declaracao: decl.numero_declaracao,
+    tipo: d.tipo ?? (decl.tipo === "retificadora" ? "retificadora" : "original"), transmitida_em: d.transmissao ?? decl.transmitida_em,
+    regime_apuracao: d.regime,
+    rpa_total: d.rpa?.total ?? null, rbt12_total: d.rbt12?.total ?? null, rba_total: d.rba?.total ?? null, rbaa_total: d.rbaa?.total ?? null,
+    limite_total: d.limite?.total ?? null, sublimite: d.sublimite,
+    fator_r_aplica: d.fator_r_aplica, fator_r_texto: d.fator_r_texto,
+    confiavel, avisos, dados: d, lido_em: new Date().toISOString(),
+  };
+  const { data, error } = await supabase.from("serpro_faturamento").upsert(linha, { onConflict: "contact_id,numero_declaracao" }).select("id").maybeSingle();
+  if (error) throw new Error(`não foi possível gravar a leitura: ${error.message}`);
+  return { id: data?.id as string | undefined, confiavel, avisos };
+}
+
+async function lerFaturamento(payload: any, uid: string) {
+  const c = await carregarCliente(String(payload.contact_id ?? ""));
+  if (c.resp) return c.resp;
+  const aaaamm = periodoAAAAMM(payload.periodo);
+  if (!aaaamm) return json({ error: "Informe o período (AAAA-MM)" }, 400);
+  const periodo = `${aaaamm.slice(0, 4)}-${aaaamm.slice(4, 6)}-01`;
+
+  let decl = await declaracaoDoPeriodo(c.contato!.id, periodo);
+  if (!decl) return json({ ok: false, error: "Não há declaração deste período na lista. Atualize o ano primeiro." });
+  let baixou = false;
+  if (!decl.declaracao_path) {
+    // PDF ainda não guardado: baixa pela mesma rotina do botão "Declaração (PDF)" (1 consulta ao Serpro, cobrada uma vez).
+    const resp = await documentos({ contact_id: c.contato!.id, periodo: payload.periodo }, uid);
+    const j = await resp.clone().json().catch(() => null);
+    if (!j?.ok) return resp;
+    baixou = true;
+    decl = await declaracaoDoPeriodo(c.contato!.id, periodo);
+    if (!decl?.declaracao_path) return json({ ok: false, error: "O Serpro não devolveu o PDF da declaração" }, 502);
+  }
+  try {
+    const f = await lerEGravar(decl, c.cnpj!);
+    return json({ ok: true, baixou, id: f.id, confiavel: f.confiavel, avisos: f.avisos });
+  } catch (e) {
+    return json({ ok: false, baixou, error: `O PDF está guardado, mas não consegui lê-lo: ${(e as Error).message}` });
+  }
+}
+
+async function aplicarFaturamento(payload: any, uid: string, admin: boolean) {
+  if (!admin) return json({ error: "Só administrador pode aplicar o faturamento ao Fiscal" }, 403);
+  const { data: f } = await supabase.from("serpro_faturamento").select("id,contact_id,numero_declaracao,periodo_apuracao,rpa_total,confiavel,dados")
+    .eq("id", String(payload.faturamento_id ?? "")).eq("company_id", COMPANY_ID).maybeSingle();
+  if (!f) return json({ error: "Leitura não encontrada" }, 404);
+  if (!f.confiavel) return json({ ok: false, error: "A leitura deste PDF não é confiável. Confira o PDF antes de aplicar." });
+  const c = await carregarCliente(f.contact_id);
+  if (c.resp) return c.resp;
+
+  // Receita de cada mês: os 12 meses anteriores do PDF (interno + externo) e a receita do próprio período.
+  const d = f.dados as DeclaracaoPgdasd;
+  const meses = new Map<string, number>();
+  for (const m of [...(d.historico_interno ?? []), ...(d.historico_externo ?? [])]) meses.set(m.mes, Math.round(((meses.get(m.mes) ?? 0) + m.valor) * 100) / 100);
+  if (f.rpa_total !== null) meses.set(String(f.periodo_apuracao).slice(0, 7), Number(f.rpa_total));
+
+  const { data: existentes } = await supabase.from("client_revenue").select("id,competence_year,competence_month,source").eq("contact_id", f.contact_id);
+  const porMes = new Map((existentes ?? []).map((e: { id: string; competence_year: number; competence_month: number; source: string }) => [`${e.competence_year}-${String(e.competence_month).padStart(2, "0")}`, e]));
+  const nota = `PGDAS-D ${f.numero_declaracao}`;
+  const novos: Record<string, unknown>[] = [];
+  let atualizados = 0, ignorados = 0;
+  for (const [mes, valor] of meses) {
+    const ex = porMes.get(mes);
+    if (!ex) {
+      novos.push({ company_id: COMPANY_ID, contact_id: f.contact_id, competence_year: Number(mes.slice(0, 4)), competence_month: Number(mes.slice(5, 7)), gross_revenue: valor, source: "rfb", notes: nota, created_by: uid });
+    } else if (ex.source === "rfb") {
+      const { error } = await supabase.from("client_revenue").update({ gross_revenue: valor, notes: nota }).eq("id", ex.id);
+      if (error) return json({ ok: false, error: `Não foi possível atualizar o faturamento: ${error.message}` }, 500);
+      atualizados++;
+    } else ignorados++; // lançamento manual: nunca sobrescrever
+  }
+  if (novos.length) {
+    const { error } = await supabase.from("client_revenue").insert(novos);
+    if (error) return json({ ok: false, error: `Não foi possível gravar o faturamento: ${error.message}` }, 500);
+  }
+  await supabase.from("serpro_faturamento").update({ aplicado_fiscal_em: new Date().toISOString(), aplicado_por: uid }).eq("id", f.id);
+  return json({ ok: true, inseridos: novos.length, atualizados, ignorados_manuais: ignorados });
+}
+
 const PASTA_TIPO: Record<string, { tabela: "serpro_pgdasd_declaracoes" | "serpro_pgdasd_das"; coluna: string; prefixo: string }> = {
   declaracao: { tabela: "serpro_pgdasd_declaracoes", coluna: "declaracao_path", prefixo: "declaracao" },
   recibo: { tabela: "serpro_pgdasd_declaracoes", coluna: "recibo_path", prefixo: "recibo" },
@@ -303,8 +420,10 @@ Deno.serve(async (req) => {
     case "documentos": return await documentos(payload, uid);
     case "extrato": return await extrato(payload, uid);
     case "gerar_das": return await gerarDas(payload, uid);
+    case "ler_faturamento": return await lerFaturamento(payload, uid);
+    case "aplicar_faturamento": return await aplicarFaturamento(payload, uid, admin);
     case "link": return await link(payload);
     case "publicar": return await publicar(payload);
-    default: return json({ error: "action inválida (consultar | documentos | extrato | gerar_das | link | publicar)" }, 400);
+    default: return json({ error: "action inválida (consultar | documentos | extrato | gerar_das | ler_faturamento | aplicar_faturamento | link | publicar)" }, 400);
   }
 });

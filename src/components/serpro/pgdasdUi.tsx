@@ -8,6 +8,7 @@ import {
   abrirPdf, useConsultarPgdasd, useDocumentosPgdasd, useExtratoDas, useGerarDas, useLinkPgdasd,
   type DasRow, type DeclaracaoRow, type ResultadoPgdasd, type TipoArquivoPgdasd,
 } from '@/hooks/useSerproPgdasd';
+import { useLerFaturamento } from '@/hooks/useSerproFaturamento';
 
 /** Erros comuns das respostas do servidor. Devolve true se já tratou (mostrou o aviso). */
 function avisarFalha(r: ResultadoPgdasd): boolean {
@@ -71,6 +72,7 @@ export function useAbrirArquivo() {
   const documentos = useDocumentosPgdasd();
   const extrato = useExtratoDas();
   const link = useLinkPgdasd();
+  const lerFaturamento = useLerFaturamento();
   const [ocupado, setOcupado] = useState<string | null>(null);
 
   const abrir = async (chave: string, tipo: TipoArquivoPgdasd, linha: { id: string; contactId: string; periodo: string }, baixar: () => Promise<ResultadoPgdasd>) => {
@@ -91,10 +93,17 @@ export function useAbrirArquivo() {
     }
   };
 
-  /** Declaração ou recibo (ou MAED) de uma declaração. */
+  /**
+   * Declaração ou recibo (ou MAED) de uma declaração. Quando o PDF acaba de ser baixado da Receita, a leitura do faturamento
+   * roda em seguida, em segundo plano e sem custo: falha aqui não atrapalha a abertura do arquivo.
+   */
   const abrirDeclaracao = (d: DeclaracaoRow, tipo: 'declaracao' | 'recibo' | 'maed_notificacao' | 'maed_darf') =>
     abrir(`${d.id}:${tipo}`, tipo, { id: d.id, contactId: d.contact_id, periodo: d.periodo_apuracao.slice(0, 7) },
-      () => documentos.mutateAsync({ contactId: d.contact_id, periodo: d.periodo_apuracao.slice(0, 7) }));
+      async () => {
+        const b = await documentos.mutateAsync({ contactId: d.contact_id, periodo: d.periodo_apuracao.slice(0, 7) });
+        if (b.ok) lerFaturamento.mutate({ contactId: d.contact_id, periodo: d.periodo_apuracao.slice(0, 7) });
+        return b;
+      });
 
   const abrirExtrato = (das: DasRow) =>
     abrir(`${das.id}:extrato`, 'extrato', { id: das.id, contactId: das.contact_id, periodo: das.periodo_apuracao.slice(0, 7) },
