@@ -4,13 +4,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { CUSTO_CONSULTA_LISTA, useConsultarCaixa } from '@/hooks/useSerproCaixaPostal';
-
-export const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+import { useConsultarCaixa } from '@/hooks/useSerproCaixaPostal';
 
 /**
- * Consulta da lista de UM cliente (R$ 0,24, sem ciência) sempre disparada por clique.
- * Se o cliente foi consultado há pouco, pede confirmação antes de gastar de novo.
+ * Consulta da lista de UM cliente (sem ciência) sempre disparada por clique.
+ * Se o cliente foi consultado há pouco, pede confirmação antes de consultar de novo.
+ * Custos não aparecem nas telas de operação: ficam só em Tech > Consumo Serpro.
  * Usado pela linha da tabela (botão Consultar) e pelo painel do cliente.
  */
 export function useConsultaCliente() {
@@ -27,7 +26,7 @@ export function useConsultaCliente() {
       if (r.semProcuracao) { toast.error('Este cliente não tem procuração para a Caixa Postal.'); return; }
       if (!r.ok) { toast.error(r.error ?? 'Falha na consulta ao Serpro.'); return; }
       setProximo((p) => ({ ...p, [contactId]: r.ultima_pagina ? null : (r.ponteiro_proxima ?? null) }));
-      toast.success(`${r.baixadas ?? 0} mensagens baixadas (${r.novas ?? 0} novas)${r.cobravel ? ` · ${reais(CUSTO_CONSULTA_LISTA)}` : ''}`);
+      toast.success(`${r.baixadas ?? 0} mensagens baixadas (${r.novas ?? 0} novas)`);
     } catch {
       toast.error('Falha na consulta. Tente novamente em instantes.');
     } finally {
@@ -41,8 +40,7 @@ export function useConsultaCliente() {
         <AlertDialogHeader>
           <AlertDialogTitle>Este cliente foi consultado há pouco</AlertDialogTitle>
           <AlertDialogDescription>
-            Consultar de novo gera uma nova cobrança de {reais(CUSTO_CONSULTA_LISTA)}. Só vale a pena se o cliente avisou de uma
-            mensagem que ainda não apareceu aqui.
+            Só vale a pena consultar de novo se o cliente avisou de uma mensagem que ainda não apareceu aqui.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

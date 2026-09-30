@@ -6,8 +6,6 @@ import type { BadgeTone } from '@/components/ds';
 // trocar este atalho por `supabase` tipado.
 const db = supabase as unknown as { from: (t: string) => any };
 
-export const CUSTO_CONSULTA_LISTA = 0.24; // R$ por chamada, 1ª faixa de Consulta do contrato Serpro (30/09/2026)
-
 export type CategoriaMsg = 'intimacao' | 'malha' | 'exclusao_simples' | 'maed' | 'cobranca' | 'processo' | 'informativo';
 export type SituacaoMsg = 'nova' | 'em_tratamento' | 'resolvida' | 'sem_acao';
 
@@ -217,7 +215,7 @@ function useInvalidarCaixa() {
   };
 }
 
-/** Baixa a LISTA de UM cliente (R$ 0,24, sem ciência). `force` ignora o aviso de "consultado há pouco". */
+/** Baixa a LISTA de UM cliente (sem ciência). `force` ignora o aviso de "consultado há pouco". */
 export function useConsultarCaixa() {
   const invalidar = useInvalidarCaixa();
   return useMutation({

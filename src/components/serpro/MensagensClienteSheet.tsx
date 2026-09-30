@@ -18,7 +18,7 @@ import {
 } from '@/hooks/useSerproCaixaPostal';
 
 /**
- * Painel de UM cliente. Abrir = lista já salva (grátis). "Consultar" baixa a lista atual do e-CAC (R$ 0,24, sem ciência).
+ * Painel de UM cliente. Abrir = lista já salva (grátis). "Consultar" baixa a lista atual do e-CAC (sem ciência).
  * O corpo de cada mensagem só abre pelo botão da própria linha, depois do pop-up de ciência.
  */
 export function MensagensClienteSheet({ cliente, onClose }: { cliente: ClienteCaixa | null; onClose: () => void }) {
@@ -63,7 +63,7 @@ export function MensagensClienteSheet({ cliente, onClose }: { cliente: ClienteCa
             <p className="min-w-[220px] flex-1 text-meta text-muted-ink">
               {semProcuracao
                 ? 'Sem procuração para a Caixa Postal: peça ao cliente para outorgá-la no e-CAC.'
-                : 'Baixa as 50 mensagens mais recentes (lidas e não lidas). Não registra ciência. Mensagens já salvas não são cobradas de novo.'}
+                : 'Baixa as 50 mensagens mais recentes (lidas e não lidas). Não registra ciência.'}
             </p>
           </div>
 
