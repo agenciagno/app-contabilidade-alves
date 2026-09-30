@@ -19,8 +19,10 @@ export interface ChamadaSerpro {
 export interface SerproConfig {
   alerta_gasto_mensal: number;
   volume_declarado_mes: number | null;
-  /** Conclui sozinha a tarefa fiscal "DAS - Simples Nacional" quando a Receita mostra DAS pago ou declaração zerada. */
+  /** Conclui sozinha tarefas fiscais quando a Receita prova (DAS pago ou zerado, DCTFWeb com recibo, MIT encerrada, DARF de PIS/COFINS ou IRPJ/CSLL pago). */
   auto_concluir_tarefas: boolean;
+  /** Cria tarefa fiscal sozinha quando a Receita manda algo (comunicação crítica, pendência na Situação Fiscal, parcela em atraso). */
+  auto_criar_tarefas: boolean;
 }
 
 // Tabela de preços do contrato Serpro nº 599032 (Anexo I, 28/09/2026). Cada faixa: quantidade máxima na faixa e valor por requisição.
@@ -94,12 +96,13 @@ export function useSerproConfig() {
     queryKey: ['serpro-config', company?.id],
     enabled: !!company?.id,
     queryFn: async (): Promise<SerproConfig> => {
-      const { data, error } = await supabase.from('serpro_config').select('alerta_gasto_mensal, volume_declarado_mes, auto_concluir_tarefas').eq('company_id', company!.id).maybeSingle();
+      const { data, error } = await supabase.from('serpro_config').select('alerta_gasto_mensal, volume_declarado_mes, auto_concluir_tarefas, auto_criar_tarefas').eq('company_id', company!.id).maybeSingle();
       if (error) throw error;
       return {
         alerta_gasto_mensal: Number(data?.alerta_gasto_mensal ?? 100),
         volume_declarado_mes: data?.volume_declarado_mes ?? null,
         auto_concluir_tarefas: data?.auto_concluir_tarefas ?? true,
+        auto_criar_tarefas: data?.auto_criar_tarefas ?? true,
       };
     },
   });

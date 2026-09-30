@@ -139,9 +139,10 @@ export default function TechConsumoSerpro() {
         <div className="min-w-[260px] flex-1 space-y-1">
           <h2 className="text-h4-card text-ink">Concluir tarefas fiscais sozinho</h2>
           <p className="text-ui text-muted-ink">
-            Quando você consulta um cliente e a Receita mostra o DAS do mês <strong className="text-ink">pago</strong>, ou uma declaração
-            transmitida <strong className="text-ink">sem receita e sem débito</strong>, a tarefa "DAS - Simples Nacional" daquele mês é
-            concluída na hora (protocolo PAGO ou ZERADO, com a origem registrada na tarefa). Declaração transmitida sozinha não conclui:
+            Quando você consulta um cliente e a Receita prova que está feito, a tarefa daquele mês é concluída na hora, com a origem registrada:
+            DAS <strong className="text-ink">pago</strong> ou declaração <strong className="text-ink">sem receita e sem débito</strong> ("DAS - Simples Nacional"),
+            DCTFWeb com recibo ("DCTF"), MIT encerrada ("MIT") e DARF pago de PIS e COFINS ou de IRPJ e CSLL do mesmo período.
+            "Sem declaração" ou "sem apuração" não conclui (a Receita não prova "sem movimento"), e DAS transmitido sozinho também não:
             a tarefa inclui enviar o DAS ao cliente.
           </p>
         </div>
@@ -151,6 +152,28 @@ export default function TechConsumoSerpro() {
             disabled={!config || salvar.isPending}
             onCheckedChange={async (v) => {
               try { await salvar.mutateAsync({ auto_concluir_tarefas: v }); toast.success(v ? 'Conclusão automática ligada.' : 'Conclusão automática desligada.'); }
+              catch { toast.error('Não foi possível salvar.'); }
+            }}
+          />
+        </DicaBotao>
+      </section>
+
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-line bg-paper p-5">
+        <div className="min-w-[260px] flex-1 space-y-1">
+          <h2 className="text-h4-card text-ink">Criar tarefas fiscais sozinho</h2>
+          <p className="text-ui text-muted-ink">
+            Todo dia às 08:00, o sistema olha o que já está salvo e cria uma tarefa fiscal, com o responsável do cliente, quando a Receita mandou algo
+            que ainda não tem tarefa aberta: <strong className="text-ink">comunicação que exige ação</strong> na Caixa Postal (dos últimos 30 dias),
+            <strong className="text-ink"> pendência na Situação Fiscal</strong> ou <strong className="text-ink">parcela de parcelamento em atraso</strong>.
+            É uma tarefa aberta por cliente e por tipo. Não chama o Serpro e não custa nada.
+          </p>
+        </div>
+        <DicaBotao texto={config?.auto_criar_tarefas === false ? 'Desligado: nenhuma tarefa é criada sozinha. Ligue para voltar a criar.' : 'Ligado: desligue se quiser criar as tarefas só à mão.'}>
+          <Switch
+            checked={config?.auto_criar_tarefas ?? true}
+            disabled={!config || salvar.isPending}
+            onCheckedChange={async (v) => {
+              try { await salvar.mutateAsync({ auto_criar_tarefas: v }); toast.success(v ? 'Criação automática de tarefas ligada.' : 'Criação automática de tarefas desligada.'); }
               catch { toast.error('Não foi possível salvar.'); }
             }}
           />

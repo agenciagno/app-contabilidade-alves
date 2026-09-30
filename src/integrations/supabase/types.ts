@@ -4734,6 +4734,7 @@ export type Database = {
         Row: {
           alerta_gasto_mensal: number
           auto_concluir_tarefas: boolean
+          auto_criar_tarefas: boolean
           company_id: string
           updated_at: string
           volume_declarado_mes: number | null
@@ -4741,6 +4742,7 @@ export type Database = {
         Insert: {
           alerta_gasto_mensal?: number
           auto_concluir_tarefas?: boolean
+          auto_criar_tarefas?: boolean
           company_id: string
           updated_at?: string
           volume_declarado_mes?: number | null
@@ -4748,6 +4750,7 @@ export type Database = {
         Update: {
           alerta_gasto_mensal?: number
           auto_concluir_tarefas?: boolean
+          auto_criar_tarefas?: boolean
           company_id?: string
           updated_at?: string
           volume_declarado_mes?: number | null
@@ -7025,6 +7028,23 @@ export type Database = {
           query_idx: number
           score: number
         }[]
+      }
+      serpro_avisar_vencimento_das: {
+        Args: { p_hoje?: string }
+        Returns: number
+      }
+      serpro_criar_tarefas_receita: { Args: never; Returns: number }
+      serpro_nova_tarefa_receita: {
+        Args: {
+          p_company: string
+          p_contact: string
+          p_descricao: string
+          p_nome: string
+          p_responsavel: string
+          p_titulo: string
+          p_vencimento: string
+        }
+        Returns: string
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
