@@ -4920,6 +4920,61 @@ export type Database = {
           },
         ]
       }
+      serpro_dctfweb_sensor: {
+        Row: {
+          company_id: string
+          contact_id: string
+          evento_ultima_data: string | null
+          evento_verificado_em: string | null
+          mudou_em: string | null
+          sem_procuracao: boolean
+          ultima_consulta_em: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          contact_id: string
+          evento_ultima_data?: string | null
+          evento_verificado_em?: string | null
+          mudou_em?: string | null
+          sem_procuracao?: boolean
+          ultima_consulta_em?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          contact_id?: string
+          evento_ultima_data?: string | null
+          evento_verificado_em?: string | null
+          mudou_em?: string | null
+          sem_procuracao?: boolean
+          ultima_consulta_em?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_dctfweb_sensor_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_dctfweb_sensor_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_dctfweb_sensor_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
       serpro_defis: {
         Row: {
           ano_calendario: number

@@ -25,9 +25,10 @@ const formatarCnpj = (d: string) => {
 };
 const dataBR = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—');
 
-type Situacao = 'todos' | 'nao_consultados' | 'sem_dctfweb' | 'sem_mit' | 'completos';
+type Situacao = 'todos' | 'novo' | 'nao_consultados' | 'sem_dctfweb' | 'sem_mit' | 'completos';
 const SITUACOES: { value: Situacao; label: string }[] = [
   { value: 'todos', label: 'Todos os clientes' },
+  { value: 'novo', label: 'Movimento novo na Receita' },
   { value: 'nao_consultados', label: 'Não consultados' },
   { value: 'sem_dctfweb', label: 'Sem DCTFWeb no mês' },
   { value: 'sem_mit', label: 'Sem MIT encerrada' },
@@ -70,6 +71,7 @@ export default function DctfwebMitFederal() {
       comDctf: ativos.filter((l) => estadoDctfweb(l) === 'transmitida').length,
       comMit: ativos.filter((l) => estadoMit(l) === 'encerrada').length,
       semUma: ativos.filter((l) => estadoDctfweb(l) === 'sem_declaracao' || estadoMit(l) === 'sem_apuracao').length,
+      novos: ativos.filter((l) => l.novo).length,
     };
   }, [linhas]);
 
@@ -80,6 +82,7 @@ export default function DctfwebMitFederal() {
       .filter((l) => {
         const d = estadoDctfweb(l), m = estadoMit(l);
         switch (situacao) {
+          case 'novo': return l.novo;
           case 'nao_consultados': return d === 'nao_consultado' && m === 'nao_consultado';
           case 'sem_dctfweb': return d === 'sem_declaracao';
           case 'sem_mit': return m === 'sem_apuracao';
@@ -93,11 +96,11 @@ export default function DctfwebMitFederal() {
   const tabelaExport = (): TabelaExport => ({
     arquivo: `dctfweb-mit-${competencia}`,
     titulo: `DCTFWeb e MIT — competência ${siglaCompetencia(competencia)}`,
-    colunas: ['Razão social', 'CNPJ', 'Regime', 'Competência', 'DCTFWeb', 'MIT', 'MIT encerrada em', 'MIT valor apurado', 'Consultado em'],
+    colunas: ['Razão social', 'CNPJ', 'Regime', 'Competência', 'DCTFWeb', 'Movimento novo', 'MIT', 'MIT encerrada em', 'MIT valor apurado', 'Consultado em'],
     linhas: filtradas.map((l) => {
       const a = apuracaoVigente(l);
       return [
-        l.nome, formatarCnpj(l.documento), REGIMES[l.regime ?? ''] ?? l.regime ?? '', siglaCompetencia(competencia), rotuloDctfweb(estadoDctfweb(l)).label, rotuloMit(estadoMit(l)).label,
+        l.nome, formatarCnpj(l.documento), REGIMES[l.regime ?? ''] ?? l.regime ?? '', siglaCompetencia(competencia), rotuloDctfweb(estadoDctfweb(l)).label, l.novo ? 'Sim' : '', rotuloMit(estadoMit(l)).label,
         a?.data_encerramento ? dataBR(a.data_encerramento) : '', a?.valor_total != null ? brl(a.valor_total) : '',
         l.dctfweb?.consultado_em ? format(new Date(l.dctfweb.consultado_em), 'dd/MM/yyyy HH:mm') : '',
       ];
@@ -116,7 +119,7 @@ export default function DctfwebMitFederal() {
       <PageHeader
         kicker="~/dashboard federal · dctfweb e mit"
         title="DCTFWeb e MIT."
-        subtitle={`Quem entregou a DCTFWeb e a MIT de cada mês, para os clientes ativos do Lucro Presumido e do Lucro Real. Cada consulta traz o recibo da DCTFWeb do mês e as apurações da MIT do ano. "Sem declaração" na DCTFWeb não quer dizer atraso: ela só existe para quem teve movimento no eSocial ou na EFD-Reinf. Confirme o prazo e o movimento do cliente antes de cobrar. Filiais seguem a matriz.`}
+        subtitle={`Quem entregou a DCTFWeb e a MIT de cada mês, para os clientes ativos do Lucro Presumido e do Lucro Real. Cada consulta traz o recibo da DCTFWeb do mês e as apurações da MIT do ano. "Sem declaração" na DCTFWeb não quer dizer atraso: ela só existe para quem teve movimento no eSocial ou na EFD-Reinf. Confirme o prazo e o movimento do cliente antes de cobrar. Filiais seguem a matriz. Todo dia às 07:40 a Receita informa, de graça, quais clientes tiveram movimento na DCTFWeb (chegada de eSocial ou Reinf, ou transmissão): eles aparecem marcados como "Movimento novo" até você consultar.`}
         actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />}
       />
 
@@ -125,9 +128,9 @@ export default function DctfwebMitFederal() {
       <StatCardRow
         items={[
           { label: 'Consultados no mês', value: `${stats.consultados} de ${stats.total}`, hint: 'clientes do Presumido e do Real' },
-          { label: 'DCTFWeb com recibo', value: stats.comDctf, hint: `competência ${siglaCompetencia(competencia)}` },
-          { label: 'MIT encerrada', value: stats.comMit, hint: `período ${siglaCompetencia(competencia)}` },
+          { label: 'Entregas em ' + siglaCompetencia(competencia), value: `${stats.comDctf} DCTFWeb · ${stats.comMit} MIT`, hint: 'com recibo e encerradas' },
           { label: 'Sem DCTFWeb ou sem MIT', value: stats.semUma, hint: 'confirme o movimento antes de cobrar', emphasis: stats.semUma > 0 ? 'warm' : 'none' },
+          { label: 'Movimento novo', value: stats.novos, hint: 'a Receita mexeu na DCTFWeb; consulte', emphasis: stats.novos > 0 ? 'warm' : 'none' },
         ]}
       />
 
@@ -169,7 +172,20 @@ export default function DctfwebMitFederal() {
                       <p className="text-meta text-muted-ink-2">{REGIMES[l.regime ?? ''] ?? l.regime ?? 'Sem regime'}</p>
                     </TableCell>
                     <TableCell className="font-mono text-ui">{formatarCnpj(l.documento)}</TableCell>
-                    <TableCell><DsBadge tone={d.tone}>{d.label}</DsBadge></TableCell>
+                    <TableCell>
+                      <div className="space-y-0.5">
+                        <div className="flex flex-wrap gap-1">
+                          <DsBadge tone={d.tone}>{d.label}</DsBadge>
+                          {l.novo && (
+                            <DicaBotao texto="Desde a sua última consulta, a Receita atualizou a DCTFWeb deste cliente: chegou eSocial, EFD-Reinf ou SERO, ou a declaração foi transmitida. O aviso não diz qual dos dois. Consulte para ver.">
+                              <DsBadge tone="warn">Movimento novo</DsBadge>
+                            </DicaBotao>
+                          )}
+                          {l.semProcuracao && <DsBadge tone="neutral">Sem procuração</DsBadge>}
+                        </div>
+                        {l.novo && l.movimentoEm && <p className="text-meta text-muted-ink-2">na Receita em {dataBR(l.movimentoEm)}</p>}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="space-y-0.5">
                         <DsBadge tone={m.tone}>{m.label}</DsBadge>

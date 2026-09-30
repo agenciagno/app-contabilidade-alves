@@ -85,6 +85,7 @@ export default function DashboardFederal() {
     const dmConsultados = dmAtivos.filter((l) => l.dctfweb || l.mitConsultado).length;
     const dctfOk = dmAtivos.filter((l) => estadoDctfweb(l) === 'transmitida').length;
     const dctfSem = dmAtivos.filter((l) => estadoDctfweb(l) === 'sem_declaracao').length;
+    const dctfNovos = dmAtivos.filter((l) => l.novo).length;
     const mitOk = dmAtivos.filter((l) => estadoMit(l) === 'encerrada').length;
     const mitSem = dmAtivos.filter((l) => estadoMit(l) === 'sem_apuracao').length;
     const mesDarf = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 7);
@@ -152,8 +153,8 @@ export default function DashboardFederal() {
         linhas: [`${parcAtivos} com parcelamento ativo · ${parcAtrasados} com parcela em atraso`, `${parcConsultados} de ${parcEstados.length} consultados · parcelas do mês ${parcDoMes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`],
       },
       {
-        titulo: 'DCTFWeb', icone: FileSpreadsheet, to: '/dashboard-federal/dctfweb-mit', tom: dmConsultados === 0 ? 'neutral' : dctfSem > 0 ? 'warn' : 'ok',
-        linhas: [`${dctfOk} com recibo · ${dctfSem} sem declaração em ${rotuloCompetencia(competencia)}`, `${dmConsultados} de ${dmAtivos.length} clientes do Presumido e Real consultados`],
+        titulo: 'DCTFWeb', icone: FileSpreadsheet, to: '/dashboard-federal/dctfweb-mit', tom: dctfNovos > 0 || dctfSem > 0 ? 'warn' : dmConsultados === 0 ? 'neutral' : 'ok',
+        linhas: [`${dctfOk} com recibo · ${dctfSem} sem declaração em ${rotuloCompetencia(competencia)}`, `${dctfNovos} com movimento novo · ${dmConsultados} de ${dmAtivos.length} consultados`],
       },
       {
         titulo: 'MIT', icone: FileSignature, to: '/dashboard-federal/dctfweb-mit', tom: dmConsultados === 0 ? 'neutral' : mitSem > 0 ? 'warn' : 'ok',

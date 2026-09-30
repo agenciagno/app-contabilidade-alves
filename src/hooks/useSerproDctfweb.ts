@@ -9,6 +9,8 @@ import { STATUS_MONITORADO } from '@/hooks/useSerproCaixaPostal';
 export interface DctfwebRow { id: string; contact_id: string; competencia: string; status: 'transmitida' | 'sem_declaracao'; consultado_em: string }
 export interface MitRow { id: string; contact_id: string; periodo: string; id_apuracao: number; situacao: number | null; data_encerramento: string | null; evento_especial: boolean; valor_total: number | null }
 export interface MitConsultaRow { contact_id: string; ano: number; consultado_em: string; apuracoes: number }
+/** Sensor E0301 (rotina diária, grátis): a Receita atualizou a DCTFWeb do cliente (eSocial/Reinf recebido ou declaração transmitida). */
+export interface SensorDctfwebRow { contact_id: string; evento_ultima_data: string | null; mudou_em: string | null; ultima_consulta_em: string | null; sem_procuracao: boolean }
 
 export interface LinhaDctfwebMit {
   contact_id: string;
@@ -22,6 +24,12 @@ export interface LinhaDctfwebMit {
   /** Apurações da MIT do período. `mitConsultado` = o ano inteiro já foi consultado para este cliente. */
   mit: MitRow[];
   mitConsultado: MitConsultaRow | null;
+  /** Sensor E0301: a Receita mexeu na DCTFWeb depois da última consulta da equipe. Não diz se foi eSocial/Reinf ou transmissão. */
+  novo: boolean;
+  /** Data (AAAA-MM-DD) da última atualização da DCTFWeb informada pela Receita, quando houver. */
+  movimentoEm: string | null;
+  /** Sensor E0301 voltou "x": sem procuração para a DCTFWeb. */
+  semProcuracao: boolean;
 }
 
 const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
@@ -64,7 +72,10 @@ export function useMatrizDctfwebMit(competencia: string) {
         () => supabase.from('serpro_mit_apuracoes').select('id, contact_id, periodo, id_apuracao, situacao, data_encerramento, evento_especial, valor_total').eq('company_id', companyId).eq('periodo', `${competencia}-01`).order('id'));
       const consultas = await fetchAllPages<MitConsultaRow>(
         () => supabase.from('serpro_mit_consultas').select('contact_id, ano, consultado_em, apuracoes').eq('company_id', companyId).eq('ano', ano).order('contact_id'));
+      const sensor = await fetchAllPages<SensorDctfwebRow>(
+        () => supabase.from('serpro_dctfweb_sensor').select('contact_id, evento_ultima_data, mudou_em, ultima_consulta_em, sem_procuracao').eq('company_id', companyId).order('contact_id'));
 
+      const sPor = new Map(sensor.map((x) => [x.contact_id, x]));
       const dPor = new Map(dctf.map((d) => [d.contact_id, d]));
       const cPor = new Map(consultas.map((c) => [c.contact_id, c]));
       const mPor = new Map<string, MitRow[]>();
@@ -72,16 +83,22 @@ export function useMatrizDctfwebMit(competencia: string) {
 
       return contatos
         .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
-        .map((c): LinhaDctfwebMit => ({
-          contact_id: c.id,
-          nome: c.display_name || c.name || 'Cliente',
-          documento: c.document ?? '',
-          regime: c.tax_regime ?? null,
-          filial: digitos(c.document).slice(8, 12) !== '0001',
-          dctfweb: dPor.get(c.id) ?? null,
-          mit: mPor.get(c.id) ?? [],
-          mitConsultado: cPor.get(c.id) ?? null,
-        }));
+        .map((c): LinhaDctfwebMit => {
+          const sn = sPor.get(c.id);
+          return {
+            contact_id: c.id,
+            nome: c.display_name || c.name || 'Cliente',
+            documento: c.document ?? '',
+            regime: c.tax_regime ?? null,
+            filial: digitos(c.document).slice(8, 12) !== '0001',
+            dctfweb: dPor.get(c.id) ?? null,
+            mit: mPor.get(c.id) ?? [],
+            mitConsultado: cPor.get(c.id) ?? null,
+            novo: !!sn?.mudou_em && (!sn.ultima_consulta_em || Date.parse(sn.mudou_em) > Date.parse(sn.ultima_consulta_em)),
+            movimentoEm: sn?.evento_ultima_data ?? null,
+            semProcuracao: !!sn?.sem_procuracao,
+          };
+        });
     },
   });
 }

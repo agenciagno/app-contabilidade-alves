@@ -4,7 +4,7 @@ import { formatDistanceToNow, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Bell, AlertTriangle, Clock, CheckCircle, UserPlus,
-  ArrowRightLeft, Calendar, Info, CalendarClock, CalendarX, HandCoins, Mail, Receipt, ShieldCheck,
+  ArrowRightLeft, Calendar, Info, CalendarClock, CalendarX, HandCoins, Mail, Receipt, ShieldCheck, FileCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -34,6 +34,7 @@ const TYPE_META: Record<string, { icon: any; color: string }> = {
   serpro_mensagem: { icon: Mail, color: 'text-warn' },
   serpro_pagamento: { icon: Receipt, color: 'text-ok' },
   serpro_procuracao: { icon: ShieldCheck, color: 'text-warn' },
+  serpro_dctfweb: { icon: FileCheck, color: 'text-warn' },
 };
 
 const DEADLINE_BADGES: Record<string, { label: string; className: string }> = {
