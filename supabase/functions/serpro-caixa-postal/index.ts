@@ -379,6 +379,13 @@ async function rotinaEventos(payload: any, uid: string | null, origem: "manual" 
   return json({ ok: true, modo_autor: modo, consultados: res.linhas!.length, com_evento: comEvento, sem_evento: semEvento, sem_procuracao: semProcuracao });
 }
 
+function jwtRole(token: string): string | null {
+  try {
+    const p = token.split(".")[1];
+    return JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/")))?.role ?? null;
+  } catch { return null; }
+}
+
 // ---------- entrada ----------
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -387,7 +394,9 @@ Deno.serve(async (req) => {
   const action: string = payload.action;
 
   // Cron chama com a chave anon (padrão do projeto). Só a rotina de eventos aceita isso, e ela tem trava de 12 h.
-  if (action === "rotina_eventos" && bearer === Deno.env.get("SUPABASE_ANON_KEY")) {
+  // A assinatura do JWT já foi validada pela plataforma (verify_jwt); aqui só se lê o papel. O ambiente da função
+  // pode ter a chave anon em formato novo (sb_publishable_), então comparar o texto da chave não basta.
+  if (action === "rotina_eventos" && (bearer === Deno.env.get("SUPABASE_ANON_KEY") || jwtRole(bearer) === "anon")) {
     return await rotinaEventos({ ...payload, forcar: false, limite: undefined }, null, "cron");
   }
 
