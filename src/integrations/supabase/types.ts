@@ -4865,6 +4865,61 @@ export type Database = {
           },
         ]
       }
+      serpro_dctfweb: {
+        Row: {
+          company_id: string
+          competencia: string
+          consultado_em: string
+          consultado_por: string | null
+          contact_id: string
+          id: string
+          recibo_path: string | null
+          status: string
+        }
+        Insert: {
+          company_id: string
+          competencia: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id: string
+          id?: string
+          recibo_path?: string | null
+          status: string
+        }
+        Update: {
+          company_id?: string
+          competencia?: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id?: string
+          id?: string
+          recibo_path?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_dctfweb_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_dctfweb_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_dctfweb_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
       serpro_defis: {
         Row: {
           ano_calendario: number
@@ -5094,6 +5149,116 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "serpro_pgdasd_declaracoes"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      serpro_mit_apuracoes: {
+        Row: {
+          company_id: string
+          contact_id: string
+          data_encerramento: string | null
+          evento_especial: boolean
+          id: string
+          id_apuracao: number
+          periodo: string
+          sincronizado_em: string
+          situacao: number | null
+          valor_total: number | null
+        }
+        Insert: {
+          company_id: string
+          contact_id: string
+          data_encerramento?: string | null
+          evento_especial?: boolean
+          id?: string
+          id_apuracao: number
+          periodo: string
+          sincronizado_em?: string
+          situacao?: number | null
+          valor_total?: number | null
+        }
+        Update: {
+          company_id?: string
+          contact_id?: string
+          data_encerramento?: string | null
+          evento_especial?: boolean
+          id?: string
+          id_apuracao?: number
+          periodo?: string
+          sincronizado_em?: string
+          situacao?: number | null
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_mit_apuracoes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_mit_apuracoes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_mit_apuracoes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_mit_consultas: {
+        Row: {
+          ano: number
+          apuracoes: number
+          company_id: string
+          consultado_em: string
+          consultado_por: string | null
+          contact_id: string
+        }
+        Insert: {
+          ano: number
+          apuracoes?: number
+          company_id: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id: string
+        }
+        Update: {
+          ano?: number
+          apuracoes?: number
+          company_id?: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_mit_consultas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_mit_consultas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_mit_consultas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
           },
         ]
       }

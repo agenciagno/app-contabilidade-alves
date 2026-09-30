@@ -18,6 +18,7 @@ import { statusDefis, useMatrizDefis } from '@/hooks/useSerproDefis';
 import { useProcuracoes, vencendo as procVencendo } from '@/hooks/useSerproProcuracoes';
 import { estadoSitfis, useMatrizSitfis } from '@/hooks/useSerproSitfis';
 import { useDarfsGerados } from '@/hooks/useSerproDarf';
+import { estadoDctfweb, estadoMit, useMatrizDctfwebMit } from '@/hooks/useSerproDctfweb';
 import { competenciaAtual, estadoParcelamento, parcelasDoMes, somaValor, useMatrizParcelamentos } from '@/hooks/useSerproParcelamentos';
 
 type Tom = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
@@ -40,8 +41,6 @@ interface CartaoEmBreve {
 // Cartões que ainda não têm dado: acendem conforme cada onda do Integra Contador entra (relatório serpro-integra-contador-oportunidades-set2026).
 const EM_BREVE: CartaoEmBreve[] = [
   { titulo: 'e-Processo', icone: Scale, onda: 'Onda 3', fonte: 'Processos por interessado' },
-  { titulo: 'DCTFWeb', icone: FileSpreadsheet, onda: 'Onda 4', fonte: 'Transmitidas e não entregues' },
-  { titulo: 'MIT', icone: FileSignature, onda: 'Onda 4', fonte: 'Encerradas e não encerradas' },
   { titulo: 'Declarações em falta', icone: FileX, onda: 'Onda 2 a 4', fonte: 'PGDAS-D, DCTFWeb e DEFIS' },
   { titulo: 'Exclusão do Simples', icone: UserX, onda: 'Onda 3', fonte: 'Termos e riscos de exclusão' },
 ];
@@ -60,6 +59,7 @@ export default function DashboardFederal() {
   const { data: sitfis = [], isLoading: carregandoSitfis } = useMatrizSitfis();
   const { data: parcelamentos = [], isLoading: carregandoParc } = useMatrizParcelamentos();
   const { data: darfs = [], isLoading: carregandoDarf } = useDarfsGerados();
+  const { data: declMensais = [], isLoading: carregandoDecl } = useMatrizDctfwebMit(competencia);
 
   const ativos = useMemo<CartaoAtivo[]>(() => {
     const selos = clientes.map((c) => seloCaixa(c).estado);
@@ -81,6 +81,12 @@ export default function DashboardFederal() {
     const fatAcima = fatConfiaveis.filter((f) => nivelLimite(f) === 'acima' || nivelSublimite(f) === 'acima').length;
     const fatPertoSub = fatConfiaveis.filter((f) => nivelSublimite(f) === 'perto').length;
     const fatFatorR = fatConfiaveis.filter((f) => f.fator_r_aplica === true).length;
+    const dmAtivos = declMensais.filter((l) => !l.filial);
+    const dmConsultados = dmAtivos.filter((l) => l.dctfweb || l.mitConsultado).length;
+    const dctfOk = dmAtivos.filter((l) => estadoDctfweb(l) === 'transmitida').length;
+    const dctfSem = dmAtivos.filter((l) => estadoDctfweb(l) === 'sem_declaracao').length;
+    const mitOk = dmAtivos.filter((l) => estadoMit(l) === 'encerrada').length;
+    const mitSem = dmAtivos.filter((l) => estadoMit(l) === 'sem_apuracao').length;
     const mesDarf = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 7);
     const darfsMes = darfs.filter((d) => d.created_at.slice(0, 7) === mesDarf);
     const darfsTotal = darfsMes.reduce((s, d) => s + (d.valor_total ?? 0), 0);
@@ -146,6 +152,14 @@ export default function DashboardFederal() {
         linhas: [`${parcAtivos} com parcelamento ativo · ${parcAtrasados} com parcela em atraso`, `${parcConsultados} de ${parcEstados.length} consultados · parcelas do mês ${parcDoMes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`],
       },
       {
+        titulo: 'DCTFWeb', icone: FileSpreadsheet, to: '/dashboard-federal/dctfweb-mit', tom: dmConsultados === 0 ? 'neutral' : dctfSem > 0 ? 'warn' : 'ok',
+        linhas: [`${dctfOk} com recibo · ${dctfSem} sem declaração em ${rotuloCompetencia(competencia)}`, `${dmConsultados} de ${dmAtivos.length} clientes do Presumido e Real consultados`],
+      },
+      {
+        titulo: 'MIT', icone: FileSignature, to: '/dashboard-federal/dctfweb-mit', tom: dmConsultados === 0 ? 'neutral' : mitSem > 0 ? 'warn' : 'ok',
+        linhas: [`${mitOk} encerradas · ${mitSem} sem apuração em ${rotuloCompetencia(competencia)}`, `${dmConsultados} de ${dmAtivos.length} clientes consultados`],
+      },
+      {
         titulo: 'DARF atualizado', icone: Calculator, to: '/dashboard-federal/darf', tom: 'neutral',
         linhas: [`${darfsMes.length} gerados este mês`, `total de ${darfsTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} com multa e juros`],
       },
@@ -163,9 +177,9 @@ export default function DashboardFederal() {
         linhas: [`${vencidos} vencidos`, `${aVencer} vencem em 30 dias · ${certificados.length} no total`],
       },
     ];
-  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, sitfis, parcelamentos, darfs, competencia]);
+  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, sitfis, parcelamentos, darfs, declMensais, competencia]);
 
-  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc || carregandoSitfis || carregandoParc || carregandoDarf;
+  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc || carregandoSitfis || carregandoParc || carregandoDarf || carregandoDecl;
 
   return (
     <div className="space-y-6">
@@ -177,7 +191,7 @@ export default function DashboardFederal() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {carregando
-          ? Array.from({ length: 14 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
+          ? Array.from({ length: 16 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
           : ativos.map((c) => {
             const Icone = c.icone;
             return (
