@@ -4759,6 +4759,219 @@ export type Database = {
           },
         ]
       }
+      serpro_pagamentos: {
+        Row: {
+          chave: string
+          company_id: string
+          comprovante_emitido_em: string | null
+          comprovante_emitido_por: string | null
+          comprovante_path: string | null
+          contact_id: string
+          created_at: string
+          data_arrecadacao: string | null
+          data_vencimento: string | null
+          desmembramentos: Json | null
+          id: string
+          numero_documento: string
+          periodo_apuracao: string | null
+          receita_codigo: string | null
+          receita_descricao: string | null
+          sincronizado_em: string
+          tipo_codigo: string | null
+          tipo_descricao: string | null
+          tipo_sigla: string
+          updated_at: string
+          valor_juros: number | null
+          valor_multa: number | null
+          valor_principal: number | null
+          valor_saldo_total: number | null
+          valor_total: number | null
+          visivel_portal: boolean
+        }
+        Insert: {
+          chave: string
+          company_id: string
+          comprovante_emitido_em?: string | null
+          comprovante_emitido_por?: string | null
+          comprovante_path?: string | null
+          contact_id: string
+          created_at?: string
+          data_arrecadacao?: string | null
+          data_vencimento?: string | null
+          desmembramentos?: Json | null
+          id?: string
+          numero_documento: string
+          periodo_apuracao?: string | null
+          receita_codigo?: string | null
+          receita_descricao?: string | null
+          sincronizado_em?: string
+          tipo_codigo?: string | null
+          tipo_descricao?: string | null
+          tipo_sigla?: string
+          updated_at?: string
+          valor_juros?: number | null
+          valor_multa?: number | null
+          valor_principal?: number | null
+          valor_saldo_total?: number | null
+          valor_total?: number | null
+          visivel_portal?: boolean
+        }
+        Update: {
+          chave?: string
+          company_id?: string
+          comprovante_emitido_em?: string | null
+          comprovante_emitido_por?: string | null
+          comprovante_path?: string | null
+          contact_id?: string
+          created_at?: string
+          data_arrecadacao?: string | null
+          data_vencimento?: string | null
+          desmembramentos?: Json | null
+          id?: string
+          numero_documento?: string
+          periodo_apuracao?: string | null
+          receita_codigo?: string | null
+          receita_descricao?: string | null
+          sincronizado_em?: string
+          tipo_codigo?: string | null
+          tipo_descricao?: string | null
+          tipo_sigla?: string
+          updated_at?: string
+          valor_juros?: number | null
+          valor_multa?: number | null
+          valor_principal?: number | null
+          valor_saldo_total?: number | null
+          valor_total?: number | null
+          visivel_portal?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_pagamentos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_pagamentos_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_pagamentos_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_pagamentos_consultas: {
+        Row: {
+          company_id: string
+          competencia: string
+          consultado_em: string
+          consultado_por: string | null
+          contact_id: string
+          documentos: number
+        }
+        Insert: {
+          company_id: string
+          competencia: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id: string
+          documentos?: number
+        }
+        Update: {
+          company_id?: string
+          competencia?: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id?: string
+          documentos?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_pagamentos_consultas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_pagamentos_consultas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_pagamentos_consultas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_pagamentos_sensor: {
+        Row: {
+          company_id: string
+          contact_id: string
+          evento_ultima_data: string | null
+          evento_verificado_em: string | null
+          mudou_em: string | null
+          sem_procuracao: boolean
+          ultima_consulta_em: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          contact_id: string
+          evento_ultima_data?: string | null
+          evento_verificado_em?: string | null
+          mudou_em?: string | null
+          sem_procuracao?: boolean
+          ultima_consulta_em?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          contact_id?: string
+          evento_ultima_data?: string | null
+          evento_verificado_em?: string | null
+          mudou_em?: string | null
+          sem_procuracao?: boolean
+          ultima_consulta_em?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_pagamentos_sensor_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_pagamentos_sensor_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_pagamentos_sensor_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
       serpro_procuracoes: {
         Row: {
           codigo_procuracao: string

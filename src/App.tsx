@@ -59,6 +59,7 @@ const CadastroCertificados = lazy(() => import("@/pages/CadastroCertificados"));
 const DashboardFederal = lazy(() => import("@/pages/DashboardFederal"));
 const MensagensEcac = lazy(() => import("@/pages/MensagensEcac"));
 const TermosIntimacao = lazy(() => import("@/pages/TermosIntimacao"));
+const PagamentosFederal = lazy(() => import("@/pages/PagamentosFederal"));
 const TechConsumoSerpro = lazy(() => import("@/pages/TechConsumoSerpro"));
 const ClassificacaoFiscal = lazy(() => import("@/pages/ClassificacaoFiscal"));
 
@@ -171,6 +172,7 @@ const App = () => (
               {/* Rota antiga: a tela mudou para /mensagens; atalho fixado e link salvo continuam funcionando. */}
               <Route path="/dashboard-federal/mensagens" element={<Navigate to="/mensagens" replace />} />
               <Route path="/dashboard-federal/intimacoes" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><TermosIntimacao /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal/pagamentos" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><PagamentosFederal /></ModuleGuard></AppLayout>} />
               <Route path="/parcelamentos" element={<AppLayout><ModuleGuard moduleName="parcelamentos"><EmBreve moduleKey="parcelamentos" /></ModuleGuard></AppLayout>} />
               <Route path="/certidoes" element={<AppLayout><ModuleGuard moduleName="certidoes"><EmBreve moduleKey="certidoes" /></ModuleGuard></AppLayout>} />
               <Route path="/processos" element={<AppLayout><ModuleGuard moduleName="processos"><EmBreve moduleKey="processos" /></ModuleGuard></AppLayout>} />

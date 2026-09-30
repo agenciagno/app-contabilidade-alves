@@ -51,6 +51,7 @@ import { usePinnedShortcuts, PinnedShortcut } from '@/hooks/usePinnedShortcuts';
 import { useModuleAccess, type RoleGated } from '@/hooks/useModuleAccess';
 import { useAudience } from '@/hooks/useAudience';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
+import { useContadorCaixaNova } from '@/hooks/useSerproCaixaPostal';
 
 import {
   Sidebar,
@@ -390,6 +391,7 @@ export function AppSidebar() {
   const { isModuleVisible, isSubItemVisible, passesRoleGate } = useModuleAccess();
   const audience = useAudience();
   const { pendingCount } = usePendingApprovals();
+  const mensagensNovas = useContadorCaixaNova(isModuleVisible('mensagens'));
 
   /** Itens visíveis de um grupo — respeita permissão própria do item, do pai e papel. */
   const visibleItems = (entry: CollapsibleModule) =>
@@ -531,6 +533,11 @@ export function AppSidebar() {
         >
           <entry.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
           {showLabels && <span className="flex-1 truncate">{entry.title}</span>}
+          {entry.moduleKey === 'mensagens' && mensagensNovas > 0 && (
+            <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-danger px-1.5 text-badge font-medium text-white">
+              {mensagensNovas}
+            </span>
+          )}
           {entry.moduleKey === 'configuracoes' && pendingCount > 0 && (
             <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-danger px-1.5 text-badge font-medium text-white">
               {pendingCount}

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { BadgeTone } from '@/components/ds';
+import { invocarSerpro } from '@/lib/invocarSerpro';
 
 /** Só cliente com este status entra na rotina e nas consultas ao Serpro (o servidor confere de novo a cada chamada). */
 export const STATUS_MONITORADO = 'Ativo';
@@ -118,9 +119,10 @@ export function diasParaPrazo(dataValidade: string | null): number | null {
 }
 
 // ---------------------------------------------------------------- leituras (RLS: equipe da empresa)
-export function useClientesCaixa() {
+export function useClientesCaixa(enabled = true) {
   return useQuery({
     queryKey: ['serpro-cp-clientes'],
+    enabled,
     queryFn: async (): Promise<ClienteCaixa[]> => {
       const { data: resumo, error } = await supabase
         .from('serpro_caixa_postal_resumo')
@@ -191,18 +193,8 @@ export function useMensagensCriticas() {
 }
 
 // ---------------------------------------------------------------- ações (edge function serpro-caixa-postal)
-async function chamarCaixa<T>(body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke('serpro-caixa-postal', { body });
-  if (error) {
-    // Respostas 4xx/5xx chegam sem corpo no `error`: lê o motivo que o servidor mandou.
-    let motivo = error.message;
-    try {
-      const corpo = await (error as { context?: Response }).context?.json();
-      if (corpo?.error) motivo = corpo.error;
-    } catch { /* corpo não é JSON */ }
-    throw new Error(motivo);
-  }
-  return data as T;
+function chamarCaixa<T>(body: Record<string, unknown>): Promise<T> {
+  return invocarSerpro<T>('serpro-caixa-postal', body);
 }
 
 export interface ResultadoConsulta {
@@ -295,4 +287,10 @@ export function useAvisarCliente() {
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['serpro-cp-avisos'] }),
   });
+}
+
+/** Clientes ativos com mensagem NOVA (a rotina diária viu a data avançar): número do menu "Mensagens e-CAC". */
+export function useContadorCaixaNova(enabled: boolean): number {
+  const { data } = useClientesCaixa(enabled);
+  return (data ?? []).filter((c) => seloCaixa(c).estado === 'nova').length;
 }

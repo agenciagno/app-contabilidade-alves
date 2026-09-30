@@ -87,7 +87,7 @@ export default function MensagensEcac() {
         kicker="~/mensagens e-cac"
         title="Mensagens e-CAC."
         subtitle="Caixa Postal da Receita Federal dos clientes ativos. O selo é atualizado todo dia às 07:30; a lista completa só é baixada quando você clica em Consultar."
-        actions={<ExportarMenu montar={() => tabelaExport(filtrados)} disabled={filtrados.length === 0} />}
+        actions={<ExportarMenu montar={() => tabelaExport(filtrados)} disabled={filtrados.length === 0} escolherColunas />}
       />
 
       <StatCardRow

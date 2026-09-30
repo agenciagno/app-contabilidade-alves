@@ -75,7 +75,7 @@ export default function TermosIntimacao() {
         kicker="~/dashboard federal · termos de intimação"
         title="Termos de intimação."
         subtitle="Mensagens da Receita que exigem ação (intimação, malha, exclusão do Simples, multa, cobrança e processo), já classificadas. Só aparecem clientes cuja lista foi baixada em Mensagens e-CAC."
-        actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} />}
+        actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />}
       />
 
       <StatCardRow
