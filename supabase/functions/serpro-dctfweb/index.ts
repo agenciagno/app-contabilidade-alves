@@ -4,6 +4,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { criarSerpro, jwtRole, onlyDigits } from "../_shared/serpro-core.ts";
 import { assinar, guardarPdf } from "../_shared/serpro-arquivos.ts";
 import { lerApuracoesMit, pdfDoRecibo, semDeclaracaoDctfweb } from "../_shared/dctfweb-mit.ts";
+import { concluirTarefaFiscal } from "../_shared/tarefas-fiscais.ts";
 
 // ---------------------------------------------------------------------------
 // DCTFWeb e MIT (Serpro Integra Contador) — F4 Onda 4, fase 1 (quem entregou), 30/09/2026. Só leitura.
@@ -83,6 +84,7 @@ async function consultar(payload: any, uid: string) {
   const agora = new Date().toISOString();
   let dctf: Parte & { status?: "transmitida" | "sem_declaracao" } = { ok: false };
   let mit: Parte & { apuracoes?: number } = { ok: false };
+  let tarefasConcluidas = 0;
 
   // ---- DCTFWeb
   const r = await serpro({
@@ -104,6 +106,13 @@ async function consultar(payload: any, uid: string) {
     }
   } else {
     dctf = { ok: false, erro: msgErro(r) };
+  }
+
+  // DCTFWeb com recibo → conclui a tarefa fiscal "DCTF" da competência (ver _shared/tarefas-fiscais.ts). "Sem declaração" não conclui.
+  if (dctf.ok && dctf.status === "transmitida") {
+    tarefasConcluidas += await concluirTarefaFiscal(supabase, COMPANY_ID, contactId, {
+      obrigacao: "DCTF", periodo: comp, tipo: "transmitted", protocolo: null, detalhe: `DCTFWeb de ${mes}/${ano} com recibo na Receita`,
+    });
   }
 
   // Apaga o aviso "movimento novo" do sensor (consulta posterior à mudança). Só toca esta coluna.
@@ -132,6 +141,17 @@ async function consultar(payload: any, uid: string) {
         { onConflict: "contact_id,periodo,id_apuracao" });
       if (error) mit = { ok: false, erro: `Consulta feita, mas não foi possível gravar: ${error.message}` };
     }
+    // MIT encerrada → conclui a tarefa fiscal "MIT" do mesmo período (o ano inteiro vem numa consulta, então pode concluir mais de um mês).
+    const encerradas = new Map<string, { id: number; data: string }>();
+    for (const a of lista) if (a.situacao === 3 && a.data_encerramento && !encerradas.has(a.periodo.slice(0, 7))) encerradas.set(a.periodo.slice(0, 7), { id: a.id_apuracao, data: a.data_encerramento });
+    if (!mit.erro) {
+      for (const [periodo, e] of encerradas) {
+        tarefasConcluidas += await concluirTarefaFiscal(supabase, COMPANY_ID, contactId, {
+          obrigacao: "MIT", periodo, tipo: "transmitted", protocolo: null,
+          detalhe: `MIT de ${periodo.slice(5, 7)}/${periodo.slice(0, 4)} encerrada em ${e.data.split("-").reverse().join("/")} (apuração nº ${e.id})`,
+        });
+      }
+    }
     if (!mit.erro && !mit.semProcuracao) {
       await supabase.from("serpro_mit_consultas").upsert({ contact_id: contactId, company_id: COMPANY_ID, ano: Number(ano), consultado_em: agora, consultado_por: uid, apuracoes: lista.length }, { onConflict: "contact_id,ano" });
       mit = { ok: true, apuracoes: lista.length };
@@ -141,7 +161,7 @@ async function consultar(payload: any, uid: string) {
   }
 
   if (!dctf.ok && !mit.ok) return json({ ok: false, error: dctf.erro ?? mit.erro ?? "Falha na consulta ao Serpro", dctfweb: dctf, mit });
-  return json({ ok: true, dctfweb: dctf, mit });
+  return json({ ok: true, dctfweb: dctf, mit, tarefas_concluidas: tarefasConcluidas });
 }
 
 async function link(payload: any) {

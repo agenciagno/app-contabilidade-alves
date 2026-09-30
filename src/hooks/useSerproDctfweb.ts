@@ -4,6 +4,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { invocarSerpro } from '@/lib/invocarSerpro';
 import { fetchAllPages } from '@/lib/fetch-all';
 import { STATUS_MONITORADO } from '@/hooks/useSerproCaixaPostal';
+import { recarregarTarefasFiscais } from '@/lib/tarefasConcluidas';
 
 /** `transmitida` = há recibo guardado (o servidor só grava a declaração como transmitida quando o PDF do recibo foi guardado). */
 export interface DctfwebRow { id: string; contact_id: string; competencia: string; status: 'transmitida' | 'sem_declaracao'; consultado_em: string }
@@ -113,14 +114,16 @@ export interface ResultadoDctfweb {
   error?: string;
   dctfweb?: { ok: boolean; erro?: string; status?: 'transmitida' | 'sem_declaracao' };
   mit?: { ok: boolean; erro?: string; apuracoes?: number; semProcuracao?: boolean };
+  tarefas_concluidas?: number;
   url?: string;
 }
 
 function useInvalidar() {
   const qc = useQueryClient();
-  return () => {
+  return (tarefasConcluidas?: number) => {
     qc.invalidateQueries({ queryKey: ['serpro-dctfweb-matriz'] });
     qc.invalidateQueries({ queryKey: ['serpro-consumo'] });
+    recarregarTarefasFiscais(qc, tarefasConcluidas);
   };
 }
 
@@ -129,7 +132,7 @@ export function useConsultarDctfwebMit() {
   return useMutation({
     mutationFn: (v: { contactId: string; competencia: string; force?: boolean }) =>
       invocarSerpro<ResultadoDctfweb>('serpro-dctfweb', { action: 'consultar', contact_id: v.contactId, competencia: v.competencia, force: v.force }),
-    onSuccess: () => invalidar(),
+    onSuccess: (d) => invalidar(d?.tarefas_concluidas),
   });
 }
 

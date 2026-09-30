@@ -6,6 +6,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { sufixoTarefas } from '@/lib/tarefasConcluidas';
 import { useConsultarDctfwebMit, useLinkReciboDctfweb, type ResultadoDctfweb } from '@/hooks/useSerproDctfweb';
 
 const msg = (e: unknown, padrao: string) => (e as Error)?.message || padrao;
@@ -35,8 +36,8 @@ export function useConsultaDctfwebMit(competencia: string) {
       if (avisarFalha(r)) return;
       const erros = [r.dctfweb?.erro && `DCTFWeb: ${r.dctfweb.erro}`, r.mit?.erro && `MIT: ${r.mit.erro}`].filter(Boolean) as string[];
       const resumo = `DCTFWeb ${r.dctfweb?.status === 'transmitida' ? 'com recibo' : r.dctfweb?.status === 'sem_declaracao' ? 'sem declaração' : 'não consultada'} · MIT com ${r.mit?.apuracoes ?? 0} apuração(ões) no ano`;
-      if (erros.length) toast.warning(`${resumo}. ${erros.join(' · ')}`);
-      else toast.success(resumo);
+      if (erros.length) toast.warning(`${resumo}. ${erros.join(' · ')}${sufixoTarefas(r.tarefas_concluidas)}`);
+      else toast.success(`${resumo}${sufixoTarefas(r.tarefas_concluidas)}`);
     } catch (e) {
       toast.error(msg(e, 'Falha na consulta. Tente novamente em instantes.'));
     } finally {
