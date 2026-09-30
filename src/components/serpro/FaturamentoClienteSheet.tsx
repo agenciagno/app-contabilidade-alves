@@ -5,6 +5,7 @@ import { Loader2, RefreshCw, Upload } from 'lucide-react';
 
 import { DsBadge } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { DicaBotao } from '@/components/serpro/DicaBotao';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -13,7 +14,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { siglaCompetencia } from '@/hooks/useSerproPagamentos';
 import {
-  fatorRCalculado, limiteDe, nivelLimite, nivelSublimite, percentualLimite, useAplicarFaturamento,
+  ROTULO_NIVEL_LIMITE, fatorRCalculado, limiteDe, nivelLimite, nivelSublimite, percentualLimite, useAplicarFaturamento,
   type FaturamentoRow,
 } from '@/hooks/useSerproFaturamento';
 import { useLeituraFaturamento } from '@/components/serpro/useLeituraFaturamento';
@@ -23,28 +24,27 @@ const mesBR = (aaaamm: string) => `${aaaamm.slice(5, 7)}/${aaaamm.slice(0, 4)}`;
 
 export const ROTULO_REGIME: Record<string, string> = { competencia: 'Regime de competência', caixa: 'Regime de caixa' };
 
-export function NivelLimiteBadge({ f }: { f: FaturamentoRow }) {
+/** `comPercentual` = false para quem não pode ver valores: o percentual do limite revelaria a receita. */
+export function NivelLimiteBadge({ f, comPercentual = true }: { f: FaturamentoRow; comPercentual?: boolean }) {
   const n = nivelLimite(f);
   const p = percentualLimite(f);
   if (!n || p === null) return null;
   const tom = n === 'regular' ? 'ok' : n === 'atencao' ? 'warn' : 'danger';
-  const rotulo = n === 'acima' ? 'Acima do limite' : n === 'critico' ? 'Crítico' : n === 'atencao' ? 'Atenção' : 'Regular';
-  return <DsBadge tone={tom}>{rotulo} · {p.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</DsBadge>;
+  return <DsBadge tone={tom}>{ROTULO_NIVEL_LIMITE[n]}{comPercentual && ` · ${p.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`}</DsBadge>;
 }
 
 /**
  * Painel de UMA leitura de declaração: números, os 13 meses de receita, folha, tributos e avisos.
- * "Reler" usa o PDF já guardado (sem custo). "Aplicar ao Fiscal" (administrador) copia a receita mensal para o
- * faturamento do cliente com fonte "Receita"; lançamentos manuais nunca são alterados.
+ * Só administrador abre este painel (tem valores em reais). "Reler" usa o PDF já guardado (sem custo).
+ * "Aplicar ao Fiscal" copia a receita mensal para o faturamento do cliente com fonte "Receita"; lançamentos manuais nunca são alterados.
  */
 export function FaturamentoClienteSheet({
-  nome, documento, contactId, faturamento, admin, onClose,
+  nome, documento, contactId, faturamento, onClose,
 }: {
   nome: string;
   documento: string;
   contactId: string;
   faturamento: FaturamentoRow | null;
-  admin: boolean;
   onClose: () => void;
 }) {
   const { executar, emAndamento } = useLeituraFaturamento();
@@ -187,17 +187,20 @@ export function FaturamentoClienteSheet({
         )}
 
         <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-line pt-4">
-          <Button variant="outline" disabled={emAndamento === contactId} onClick={() => executar(contactId, pa)} title="Lê de novo o PDF já guardado (sem consulta ao Serpro)">
-            {emAndamento === contactId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-            Reler o PDF
-          </Button>
-          {admin && (
-            <Button disabled={!f.confiavel || aplicar.isPending} onClick={() => setConfirmando(true)}
-              title={f.confiavel ? 'Copia a receita mensal para o faturamento do cliente no Fiscal' : 'Só com leitura confiável'}>
+          <DicaBotao texto="Lê de novo o PDF da declaração que já está guardado. Não consulta a Receita.">
+            <Button variant="outline" disabled={emAndamento === contactId} onClick={() => executar(contactId, pa)}>
+              {emAndamento === contactId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Reler o PDF
+            </Button>
+          </DicaBotao>
+          <DicaBotao texto={f.confiavel
+            ? 'Copia a receita mês a mês deste cliente para o cadastro de faturamento dele (fonte: Receita). Não envia nada à Receita e não altera o que foi lançado à mão.'
+            : 'Só disponível quando a leitura do PDF está confiável.'}>
+            <Button disabled={!f.confiavel || aplicar.isPending} onClick={() => setConfirmando(true)}>
               {aplicar.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
               Aplicar ao Fiscal
             </Button>
-          )}
+          </DicaBotao>
           <p className="min-w-[200px] flex-1 text-meta text-muted-ink-2">
             {`Lido em ${format(new Date(f.lido_em), 'dd/MM/yyyy HH:mm')}.`}
             {f.aplicado_fiscal_em && ` Aplicado ao Fiscal em ${format(new Date(f.aplicado_fiscal_em), 'dd/MM/yyyy HH:mm')}.`}

@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CompetenciaNav } from '@/components/serpro/CompetenciaNav';
+import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { FaturamentoClienteSheet, NivelLimiteBadge, ROTULO_REGIME, moeda } from '@/components/serpro/FaturamentoClienteSheet';
 import { useLeituraFaturamento } from '@/components/serpro/useLeituraFaturamento';
@@ -16,7 +17,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { competenciaPadrao, mesDeData, rotuloCompetencia, siglaCompetencia } from '@/hooks/useSerproPagamentos';
 import { anoDe, declaracaoVigente, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
 import {
-  faturamentoVigente, nivelLimite, nivelSublimite, percentualLimite, useFaturamentoAno,
+  ROTULO_NIVEL_LIMITE, faturamentoVigente, nivelLimite, nivelSublimite, percentualLimite, useFaturamentoAno,
   type FaturamentoRow,
 } from '@/hooks/useSerproFaturamento';
 import type { TabelaExport } from '@/lib/exportarTabela';
@@ -47,7 +48,8 @@ export default function FaturamentoFederal() {
   const { data: linhas = [], isLoading } = useMatrizPgdasd(ano);
   const { data: leituras = [], isLoading: carregandoLeituras } = useFaturamentoAno(ano);
   const { executar, emAndamento } = useLeituraFaturamento();
-  const { profile } = useProfile();
+  const { profile, isLoading: carregandoPerfil } = useProfile();
+  // Valores em reais (e o percentual do limite, que revelaria a receita) só para administrador e super administrador.
   const admin = profile?.is_super_admin === true || profile?.role === 'admin';
   const [busca, setBusca] = useState('');
   const [situacao, setSituacao] = useState<Situacao>(SITUACOES.some((s) => s.value === filtroInicial) ? (filtroInicial as Situacao) : 'todos');
@@ -96,14 +98,20 @@ export default function FaturamentoFederal() {
   const tabelaExport = (): TabelaExport => ({
     arquivo: `faturamento-${pa}`,
     titulo: `Faturamento do Simples Nacional — declaração do período ${siglaCompetencia(pa)}`,
-    colunas: ['Razão social', 'CNPJ', 'Nº da declaração', 'Regime de apuração', 'Receita do mês', 'Últimos 12 meses', 'No ano', 'Limite', '% do limite', 'Sublimite', 'Fator r', 'Leitura'],
+    colunas: admin
+      ? ['Razão social', 'CNPJ', 'Nº da declaração', 'Regime de apuração', 'Receita do mês', 'Últimos 12 meses', 'No ano', 'Limite', '% do limite', 'Sublimite', 'Situação do limite', 'Fator r', 'Leitura']
+      : ['Razão social', 'CNPJ', 'Nº da declaração', 'Regime de apuração', 'Situação do limite', 'Fator r', 'Leitura'],
     linhas: filtradas.map(({ l, fat }) => {
       const p = fat ? percentualLimite(fat) : null;
+      const n = fat ? nivelLimite(fat) : null;
+      const inicio = [l.nome, formatarCnpj(l.documento), fat?.numero_declaracao ?? '', fat?.regime_apuracao ? ROTULO_REGIME[fat.regime_apuracao] : ''];
+      const fim = [n ? ROTULO_NIVEL_LIMITE[n] : '', fat?.fator_r_texto ?? '', fat ? (fat.confiavel ? 'Confiável' : 'A conferir') : 'Não lida'];
+      if (!admin) return [...inicio, ...fim];
       return [
-        l.nome, formatarCnpj(l.documento), fat?.numero_declaracao ?? '', fat?.regime_apuracao ? ROTULO_REGIME[fat.regime_apuracao] : '',
+        ...inicio,
         fat?.confiavel ? moeda(fat.rpa_total) : '', fat?.confiavel ? moeda(fat.rbt12_total) : '', fat?.confiavel ? moeda(fat.rba_total) : '',
         fat?.confiavel ? moeda(fat.limite_total) : '', fat?.confiavel && p !== null ? pct(p) : '', fat?.confiavel ? moeda(fat.sublimite) : '',
-        fat?.fator_r_texto ?? '', fat ? (fat.confiavel ? 'Confiável' : 'A conferir') : 'Não lida',
+        ...fim,
       ];
     }),
   });
@@ -115,8 +123,8 @@ export default function FaturamentoFederal() {
       <PageHeader
         kicker="~/dashboard federal · faturamento"
         title="Faturamento."
-        subtitle={`Receita e limites do Simples Nacional, lidos do PDF da declaração PGDAS-D do período (regra fixa de leitura, sem IA). Comece pela tela PGDAS: consulte o ano do cliente; abrir a declaração já faz a leitura. Se a leitura não fechar nas conferências, o número não entra nos alertas.`}
-        actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />}
+        subtitle={`Receita e limites do Simples Nacional, lidos do PDF da declaração PGDAS-D do período (regra fixa de leitura, sem IA). Comece pela tela PGDAS: consulte o ano do cliente; abrir a declaração já faz a leitura. Se a leitura não fechar nas conferências, o número não entra nos alertas.${admin ? '' : ' Os valores em reais aparecem só para administradores.'}`}
+        actions={!carregandoPerfil && <ExportarMenu key={admin ? 'adm' : 'equipe'} montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />}
       />
 
       <CompetenciaNav competencia={pa} onChange={setPa} limite={limite} />
@@ -148,9 +156,9 @@ export default function FaturamentoFederal() {
             <TableHeader>
               <TableRow>
                 <TableHead>Razão social</TableHead>
-                <TableHead className="text-right">Receita do mês</TableHead>
-                <TableHead className="text-right">12 meses</TableHead>
-                <TableHead className="text-right">No ano</TableHead>
+                {admin && <TableHead className="text-right">Receita do mês</TableHead>}
+                {admin && <TableHead className="text-right">12 meses</TableHead>}
+                {admin && <TableHead className="text-right">No ano</TableHead>}
                 <TableHead className="min-w-[170px]">Limite</TableHead>
                 <TableHead>Fator r</TableHead>
                 <TableHead className="text-center">Ver</TableHead>
@@ -165,22 +173,22 @@ export default function FaturamentoFederal() {
                 const sub = fat ? nivelSublimite(fat) : null;
                 const confiavel = !!fat?.confiavel;
                 return (
-                  <TableRow key={l.contact_id} className={fat ? 'cursor-pointer' : undefined} onClick={() => fat && setAberto(l.contact_id)}>
+                  <TableRow key={l.contact_id} className={fat && admin ? 'cursor-pointer' : undefined} onClick={() => fat && admin && setAberto(l.contact_id)}>
                     <TableCell>
                       <p className="text-ui text-ink">{l.nome}</p>
                       <p className="text-meta text-muted-ink-2">
                         {formatarCnpj(l.documento)}{fat?.regime_apuracao ? ` · ${ROTULO_REGIME[fat.regime_apuracao]}` : ''}
                       </p>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-right text-ui">{confiavel ? moeda(fat!.rpa_total) : '—'}</TableCell>
-                    <TableCell className="whitespace-nowrap text-right text-ui">{confiavel ? moeda(fat!.rbt12_total) : '—'}</TableCell>
-                    <TableCell className="whitespace-nowrap text-right text-ui">{confiavel ? moeda(fat!.rba_total) : '—'}</TableCell>
+                    {admin && <TableCell className="whitespace-nowrap text-right text-ui">{confiavel ? moeda(fat!.rpa_total) : '—'}</TableCell>}
+                    {admin && <TableCell className="whitespace-nowrap text-right text-ui">{confiavel ? moeda(fat!.rbt12_total) : '—'}</TableCell>}
+                    {admin && <TableCell className="whitespace-nowrap text-right text-ui">{confiavel ? moeda(fat!.rba_total) : '—'}</TableCell>}
                     <TableCell>
                       {confiavel && p !== null ? (
                         <div className="space-y-1">
-                          <Progress value={Math.min(100, p)} className="h-1.5" />
+                          {admin && <Progress value={Math.min(100, p)} className="h-1.5" />}
                           <div className="flex flex-wrap gap-1">
-                            <NivelLimiteBadge f={fat!} />
+                            <NivelLimiteBadge f={fat!} comPercentual={admin} />
                             {sub === 'acima' && <DsBadge tone="danger" dot={false}>Sublimite</DsBadge>}
                             {sub === 'perto' && <DsBadge tone="warn" dot={false}>Perto do sublimite</DsBadge>}
                           </div>
@@ -197,17 +205,23 @@ export default function FaturamentoFederal() {
                     </TableCell>
                     <TableCell className="text-ui text-muted-ink">{fat?.fator_r_aplica ? fat.fator_r_texto : fat ? 'Não se aplica' : '—'}</TableCell>
                     <TableCell className="text-center">
-                      <Button size="icon" variant="ghost" className="h-8 w-8" disabled={!fat} title="Ver a leitura completa" onClick={(e) => { e.stopPropagation(); setAberto(l.contact_id); }}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <DicaBotao texto={!admin ? 'Os valores em reais são restritos a administradores.' : fat ? 'Abre o detalhe da declaração: receita mês a mês, tributos, fator r e avisos da leitura.' : 'Ainda não há leitura desta declaração. Use "Ler".'}>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" disabled={!fat || !admin} onClick={(e) => { e.stopPropagation(); setAberto(l.contact_id); }}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </DicaBotao>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="outline" disabled={!decl || lendo}
-                        title={!decl ? 'Sem declaração neste período: consulte o ano na tela PGDAS' : fat ? 'Ler de novo o PDF guardado' : 'Abre o PDF da declaração e lê os números'}
-                        onClick={(e) => { e.stopPropagation(); executar(l.contact_id, pa); }}>
-                        {lendo ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileSearch className="mr-1.5 h-4 w-4" />}
-                        {fat ? 'Reler' : 'Ler'}
-                      </Button>
+                      <DicaBotao texto={!decl
+                        ? 'Este cliente não tem declaração neste período na lista. Consulte o ano dele na tela PGDAS.'
+                        : fat ? 'Lê de novo o PDF da declaração que já está guardado. Não consulta a Receita.'
+                          : 'Lê os números do PDF da declaração deste mês. Se o PDF ainda não estiver guardado, busca na Receita antes.'}>
+                        <Button size="sm" variant="outline" disabled={!decl || lendo}
+                          onClick={(e) => { e.stopPropagation(); executar(l.contact_id, pa); }}>
+                          {lendo ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileSearch className="mr-1.5 h-4 w-4" />}
+                          {fat ? 'Reler' : 'Ler'}
+                        </Button>
+                      </DicaBotao>
                     </TableCell>
                   </TableRow>
                 );
@@ -219,13 +233,12 @@ export default function FaturamentoFederal() {
 
       <p className="text-meta text-muted-ink-2">Mostrando {filtradas.length} de {base.length} clientes do Simples Nacional · {rotuloCompetencia(pa)}.</p>
 
-      {linhaAberta && (
+      {linhaAberta && admin && (
         <FaturamentoClienteSheet
           nome={linhaAberta.l.nome}
           documento={formatarCnpj(linhaAberta.l.documento)}
           contactId={linhaAberta.l.contact_id}
           faturamento={linhaAberta.fat}
-          admin={admin}
           onClose={() => setAberto(null)}
         />
       )}

@@ -99,6 +99,8 @@ export function nivelLimite(f: FaturamentoRow): NivelLimite | null {
   return 'regular';
 }
 
+export const ROTULO_NIVEL_LIMITE: Record<NivelLimite, string> = { regular: 'Regular', atencao: 'Atenção', critico: 'Crítico', acima: 'Acima do limite' };
+
 export type NivelSublimite = 'regular' | 'perto' | 'acima';
 export function nivelSublimite(f: FaturamentoRow): NivelSublimite | null {
   if (!f.confiavel || !f.sublimite) return null;

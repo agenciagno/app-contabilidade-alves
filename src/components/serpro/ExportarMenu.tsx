@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { ChevronDown, Download, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { DicaBotao } from '@/components/serpro/DicaBotao';
 import {
   DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -61,12 +62,14 @@ export function ExportarMenu({ montar, disabled, escolherColunas }: { montar: ()
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" disabled={disabled || gerando}>
-          {gerando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
-          Exportar <ChevronDown className="ml-1.5 h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
+      <DicaBotao texto="Baixa a lista que está na tela, com os filtros atuais, em Excel, PDF ou CSV. Dá para escolher as colunas.">
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" disabled={disabled || gerando}>
+            {gerando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
+            Exportar <ChevronDown className="ml-1.5 h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+      </DicaBotao>
       <DropdownMenuContent align="end">
         {OPCOES.map((o) => (
           <DropdownMenuItem key={o.formato} onSelect={() => exportar(o.formato)}>{o.label}</DropdownMenuItem>
