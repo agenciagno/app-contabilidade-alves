@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 
 import { DsAlert, PageHeader, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -163,9 +164,11 @@ export default function TechConsumoSerpro() {
               <Input inputMode="numeric" value={volume} onChange={(e) => setVolume(e.target.value)} placeholder="ex.: 5000" />
             </label>
           </div>
-          <Button onClick={handleSalvar} disabled={salvar.isPending}>
-            {salvar.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Salvar
-          </Button>
+          <DicaBotao texto="Salva o alerta de gasto mensal e o volume declarado ao Serpro.">
+            <Button onClick={handleSalvar} disabled={salvar.isPending}>
+              {salvar.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Salvar
+            </Button>
+          </DicaBotao>
           <p className="text-meta text-muted-ink-2">
             O Serpro suspende o acesso sozinho se o consumo subir de forma abrupta acima do volume seguro (contrato, cláusula 5).
             {r.testes > 0 && ` ${r.testes} chamadas de teste (trial) neste ciclo não entram na conta.`}

@@ -68,6 +68,12 @@ export function dasDoPeriodo(l: LinhaPgdasd, pa: string): DasRow[] {
     .sort((a, b) => (b.emitido_em ?? '').localeCompare(a.emitido_em ?? ''));
 }
 
+/** DAS já gerado aqui e ainda dentro do prazo: "Gerar DAS" só abre o arquivo guardado, sem emitir outro (e sem cobrança). Mesma regra da função. */
+export function dasReaproveitavel(l: LinhaPgdasd, pa: string): boolean {
+  const hoje = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+  return dasDoPeriodo(l, pa).some((d) => { const ate = d.limite_acolhimento ?? d.vencimento; return !!d.das_path && (!ate || ate >= hoje); });
+}
+
 export type StatusPgdas = 'filial' | 'nao_consultado' | 'sem_declaracao' | 'transmitida' | 'retificada';
 export function statusPgdas(l: LinhaPgdasd, pa: string): StatusPgdas {
   if (l.filial) return 'filial';

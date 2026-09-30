@@ -4,6 +4,8 @@ import { FileText, Loader2, Receipt, RefreshCw } from 'lucide-react';
 
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { Preco } from '@/components/serpro/CustoSerpro';
+import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -185,17 +187,25 @@ export default function PgdasFederal() {
                     <TableCell className="text-center">
                       {d ? (
                         <div className="flex items-center justify-center gap-1">
-                          <Button size="icon" variant="ghost" className="h-8 w-8" title="Declaração (PDF)" disabled={ocupado === `${d.id}:declaracao`} onClick={() => abrirDeclaracao(d, 'declaracao')}>
-                            {ocupado === `${d.id}:declaracao` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8" title="Recibo de entrega (PDF)" disabled={ocupado === `${d.id}:recibo`} onClick={() => abrirDeclaracao(d, 'recibo')}>
-                            {ocupado === `${d.id}:recibo` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
-                          </Button>
+                          <DicaBotao custo={d.declaracao_path ? undefined : 'Consultar'}
+                            texto={d.declaracao_path ? 'Abre o PDF da declaração transmitida, que já está guardado.' : 'Baixa da Receita o PDF da declaração transmitida, guarda e lê o faturamento dela.'}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" disabled={ocupado === `${d.id}:declaracao`} onClick={() => abrirDeclaracao(d, 'declaracao')}>
+                              {ocupado === `${d.id}:declaracao` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                            </Button>
+                          </DicaBotao>
+                          <DicaBotao custo={d.recibo_path ? undefined : 'Consultar'}
+                            texto={d.recibo_path ? 'Abre o recibo de entrega da declaração, que já está guardado.' : 'Baixa da Receita o recibo de entrega da declaração e guarda.'}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" disabled={ocupado === `${d.id}:recibo`} onClick={() => abrirDeclaracao(d, 'recibo')}>
+                              {ocupado === `${d.id}:recibo` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
+                            </Button>
+                          </DicaBotao>
                           {maed && (
                             <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="outline" className="h-8 px-2 text-meta">MAED</Button>
-                              </DropdownMenuTrigger>
+                              <DicaBotao texto="Multa por atraso na entrega (MAED): abre a notificação da multa ou o DARF para pagá-la. Os arquivos já estão guardados.">
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="sm" variant="outline" className="h-8 px-2 text-meta">MAED</Button>
+                                </DropdownMenuTrigger>
+                              </DicaBotao>
                               <DropdownMenuContent align="end">
                                 {d.maed_notificacao_path && <DropdownMenuItem onSelect={() => abrirDeclaracao(d, 'maed_notificacao')}>Notificação da multa</DropdownMenuItem>}
                                 {d.maed_darf_path && <DropdownMenuItem onSelect={() => abrirDeclaracao(d, 'maed_darf')}>DARF da multa</DropdownMenuItem>}
@@ -206,12 +216,13 @@ export default function PgdasFederal() {
                       ) : <span className="text-muted-ink-2">—</span>}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="outline" disabled={consultando || l.filial}
-                        title={l.filial ? 'Filial: consulte a matriz' : `Consultar o ano ${ano} deste cliente`}
-                        onClick={() => executar(l.contact_id)}>
-                        {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-                        Consultar
-                      </Button>
+                      <DicaBotao custo={l.filial ? undefined : 'Consultar'}
+                        texto={l.filial ? 'Filial: o PGDAS-D é da matriz. Consulte o CNPJ da matriz.' : `Consulta na Receita as declarações e os DAS do ano ${ano} inteiro deste cliente, numa só chamada.`}>
+                        <Button size="sm" variant="outline" disabled={consultando || l.filial} onClick={() => executar(l.contact_id)}>
+                          {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+                          Consultar{!l.filial && <Preco tipo="Consultar" />}
+                        </Button>
+                      </DicaBotao>
                     </TableCell>
                   </TableRow>
                 );

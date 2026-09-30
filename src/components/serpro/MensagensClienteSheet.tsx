@@ -4,6 +4,8 @@ import { FileText, Loader2, MailOpen, RefreshCw } from 'lucide-react';
 
 import { DsBadge } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { Preco } from '@/components/serpro/CustoSerpro';
+import { DICA_LARGURA_TOTAL, DicaBotao } from '@/components/serpro/DicaBotao';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -57,10 +59,13 @@ export function MensagensClienteSheet({ cliente, onClose }: { cliente: ClienteCa
           </SheetHeader>
 
           <div className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-bg-2 p-4">
-            <Button onClick={() => executar(cliente.contact_id)} disabled={consultando || semProcuracao || inativo}>
-              {consultando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-              Consultar
-            </Button>
+            <DicaBotao custo={semProcuracao || inativo ? undefined : 'Consultar'}
+              texto="Baixa da Receita as 50 mensagens mais recentes da Caixa Postal deste cliente (lidas e não lidas). Não registra ciência.">
+              <Button onClick={() => executar(cliente.contact_id)} disabled={consultando || semProcuracao || inativo}>
+                {consultando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                Consultar{!semProcuracao && !inativo && <Preco tipo="Consultar" />}
+              </Button>
+            </DicaBotao>
             <p className="min-w-[220px] flex-1 text-meta text-muted-ink">
               {inativo
                 ? `Cliente fora do monitoramento (${cliente.status_cliente ?? 'sem status'}). O Serpro só é consultado para clientes ativos.`
@@ -109,10 +114,14 @@ export function MensagensClienteSheet({ cliente, onClose }: { cliente: ClienteCa
                           ))}
                         </SelectContent>
                       </Select>
-                      <Button size="sm" variant={m.corpo ? 'outline' : 'default'} onClick={() => solicitar(m, cliente.nome)}>
-                        {m.corpo ? <FileText className="mr-1.5 h-4 w-4" /> : <MailOpen className="mr-1.5 h-4 w-4" />}
-                        {m.corpo ? 'Ver mensagem' : 'Abrir mensagem'}
-                      </Button>
+                      <DicaBotao custo={m.corpo ? undefined : 'Consultar'}
+                        texto={m.corpo ? 'Mostra o texto da mensagem que já foi aberto antes. Não consulta a Receita e não registra nova ciência.'
+                          : 'Abre o corpo da mensagem na Receita. Antes, pede sua confirmação: abrir registra a ciência do contribuinte.'}>
+                        <Button size="sm" variant={m.corpo ? 'outline' : 'default'} onClick={() => solicitar(m, cliente.nome)}>
+                          {m.corpo ? <FileText className="mr-1.5 h-4 w-4" /> : <MailOpen className="mr-1.5 h-4 w-4" />}
+                          {m.corpo ? 'Ver mensagem' : 'Abrir mensagem'}{!m.corpo && <Preco tipo="Consultar" />}
+                        </Button>
+                      </DicaBotao>
                       <label className="ml-auto flex items-center gap-2 text-meta text-muted-ink">
                         <Switch checked={m.visivel_portal} onCheckedChange={(v) => salvar(m, { visivel_portal: v })} />
                         Publicar no portal
@@ -134,9 +143,11 @@ export function MensagensClienteSheet({ cliente, onClose }: { cliente: ClienteCa
             )}
 
             {proximo && (
-              <Button variant="outline" className="w-full" disabled={consultando} onClick={() => executar(cliente.contact_id, true, proximo)}>
-                Carregar mais antigas
-              </Button>
+              <DicaBotao className={DICA_LARGURA_TOTAL} custo="Consultar" texto="Baixa da Receita a página seguinte, com as mensagens mais antigas deste cliente.">
+                <Button variant="outline" className="w-full" disabled={consultando} onClick={() => executar(cliente.contact_id, true, proximo)}>
+                  Carregar mais antigas<Preco tipo="Consultar" />
+                </Button>
+              </DicaBotao>
             )}
           </div>
         </SheetContent>

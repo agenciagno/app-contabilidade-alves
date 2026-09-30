@@ -4,6 +4,8 @@ import { FileDown, Loader2, RefreshCw } from 'lucide-react';
 
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { Preco } from '@/components/serpro/CustoSerpro';
+import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,7 +13,7 @@ import { CompetenciaNav } from '@/components/serpro/CompetenciaNav';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { useAbrirArquivo, useConsultaPgdasd, useGerarDasComConfirmacao } from '@/components/serpro/pgdasdUi';
 import { competenciaPadrao, mesDeData, rotuloCompetencia, siglaCompetencia } from '@/hooks/useSerproPagamentos';
-import { anoDe, dasDoPeriodo, duplicidadeDas, statusDas, useMatrizPgdasd, type LinhaPgdasd, type StatusDas } from '@/hooks/useSerproPgdasd';
+import { anoDe, dasDoPeriodo, dasReaproveitavel, duplicidadeDas, statusDas, useMatrizPgdasd, type LinhaPgdasd, type StatusDas } from '@/hooks/useSerproPgdasd';
 import type { TabelaExport } from '@/lib/exportarTabela';
 
 const formatarCnpj = (d: string) => {
@@ -190,25 +192,35 @@ export default function DasFederal() {
                     </TableCell>
                     <TableCell className="text-center">
                       {das ? (
-                        <Button size="icon" variant="ghost" className="h-8 w-8" title="Extrato do DAS (PDF)" disabled={ocupado === `${das.id}:extrato`} onClick={() => abrirExtrato(das)}>
-                          {ocupado === `${das.id}:extrato` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                        </Button>
+                        <DicaBotao custo={das.extrato_path ? undefined : 'Consultar'}
+                          texto={das.extrato_path ? 'Abre o extrato do DAS em PDF, que já está guardado.' : 'Baixa da Receita o extrato do DAS em PDF e guarda.'}>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" disabled={ocupado === `${das.id}:extrato`} onClick={() => abrirExtrato(das)}>
+                            {ocupado === `${das.id}:extrato` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                          </Button>
+                        </DicaBotao>
                       ) : <span className="text-muted-ink-2">—</span>}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button size="sm" variant="outline" disabled={gerando === l.contact_id || l.filial || st === 'nao_consultado'}
-                        title={l.filial ? 'Filial: use a matriz' : st === 'nao_consultado' ? 'Consulte o ano antes' : 'Gerar o DAS deste período'}
-                        onClick={() => pedir(l.contact_id, pa, l.nome)}>
-                        {gerando === l.contact_id && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />} Gerar DAS
-                      </Button>
+                      <DicaBotao custo={l.filial || st === 'nao_consultado' || dasReaproveitavel(l, pa) ? undefined : 'Emitir'}
+                        texto={l.filial ? 'Filial: o DAS é da matriz. Use o CNPJ da matriz.'
+                          : st === 'nao_consultado' ? 'Consulte o ano deste cliente antes de gerar o DAS.'
+                            : dasReaproveitavel(l, pa) ? 'Já existe um DAS gerado aqui e dentro do prazo: abre o arquivo guardado, sem emitir outro.'
+                              : 'Gera o DAS deste período na Receita e guarda o PDF. Fica registrada uma emissão. Pede confirmação antes.'}>
+                        <Button size="sm" variant="outline" disabled={gerando === l.contact_id || l.filial || st === 'nao_consultado'}
+                          onClick={() => pedir(l.contact_id, pa, l.nome, dasReaproveitavel(l, pa))}>
+                          {gerando === l.contact_id && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />} Gerar DAS
+                          {!l.filial && st !== 'nao_consultado' && !dasReaproveitavel(l, pa) && <Preco tipo="Emitir" />}
+                        </Button>
+                      </DicaBotao>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="outline" disabled={consultando || l.filial}
-                        title={l.filial ? 'Filial: consulte a matriz' : `Consultar o ano ${ano} deste cliente`}
-                        onClick={() => executar(l.contact_id)}>
-                        {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-                        Consultar
-                      </Button>
+                      <DicaBotao custo={l.filial ? undefined : 'Consultar'}
+                        texto={l.filial ? 'Filial: o PGDAS-D é da matriz. Consulte o CNPJ da matriz.' : `Consulta na Receita as declarações e os DAS do ano ${ano} inteiro deste cliente, numa só chamada.`}>
+                        <Button size="sm" variant="outline" disabled={consultando || l.filial} onClick={() => executar(l.contact_id)}>
+                          {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+                          Consultar{!l.filial && <Preco tipo="Consultar" />}
+                        </Button>
+                      </DicaBotao>
                     </TableCell>
                   </TableRow>
                 );

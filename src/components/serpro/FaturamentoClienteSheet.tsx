@@ -1,20 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { format } from 'date-fns';
-import { toast } from 'sonner';
-import { Loader2, RefreshCw, Upload } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 
 import { DsBadge } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { siglaCompetencia } from '@/hooks/useSerproPagamentos';
 import {
-  ROTULO_NIVEL_LIMITE, fatorRCalculado, limiteDe, nivelLimite, nivelSublimite, percentualLimite, useAplicarFaturamento,
+  ROTULO_NIVEL_LIMITE, fatorRCalculado, limiteDe, nivelLimite, nivelSublimite, percentualLimite,
   type FaturamentoRow,
 } from '@/hooks/useSerproFaturamento';
 import { useLeituraFaturamento } from '@/components/serpro/useLeituraFaturamento';
@@ -24,19 +19,17 @@ const mesBR = (aaaamm: string) => `${aaaamm.slice(5, 7)}/${aaaamm.slice(0, 4)}`;
 
 export const ROTULO_REGIME: Record<string, string> = { competencia: 'Regime de competência', caixa: 'Regime de caixa' };
 
-/** `comPercentual` = false para quem não pode ver valores: o percentual do limite revelaria a receita. */
-export function NivelLimiteBadge({ f, comPercentual = true }: { f: FaturamentoRow; comPercentual?: boolean }) {
+export function NivelLimiteBadge({ f }: { f: FaturamentoRow }) {
   const n = nivelLimite(f);
   const p = percentualLimite(f);
   if (!n || p === null) return null;
   const tom = n === 'regular' ? 'ok' : n === 'atencao' ? 'warn' : 'danger';
-  return <DsBadge tone={tom}>{ROTULO_NIVEL_LIMITE[n]}{comPercentual && ` · ${p.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`}</DsBadge>;
+  return <DsBadge tone={tom}>{ROTULO_NIVEL_LIMITE[n]} · {p.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</DsBadge>;
 }
 
 /**
  * Painel de UMA leitura de declaração: números, os 13 meses de receita, folha, tributos e avisos.
- * Só administrador abre este painel (tem valores em reais). "Reler" usa o PDF já guardado (sem custo).
- * "Aplicar ao Fiscal" copia a receita mensal para o faturamento do cliente com fonte "Receita"; lançamentos manuais nunca são alterados.
+ * "Reler" usa o PDF já guardado (sem custo).
  */
 export function FaturamentoClienteSheet({
   nome, documento, contactId, faturamento, onClose,
@@ -48,8 +41,6 @@ export function FaturamentoClienteSheet({
   onClose: () => void;
 }) {
   const { executar, emAndamento } = useLeituraFaturamento();
-  const aplicar = useAplicarFaturamento();
-  const [confirmando, setConfirmando] = useState(false);
 
   const meses = useMemo(() => {
     const d = faturamento?.dados;
@@ -67,17 +58,6 @@ export function FaturamentoClienteSheet({
   const nSub = nivelSublimite(f);
   const fatorCalc = fatorRCalculado(f);
   const tributos = d?.debito_declarado;
-
-  const confirmarAplicar = async () => {
-    setConfirmando(false);
-    try {
-      const r = await aplicar.mutateAsync({ faturamentoId: f.id });
-      if (!r.ok) { toast.error(r.error ?? 'Não foi possível aplicar.'); return; }
-      toast.success(`Faturamento aplicado: ${r.inseridos ?? 0} meses novos, ${r.atualizados ?? 0} atualizados${r.ignorados_manuais ? `, ${r.ignorados_manuais} mantidos (lançamento manual)` : ''}.`);
-    } catch (e) {
-      toast.error((e as Error)?.message || 'Não foi possível aplicar.');
-    }
-  };
 
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
@@ -193,34 +173,12 @@ export function FaturamentoClienteSheet({
               Reler o PDF
             </Button>
           </DicaBotao>
-          <DicaBotao texto={f.confiavel
-            ? 'Copia a receita mês a mês deste cliente para o cadastro de faturamento dele (fonte: Receita). Não envia nada à Receita e não altera o que foi lançado à mão.'
-            : 'Só disponível quando a leitura do PDF está confiável.'}>
-            <Button disabled={!f.confiavel || aplicar.isPending} onClick={() => setConfirmando(true)}>
-              {aplicar.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-              Aplicar ao Fiscal
-            </Button>
-          </DicaBotao>
           <p className="min-w-[200px] flex-1 text-meta text-muted-ink-2">
             {`Lido em ${format(new Date(f.lido_em), 'dd/MM/yyyy HH:mm')}.`}
             {f.aplicado_fiscal_em && ` Aplicado ao Fiscal em ${format(new Date(f.aplicado_fiscal_em), 'dd/MM/yyyy HH:mm')}.`}
           </p>
         </div>
 
-        <AlertDialog open={confirmando} onOpenChange={setConfirmando}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Aplicar ao faturamento do Fiscal?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Copia a receita de {meses.length + 1} meses de {nome} para o faturamento do cliente (fonte: Receita). Meses que já foram lançados à mão não são alterados.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmarAplicar}>Aplicar</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </SheetContent>
     </Sheet>
   );

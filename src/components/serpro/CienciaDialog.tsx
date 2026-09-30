@@ -1,5 +1,7 @@
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Preco } from '@/components/serpro/CustoSerpro';
+import { DICA_RODAPE, DicaBotao } from '@/components/serpro/DicaBotao';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 
 interface CienciaDialogProps {
@@ -44,13 +46,17 @@ export function CienciaDialog({ open, assunto, cliente, carregando, onFechar, on
           </div>
         </div>
         <div className="flex flex-col-reverse gap-3 border-t border-line-2 px-8 py-5 sm:flex-row sm:justify-end">
-          <Button variant="outline" size="lg" onClick={onFechar} disabled={carregando} className="sm:min-w-[140px]">
-            Fechar
-          </Button>
-          <Button variant="destructive" size="lg" onClick={onConfirmar} disabled={carregando} className="sm:min-w-[200px]">
-            {carregando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Confirmar e abrir
-          </Button>
+          <DicaBotao className={DICA_RODAPE} texto="Fecha sem abrir a mensagem. Nenhuma ciência é registrada.">
+            <Button variant="outline" size="lg" onClick={onFechar} disabled={carregando} className="sm:min-w-[140px]">
+              Fechar
+            </Button>
+          </DicaBotao>
+          <DicaBotao className={DICA_RODAPE} custo="Consultar" texto="Abre a mensagem na Receita agora. A ciência do contribuinte fica registrada e não pode ser desfeita.">
+            <Button variant="destructive" size="lg" onClick={onConfirmar} disabled={carregando} className="sm:min-w-[200px]">
+              {carregando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirmar e abrir<Preco tipo="Consultar" />
+            </Button>
+          </DicaBotao>
         </div>
       </DialogContent>
     </Dialog>

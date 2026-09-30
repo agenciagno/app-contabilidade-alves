@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CienciaDialog } from '@/components/serpro/CienciaDialog';
 import { limparCorpo, useAbrirMensagem, type MensagemCaixa } from '@/hooks/useSerproCaixaPostal';
@@ -65,7 +66,9 @@ export function useAbrirMensagemFlow() {
             {lendo ? limparCorpo(lendo.corpo) : ''}
           </div>
           <DialogFooter className="border-t border-line-2 px-6 py-4">
-            <Button variant="outline" onClick={() => setLendo(null)}>Fechar</Button>
+            <DicaBotao texto="Fecha a leitura. O texto continua salvo e pode ser reaberto sem custo.">
+              <Button variant="outline" onClick={() => setLendo(null)}>Fechar</Button>
+            </DicaBotao>
           </DialogFooter>
         </DialogContent>
       </Dialog>

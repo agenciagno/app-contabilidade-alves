@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Preco } from '@/components/serpro/CustoSerpro';
+import { DICA_RODAPE, DicaBotao } from '@/components/serpro/DicaBotao';
 import { toast } from 'sonner';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -22,7 +24,7 @@ const msg = (e: unknown, padrao: string) => (e as Error)?.message || padrao;
 /**
  * Consulta do ANO de UM cliente (as 12 competências numa chamada), sempre por clique, sem lote.
  * Se o ano deste cliente foi consultado há pouco, pede confirmação antes de consultar de novo.
- * Custos não aparecem nas telas de operação: ficam só em Tech > Consumo Serpro.
+ * O valor do clique aparece no botão e na dica só para administrador e super administrador (`Preco`, `DicaBotao`); o total fica em Tech > Consumo Serpro.
  */
 export function useConsultaPgdasd(ano: number) {
   const consultar = useConsultarPgdasd();
@@ -53,10 +55,14 @@ export function useConsultaPgdasd(ano: number) {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={() => { const id = aConfirmar!; setAConfirmar(null); executar(id, true); }}>
-            Consultar de novo
-          </AlertDialogAction>
+          <DicaBotao className={DICA_RODAPE} texto="Fecha sem consultar.">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          </DicaBotao>
+          <DicaBotao className={DICA_RODAPE} custo="Consultar" texto="Consulta a Receita de novo, mesmo já tendo consultado há pouco.">
+            <AlertDialogAction onClick={() => { const id = aConfirmar!; setAConfirmar(null); executar(id, true); }}>
+              Consultar de novo<Preco tipo="Consultar" />
+            </AlertDialogAction>
+          </DicaBotao>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -118,7 +124,7 @@ export function useAbrirArquivo() {
 /** Gerar DAS: pede confirmação (registra uma emissão na Receita) e abre o PDF. */
 export function useGerarDasComConfirmacao() {
   const gerar = useGerarDas();
-  const [alvo, setAlvo] = useState<{ contactId: string; periodo: string; nome: string } | null>(null);
+  const [alvo, setAlvo] = useState<{ contactId: string; periodo: string; nome: string; gratis: boolean } | null>(null);
   const [gerando, setGerando] = useState<string | null>(null);
 
   const confirmar = async () => {
@@ -149,11 +155,17 @@ export function useGerarDasComConfirmacao() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={confirmar}>Gerar DAS</AlertDialogAction>
+          <DicaBotao className={DICA_RODAPE} texto="Fecha sem gerar o DAS.">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          </DicaBotao>
+          <DicaBotao className={DICA_RODAPE} custo={alvo?.gratis ? undefined : 'Emitir'}
+            texto={alvo?.gratis ? 'Abre o DAS que já está guardado, sem emitir outro.' : 'Gera o DAS na Receita e abre o PDF. Fica registrada uma emissão.'}>
+            <AlertDialogAction onClick={confirmar}>Gerar DAS{!alvo?.gratis && <Preco tipo="Emitir" />}</AlertDialogAction>
+          </DicaBotao>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );
-  return { pedir: (contactId: string, periodo: string, nome: string) => setAlvo({ contactId, periodo, nome }), gerando, dialog };
+  /** `gratis` = já há DAS guardado e dentro do prazo: abrir o arquivo não emite nem cobra. */
+  return { pedir: (contactId: string, periodo: string, nome: string, gratis = false) => setAlvo({ contactId, periodo, nome, gratis }), gerando, dialog };
 }

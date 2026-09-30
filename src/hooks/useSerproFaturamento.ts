@@ -126,9 +126,6 @@ export interface ResultadoFaturamento {
   foraDoMonitoramento?: boolean;
   filial?: boolean;
   error?: string;
-  inseridos?: number;
-  atualizados?: number;
-  ignorados_manuais?: number;
 }
 
 function useInvalidar() {
@@ -146,17 +143,5 @@ export function useLerFaturamento() {
     mutationFn: (v: { contactId: string; periodo: string }) =>
       invocarSerpro<ResultadoFaturamento>('serpro-pgdasd', { action: 'ler_faturamento', contact_id: v.contactId, periodo: v.periodo }),
     onSuccess: invalidar,
-  });
-}
-
-export function useAplicarFaturamento() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { faturamentoId: string }) =>
-      invocarSerpro<ResultadoFaturamento>('serpro-pgdasd', { action: 'aplicar_faturamento', faturamento_id: v.faturamentoId }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['serpro-faturamento'] });
-      qc.invalidateQueries({ queryKey: ['client-revenue-ytd'] });
-    },
   });
 }

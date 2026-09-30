@@ -5,6 +5,8 @@ import { Eye, Loader2, RefreshCw } from 'lucide-react';
 
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { Preco } from '@/components/serpro/CustoSerpro';
+import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -155,18 +157,24 @@ export default function MensagensEcac() {
                       {c.consultado_em ? format(new Date(c.consultado_em), 'dd/MM/yyyy HH:mm') : '—'}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button size="icon" variant="ghost" className="h-8 w-8" title="Ver mensagens salvas (grátis)"
-                        onClick={(e) => { e.stopPropagation(); setAberto(c.contact_id); }}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <DicaBotao texto="Abre o painel do cliente com as mensagens já salvas. Não consulta a Receita.">
+                        <Button size="icon" variant="ghost" className="h-8 w-8"
+                          onClick={(e) => { e.stopPropagation(); setAberto(c.contact_id); }}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </DicaBotao>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="outline" disabled={consultando || c.procuracao === 'ausente' || selo.estado === 'inativo'}
-                        title={selo.estado === 'inativo' ? `Fora do monitoramento (${c.status_cliente ?? 'sem status'})` : c.procuracao === 'ausente' ? 'Sem procuração' : 'Baixar a lista de mensagens'}
-                        onClick={(e) => { e.stopPropagation(); executar(c.contact_id); }}>
-                        {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-                        Consultar
-                      </Button>
+                      <DicaBotao custo={selo.estado === 'inativo' || c.procuracao === 'ausente' ? undefined : 'Consultar'}
+                        texto={selo.estado === 'inativo' ? `Cliente fora do monitoramento (${c.status_cliente ?? 'sem status'}): o Serpro só é consultado para clientes ativos.`
+                          : c.procuracao === 'ausente' ? 'Sem procuração para a Caixa Postal: peça ao cliente para outorgá-la no e-CAC.'
+                            : 'Baixa da Receita a lista de mensagens da Caixa Postal deste cliente. Não registra ciência.'}>
+                        <Button size="sm" variant="outline" disabled={consultando || c.procuracao === 'ausente' || selo.estado === 'inativo'}
+                          onClick={(e) => { e.stopPropagation(); executar(c.contact_id); }}>
+                          {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+                          Consultar{selo.estado !== 'inativo' && c.procuracao !== 'ausente' && <Preco tipo="Consultar" />}
+                        </Button>
+                      </DicaBotao>
                     </TableCell>
                   </TableRow>
                 );

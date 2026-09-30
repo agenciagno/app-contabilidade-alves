@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useProfile } from '@/hooks/useProfile';
 
 export interface ChamadaSerpro {
   created_at: string;
@@ -61,10 +63,11 @@ export function cicloAtual(hoje = new Date()): { inicio: Date; fim: Date; rotulo
   return { inicio, fim, rotulo: `${f(inicio)} a ${f(fim)}` };
 }
 
-export function useConsumoSerpro() {
+export function useConsumoSerpro(enabled = true) {
   const ciclo = cicloAtual();
   return useQuery({
     queryKey: ['serpro-consumo', ciclo.inicio.toISOString()],
+    enabled,
     queryFn: async (): Promise<ChamadaSerpro[]> => {
       const linhas: ChamadaSerpro[] = [];
       for (let de = 0; ; de += 1000) {
@@ -109,4 +112,31 @@ export function useSalvarSerproConfig() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['serpro-config'] }),
   });
+}
+
+/** Valor da PRÓXIMA chamada cobrada: o da faixa em que ela cai, dado quantas já foram cobradas no ciclo (mesma estimativa de `custoEstimado`). */
+export function precoProxima(tipo: 'Consultar' | 'Emitir', jaCobradas: number): number {
+  const faixas = FAIXAS[tipo];
+  for (const f of faixas) if (jaCobradas < f.ate) return f.valor;
+  return faixas[faixas.length - 1].valor;
+}
+
+/**
+ * Valores só para administrador e super administrador: para os demais, `preco()` devolve null e nenhuma tela mostra custo
+ * (a consulta do consumo nem é feita). Os botões que geram cobrança no Serpro usam isto para mostrar quanto custa o clique.
+ */
+export function useCustoSerpro() {
+  const { profile } = useProfile();
+  const admin = profile?.is_super_admin === true || profile?.role === 'admin';
+  const { data: chamadas } = useConsumoSerpro(admin);
+  const cobradas = useMemo(() => {
+    const n = { Consultar: 0, Emitir: 0 };
+    for (const c of chamadas ?? []) {
+      if (c.ambiente !== 'producao' || c.cobravel !== true) continue;
+      if (c.tipo_chamada === 'Consultar') n.Consultar++;
+      else if (c.tipo_chamada === 'Emitir') n.Emitir++;
+    }
+    return n;
+  }, [chamadas]);
+  return { admin, preco: (tipo: 'Consultar' | 'Emitir'): number | null => (admin ? precoProxima(tipo, cobradas[tipo]) : null) };
 }

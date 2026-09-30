@@ -4,6 +4,8 @@ import { Eye, Loader2, RefreshCw } from 'lucide-react';
 
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { Preco } from '@/components/serpro/CustoSerpro';
+import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -183,16 +185,20 @@ export default function PagamentosFederal() {
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button size="icon" variant="ghost" className="h-8 w-8" title="Ver pagamentos salvos (grátis)" onClick={(e) => { e.stopPropagation(); setAberto(l.contact_id); }}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <DicaBotao texto="Abre o painel do cliente com os pagamentos já salvos. Não consulta a Receita.">
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setAberto(l.contact_id); }}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </DicaBotao>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="outline" disabled={consultando} title="Consultar os pagamentos deste mês"
-                        onClick={(e) => { e.stopPropagation(); executar(l.contact_id); }}>
-                        {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-                        Consultar
-                      </Button>
+                      <DicaBotao custo="Consultar" texto="Baixa da Receita os pagamentos do mês deste cliente (DARF, DAS, DAE e DJE).">
+                        <Button size="sm" variant="outline" disabled={consultando}
+                          onClick={(e) => { e.stopPropagation(); executar(l.contact_id); }}>
+                          {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+                          Consultar<Preco tipo="Consultar" />
+                        </Button>
+                      </DicaBotao>
                     </TableCell>
                   </TableRow>
                 );

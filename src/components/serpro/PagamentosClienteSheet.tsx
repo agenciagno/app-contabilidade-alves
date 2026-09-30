@@ -5,6 +5,8 @@ import { ChevronDown, FileDown, Loader2, RefreshCw, Search } from 'lucide-react'
 
 import { DsBadge } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { Preco } from '@/components/serpro/CustoSerpro';
+import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -123,13 +125,17 @@ export function PagamentosClienteSheet({
 
         <div className="mt-5 space-y-3 rounded-lg border border-line bg-bg-2 p-4">
           <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={() => onConsultar(linha.contact_id)} disabled={consultando}>
-              {consultando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-              Consultar
-            </Button>
-            <Button variant="outline" onClick={() => setAvancada((v) => !v)}>
-              <Search className="mr-2 h-4 w-4" /> Busca avançada
-            </Button>
+            <DicaBotao custo="Consultar" texto={`Baixa da Receita os pagamentos da competência ${siglaCompetencia(competencia)} deste cliente.`}>
+              <Button onClick={() => onConsultar(linha.contact_id)} disabled={consultando}>
+                {consultando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                Consultar<Preco tipo="Consultar" />
+              </Button>
+            </DicaBotao>
+            <DicaBotao texto="Mostra ou esconde os filtros para procurar pagamentos por tipo, documento, receita, datas e valores.">
+              <Button variant="outline" onClick={() => setAvancada((v) => !v)}>
+                <Search className="mr-2 h-4 w-4" /> Busca avançada
+              </Button>
+            </DicaBotao>
             <p className="min-w-[200px] flex-1 text-meta text-muted-ink">
               Baixa os pagamentos da competência {siglaCompetencia(competencia)} (DARF, DAS, DAE e DJE). A Receita só informa o que foi pago.
             </p>
@@ -172,9 +178,11 @@ export function PagamentosClienteSheet({
                   </label>
                 </div>
               </div>
-              <Button onClick={buscaAvancada} disabled={buscar.isPending}>
-                {buscar.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Buscar
-              </Button>
+              <DicaBotao custo="Consultar" texto="Procura na Receita os pagamentos que batem com os filtros preenchidos.">
+                <Button onClick={buscaAvancada} disabled={buscar.isPending}>
+                  {buscar.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Buscar<Preco tipo="Consultar" />
+                </Button>
+              </DicaBotao>
             </div>
           )}
         </div>
@@ -227,9 +235,11 @@ export function PagamentosClienteSheet({
 
                   {comp.length > 0 && (
                     <div>
-                      <button type="button" className="flex items-center gap-1 text-meta text-muted-ink hover:text-ink" onClick={() => setAbertos((a) => ({ ...a, [p.id]: !aberto }))}>
-                        <ChevronDown className={`h-4 w-4 transition-transform ${aberto ? 'rotate-180' : ''}`} /> Composição ({comp.length})
-                      </button>
+                      <DicaBotao texto="Mostra ou esconde a composição deste documento: quais receitas e valores formam o total.">
+                        <button type="button" className="flex items-center gap-1 text-meta text-muted-ink hover:text-ink" onClick={() => setAbertos((a) => ({ ...a, [p.id]: !aberto }))}>
+                          <ChevronDown className={`h-4 w-4 transition-transform ${aberto ? 'rotate-180' : ''}`} /> Composição ({comp.length})
+                        </button>
+                      </DicaBotao>
                       {aberto && (
                         <div className="mt-2 divide-y divide-line rounded-md border border-line">
                           {comp.map((d, i) => (
@@ -244,10 +254,13 @@ export function PagamentosClienteSheet({
                   )}
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <Button size="sm" variant={p.comprovante_path ? 'outline' : 'default'} onClick={() => baixarComprovante(p)} disabled={emitindo === p.id}>
-                      {emitindo === p.id ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileDown className="mr-1.5 h-4 w-4" />}
-                      {p.comprovante_path ? 'Baixar comprovante' : 'Emitir comprovante'}
-                    </Button>
+                    <DicaBotao custo={p.comprovante_path ? undefined : 'Emitir'}
+                      texto={p.comprovante_path ? 'Baixa o comprovante de pagamento que já está guardado. Não consulta a Receita.' : 'Emite na Receita o comprovante deste pagamento e guarda o PDF. Depois, é só reabrir o arquivo.'}>
+                      <Button size="sm" variant={p.comprovante_path ? 'outline' : 'default'} onClick={() => baixarComprovante(p)} disabled={emitindo === p.id}>
+                        {emitindo === p.id ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileDown className="mr-1.5 h-4 w-4" />}
+                        {p.comprovante_path ? 'Baixar comprovante' : 'Emitir comprovante'}{!p.comprovante_path && <Preco tipo="Emitir" />}
+                      </Button>
+                    </DicaBotao>
                     <label className="flex items-center gap-2 text-meta text-muted-ink">
                       <Switch
                         checked={p.visivel_portal}

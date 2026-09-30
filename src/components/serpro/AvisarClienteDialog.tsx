@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { DICA_LARGURA_TOTAL, DicaBotao } from '@/components/serpro/DicaBotao';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -85,13 +86,19 @@ export function AvisarClienteDialog({ mensagem, onClose }: { mensagem: MensagemC
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            <Button variant="outline" onClick={copiar} disabled={!texto.trim()}>Copiar</Button>
-            <Button variant="outline" onClick={whatsapp} disabled={!texto.trim() || !fone} title={fone ? undefined : 'Sem WhatsApp/telefone'}>
-              Abrir WhatsApp
-            </Button>
-            <Button variant="outline" onClick={enviarEmail} disabled={!texto.trim() || !email || enviando} title={email ? undefined : 'Sem e-mail'}>
-              {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar por E-mail'}
-            </Button>
+            <DicaBotao className={DICA_LARGURA_TOTAL} texto="Copia o texto do aviso para colar onde quiser.">
+              <Button variant="outline" className="w-full" onClick={copiar} disabled={!texto.trim()}>Copiar</Button>
+            </DicaBotao>
+            <DicaBotao className={DICA_LARGURA_TOTAL} texto={fone ? 'Abre o WhatsApp com o texto pronto. Você só confirma o envio lá.' : 'Este cliente não tem WhatsApp ou telefone cadastrado.'}>
+              <Button variant="outline" className="w-full" onClick={whatsapp} disabled={!texto.trim() || !fone}>
+                Abrir WhatsApp
+              </Button>
+            </DicaBotao>
+            <DicaBotao className={DICA_LARGURA_TOTAL} texto={email ? 'Envia o aviso por e-mail ao cliente, pelo e-mail da Contabilidade Alves.' : 'Este cliente não tem e-mail cadastrado.'}>
+              <Button variant="outline" className="w-full" onClick={enviarEmail} disabled={!texto.trim() || !email || enviando}>
+                {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar por E-mail'}
+              </Button>
+            </DicaBotao>
           </div>
 
           <p className="text-meta text-muted-ink-2">
@@ -102,7 +109,9 @@ export function AvisarClienteDialog({ mensagem, onClose }: { mensagem: MensagemC
         </div>
 
         <DialogFooter className="border-t border-line-2 px-6 py-4">
-          <Button variant="outline" onClick={onClose}>Fechar</Button>
+          <DicaBotao texto="Fecha esta janela.">
+            <Button variant="outline" onClick={onClose}>Fechar</Button>
+          </DicaBotao>
         </DialogFooter>
       </DialogContent>
     </Dialog>

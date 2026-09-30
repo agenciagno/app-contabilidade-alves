@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Preco } from '@/components/serpro/CustoSerpro';
+import { DICA_RODAPE, DicaBotao } from '@/components/serpro/DicaBotao';
 import { toast } from 'sonner';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -9,7 +11,7 @@ import { useConsultarPagamentos } from '@/hooks/useSerproPagamentos';
 /**
  * Consulta de pagamentos de UM cliente num mês, sempre por clique (sem lote).
  * Se o mês deste cliente foi consultado há pouco, pede confirmação antes de consultar de novo.
- * Custos não aparecem nas telas de operação: ficam só em Tech > Consumo Serpro.
+ * O valor do clique aparece no botão e na dica só para administrador e super administrador (`Preco`, `DicaBotao`); o total fica em Tech > Consumo Serpro.
  */
 export function useConsultaPagamentos(competencia: string) {
   const consultar = useConsultarPagamentos();
@@ -42,10 +44,14 @@ export function useConsultaPagamentos(competencia: string) {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={() => { const id = aConfirmar!; setAConfirmar(null); executar(id, true); }}>
-            Consultar de novo
-          </AlertDialogAction>
+          <DicaBotao className={DICA_RODAPE} texto="Fecha sem consultar.">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          </DicaBotao>
+          <DicaBotao className={DICA_RODAPE} custo="Consultar" texto="Consulta a Receita de novo, mesmo já tendo consultado há pouco.">
+            <AlertDialogAction onClick={() => { const id = aConfirmar!; setAConfirmar(null); executar(id, true); }}>
+              Consultar de novo<Preco tipo="Consultar" />
+            </AlertDialogAction>
+          </DicaBotao>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

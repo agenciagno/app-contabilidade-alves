@@ -5,6 +5,8 @@ import { FileText, MailOpen, Send } from 'lucide-react';
 
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { Preco } from '@/components/serpro/CustoSerpro';
+import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -173,13 +175,19 @@ export default function TermosIntimacao() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="outline" onClick={() => setAvisando(m)}>
-                          <Send className="mr-1.5 h-4 w-4" /> Avisar cliente
-                        </Button>
-                        <Button size="sm" variant={m.corpo ? 'outline' : 'default'} onClick={() => solicitar(m, nomeCliente(m))}>
-                          {m.corpo ? <FileText className="mr-1.5 h-4 w-4" /> : <MailOpen className="mr-1.5 h-4 w-4" />}
-                          {m.corpo ? 'Ver' : 'Abrir'}
-                        </Button>
+                        <DicaBotao texto="Abre o texto pronto para avisar o cliente desta mensagem por WhatsApp ou e-mail, ou copiar. Não abre a mensagem na Receita.">
+                          <Button size="sm" variant="outline" onClick={() => setAvisando(m)}>
+                            <Send className="mr-1.5 h-4 w-4" /> Avisar cliente
+                          </Button>
+                        </DicaBotao>
+                        <DicaBotao custo={m.corpo ? undefined : 'Consultar'}
+                          texto={m.corpo ? 'Mostra o texto da mensagem que já foi aberto antes. Não consulta a Receita e não registra nova ciência.'
+                            : 'Abre o corpo da mensagem na Receita. Antes, pede sua confirmação: abrir registra a ciência do contribuinte.'}>
+                          <Button size="sm" variant={m.corpo ? 'outline' : 'default'} onClick={() => solicitar(m, nomeCliente(m))}>
+                            {m.corpo ? <FileText className="mr-1.5 h-4 w-4" /> : <MailOpen className="mr-1.5 h-4 w-4" />}
+                            {m.corpo ? 'Ver' : 'Abrir'}{!m.corpo && <Preco tipo="Consultar" />}
+                          </Button>
+                        </DicaBotao>
                       </div>
                       {avisos?.get(m.id) && (
                         <p className="mt-1 text-meta text-muted-ink-2">Avisado em {format(new Date(avisos.get(m.id)!.enviado_em), 'dd/MM')}</p>
