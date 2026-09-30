@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -55,7 +56,8 @@ export default function ProcuracoesFederal() {
   const mapear = useMapearProcuracao();
   const [emAndamento, setEmAndamento] = useState<string | null>(null);
   const [aConfirmar, setAConfirmar] = useState<LinhaProcuracao | null>(null);
-  const [busca, setBusca] = useState('');
+  const buscaInicial = useBuscaInicial();
+  const [busca, setBusca] = useState(buscaInicial);
   const [filtro, setFiltro] = useState<Filtro>('todos');
 
   const stats = useMemo(() => ({

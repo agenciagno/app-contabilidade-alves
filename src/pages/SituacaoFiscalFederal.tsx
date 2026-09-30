@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { FileText, Loader2, RefreshCw } from 'lucide-react';
 
+import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -49,7 +50,8 @@ export default function SituacaoFiscalFederal() {
   const { data: linhas = [], isLoading } = useMatrizSitfis();
   const { executar, emAndamento, dialog } = useGerarRelatorioSitfis();
   const { ocupado, abrir } = useAbrirRelatorioSitfis();
-  const [busca, setBusca] = useState('');
+  const buscaInicial = useBuscaInicial();
+  const [busca, setBusca] = useState(buscaInicial);
   const [situacao, setSituacao] = useState<Situacao>('todos');
   const [regime, setRegime] = useState('todos');
 

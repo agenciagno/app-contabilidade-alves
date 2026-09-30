@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { Eye, Loader2, RefreshCw } from 'lucide-react';
 
+import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,7 +47,8 @@ function rotulo(e: EstadoParcelamento): { label: string; tone: 'ok' | 'warn' | '
 export default function ParcelamentosFederal() {
   const { data: linhas = [], isLoading } = useMatrizParcelamentos();
   const { executar, emAndamento, dialog } = useConsultaParcelamentos();
-  const [busca, setBusca] = useState('');
+  const buscaInicial = useBuscaInicial();
+  const [busca, setBusca] = useState(buscaInicial);
   const [situacao, setSituacao] = useState<Situacao>('todos');
   const [aberto, setAberto] = useState<string | null>(null);
   const atual = competenciaAtual();

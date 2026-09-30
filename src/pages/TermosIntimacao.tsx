@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { FileText, MailOpen, Send } from 'lucide-react';
 
+import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Preco } from '@/components/serpro/CustoSerpro';
@@ -28,7 +29,8 @@ export default function TermosIntimacao() {
   const { solicitar, dialogs } = useAbrirMensagemFlow();
   const { data: avisos } = useAvisosCaixa();
   const [avisando, setAvisando] = useState<MensagemComCliente | null>(null);
-  const [busca, setBusca] = useState('');
+  const buscaInicial = useBuscaInicial();
+  const [busca, setBusca] = useState(buscaInicial);
   const [categoria, setCategoria] = useState<'todas' | CategoriaMsg>('todas');
   const [situacao, setSituacao] = useState<'abertas' | 'todas' | SituacaoMsg>('abertas');
 

@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { MensagensClienteSheet } from '@/components/serpro/MensagensClienteSheet';
 import { useConsultaCliente } from '@/components/serpro/useConsultaCliente';
+import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { seloCaixa, useClientesCaixa, type ClienteCaixa, type SeloEstado } from '@/hooks/useSerproCaixaPostal';
 import type { TabelaExport } from '@/lib/exportarTabela';
 
@@ -55,7 +56,8 @@ export default function MensagensEcac() {
   const { data: clientes = [], isLoading } = useClientesCaixa();
   const { executar, emAndamento, dialog } = useConsultaCliente();
   const [params, setParams] = useSearchParams();
-  const [busca, setBusca] = useState('');
+  const buscaInicial = useBuscaInicial();
+  const [busca, setBusca] = useState(buscaInicial);
   const [regime, setRegime] = useState('todos');
   const [aberto, setAberto] = useState<string | null>(null);
 

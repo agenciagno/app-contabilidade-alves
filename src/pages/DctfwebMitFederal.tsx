@@ -12,6 +12,7 @@ import { Preco, brl } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { useAbrirRecibo, useConsultaDctfwebMit } from '@/components/serpro/dctfwebUi';
+import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { competenciaPadrao, mesDeData, siglaCompetencia } from '@/hooks/useSerproPagamentos';
 import {
   apuracaoVigente, estadoDctfweb, estadoMit, useMatrizDctfwebMit, type EstadoDctfweb, type EstadoMit, type LinhaDctfwebMit,
@@ -58,7 +59,8 @@ export default function DctfwebMitFederal() {
   const { data: linhas = [], isLoading } = useMatrizDctfwebMit(competencia);
   const { executar, emAndamento, dialog } = useConsultaDctfwebMit(competencia);
   const { ocupado, abrir } = useAbrirRecibo();
-  const [busca, setBusca] = useState('');
+  const buscaInicial = useBuscaInicial();
+  const [busca, setBusca] = useState(buscaInicial);
   const [situacao, setSituacao] = useState<Situacao>('todos');
   const limite = mesDeData(new Date());
 

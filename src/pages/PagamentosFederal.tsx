@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { Eye, Loader2, RefreshCw } from 'lucide-react';
 
+import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Preco } from '@/components/serpro/CustoSerpro';
@@ -64,7 +65,8 @@ export default function PagamentosFederal() {
   const [competencia, setCompetencia] = useState(competenciaPadrao());
   const { data: linhas = [], isLoading } = useMatrizPagamentos(competencia);
   const { executar, emAndamento, dialog } = useConsultaPagamentos(competencia);
-  const [busca, setBusca] = useState('');
+  const buscaInicial = useBuscaInicial();
+  const [busca, setBusca] = useState(buscaInicial);
   const [regime, setRegime] = useState('todos');
   const [situacao, setSituacao] = useState<Situacao>('todos');
   const [aberto, setAberto] = useState<string | null>(null);

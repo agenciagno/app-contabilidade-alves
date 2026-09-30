@@ -69,6 +69,7 @@ const SituacaoFiscalFederal = lazy(() => import("@/pages/SituacaoFiscalFederal")
 const ParcelamentosFederal = lazy(() => import("@/pages/ParcelamentosFederal"));
 const DarfFederal = lazy(() => import("@/pages/DarfFederal"));
 const DctfwebMitFederal = lazy(() => import("@/pages/DctfwebMitFederal"));
+const FilaDoDiaFederal = lazy(() => import("@/pages/FilaDoDiaFederal"));
 const TechConsumoSerpro = lazy(() => import("@/pages/TechConsumoSerpro"));
 const ClassificacaoFiscal = lazy(() => import("@/pages/ClassificacaoFiscal"));
 
@@ -191,6 +192,7 @@ const App = () => (
               <Route path="/dashboard-federal/parcelamentos" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><ParcelamentosFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/darf" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><DarfFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/dctfweb-mit" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><DctfwebMitFederal /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal/fila-do-dia" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><FilaDoDiaFederal /></ModuleGuard></AppLayout>} />
               <Route path="/parcelamentos" element={<AppLayout><ModuleGuard moduleName="parcelamentos"><EmBreve moduleKey="parcelamentos" /></ModuleGuard></AppLayout>} />
               <Route path="/certidoes" element={<AppLayout><ModuleGuard moduleName="certidoes"><EmBreve moduleKey="certidoes" /></ModuleGuard></AppLayout>} />
               <Route path="/processos" element={<AppLayout><ModuleGuard moduleName="processos"><EmBreve moduleKey="processos" /></ModuleGuard></AppLayout>} />
