@@ -18,6 +18,8 @@ export interface Chamada {
   contactId?: string | null;
   origem: "manual" | "cron";
   finalidade: string;
+  /** versaoSistema do serviço; o padrão "1.0" vale para quase todos (SITFIS usa "2.0"). */
+  versao?: string;
 }
 
 export const onlyDigits = (v: unknown) => String(v ?? "").replace(/\D/g, "");
@@ -105,7 +107,7 @@ export function criarSerpro(supabase: SupabaseClient, companyId: string) {
       contratante: { numero: CONTRATANTE_NI, tipo: 2 },
       autorPedidoDados: { numero: autorNi, tipo: 2 },
       contribuinte: c.contribuinte,
-      pedidoDados: { idSistema: c.idSistema, idServico: c.idServico, versaoSistema: "1.0", dados: c.dados },
+      pedidoDados: { idSistema: c.idSistema, idServico: c.idServico, versaoSistema: c.versao ?? "1.0", dados: c.dados },
     };
     const t0 = Date.now();
     let status = 0, responseId: string | null = null, resposta: any = null, mensagemCodigo: string | null = null;

@@ -5502,6 +5502,91 @@ export type Database = {
           },
         ]
       }
+      serpro_sitfis: {
+        Row: {
+          avisos: string[]
+          categorias: string[]
+          certidao_emissao: string | null
+          certidao_tipo: string | null
+          certidao_validade: string | null
+          company_id: string
+          confiavel: boolean
+          contact_id: string
+          created_at: string
+          gerado_em: string | null
+          id: string
+          pdf_path: string | null
+          protocolo: string | null
+          resultado: string | null
+          solicitado_em: string
+          solicitado_por: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          avisos?: string[]
+          categorias?: string[]
+          certidao_emissao?: string | null
+          certidao_tipo?: string | null
+          certidao_validade?: string | null
+          company_id: string
+          confiavel?: boolean
+          contact_id: string
+          created_at?: string
+          gerado_em?: string | null
+          id?: string
+          pdf_path?: string | null
+          protocolo?: string | null
+          resultado?: string | null
+          solicitado_em?: string
+          solicitado_por?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          avisos?: string[]
+          categorias?: string[]
+          certidao_emissao?: string | null
+          certidao_tipo?: string | null
+          certidao_validade?: string | null
+          company_id?: string
+          confiavel?: boolean
+          contact_id?: string
+          created_at?: string
+          gerado_em?: string | null
+          id?: string
+          pdf_path?: string | null
+          protocolo?: string | null
+          resultado?: string | null
+          solicitado_em?: string
+          solicitado_por?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_sitfis_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_sitfis_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_sitfis_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
       support_sessions: {
         Row: {
           ended_at: string | null

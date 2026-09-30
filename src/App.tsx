@@ -65,6 +65,7 @@ const DasFederal = lazy(() => import("@/pages/DasFederal"));
 const FaturamentoFederal = lazy(() => import("@/pages/FaturamentoFederal"));
 const DefisFederal = lazy(() => import("@/pages/DefisFederal"));
 const ProcuracoesFederal = lazy(() => import("@/pages/ProcuracoesFederal"));
+const SituacaoFiscalFederal = lazy(() => import("@/pages/SituacaoFiscalFederal"));
 const TechConsumoSerpro = lazy(() => import("@/pages/TechConsumoSerpro"));
 const ClassificacaoFiscal = lazy(() => import("@/pages/ClassificacaoFiscal"));
 
@@ -183,6 +184,7 @@ const App = () => (
               <Route path="/dashboard-federal/faturamento" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><FaturamentoFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/defis" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><DefisFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/procuracoes" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><ProcuracoesFederal /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal/situacao-fiscal" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><SituacaoFiscalFederal /></ModuleGuard></AppLayout>} />
               <Route path="/parcelamentos" element={<AppLayout><ModuleGuard moduleName="parcelamentos"><EmBreve moduleKey="parcelamentos" /></ModuleGuard></AppLayout>} />
               <Route path="/certidoes" element={<AppLayout><ModuleGuard moduleName="certidoes"><EmBreve moduleKey="certidoes" /></ModuleGuard></AppLayout>} />
               <Route path="/processos" element={<AppLayout><ModuleGuard moduleName="processos"><EmBreve moduleKey="processos" /></ModuleGuard></AppLayout>} />

@@ -16,6 +16,7 @@ import { anoDe, declaracaoVigente, statusDas, useMatrizPgdasd } from '@/hooks/us
 import { faturamentoVigente, nivelLimite, nivelSublimite, useFaturamentoAno } from '@/hooks/useSerproFaturamento';
 import { statusDefis, useMatrizDefis } from '@/hooks/useSerproDefis';
 import { useProcuracoes, vencendo as procVencendo } from '@/hooks/useSerproProcuracoes';
+import { estadoSitfis, useMatrizSitfis } from '@/hooks/useSerproSitfis';
 
 type Tom = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
 
@@ -36,7 +37,6 @@ interface CartaoEmBreve {
 
 // Cartões que ainda não têm dado: acendem conforme cada onda do Integra Contador entra (relatório serpro-integra-contador-oportunidades-set2026).
 const EM_BREVE: CartaoEmBreve[] = [
-  { titulo: 'Situação fiscal', icone: Landmark, onda: 'Onda 3', fonte: 'Pendências e regulares' },
   { titulo: 'Parcelamentos', icone: CreditCard, onda: 'Onda 3', fonte: 'Parcela do mês e guia' },
   { titulo: 'e-Processo', icone: Scale, onda: 'Onda 3', fonte: 'Processos por interessado' },
   { titulo: 'DCTFWeb', icone: FileSpreadsheet, onda: 'Onda 4', fonte: 'Transmitidas e não entregues' },
@@ -56,6 +56,7 @@ export default function DashboardFederal() {
   const { data: leituras = [], isLoading: carregandoFat } = useFaturamentoAno(anoDe(competencia));
   const { data: defis = [], isLoading: carregandoDefis } = useMatrizDefis();
   const { data: procuracoes = [], isLoading: carregandoProc } = useProcuracoes();
+  const { data: sitfis = [], isLoading: carregandoSitfis } = useMatrizSitfis();
 
   const ativos = useMemo<CartaoAtivo[]>(() => {
     const selos = clientes.map((c) => seloCaixa(c).estado);
@@ -77,6 +78,11 @@ export default function DashboardFederal() {
     const fatAcima = fatConfiaveis.filter((f) => nivelLimite(f) === 'acima' || nivelSublimite(f) === 'acima').length;
     const fatPertoSub = fatConfiaveis.filter((f) => nivelSublimite(f) === 'perto').length;
     const fatFatorR = fatConfiaveis.filter((f) => f.fator_r_aplica === true).length;
+    const sfEstados = sitfis.filter((l) => !l.filial).map(estadoSitfis);
+    const sfSemPend = sfEstados.filter((e) => e === 'sem_pendencias').length;
+    const sfComPend = sfEstados.filter((e) => e === 'com_pendencias').length;
+    const sfConferir = sfEstados.filter((e) => e === 'a_conferir').length;
+    const sfGerados = sfEstados.filter((e) => e !== 'sem_relatorio').length;
     const pcCompletas = procuracoes.filter((l) => l.situacao === 'total').length;
     const pcSem = procuracoes.filter((l) => l.situacao === 'sem' || l.situacao === 'vencida').length;
     const pcVencendo = procuracoes.filter((l) => l.situacao !== 'vencida' && procVencendo(l)).length;
@@ -120,6 +126,10 @@ export default function DashboardFederal() {
         linhas: [`${dfEntregues} entregues em ${anoDefis}`, `${dfAtraso} não entregues · ${dfConsultados} clientes consultados`],
       },
       {
+        titulo: 'Situação fiscal', icone: Landmark, to: '/dashboard-federal/situacao-fiscal', tom: sfGerados === 0 ? 'neutral' : sfComPend > 0 ? 'danger' : sfConferir > 0 ? 'warn' : 'ok',
+        linhas: [`${sfSemPend} sem pendências · ${sfComPend} com pendências`, `${sfGerados} de ${sfEstados.length} clientes com relatório${sfConferir ? ` · ${sfConferir} a conferir` : ''}`],
+      },
+      {
         titulo: 'Termos de intimação', icone: Gavel, to: '/dashboard-federal/intimacoes', tom: abertas.length > 0 ? 'danger' : 'ok',
         linhas: [`${abertas.length} em aberto`, `${abertas.filter((m) => m.situacao === 'nova').length} novas sem responsável`],
       },
@@ -133,9 +143,9 @@ export default function DashboardFederal() {
         linhas: [`${vencidos} vencidos`, `${aVencer} vencem em 30 dias · ${certificados.length} no total`],
       },
     ];
-  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, competencia]);
+  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, sitfis, competencia]);
 
-  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc;
+  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc || carregandoSitfis;
 
   return (
     <div className="space-y-6">
@@ -147,7 +157,7 @@ export default function DashboardFederal() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {carregando
-          ? Array.from({ length: 11 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
+          ? Array.from({ length: 12 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
           : ativos.map((c) => {
             const Icone = c.icone;
             return (
