@@ -326,7 +326,8 @@ async function rotinaEventos(payload: any, uid: string | null, origem: "manual" 
     // "dados" pode chegar como objeto ou como texto (o trial devolve um JSON quebrado): lê dos dois jeitos.
     const d = s.resposta?.dados;
     const texto = typeof d === "string" ? d : JSON.stringify(d ?? {});
-    const protocolo = (d && typeof d === "object" && d.protocolo) || /"protocolo"\s*:\s*"([^"]+)"/.exec(texto)?.[1];
+    // Produção devolve "Protocolo" (P maiúsculo); o trial devolve "protocolo". Aceita os dois.
+    const protocolo = (d && typeof d === "object" && (d.Protocolo ?? d.protocolo)) || /"protocolo"\s*:\s*"([^"]+)"/i.exec(texto)?.[1];
     if (!protocolo) return { erro: `Serpro não devolveu o protocolo. Formato recebido: ${texto.slice(0, 300)}` };
     const tempoMs = Number((d && typeof d === "object" && (d.TempoEsperaMedioEmMs ?? d.tempoEsperaMedioEmMs)) || /"TempoEsperaMedioEmMs"\s*:\s*(\d+)/i.exec(texto)?.[1] || 3000);
     await sleep(Math.max(tempoMs, 3000) + 1500);
