@@ -41,7 +41,10 @@ function reg(sistema: string, tipo: Tipo, servicos: string[]) {
 }
 reg("PROCURACOES", "Consultar", ["OBTERPROCURACAO41"]);
 reg("DTE", "Consultar", ["CONSULTASITUACAODTE111"]);
-reg("CAIXAPOSTAL", "Consultar", ["MSGCONTRIBUINTE61", "MSGDETALHAMENTO62"]);
+// MSGDETALHAMENTO62 (ler o corpo da mensagem) NÃO entra aqui de propósito: caracteriza CIÊNCIA da intimação
+// (art. 23, § 2º, III, Decreto 70.235/1972) e marca a mensagem como lida. Só a função dedicada da Caixa Postal
+// pode chamá-lo, com confirmação individual e registro de quem abriu (decisão de Gabriel, 30/09/2026).
+reg("CAIXAPOSTAL", "Consultar", ["MSGCONTRIBUINTE61"]);
 reg("CAIXAPOSTAL", "Monitorar", ["INNOVAMSG63"]);
 reg("EVENTOSATUALIZACAO", "Monitorar", ["SOLICEVENTOSPJ132", "OBTEREVENTOSPJ134"]);
 reg("PAGTOWEB", "Consultar", ["PAGAMENTOS71", "CONTACONSDOCARRPG73"]);
