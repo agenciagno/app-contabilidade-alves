@@ -359,11 +359,6 @@ export const EM_BREVE: Record<string, EmBreveInfo> = {
     descricao: 'Atendimento de WhatsApp dentro do sistema, sobre a base do Chatwoot.',
     fase: 'F3 · Chatwoot + Agente IA',
   },
-  dashboard_federal: {
-    titulo: 'Dashboard Federal',
-    descricao: 'Situação de cada cliente na Receita: Caixa Postal, pendências e malha.',
-    fase: 'F4 · Serpro / Integra Contador',
-  },
   parcelamentos: {
     titulo: 'Parcelamentos',
     descricao: 'Parcelamentos federais por cliente, com parcelas e situação.',

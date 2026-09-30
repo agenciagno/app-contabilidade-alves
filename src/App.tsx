@@ -58,6 +58,10 @@ const Faturas = lazy(() => import("@/pages/Faturas"));
 const Equipe = lazy(() => import("@/pages/Equipe"));
 const ReformaTributariaCalculadora = lazy(() => import("@/pages/ReformaTributariaCalculadora"));
 const CadastroCertificados = lazy(() => import("@/pages/CadastroCertificados"));
+const DashboardFederal = lazy(() => import("@/pages/DashboardFederal"));
+const MensagensEcac = lazy(() => import("@/pages/MensagensEcac"));
+const TermosIntimacao = lazy(() => import("@/pages/TermosIntimacao"));
+const TechConsumoSerpro = lazy(() => import("@/pages/TechConsumoSerpro"));
 const ClassificacaoFiscal = lazy(() => import("@/pages/ClassificacaoFiscal"));
 
 const RouteFallback = () => (
@@ -143,6 +147,7 @@ const App = () => (
               <Route path="/tech/operacao" element={<Navigate to="/tech/clientes-externos" replace />} />
               <Route path="/tech/lgpd" element={<AppLayout><AudienceGuard audience="external"><TechLGPD /></AudienceGuard></AppLayout>} />
               <Route path="/tech/agente-ia" element={<AppLayout><AudienceGuard audience="internal"><TechAgenteIA /></AudienceGuard></AppLayout>} />
+              <Route path="/tech/consumo-serpro" element={<AppLayout><AudienceGuard audience="internal"><TechConsumoSerpro /></AudienceGuard></AppLayout>} />
               <Route path="/central-notificacoes" element={<AppLayout><CentralNotificacoes /></AppLayout>} />
 
               {/* Conta do usuário */}
@@ -166,7 +171,9 @@ const App = () => (
 
               {/* Monitoramento */}
               <Route path="/mensagens" element={<AppLayout><ModuleGuard moduleName="mensagens"><EmBreve moduleKey="mensagens" /></ModuleGuard></AppLayout>} />
-              <Route path="/dashboard-federal" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><EmBreve moduleKey="dashboard_federal" /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><DashboardFederal /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal/mensagens" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><MensagensEcac /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal/intimacoes" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><TermosIntimacao /></ModuleGuard></AppLayout>} />
               <Route path="/parcelamentos" element={<AppLayout><ModuleGuard moduleName="parcelamentos"><EmBreve moduleKey="parcelamentos" /></ModuleGuard></AppLayout>} />
               <Route path="/certidoes" element={<AppLayout><ModuleGuard moduleName="certidoes"><EmBreve moduleKey="certidoes" /></ModuleGuard></AppLayout>} />
               <Route path="/processos" element={<AppLayout><ModuleGuard moduleName="processos"><EmBreve moduleKey="processos" /></ModuleGuard></AppLayout>} />

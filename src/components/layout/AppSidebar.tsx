@@ -196,6 +196,7 @@ export const menuEntries: MenuEntry[] = [
       { title: 'Canais de Suporte', url: '/tech/suporte-canais', icon: MessageSquare, iconName: 'message-square', requireSuperAdmin: true, audience: 'external' },
       { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check', requireAdmin: true, audience: 'external' },
       { title: 'Agente IA', url: '/tech/agente-ia', icon: Bot, iconName: 'bot', requireAdmin: true, audience: 'internal' },
+      { title: 'Consumo Serpro', url: '/tech/consumo-serpro', icon: Gauge, iconName: 'gauge', requireAdmin: true, audience: 'internal' },
       { title: 'Central de Notificações', url: '/central-notificacoes', icon: BellRing, iconName: 'bell-ring', requireSuperAdmin: true },
     ],
   },
