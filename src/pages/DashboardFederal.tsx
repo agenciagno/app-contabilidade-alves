@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  BadgeCheck, BarChart3, ClipboardList, CreditCard, FileCheck, FileSignature, FileSpreadsheet, FileX,
+  BadgeCheck, Banknote, BarChart3, ClipboardList, CreditCard, FileCheck, FileSignature, FileSpreadsheet, FileX,
   Gauge, Gavel, Landmark, Mail, Percent, Receipt, Scale, ShieldCheck, UserX, ArrowRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { diasParaVencer, useCertificates } from '@/hooks/useCertificates';
 import { STATUS_MONITORADO, seloCaixa, useClientesCaixa, useMensagensCriticas } from '@/hooks/useSerproCaixaPostal';
 import { competenciaPadrao, rotuloCompetencia, useMatrizPagamentos } from '@/hooks/useSerproPagamentos';
+import { anoDe, declaracaoVigente, statusDas, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
 
 type Tom = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
 
@@ -32,8 +33,6 @@ interface CartaoEmBreve {
 
 // Cartões que ainda não têm dado: acendem conforme cada onda do Integra Contador entra (relatório serpro-integra-contador-oportunidades-set2026).
 const EM_BREVE: CartaoEmBreve[] = [
-  { titulo: 'PGDAS', icone: FileCheck, onda: 'Onda 2', fonte: 'Transmitidas e não entregues' },
-  { titulo: 'DAS', icone: Receipt, onda: 'Onda 2', fonte: 'Pagos, não pagos e sem DAS' },
   { titulo: 'Faturamento', icone: BarChart3, onda: 'Onda 2', fonte: 'Últimos 12 meses (Simples)' },
   { titulo: 'Sublimite do Simples', icone: Gauge, onda: 'Onda 2', fonte: 'Receita acumulada x limite' },
   { titulo: 'Fator R', icone: Percent, onda: 'Onda 2', fonte: 'Folha sobre receita' },
@@ -54,6 +53,7 @@ export default function DashboardFederal() {
   const { data: certificados = [], isLoading: carregandoCert } = useCertificates();
   const competencia = competenciaPadrao();
   const { data: pagamentos = [], isLoading: carregandoPag } = useMatrizPagamentos(competencia);
+  const { data: simples = [], isLoading: carregandoSn } = useMatrizPgdasd(anoDe(competencia));
 
   const ativos = useMemo<CartaoAtivo[]>(() => {
     const selos = clientes.map((c) => seloCaixa(c).estado);
@@ -64,6 +64,11 @@ export default function DashboardFederal() {
     const aVencer = certificados.filter((c) => { const d = diasParaVencer(c.data_validade); return d >= 0 && d <= 30; }).length;
     const pagNovos = pagamentos.filter((l) => l.novo).length;
     const pagConsultados = pagamentos.filter((l) => l.consultadoEm).length;
+    const snConsultados = simples.filter((l) => !l.filial && l.consultadoEm);
+    const snTransmitidas = snConsultados.filter((l) => declaracaoVigente(l, competencia)).length;
+    const snPagos = snConsultados.filter((l) => statusDas(l, competencia) === 'pago').length;
+    const snNaoPagos = snConsultados.filter((l) => ['nao_pago', 'parcial'].includes(statusDas(l, competencia))).length;
+    const snTotal = simples.filter((l) => !l.filial).length;
     return [
       {
         titulo: 'Mensagens e-CAC', icone: Mail, to: '/mensagens', tom: comMensagem > 0 ? 'warn' : 'ok',
@@ -72,6 +77,14 @@ export default function DashboardFederal() {
       {
         titulo: 'Pagamentos', icone: Receipt, to: '/dashboard-federal/pagamentos', tom: pagNovos > 0 ? 'warn' : pagConsultados > 0 ? 'ok' : 'neutral',
         linhas: [`${pagNovos} com pagamento novo`, `${pagConsultados} de ${pagamentos.length} consultados em ${rotuloCompetencia(competencia)}`],
+      },
+      {
+        titulo: 'PGDAS', icone: FileCheck, to: '/dashboard-federal/pgdas', tom: snConsultados.length === 0 ? 'neutral' : snTransmitidas < snConsultados.length ? 'warn' : 'ok',
+        linhas: [`${snTransmitidas} de ${snConsultados.length} transmitidas em ${rotuloCompetencia(competencia)}`, `${snConsultados.length} de ${snTotal} clientes do Simples consultados`],
+      },
+      {
+        titulo: 'DAS', icone: Banknote, to: '/dashboard-federal/das', tom: snNaoPagos > 0 ? 'warn' : snPagos > 0 ? 'ok' : 'neutral',
+        linhas: [`${snPagos} pagos · ${snNaoPagos} não pagos`, `em ${rotuloCompetencia(competencia)}, entre os consultados`],
       },
       {
         titulo: 'Termos de intimação', icone: Gavel, to: '/dashboard-federal/intimacoes', tom: abertas.length > 0 ? 'danger' : 'ok',
@@ -86,9 +99,9 @@ export default function DashboardFederal() {
         linhas: [`${vencidos} vencidos`, `${aVencer} vencem em 30 dias · ${certificados.length} no total`],
       },
     ];
-  }, [clientes, criticas, certificados, pagamentos, competencia]);
+  }, [clientes, criticas, certificados, pagamentos, simples, competencia]);
 
-  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag;
+  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn;
 
   return (
     <div className="space-y-6">
@@ -100,7 +113,7 @@ export default function DashboardFederal() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {carregando
-          ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
+          ? Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
           : ativos.map((c) => {
             const Icone = c.icone;
             return (

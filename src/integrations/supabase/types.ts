@@ -4972,6 +4972,234 @@ export type Database = {
           },
         ]
       }
+      serpro_pgdasd_consultas: {
+        Row: {
+          ano: number
+          company_id: string
+          consultado_em: string
+          consultado_por: string | null
+          contact_id: string
+          das: number
+          declaracoes: number
+        }
+        Insert: {
+          ano: number
+          company_id: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id: string
+          das?: number
+          declaracoes?: number
+        }
+        Update: {
+          ano?: number
+          company_id?: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id?: string
+          das?: number
+          declaracoes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_pgdasd_consultas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_pgdasd_consultas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_pgdasd_consultas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_pgdasd_das: {
+        Row: {
+          company_id: string
+          composicao: Json | null
+          contact_id: string
+          created_at: string
+          das_pago: boolean | null
+          das_path: string | null
+          emitido_em: string | null
+          extrato_path: string | null
+          id: string
+          limite_acolhimento: string | null
+          numero_das: string
+          periodo_apuracao: string
+          sincronizado_em: string
+          tipo_operacao: string | null
+          updated_at: string
+          valor_juros: number | null
+          valor_multa: number | null
+          valor_principal: number | null
+          valor_total: number | null
+          vencimento: string | null
+          visivel_portal: boolean
+        }
+        Insert: {
+          company_id: string
+          composicao?: Json | null
+          contact_id: string
+          created_at?: string
+          das_pago?: boolean | null
+          das_path?: string | null
+          emitido_em?: string | null
+          extrato_path?: string | null
+          id?: string
+          limite_acolhimento?: string | null
+          numero_das: string
+          periodo_apuracao: string
+          sincronizado_em?: string
+          tipo_operacao?: string | null
+          updated_at?: string
+          valor_juros?: number | null
+          valor_multa?: number | null
+          valor_principal?: number | null
+          valor_total?: number | null
+          vencimento?: string | null
+          visivel_portal?: boolean
+        }
+        Update: {
+          company_id?: string
+          composicao?: Json | null
+          contact_id?: string
+          created_at?: string
+          das_pago?: boolean | null
+          das_path?: string | null
+          emitido_em?: string | null
+          extrato_path?: string | null
+          id?: string
+          limite_acolhimento?: string | null
+          numero_das?: string
+          periodo_apuracao?: string
+          sincronizado_em?: string
+          tipo_operacao?: string | null
+          updated_at?: string
+          valor_juros?: number | null
+          valor_multa?: number | null
+          valor_principal?: number | null
+          valor_total?: number | null
+          vencimento?: string | null
+          visivel_portal?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_pgdasd_das_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_pgdasd_das_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_pgdasd_das_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_pgdasd_declaracoes: {
+        Row: {
+          company_id: string
+          contact_id: string
+          created_at: string
+          declaracao_path: string | null
+          documentos_em: string | null
+          id: string
+          maed_darf_path: string | null
+          maed_notificacao_path: string | null
+          malha: string | null
+          numero_declaracao: string
+          periodo_apuracao: string
+          recibo_path: string | null
+          sincronizado_em: string
+          tipo: string
+          transmitida_em: string | null
+          updated_at: string
+          visivel_portal: boolean
+        }
+        Insert: {
+          company_id: string
+          contact_id: string
+          created_at?: string
+          declaracao_path?: string | null
+          documentos_em?: string | null
+          id?: string
+          maed_darf_path?: string | null
+          maed_notificacao_path?: string | null
+          malha?: string | null
+          numero_declaracao: string
+          periodo_apuracao: string
+          recibo_path?: string | null
+          sincronizado_em?: string
+          tipo: string
+          transmitida_em?: string | null
+          updated_at?: string
+          visivel_portal?: boolean
+        }
+        Update: {
+          company_id?: string
+          contact_id?: string
+          created_at?: string
+          declaracao_path?: string | null
+          documentos_em?: string | null
+          id?: string
+          maed_darf_path?: string | null
+          maed_notificacao_path?: string | null
+          malha?: string | null
+          numero_declaracao?: string
+          periodo_apuracao?: string
+          recibo_path?: string | null
+          sincronizado_em?: string
+          tipo?: string
+          transmitida_em?: string | null
+          updated_at?: string
+          visivel_portal?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_pgdasd_declaracoes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_pgdasd_declaracoes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_pgdasd_declaracoes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
       serpro_procuracoes: {
         Row: {
           codigo_procuracao: string

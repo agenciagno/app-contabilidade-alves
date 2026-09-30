@@ -1,17 +1,18 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, Eye, Loader2, RefreshCw } from 'lucide-react';
+import { Eye, Loader2, RefreshCw } from 'lucide-react';
 
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { CompetenciaNav } from '@/components/serpro/CompetenciaNav';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { PagamentosClienteSheet } from '@/components/serpro/PagamentosClienteSheet';
 import { useConsultaPagamentos } from '@/components/serpro/useConsultaPagamentos';
 import {
-  TIPOS_DOC, competenciaPadrao, deslocarCompetencia, mesDeData, rotuloCompetencia, siglaCompetencia, useMatrizPagamentos,
+  TIPOS_DOC, competenciaPadrao, mesDeData, siglaCompetencia, useMatrizPagamentos,
   type LinhaPagamentos, type TipoDoc,
 } from '@/hooks/useSerproPagamentos';
 import type { TabelaExport } from '@/lib/exportarTabela';
@@ -113,20 +114,7 @@ export default function PagamentosFederal() {
         actions={<ExportarMenu montar={() => tabelaExport(filtradas, competencia)} disabled={filtradas.length === 0} escolherColunas />}
       />
 
-      <div className="flex justify-center">
-        <div className="flex items-center gap-2 rounded-lg border border-line bg-paper p-1.5">
-          <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => setCompetencia(deslocarCompetencia(competencia, -1))} title="Mês anterior">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="min-w-[200px] text-center">
-            <p className="text-[15px] font-medium text-ink">{rotuloCompetencia(competencia)}</p>
-            <p className="text-meta text-muted-ink-2">Período de apuração {siglaCompetencia(competencia)}</p>
-          </div>
-          <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => setCompetencia(deslocarCompetencia(competencia, 1))} disabled={competencia >= limite} title="Próximo mês">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <CompetenciaNav competencia={competencia} onChange={setCompetencia} limite={limite} />
 
       <StatCardRow
         items={[
