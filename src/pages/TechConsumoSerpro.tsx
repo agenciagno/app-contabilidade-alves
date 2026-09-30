@@ -105,6 +105,12 @@ export default function TechConsumoSerpro() {
         subtitle={`Ciclo de cobrança: ${ciclo.rotulo}. Valores são estimativa a partir do nosso registro de chamadas; o oficial fica em “Consultar Consumo” na Área do Cliente do Serpro.`}
       />
 
+      <DsAlert
+        tone="info"
+        title="Como funciona o custo"
+        description={'O selo da Caixa Postal é grátis (rotina diária das 07:30). "Consultar" baixa a lista de mensagens de um cliente e custa R$ 0,24 por consulta (1ª faixa do contrato), sem registrar ciência. O corpo de cada mensagem só abre por clique individual, depois do aviso de ciência. Serviços de monitoramento e apoio não são cobrados.'}
+      />
+
       {passouAlerta && (
         <DsAlert tone="warn" title="Gasto do ciclo acima do alerta" description={`A estimativa (${reais(r.custo)}) passou do limite de ${reais(alertaValor)}. Confira o que mais consumiu abaixo.`} />
       )}

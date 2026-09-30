@@ -3,14 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Download, Eye, Loader2, RefreshCw } from 'lucide-react';
 
-import { DsAlert, DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
+import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { MensagensClienteSheet } from '@/components/serpro/MensagensClienteSheet';
-import { reais, useConsultaCliente } from '@/components/serpro/useConsultaCliente';
-import { CUSTO_CONSULTA_LISTA, seloCaixa, useClientesCaixa, type ClienteCaixa, type SeloEstado } from '@/hooks/useSerproCaixaPostal';
+import { useConsultaCliente } from '@/components/serpro/useConsultaCliente';
+import { seloCaixa, useClientesCaixa, type ClienteCaixa, type SeloEstado } from '@/hooks/useSerproCaixaPostal';
 
 const REGIMES: Record<string, string> = {
   simples_nacional: 'Simples Nacional',
@@ -104,12 +104,6 @@ export default function MensagensEcac() {
         ]}
       />
 
-      <DsAlert
-        tone="info"
-        title="Como funciona o custo"
-        description={`O selo é grátis. "Consultar" baixa a lista do cliente (${reais(CUSTO_CONSULTA_LISTA)} por consulta) e não registra ciência. O corpo de cada mensagem só abre por clique individual, depois de um aviso de ciência.`}
-      />
-
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <SearchField
           placeholder="Buscar por razão social ou CNPJ..."
@@ -173,7 +167,7 @@ export default function MensagensEcac() {
                     </TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" variant="outline" disabled={consultando || c.procuracao === 'ausente'}
-                        title={c.procuracao === 'ausente' ? 'Sem procuração' : `Baixar a lista (${reais(CUSTO_CONSULTA_LISTA)})`}
+                        title={c.procuracao === 'ausente' ? 'Sem procuração' : 'Baixar a lista de mensagens'}
                         onClick={(e) => { e.stopPropagation(); executar(c.contact_id); }}>
                         {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
                         Consultar

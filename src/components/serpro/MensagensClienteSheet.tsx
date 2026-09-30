@@ -10,9 +10,9 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAbrirMensagemFlow } from '@/components/serpro/AbrirMensagemFlow';
-import { reais, useConsultaCliente } from '@/components/serpro/useConsultaCliente';
+import { useConsultaCliente } from '@/components/serpro/useConsultaCliente';
 import {
-  CATEGORIAS, CUSTO_CONSULTA_LISTA, SITUACOES, diasParaPrazo, seloCaixa,
+  CATEGORIAS, SITUACOES, diasParaPrazo, seloCaixa,
   useAcompanharMensagem, useMensagensCliente,
   type ClienteCaixa, type MensagemCaixa, type SituacaoMsg,
 } from '@/hooks/useSerproCaixaPostal';
@@ -58,7 +58,7 @@ export function MensagensClienteSheet({ cliente, onClose }: { cliente: ClienteCa
           <div className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-bg-2 p-4">
             <Button onClick={() => executar(cliente.contact_id)} disabled={consultando || semProcuracao}>
               {consultando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-              Consultar ({reais(CUSTO_CONSULTA_LISTA)})
+              Consultar
             </Button>
             <p className="min-w-[220px] flex-1 text-meta text-muted-ink">
               {semProcuracao
@@ -132,7 +132,7 @@ export function MensagensClienteSheet({ cliente, onClose }: { cliente: ClienteCa
 
             {proximo && (
               <Button variant="outline" className="w-full" disabled={consultando} onClick={() => executar(cliente.contact_id, true, proximo)}>
-                Carregar mais antigas ({reais(CUSTO_CONSULTA_LISTA)})
+                Carregar mais antigas
               </Button>
             )}
           </div>
