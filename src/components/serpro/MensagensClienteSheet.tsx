@@ -30,6 +30,7 @@ export function MensagensClienteSheet({ cliente, onClose }: { cliente: ClienteCa
   if (!cliente) return null;
   const selo = seloCaixa(cliente);
   const semProcuracao = cliente.procuracao === 'ausente';
+  const inativo = selo.estado === 'inativo';
   const consultando = emAndamento === cliente.contact_id;
   const proximo = proximos[cliente.contact_id] ?? null;
 
@@ -56,14 +57,16 @@ export function MensagensClienteSheet({ cliente, onClose }: { cliente: ClienteCa
           </SheetHeader>
 
           <div className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-bg-2 p-4">
-            <Button onClick={() => executar(cliente.contact_id)} disabled={consultando || semProcuracao}>
+            <Button onClick={() => executar(cliente.contact_id)} disabled={consultando || semProcuracao || inativo}>
               {consultando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
               Consultar
             </Button>
             <p className="min-w-[220px] flex-1 text-meta text-muted-ink">
-              {semProcuracao
-                ? 'Sem procuração para a Caixa Postal: peça ao cliente para outorgá-la no e-CAC.'
-                : 'Baixa as 50 mensagens mais recentes (lidas e não lidas). Não registra ciência.'}
+              {inativo
+                ? `Cliente fora do monitoramento (${cliente.status_cliente ?? 'sem status'}). O Serpro só é consultado para clientes ativos.`
+                : semProcuracao
+                  ? 'Sem procuração para a Caixa Postal: peça ao cliente para outorgá-la no e-CAC.'
+                  : 'Baixa as 50 mensagens mais recentes (lidas e não lidas). Não registra ciência.'}
             </p>
           </div>
 

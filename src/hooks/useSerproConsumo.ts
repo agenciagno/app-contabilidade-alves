@@ -2,9 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
 
-// Tabelas novas (serpro_*) ainda fora de types.ts.
-const db = supabase as unknown as { from: (t: string) => any };
-
 export interface ChamadaSerpro {
   created_at: string;
   ambiente: 'trial' | 'producao';
@@ -71,14 +68,14 @@ export function useConsumoSerpro() {
     queryFn: async (): Promise<ChamadaSerpro[]> => {
       const linhas: ChamadaSerpro[] = [];
       for (let de = 0; ; de += 1000) {
-        const { data, error } = await db
+        const { data, error } = await supabase
           .from('serpro_call_log')
           .select('created_at, ambiente, tipo_chamada, id_sistema, id_servico, status_http, cobravel, acionado_por, origem')
           .gte('created_at', ciclo.inicio.toISOString())
           .order('created_at', { ascending: false })
           .range(de, de + 999);
         if (error) throw error;
-        linhas.push(...(data ?? []));
+        linhas.push(...((data ?? []) as unknown as ChamadaSerpro[]));
         if (!data || data.length < 1000) break; // PostgREST corta em 1000 linhas por página
       }
       return linhas;
@@ -92,7 +89,7 @@ export function useSerproConfig() {
     queryKey: ['serpro-config', company?.id],
     enabled: !!company?.id,
     queryFn: async (): Promise<SerproConfig> => {
-      const { data, error } = await db.from('serpro_config').select('alerta_gasto_mensal, volume_declarado_mes').eq('company_id', company!.id).maybeSingle();
+      const { data, error } = await supabase.from('serpro_config').select('alerta_gasto_mensal, volume_declarado_mes').eq('company_id', company!.id).maybeSingle();
       if (error) throw error;
       return { alerta_gasto_mensal: Number(data?.alerta_gasto_mensal ?? 100), volume_declarado_mes: data?.volume_declarado_mes ?? null };
     },
@@ -104,7 +101,7 @@ export function useSalvarSerproConfig() {
   const { company } = useCompany();
   return useMutation({
     mutationFn: async (v: SerproConfig) => {
-      const { error } = await db
+      const { error } = await supabase
         .from('serpro_config')
         .update({ alerta_gasto_mensal: v.alerta_gasto_mensal, volume_declarado_mes: v.volume_declarado_mes })
         .eq('company_id', company!.id);

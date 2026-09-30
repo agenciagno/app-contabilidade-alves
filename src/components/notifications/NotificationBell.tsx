@@ -4,7 +4,7 @@ import { formatDistanceToNow, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Bell, AlertTriangle, Clock, CheckCircle, UserPlus,
-  ArrowRightLeft, Calendar, Info, CalendarClock, CalendarX, HandCoins,
+  ArrowRightLeft, Calendar, Info, CalendarClock, CalendarX, HandCoins, Mail,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -31,6 +31,7 @@ const TYPE_META: Record<string, { icon: any; color: string }> = {
   due_alert: { icon: Clock, color: 'text-warn' },
   overdue: { icon: AlertTriangle, color: 'text-danger' },
   boleto_pago: { icon: HandCoins, color: 'text-ok' },
+  serpro_mensagem: { icon: Mail, color: 'text-warn' },
 };
 
 const DEADLINE_BADGES: Record<string, { label: string; className: string }> = {

@@ -11,6 +11,8 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 //   abrir            { mensagem_id, ciencia_confirmada: true }  lê o CORPO de UMA mensagem (MSGDETALHAMENTO62).
 //                    GERA CIÊNCIA da intimação (art. 23 §2º III, Dec. 70.235/72). Só com confirmação explícita.
 //   acompanhar       { mensagem_id, situacao?, responsavel_id?, observacoes?, visivel_portal? }
+//   avisar           { mensagem_id, canal: email|whatsapp|copiar, mensagem, assunto? }  avisa o CLIENTE (nunca envia o corpo da
+//                    intimação); e-mail sai daqui, WhatsApp/copiar só registram o histórico.
 //   rotina_eventos   rotina diária (07:30 BRT, cron): EVENTOSATUALIZACAO E0601, grátis (/Monitorar), sem ciência.
 //                    { limite?: n } (teste com poucos CNPJs) · { forcar?: true } (ignora a trava de 12 h)
 //
@@ -34,6 +36,12 @@ const TRIAL_BEARER = Deno.env.get("SERPRO_TRIAL_BEARER") ?? "06aef429-a981-3ec5-
 const TIMEOUT_MS = 28_000;
 const RECENTE_MIN = 15; // consultar de novo antes disso pede confirmação (force)
 const BASE_LEGAL = "LGPD art. 7º, V (execução de contrato) e II (obrigação legal/regulatória) — CA na qualidade de procuradora do contribuinte";
+// Só cliente com status "Ativo" entra na rotina e nas consultas (decisão de Gabriel, 01/10/2026): suspenso por falta de
+// pagamento ("Suspensa - Contabilidade"), ex-cliente, baixado, inapto etc. não geram nenhuma chamada ao Serpro.
+// O status é lido do cadastro a cada chamada, então mudar o cadastro muda o comportamento na hora.
+const STATUS_MONITORADO = "Ativo";
+const msgForaMonitoramento = (status: string | null) =>
+  `Cliente fora do monitoramento (status: ${status ?? "sem status"}). O Serpro só é consultado para clientes com status "${STATUS_MONITORADO}".`;
 
 type Tipo = "Apoiar" | "Consultar" | "Declarar" | "Emitir" | "Monitorar";
 type Categoria = "intimacao" | "malha" | "exclusao_simples" | "maed" | "cobranca" | "processo" | "informativo";
@@ -189,8 +197,9 @@ function classificar(assunto: string, regras: { re: RegExp; categoria: Categoria
 // ---------- ações ----------
 async function consultar(payload: any, uid: string) {
   const contactId = String(payload.contact_id ?? "");
-  const { data: contato } = await supabase.from("contacts").select("id,name,document").eq("id", contactId).eq("company_id", COMPANY_ID).maybeSingle();
+  const { data: contato } = await supabase.from("contacts").select("id,name,document,status_cliente").eq("id", contactId).eq("company_id", COMPANY_ID).maybeSingle();
   if (!contato) return json({ error: "Cliente não encontrado" }, 404);
+  if (contato.status_cliente !== STATUS_MONITORADO) return json({ ok: false, foraDoMonitoramento: true, error: msgForaMonitoramento(contato.status_cliente) });
   const cnpj = onlyDigits(contato.document);
   if (cnpj.length !== 14) return json({ error: "Cliente sem CNPJ válido" }, 400);
   const ponteiro = payload.ponteiro ? String(payload.ponteiro) : null;
@@ -263,7 +272,8 @@ async function abrir(payload: any, uid: string) {
     .select("id,isn,contact_id,assunto,corpo,data_leitura,data_ciencia").eq("id", String(payload.mensagem_id ?? "")).eq("company_id", COMPANY_ID).maybeSingle();
   if (!msg) return json({ error: "Mensagem não encontrada" }, 404);
   if (msg.corpo) return json({ ok: true, jaAberta: true, corpo: msg.corpo });
-  const { data: contato } = await supabase.from("contacts").select("document").eq("id", msg.contact_id).maybeSingle();
+  const { data: contato } = await supabase.from("contacts").select("document,status_cliente").eq("id", msg.contact_id).maybeSingle();
+  if (contato?.status_cliente !== STATUS_MONITORADO) return json({ ok: false, foraDoMonitoramento: true, error: msgForaMonitoramento(contato?.status_cliente ?? null) });
   const cnpj = onlyDigits(contato?.document);
   if (cnpj.length !== 14) return json({ error: "Cliente sem CNPJ válido" }, 400);
 
@@ -310,7 +320,8 @@ async function rotinaEventos(payload: any, uid: string | null, origem: "manual" 
       .eq("id_servico", "SOLICEVENTOSPJ132").gte("created_at", desde).gte("status_http", 200).lt("status_http", 300);
     if ((count ?? 0) > 0) return json({ ok: true, ignorado: "A rotina já rodou nas últimas 12 h." });
   }
-  const { data: contatos } = await supabase.from("contacts").select("id,document").eq("company_id", COMPANY_ID).eq("is_active", true);
+  const { data: contatos } = await supabase.from("contacts").select("id,document")
+    .eq("company_id", COMPANY_ID).eq("is_active", true).eq("status_cliente", STATUS_MONITORADO);
   let alvo = (contatos ?? []).map((c: any) => ({ id: c.id as string, cnpj: onlyDigits(c.document) }))
     .filter((c) => c.cnpj.length === 14 && !CNPJS_DA_CA.has(c.cnpj));
   if (payload.limite) alvo = alvo.slice(0, Math.min(Number(payload.limite), 1000));
@@ -360,6 +371,15 @@ async function rotinaEventos(payload: any, uid: string | null, origem: "manual" 
   const linhas: any[] = [];
   const ausentes: string[] = [];
   const ativos: string[] = [];
+  // Estado anterior, para detectar mensagem nova (a data do evento avançou) sem barulho na 1ª vez de cada cliente:
+  // sem leitura anterior da rotina, ou sem procuração antes, é só linha de base.
+  const { data: antes } = await supabase.from("serpro_caixa_postal_resumo")
+    .select("contact_id,evento_ultima_data,evento_verificado_em").eq("company_id", COMPANY_ID).limit(1000);
+  const { data: procsAntes } = await supabase.from("serpro_procuracoes")
+    .select("contact_id,status").eq("company_id", COMPANY_ID).eq("codigo_procuracao", "00006").limit(1000);
+  const estadoAntes = new Map((antes ?? []).map((r: any) => [r.contact_id, r]));
+  const procAntes = new Map((procsAntes ?? []).map((p: any) => [p.contact_id, p.status]));
+  const novidades: string[] = [];
   for (const [cnpj, d] of res.linhas!) {
     const id = porCnpj.get(onlyDigits(cnpj));
     if (!id) continue;
@@ -367,6 +387,8 @@ async function rotinaEventos(payload: any, uid: string | null, origem: "manual" 
     ativos.push(id);
     let data: string | null = null;
     if (/^\d{6}$/.test(d)) { data = `20${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4, 6)}`; comEvento++; } else semEvento++;
+    const ant: any = estadoAntes.get(id);
+    if (data && ant?.evento_verificado_em && procAntes.get(id) === "ativa" && (!ant.evento_ultima_data || data > ant.evento_ultima_data)) novidades.push(id);
     linhas.push({ contact_id: id, company_id: COMPANY_ID, evento_ultima_data: data, evento_verificado_em: agora });
   }
   if (linhas.length) await supabase.from("serpro_caixa_postal_resumo").upsert(linhas, { onConflict: "contact_id" });
@@ -376,7 +398,70 @@ async function rotinaEventos(payload: any, uid: string | null, origem: "manual" 
     { onConflict: "contact_id,codigo_procuracao" }) : Promise.resolve();
   await marca(ausentes, "ausente");
   await marca(ativos, "ativa");
-  return json({ ok: true, modo_autor: modo, consultados: res.linhas!.length, com_evento: comEvento, sem_evento: semEvento, sem_procuracao: semProcuracao });
+  if (novidades.length) await notificarNovidades(novidades);
+  return json({ ok: true, modo_autor: modo, consultados: res.linhas!.length, com_evento: comEvento, sem_evento: semEvento, sem_procuracao: semProcuracao, novidades: novidades.length });
+}
+
+// Um aviso interno por rodada (não um por cliente): lista os primeiros nomes e leva para a tela de Mensagens.
+// Vai para admins e para quem tem o módulo dashboard_federal (mesmo critério do ModuleGuard das telas).
+async function notificarNovidades(ids: string[]) {
+  try {
+    const { data: nomes } = await supabase.from("contacts").select("id,name,display_name").in("id", ids.slice(0, 100));
+    const lista = (nomes ?? []).map((c: any) => (c.display_name || c.name) as string).sort((a, b) => a.localeCompare(b, "pt-BR"));
+    const corpo = lista.slice(0, 5).join(", ") + (ids.length > 5 ? ` e mais ${ids.length - 5}` : "");
+    const { data: alvos } = await supabase.from("profiles").select("user_id")
+      .eq("company_id", COMPANY_ID).eq("status_active", true).or("role.in.(admin,super_admin),allowed_modules.cs.{dashboard_federal}");
+    if (!alvos?.length) return;
+    await supabase.from("notifications").insert(alvos.map((t: { user_id: string }) => ({
+      user_id: t.user_id,
+      company_id: COMPANY_ID,
+      type: "serpro_mensagem",
+      title: ids.length === 1 ? "Nova mensagem na Caixa Postal (e-CAC)" : `${ids.length} clientes com mensagem nova (e-CAC)`,
+      body: corpo,
+      action_url: "/dashboard-federal/mensagens?selo=nova",
+    })));
+  } catch (e) {
+    console.error("Falha ao notificar novas mensagens:", String((e as Error).message || e));
+  }
+}
+
+// Aviso ao cliente sobre uma mensagem da Caixa Postal. Nunca leva o corpo da intimação: só o texto que a equipe revisou.
+// E-mail sai por aqui (API de e-mail da Hostinger, mesmos segredos do boleto-notificar-cliente); WhatsApp abre no navegador
+// do usuário (wa.me) e esta ação só registra o histórico.
+async function avisar(payload: any, uid: string) {
+  const canal = String(payload.canal ?? "");
+  if (!["email", "whatsapp", "copiar"].includes(canal)) return json({ error: "Canal inválido" }, 400);
+  const texto = String(payload.mensagem ?? "").trim().slice(0, 4000);
+  if (!texto) return json({ error: "Escreva a mensagem ao cliente" }, 400);
+  const { data: msg } = await supabase.from("serpro_caixa_postal_mensagens")
+    .select("id,contact_id").eq("id", String(payload.mensagem_id ?? "")).eq("company_id", COMPANY_ID).maybeSingle();
+  if (!msg) return json({ error: "Mensagem não encontrada" }, 404);
+  const { data: contato } = await supabase.from("contacts").select("email,whatsapp,phone").eq("id", msg.contact_id).maybeSingle();
+  const { data: perfil } = await supabase.from("profiles").select("id").eq("user_id", uid).maybeSingle();
+
+  let destino: string | null = null;
+  if (canal === "email") {
+    destino = contato?.email ?? null;
+    if (!destino) return json({ error: "Cliente não tem e-mail cadastrado." }, 400);
+    const token = Deno.env.get("HOSTINGER_MAIL_API_TOKEN");
+    const resourceId = Deno.env.get("HOSTINGER_MAIL_RESOURCE_ID");
+    if (!token || !resourceId) return json({ error: "E-mail não configurado (faltam os segredos da Hostinger)." }, 500);
+    const assunto = String(payload.assunto ?? "").trim().slice(0, 200) || "Comunicação da Receita Federal para a sua empresa";
+    const res = await fetch(`https://api.mail.hostinger.com/api/v1/mailboxes/${resourceId}/send`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ to: [destino], subject: assunto, text: texto }),
+    });
+    if (!res.ok) return json({ error: `Falha ao enviar e-mail (HTTP ${res.status})` }, 502);
+  } else if (canal === "whatsapp") {
+    destino = contato?.whatsapp || contato?.phone || null;
+  }
+
+  const { error } = await supabase.from("serpro_caixa_postal_avisos").insert({
+    company_id: COMPANY_ID, mensagem_id: msg.id, contact_id: msg.contact_id, canal, destino, mensagem: texto, enviado_por: perfil?.id ?? null,
+  });
+  if (error) return json({ ok: true, aviso: "Aviso enviado, mas o histórico não foi gravado." });
+  return json({ ok: true });
 }
 
 function jwtRole(token: string): string | null {
@@ -412,9 +497,10 @@ Deno.serve(async (req) => {
     case "consultar": return await consultar(payload, uid);
     case "abrir": return await abrir(payload, uid);
     case "acompanhar": return await acompanhar(payload, uid);
+    case "avisar": return await avisar(payload, uid);
     case "rotina_eventos":
       if (!admin) return json({ error: "Só administradores rodam a rotina manualmente" }, 403);
       return await rotinaEventos(payload, uid, "manual");
-    default: return json({ error: "action inválida (consultar | abrir | acompanhar | rotina_eventos)" }, 400);
+    default: return json({ error: "action inválida (consultar | abrir | acompanhar | avisar | rotina_eventos)" }, 400);
   }
 });

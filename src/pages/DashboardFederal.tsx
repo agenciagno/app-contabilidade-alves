@@ -10,7 +10,7 @@ import { DsBadge, IconBox, PageHeader } from '@/components/ds';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { diasParaVencer, useCertificates } from '@/hooks/useCertificates';
-import { seloCaixa, useClientesCaixa, useMensagensCriticas } from '@/hooks/useSerproCaixaPostal';
+import { STATUS_MONITORADO, seloCaixa, useClientesCaixa, useMensagensCriticas } from '@/hooks/useSerproCaixaPostal';
 
 type Tom = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
 
@@ -48,7 +48,8 @@ const EM_BREVE: CartaoEmBreve[] = [
 ];
 
 export default function DashboardFederal() {
-  const { data: clientes = [], isLoading: carregandoClientes } = useClientesCaixa();
+  const { data: todos = [], isLoading: carregandoClientes } = useClientesCaixa();
+  const clientes = useMemo(() => todos.filter((c) => c.status_cliente === STATUS_MONITORADO), [todos]);
   const { data: criticas = [], isLoading: carregandoCriticas } = useMensagensCriticas();
   const { data: certificados = [], isLoading: carregandoCert } = useCertificates();
 
@@ -61,7 +62,7 @@ export default function DashboardFederal() {
     const aVencer = certificados.filter((c) => { const d = diasParaVencer(c.data_validade); return d >= 0 && d <= 30; }).length;
     return [
       {
-        titulo: 'Mensagens e-CAC', icone: Mail, to: '/dashboard-federal/mensagens', tom: comMensagem > 0 ? 'warn' : 'ok',
+        titulo: 'Mensagens e-CAC', icone: Mail, to: '/mensagens', tom: comMensagem > 0 ? 'warn' : 'ok',
         linhas: [`${comMensagem} com mensagem não lida ou nova`, `${clientes.length - semProc} clientes monitorados`],
       },
       {
@@ -69,7 +70,7 @@ export default function DashboardFederal() {
         linhas: [`${abertas.length} em aberto`, `${abertas.filter((m) => m.situacao === 'nova').length} novas sem responsável`],
       },
       {
-        titulo: 'Procurações', icone: ShieldCheck, to: '/dashboard-federal/mensagens?selo=sem_procuracao', tom: semProc > 0 ? 'warn' : 'ok',
+        titulo: 'Procurações', icone: ShieldCheck, to: '/mensagens?selo=sem_procuracao', tom: semProc > 0 ? 'warn' : 'ok',
         linhas: [`${clientes.length - semProc} com procuração (Caixa Postal)`, `${semProc} sem procuração`],
       },
       {

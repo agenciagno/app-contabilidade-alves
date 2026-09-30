@@ -14,6 +14,7 @@ import { useCompany } from '@/hooks/useCompany';
 import {
   cicloAtual, custoEstimado, useConsumoSerpro, useSalvarSerproConfig, useSerproConfig,
 } from '@/hooks/useSerproConsumo';
+import { STATUS_MONITORADO, useClientesCaixa } from '@/hooks/useSerproCaixaPostal';
 
 const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -35,6 +36,7 @@ export default function TechConsumoSerpro() {
   const { data: chamadas = [], isLoading } = useConsumoSerpro();
   const { data: config } = useSerproConfig();
   const { data: nomes } = useNomesUsuarios();
+  const { data: clientesCaixa = [] } = useClientesCaixa();
   const salvar = useSalvarSerproConfig();
   const [alerta, setAlerta] = useState('');
   const [volume, setVolume] = useState('');
@@ -81,6 +83,12 @@ export default function TechConsumoSerpro() {
     };
   }, [chamadas]);
 
+  const monitorados = clientesCaixa.filter((c) => c.status_cliente === STATUS_MONITORADO).length;
+  const foraPorStatus = new Map<string, number>();
+  for (const c of clientesCaixa) {
+    if (c.status_cliente !== STATUS_MONITORADO) foraPorStatus.set(c.status_cliente ?? 'Sem status', (foraPorStatus.get(c.status_cliente ?? 'Sem status') ?? 0) + 1);
+  }
+
   const alertaValor = config?.alerta_gasto_mensal ?? 100;
   const passouAlerta = r.custo >= alertaValor;
   const volumeDeclarado = config?.volume_declarado_mes ?? null;
@@ -110,6 +118,20 @@ export default function TechConsumoSerpro() {
         title="Como funciona o custo"
         description={'O selo da Caixa Postal é grátis (rotina diária das 07:30). "Consultar" baixa a lista de mensagens de um cliente e custa R$ 0,24 por consulta (1ª faixa do contrato), sem registrar ciência. O corpo de cada mensagem só abre por clique individual, depois do aviso de ciência. Serviços de monitoramento e apoio não são cobrados.'}
       />
+
+      <section className="space-y-1.5 rounded-lg border border-line bg-paper p-5">
+        <h2 className="text-h4-card text-ink">Quem entra no monitoramento</h2>
+        <p className="text-ui text-muted-ink">
+          Só clientes com status <strong className="text-ink">{STATUS_MONITORADO}</strong> entram na rotina das 07:30 e nas consultas ao Serpro.
+          Cliente suspenso por falta de pagamento (“Suspensa - Contabilidade”), ex-cliente, baixado, inapto ou suspenso na Receita
+          fica de fora sozinho, sem nenhuma chamada. Quando voltar para “{STATUS_MONITORADO}” no cadastro, volta na hora.
+        </p>
+        <p className="text-meta text-muted-ink-2">
+          {monitorados} clientes monitorados hoje
+          {foraPorStatus.size > 0 && ` · fora: ${[...foraPorStatus.entries()].map(([s, n]) => `${n} ${s}`).join(', ')}`}
+          {!foraPorStatus.has('Suspensa - Contabilidade') && ' · nenhum suspenso por falta de pagamento'}.
+        </p>
+      </section>
 
       {passouAlerta && (
         <DsAlert tone="warn" title="Gasto do ciclo acima do alerta" description={`A estimativa (${reais(r.custo)}) passou do limite de ${reais(alertaValor)}. Confira o que mais consumiu abaixo.`} />

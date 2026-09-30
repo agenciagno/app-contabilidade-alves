@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -413,6 +413,61 @@ export type Database = {
           },
         ]
       }
+      boleto_client_notifications: {
+        Row: {
+          boleto_id: string
+          canal: string
+          company_id: string
+          destino: string | null
+          enviado_em: string
+          enviado_por: string | null
+          id: string
+          mensagem: string | null
+        }
+        Insert: {
+          boleto_id: string
+          canal: string
+          company_id: string
+          destino?: string | null
+          enviado_em?: string
+          enviado_por?: string | null
+          id?: string
+          mensagem?: string | null
+        }
+        Update: {
+          boleto_id?: string
+          canal?: string
+          company_id?: string
+          destino?: string | null
+          enviado_em?: string
+          enviado_por?: string | null
+          id?: string
+          mensagem?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "boleto_client_notifications_boleto_id_fkey"
+            columns: ["boleto_id"]
+            isOneToOne: false
+            referencedRelation: "boleto_controls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "boleto_client_notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "boleto_client_notifications_enviado_por_fkey"
+            columns: ["enviado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       boleto_controls: {
         Row: {
           canal_entrega: string | null
@@ -426,6 +481,7 @@ export type Database = {
           generated_at: string | null
           id: string
           linha_digitavel: string | null
+          liquidacao_habilitada: boolean
           nosso_numero: number | null
           origem_baixa: string | null
           pdf_url: string | null
@@ -433,6 +489,7 @@ export type Database = {
           seu_numero: string | null
           sicoob_response: Json | null
           status: string
+          transaction_id: string | null
           updated_at: string
           url_qrcode: string | null
           valor: number | null
@@ -450,6 +507,7 @@ export type Database = {
           generated_at?: string | null
           id?: string
           linha_digitavel?: string | null
+          liquidacao_habilitada?: boolean
           nosso_numero?: number | null
           origem_baixa?: string | null
           pdf_url?: string | null
@@ -457,6 +515,7 @@ export type Database = {
           seu_numero?: string | null
           sicoob_response?: Json | null
           status?: string
+          transaction_id?: string | null
           updated_at?: string
           url_qrcode?: string | null
           valor?: number | null
@@ -474,6 +533,7 @@ export type Database = {
           generated_at?: string | null
           id?: string
           linha_digitavel?: string | null
+          liquidacao_habilitada?: boolean
           nosso_numero?: number | null
           origem_baixa?: string | null
           pdf_url?: string | null
@@ -481,6 +541,7 @@ export type Database = {
           seu_numero?: string | null
           sicoob_response?: Json | null
           status?: string
+          transaction_id?: string | null
           updated_at?: string
           url_qrcode?: string | null
           valor?: number | null
@@ -507,6 +568,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_cofre_global"
             referencedColumns: ["contact_id"]
+          },
+          {
+            foreignKeyName: "boleto_controls_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -566,6 +634,84 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cclasstrib_codes: {
+        Row: {
+          base_legal: string | null
+          codigo: string
+          cst_vinculado: string | null
+          descricao: string
+          importado_em: string
+          lc_214_25: string | null
+          nome: string | null
+          p_red_cbs: number | null
+          p_red_ibs: number | null
+          regulamento_cbs: string | null
+          regulamento_ibs: string | null
+          tipo_aliquota: string | null
+          versao_informe_tecnico: string
+        }
+        Insert: {
+          base_legal?: string | null
+          codigo: string
+          cst_vinculado?: string | null
+          descricao: string
+          importado_em?: string
+          lc_214_25?: string | null
+          nome?: string | null
+          p_red_cbs?: number | null
+          p_red_ibs?: number | null
+          regulamento_cbs?: string | null
+          regulamento_ibs?: string | null
+          tipo_aliquota?: string | null
+          versao_informe_tecnico: string
+        }
+        Update: {
+          base_legal?: string | null
+          codigo?: string
+          cst_vinculado?: string | null
+          descricao?: string
+          importado_em?: string
+          lc_214_25?: string | null
+          nome?: string | null
+          p_red_cbs?: number | null
+          p_red_ibs?: number | null
+          regulamento_cbs?: string | null
+          regulamento_ibs?: string | null
+          tipo_aliquota?: string | null
+          versao_informe_tecnico?: string
+        }
+        Relationships: []
+      }
+      ccredpres_codes: {
+        Row: {
+          apropria_via_evento: boolean | null
+          apropria_via_nf: boolean | null
+          base_legal: string | null
+          codigo: string
+          descricao: string
+          importado_em: string
+          versao_fonte: string
+        }
+        Insert: {
+          apropria_via_evento?: boolean | null
+          apropria_via_nf?: boolean | null
+          base_legal?: string | null
+          codigo: string
+          descricao: string
+          importado_em?: string
+          versao_fonte: string
+        }
+        Update: {
+          apropria_via_evento?: boolean | null
+          apropria_via_nf?: boolean | null
+          base_legal?: string | null
+          codigo?: string
+          descricao?: string
+          importado_em?: string
+          versao_fonte?: string
+        }
+        Relationships: []
       }
       certificate_client_notifications: {
         Row: {
@@ -743,6 +889,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cest_codes: {
+        Row: {
+          codigo: string
+          descricao: string
+          importado_em: string
+          item: string | null
+          ncm_relacionado: string[] | null
+          segmento: string | null
+          segmento_codigo: string | null
+          versao_fonte: string
+        }
+        Insert: {
+          codigo: string
+          descricao: string
+          importado_em?: string
+          item?: string | null
+          ncm_relacionado?: string[] | null
+          segmento?: string | null
+          segmento_codigo?: string | null
+          versao_fonte: string
+        }
+        Update: {
+          codigo?: string
+          descricao?: string
+          importado_em?: string
+          item?: string | null
+          ncm_relacionado?: string[] | null
+          segmento?: string | null
+          segmento_codigo?: string | null
+          versao_fonte?: string
+        }
+        Relationships: []
+      }
+      cfop_codes: {
+        Row: {
+          codigo: string
+          data_fim_vigencia: string | null
+          data_inicio_vigencia: string | null
+          descricao: string
+          importado_em: string
+          versao_fonte: string
+          vigente: boolean
+        }
+        Insert: {
+          codigo: string
+          data_fim_vigencia?: string | null
+          data_inicio_vigencia?: string | null
+          descricao: string
+          importado_em?: string
+          versao_fonte: string
+          vigente?: boolean
+        }
+        Update: {
+          codigo?: string
+          data_fim_vigencia?: string | null
+          data_inicio_vigencia?: string | null
+          descricao?: string
+          importado_em?: string
+          versao_fonte?: string
+          vigente?: boolean
+        }
+        Relationships: []
       }
       client_obligations: {
         Row: {
@@ -1952,6 +2161,45 @@ export type Database = {
           },
         ]
       }
+      csosn_codes: {
+        Row: {
+          codigo: string
+          descricao: string
+          importado_em: string
+        }
+        Insert: {
+          codigo: string
+          descricao: string
+          importado_em?: string
+        }
+        Update: {
+          codigo?: string
+          descricao?: string
+          importado_em?: string
+        }
+        Relationships: []
+      }
+      cst_ibs_cbs: {
+        Row: {
+          codigo: string
+          descricao: string
+          importado_em: string
+          versao_informe_tecnico: string
+        }
+        Insert: {
+          codigo: string
+          descricao: string
+          importado_em?: string
+          versao_informe_tecnico: string
+        }
+        Update: {
+          codigo?: string
+          descricao?: string
+          importado_em?: string
+          versao_informe_tecnico?: string
+        }
+        Relationships: []
+      }
       curadoria_sessions: {
         Row: {
           company_id: string
@@ -2314,6 +2562,77 @@ export type Database = {
           },
         ]
       }
+      fiscal_classification_batches: {
+        Row: {
+          arquivo_resultado_path: string | null
+          company_id: string
+          contact_id: string
+          contexto: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          itens_confirmados: number
+          status: string
+          total_itens: number
+          updated_at: string
+        }
+        Insert: {
+          arquivo_resultado_path?: string | null
+          company_id: string
+          contact_id: string
+          contexto?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          itens_confirmados?: number
+          status?: string
+          total_itens?: number
+          updated_at?: string
+        }
+        Update: {
+          arquivo_resultado_path?: string | null
+          company_id?: string
+          contact_id?: string
+          contexto?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          itens_confirmados?: number
+          status?: string
+          total_itens?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_classification_batches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiscal_classification_batches_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiscal_classification_batches_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+          {
+            foreignKeyName: "fiscal_classification_batches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fiscal_obligations_catalog: {
         Row: {
           active: boolean | null
@@ -2447,6 +2766,108 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      fiscal_product_classifications: {
+        Row: {
+          base_legal: Json | null
+          batch_id: string | null
+          cclasstrib: string | null
+          cest: string | null
+          cfop_referencia: string | null
+          company_id: string
+          confirmado_em: string | null
+          confirmado_por: string | null
+          corrigido_manualmente: boolean
+          created_at: string
+          csosn: string | null
+          cst_ibs_cbs: string | null
+          descricao_normalizada: string
+          descricao_produto: string
+          id: string
+          ncm: string | null
+          source_contact_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          base_legal?: Json | null
+          batch_id?: string | null
+          cclasstrib?: string | null
+          cest?: string | null
+          cfop_referencia?: string | null
+          company_id: string
+          confirmado_em?: string | null
+          confirmado_por?: string | null
+          corrigido_manualmente?: boolean
+          created_at?: string
+          csosn?: string | null
+          cst_ibs_cbs?: string | null
+          descricao_normalizada: string
+          descricao_produto: string
+          id?: string
+          ncm?: string | null
+          source_contact_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          base_legal?: Json | null
+          batch_id?: string | null
+          cclasstrib?: string | null
+          cest?: string | null
+          cfop_referencia?: string | null
+          company_id?: string
+          confirmado_em?: string | null
+          confirmado_por?: string | null
+          corrigido_manualmente?: boolean
+          created_at?: string
+          csosn?: string | null
+          cst_ibs_cbs?: string | null
+          descricao_normalizada?: string
+          descricao_produto?: string
+          id?: string
+          ncm?: string | null
+          source_contact_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_product_classifications_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_classification_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiscal_product_classifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiscal_product_classifications_confirmado_por_fkey"
+            columns: ["confirmado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiscal_product_classifications_source_contact_id_fkey"
+            columns: ["source_contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiscal_product_classifications_source_contact_id_fkey"
+            columns: ["source_contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
       }
       fiscal_tasks: {
         Row: {
@@ -2829,6 +3250,39 @@ export type Database = {
           },
         ]
       }
+      lc214_anexos_produtos: {
+        Row: {
+          anexo: string
+          codigos: string[]
+          descricao: string
+          id: string
+          importado_em: string
+          item: string
+          tipo: string
+          versao_fonte: string
+        }
+        Insert: {
+          anexo: string
+          codigos?: string[]
+          descricao: string
+          id?: string
+          importado_em?: string
+          item: string
+          tipo: string
+          versao_fonte: string
+        }
+        Update: {
+          anexo?: string
+          codigos?: string[]
+          descricao?: string
+          id?: string
+          importado_em?: string
+          item?: string
+          tipo?: string
+          versao_fonte?: string
+        }
+        Relationships: []
+      }
       lgpd_tratamentos: {
         Row: {
           base_legal: string
@@ -3018,6 +3472,39 @@ export type Database = {
           name?: string
           state?: string | null
           type?: string
+        }
+        Relationships: []
+      }
+      ncm_codes: {
+        Row: {
+          ato: string | null
+          codigo: string
+          codigo_digitos: string | null
+          data_fim: string | null
+          data_inicio: string | null
+          descricao: string
+          descricao_hierarquica: string | null
+          sincronizado_em: string
+        }
+        Insert: {
+          ato?: string | null
+          codigo: string
+          codigo_digitos?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          descricao: string
+          descricao_hierarquica?: string | null
+          sincronizado_em?: string
+        }
+        Update: {
+          ato?: string | null
+          codigo?: string
+          codigo_digitos?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          descricao?: string
+          descricao_hierarquica?: string | null
+          sincronizado_em?: string
         }
         Relationships: []
       }
@@ -3315,6 +3802,119 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      portal_client_modules: {
+        Row: {
+          company_id: string
+          contact_id: string
+          enabled: boolean
+          module_key: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          contact_id: string
+          enabled: boolean
+          module_key: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          contact_id?: string
+          enabled?: boolean
+          module_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_client_modules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_client_modules_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_client_modules_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+          {
+            foreignKeyName: "portal_client_modules_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "portal_modules"
+            referencedColumns: ["module_key"]
+          },
+        ]
+      }
+      portal_module_defaults: {
+        Row: {
+          company_id: string
+          enabled: boolean
+          module_key: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          enabled?: boolean
+          module_key: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          enabled?: boolean
+          module_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_module_defaults_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_module_defaults_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "portal_modules"
+            referencedColumns: ["module_key"]
+          },
+        ]
+      }
+      portal_modules: {
+        Row: {
+          descricao: string
+          module_key: string
+          ordem: number
+          requer_curadoria: boolean
+          titulo: string
+        }
+        Insert: {
+          descricao: string
+          module_key: string
+          ordem?: number
+          requer_curadoria?: boolean
+          titulo: string
+        }
+        Update: {
+          descricao?: string
+          module_key?: string
+          ordem?: number
+          requer_curadoria?: boolean
+          titulo?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -3766,6 +4366,463 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      serpro_caixa_postal_avisos: {
+        Row: {
+          canal: string
+          company_id: string
+          contact_id: string
+          destino: string | null
+          enviado_em: string
+          enviado_por: string | null
+          id: string
+          mensagem: string
+          mensagem_id: string
+        }
+        Insert: {
+          canal: string
+          company_id: string
+          contact_id: string
+          destino?: string | null
+          enviado_em?: string
+          enviado_por?: string | null
+          id?: string
+          mensagem: string
+          mensagem_id: string
+        }
+        Update: {
+          canal?: string
+          company_id?: string
+          contact_id?: string
+          destino?: string | null
+          enviado_em?: string
+          enviado_por?: string | null
+          id?: string
+          mensagem?: string
+          mensagem_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_caixa_postal_avisos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_caixa_postal_avisos_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_caixa_postal_avisos_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+          {
+            foreignKeyName: "serpro_caixa_postal_avisos_mensagem_id_fkey"
+            columns: ["mensagem_id"]
+            isOneToOne: false
+            referencedRelation: "serpro_caixa_postal_mensagens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      serpro_caixa_postal_mensagens: {
+        Row: {
+          assunto: string
+          categoria: string
+          codigo_modelo: string | null
+          company_id: string
+          contact_id: string
+          corpo: string | null
+          corpo_aberto_em: string | null
+          corpo_aberto_por: string | null
+          created_at: string
+          data_ciencia: string | null
+          data_envio: string | null
+          data_leitura: string | null
+          data_validade: string | null
+          descricao_origem: string | null
+          id: string
+          isn: string
+          lida: boolean
+          numero_controle: string | null
+          observacoes: string | null
+          relevancia: number | null
+          responsavel_id: string | null
+          sincronizado_em: string
+          situacao: string
+          tipo_origem: number | null
+          updated_at: string
+          visivel_portal: boolean
+        }
+        Insert: {
+          assunto: string
+          categoria?: string
+          codigo_modelo?: string | null
+          company_id: string
+          contact_id: string
+          corpo?: string | null
+          corpo_aberto_em?: string | null
+          corpo_aberto_por?: string | null
+          created_at?: string
+          data_ciencia?: string | null
+          data_envio?: string | null
+          data_leitura?: string | null
+          data_validade?: string | null
+          descricao_origem?: string | null
+          id?: string
+          isn: string
+          lida?: boolean
+          numero_controle?: string | null
+          observacoes?: string | null
+          relevancia?: number | null
+          responsavel_id?: string | null
+          sincronizado_em?: string
+          situacao?: string
+          tipo_origem?: number | null
+          updated_at?: string
+          visivel_portal?: boolean
+        }
+        Update: {
+          assunto?: string
+          categoria?: string
+          codigo_modelo?: string | null
+          company_id?: string
+          contact_id?: string
+          corpo?: string | null
+          corpo_aberto_em?: string | null
+          corpo_aberto_por?: string | null
+          created_at?: string
+          data_ciencia?: string | null
+          data_envio?: string | null
+          data_leitura?: string | null
+          data_validade?: string | null
+          descricao_origem?: string | null
+          id?: string
+          isn?: string
+          lida?: boolean
+          numero_controle?: string | null
+          observacoes?: string | null
+          relevancia?: number | null
+          responsavel_id?: string | null
+          sincronizado_em?: string
+          situacao?: string
+          tipo_origem?: number | null
+          updated_at?: string
+          visivel_portal?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_caixa_postal_mensagens_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_caixa_postal_mensagens_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_caixa_postal_mensagens_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_caixa_postal_regras: {
+        Row: {
+          ativa: boolean
+          categoria: string
+          company_id: string
+          created_at: string
+          id: string
+          ordem: number
+          padrao: string
+        }
+        Insert: {
+          ativa?: boolean
+          categoria: string
+          company_id: string
+          created_at?: string
+          id?: string
+          ordem: number
+          padrao: string
+        }
+        Update: {
+          ativa?: boolean
+          categoria?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          ordem?: number
+          padrao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_caixa_postal_regras_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      serpro_caixa_postal_resumo: {
+        Row: {
+          company_id: string
+          consultado_em: string | null
+          consultado_por: string | null
+          contact_id: string
+          evento_ultima_data: string | null
+          evento_verificado_em: string | null
+          indicador_mensagens_novas: number | null
+          indicador_verificado_em: string | null
+          mensagens_salvas: number
+          nao_lidas_salvas: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          consultado_em?: string | null
+          consultado_por?: string | null
+          contact_id: string
+          evento_ultima_data?: string | null
+          evento_verificado_em?: string | null
+          indicador_mensagens_novas?: number | null
+          indicador_verificado_em?: string | null
+          mensagens_salvas?: number
+          nao_lidas_salvas?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          consultado_em?: string | null
+          consultado_por?: string | null
+          contact_id?: string
+          evento_ultima_data?: string | null
+          evento_verificado_em?: string | null
+          indicador_mensagens_novas?: number | null
+          indicador_verificado_em?: string | null
+          mensagens_salvas?: number
+          nao_lidas_salvas?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_caixa_postal_resumo_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_caixa_postal_resumo_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_caixa_postal_resumo_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_call_log: {
+        Row: {
+          acionado_por: string | null
+          ambiente: string
+          base_legal: string
+          cobravel: boolean | null
+          company_id: string
+          contact_id: string | null
+          contribuinte_ni: string | null
+          created_at: string
+          duracao_ms: number | null
+          finalidade: string
+          id: string
+          id_servico: string
+          id_sistema: string
+          mensagem_codigo: string | null
+          origem: string
+          response_id: string | null
+          status_http: number | null
+          tipo_chamada: string
+        }
+        Insert: {
+          acionado_por?: string | null
+          ambiente: string
+          base_legal: string
+          cobravel?: boolean | null
+          company_id: string
+          contact_id?: string | null
+          contribuinte_ni?: string | null
+          created_at?: string
+          duracao_ms?: number | null
+          finalidade: string
+          id?: string
+          id_servico: string
+          id_sistema: string
+          mensagem_codigo?: string | null
+          origem?: string
+          response_id?: string | null
+          status_http?: number | null
+          tipo_chamada: string
+        }
+        Update: {
+          acionado_por?: string | null
+          ambiente?: string
+          base_legal?: string
+          cobravel?: boolean | null
+          company_id?: string
+          contact_id?: string | null
+          contribuinte_ni?: string | null
+          created_at?: string
+          duracao_ms?: number | null
+          finalidade?: string
+          id?: string
+          id_servico?: string
+          id_sistema?: string
+          mensagem_codigo?: string | null
+          origem?: string
+          response_id?: string | null
+          status_http?: number | null
+          tipo_chamada?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_call_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_call_log_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_call_log_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_config: {
+        Row: {
+          alerta_gasto_mensal: number
+          company_id: string
+          updated_at: string
+          volume_declarado_mes: number | null
+        }
+        Insert: {
+          alerta_gasto_mensal?: number
+          company_id: string
+          updated_at?: string
+          volume_declarado_mes?: number | null
+        }
+        Update: {
+          alerta_gasto_mensal?: number
+          company_id?: string
+          updated_at?: string
+          volume_declarado_mes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      serpro_procuracoes: {
+        Row: {
+          codigo_procuracao: string
+          company_id: string
+          contact_id: string
+          created_at: string
+          data_fim: string | null
+          data_inicio: string | null
+          fonte: string
+          id: string
+          resposta: Json | null
+          status: string
+          updated_at: string
+          verificado_em: string | null
+        }
+        Insert: {
+          codigo_procuracao: string
+          company_id: string
+          contact_id: string
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          fonte?: string
+          id?: string
+          resposta?: Json | null
+          status?: string
+          updated_at?: string
+          verificado_em?: string | null
+        }
+        Update: {
+          codigo_procuracao?: string
+          company_id?: string
+          contact_id?: string
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          fonte?: string
+          id?: string
+          resposta?: Json | null
+          status?: string
+          updated_at?: string
+          verificado_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_procuracoes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_procuracoes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_procuracoes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
           },
         ]
       }
@@ -4384,6 +5441,67 @@ export type Database = {
         Returns: string
       }
       end_support_session: { Args: { _session_id: string }; Returns: undefined }
+      find_cest_by_ncm: {
+        Args: { p_limit?: number; p_ncm: string; p_query?: string }
+        Returns: {
+          codigo: string
+          descricao: string
+          item: string
+          score: number
+          segmento: string
+        }[]
+      }
+      find_cest_by_ncm_batch: {
+        Args: { p_limit?: number; p_ncms: string[]; p_queries: string[] }
+        Returns: {
+          codigo: string
+          descricao: string
+          item: string
+          query_idx: number
+          score: number
+          segmento: string
+        }[]
+      }
+      find_ncm_exact: {
+        Args: { p_ncm: string }
+        Returns: {
+          codigo: string
+          data_fim: string
+          descricao: string
+        }[]
+      }
+      find_ncm_exact_batch: {
+        Args: { p_ncms: string[] }
+        Returns: {
+          codigo: string
+          data_fim: string
+          descricao: string
+          query_idx: number
+        }[]
+      }
+      find_ncm_hierarquia: {
+        Args: { p_ncm: string }
+        Returns: {
+          codigo: string
+          descricao: string
+          nivel: number
+        }[]
+      }
+      find_ncm_posicao: {
+        Args: { p_ncm: string }
+        Returns: {
+          codigo: string
+          descricao: string
+        }[]
+      }
+      find_ncm_posicao_batch: {
+        Args: { p_ncms: string[] }
+        Returns: {
+          codigo: string
+          descricao: string
+          query_idx: number
+        }[]
+      }
       fn_anonimizar_contato: {
         Args: { p_contact_id: string }
         Returns: undefined
@@ -4394,7 +5512,13 @@ export type Database = {
         Returns: number
       }
       generate_monthly_fiscal_tasks: {
-        Args: { p_month: number; p_year: number }
+        Args: {
+          p_contact_ids?: string[]
+          p_month: number
+          p_responsible_ids?: string[]
+          p_tax_regimes?: string[]
+          p_year: number
+        }
         Returns: Json
       }
       generate_my_recurring_transactions: { Args: never; Returns: number }
@@ -4486,6 +5610,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      imm_unaccent: { Args: { "": string }; Returns: string }
       is_company_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       log_data_access: {
@@ -4498,7 +5623,92 @@ export type Database = {
         }
         Returns: undefined
       }
+      refresh_ncm_descricao_hierarquica: { Args: never; Returns: undefined }
+      resolve_cclasstrib_by_ncm: {
+        Args: { p_ncm: string }
+        Returns: {
+          anexo: string
+          cclasstrib_codigo: string
+          cclasstrib_nome: string
+          descricao_lei: string
+          item_lei: string
+        }[]
+      }
+      resolve_cclasstrib_by_ncm_batch: {
+        Args: { p_ncms: string[] }
+        Returns: {
+          anexo: string
+          cclasstrib_codigo: string
+          cclasstrib_nome: string
+          descricao_lei: string
+          item_lei: string
+          query_idx: number
+        }[]
+      }
       revert_transfer: { Args: { p_transfer_log_id: string }; Returns: Json }
+      run_daily_boleto_sync: { Args: never; Returns: undefined }
+      run_webhook_healthcheck: { Args: never; Returns: undefined }
+      search_acervo_by_text: {
+        Args: { p_company_id: string; p_limit?: number; p_query: string }
+        Returns: {
+          cclasstrib: string
+          cest: string
+          cfop_referencia: string
+          csosn: string
+          cst_ibs_cbs: string
+          descricao_produto: string
+          id: string
+          ncm: string
+          score: number
+        }[]
+      }
+      search_acervo_by_text_batch: {
+        Args: { p_company_id: string; p_limit?: number; p_queries: string[] }
+        Returns: {
+          cclasstrib: string
+          cest: string
+          cfop_referencia: string
+          csosn: string
+          cst_ibs_cbs: string
+          descricao_produto: string
+          id: string
+          ncm: string
+          query_idx: number
+          score: number
+        }[]
+      }
+      search_cclasstrib_by_text: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          base_legal: string
+          codigo: string
+          cst_vinculado: string
+          descricao: string
+          nome: string
+          p_red_cbs: number
+          p_red_ibs: number
+          score: number
+        }[]
+      }
+      search_ncm_by_text: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          codigo: string
+          descricao: string
+          score: number
+        }[]
+      }
+      search_ncm_by_text_batch: {
+        Args: { p_limit?: number; p_queries: string[] }
+        Returns: {
+          codigo: string
+          descricao: string
+          query_idx: number
+          score: number
+        }[]
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       start_support_session: {
         Args: { _motivo: string; _target_company_id: string }
         Returns: string
@@ -4506,6 +5716,16 @@ export type Database = {
       transfer_clients_with_log: {
         Args: { p_from_profile_id: string; p_to_profile_id: string }
         Returns: Json
+      }
+      unaccent: { Args: { "": string }; Returns: string }
+      validar_ncm_leaf_batch: {
+        Args: { p_ncms: string[] }
+        Returns: {
+          codigo: string
+          data_fim: string
+          descricao: string
+          query_idx: number
+        }[]
       }
     }
     Enums: {
@@ -4535,12 +5755,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4564,11 +5784,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4589,11 +5809,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4614,11 +5834,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -4631,11 +5851,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

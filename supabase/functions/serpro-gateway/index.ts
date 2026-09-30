@@ -212,6 +212,24 @@ Deno.serve(async (req) => {
     return json({ error: "contribuinte.numero inválido (CPF 11 ou CNPJ 14 dígitos)" }, 400);
   }
 
+  // Só cliente com status "Ativo" gera chamada em produção (decisão de Gabriel, 01/10/2026): cliente suspenso por falta de
+  // pagamento ("Suspensa - Contabilidade"), ex-cliente, baixado etc. é recusado. Os CNPJs da própria CA e números que não
+  // são cliente cadastrado passam. O status é lido do cadastro a cada chamada.
+  if (MODE === "producao" && contribuinteNi && contribuinteNi !== CONTRATANTE_NI && contribuinteNi !== AUTOR_NI) {
+    const formatado = contribuinteNi.length === 14
+      ? contribuinteNi.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
+      : contribuinteNi.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+    const cid = /^[0-9a-f-]{36}$/i.test(String(payload.contact_id ?? "")) ? String(payload.contact_id) : null;
+    const { data: cadastro } = await supabase.from("contacts").select("status_cliente")
+      .eq("company_id", COMPANY_ID).or(`document.eq.${contribuinteNi},document.eq.${formatado}${cid ? `,id.eq.${cid}` : ""}`);
+    if (cadastro?.length && !cadastro.some((c: { status_cliente: string | null }) => c.status_cliente === "Ativo")) {
+      return json({
+        error: `Cliente fora do monitoramento (status: ${cadastro[0].status_cliente ?? "sem status"}). O Serpro só é consultado para clientes com status "Ativo".`,
+        fora_do_monitoramento: true,
+      }, 403);
+    }
+  }
+
   const dados = typeof payload.dados === "string" ? payload.dados : payload.dados == null ? "" : JSON.stringify(payload.dados);
   // No trial os números reais não importam (dados simulados); permite override pra usar os números do manual.
   const contratanteNi = MODE === "trial" && payload.trial_contratante ? onlyDigits(payload.trial_contratante) : CONTRATANTE_NI;

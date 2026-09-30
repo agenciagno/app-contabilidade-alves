@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Download, Eye, Loader2, RefreshCw } from 'lucide-react';
+import { Eye, Loader2, RefreshCw } from 'lucide-react';
 
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { MensagensClienteSheet } from '@/components/serpro/MensagensClienteSheet';
 import { useConsultaCliente } from '@/components/serpro/useConsultaCliente';
 import { seloCaixa, useClientesCaixa, type ClienteCaixa, type SeloEstado } from '@/hooks/useSerproCaixaPostal';
+import type { TabelaExport } from '@/lib/exportarTabela';
 
 const REGIMES: Record<string, string> = {
   simples_nacional: 'Simples Nacional',
@@ -26,28 +28,25 @@ const formatarCnpj = (d: string) => {
 };
 
 const FILTROS_SELO: { value: 'todos' | SeloEstado; label: string }[] = [
-  { value: 'todos', label: 'Todos os selos' },
+  { value: 'todos', label: 'Todos os ativos' },
   { value: 'nao_lida', label: 'Msg não lida' },
   { value: 'nova', label: 'Nova mensagem' },
   { value: 'todas_lidas', label: 'Todas lidas' },
   { value: 'sem_procuracao', label: 'Sem procuração' },
   { value: 'nao_verificada', label: 'Não verificada' },
+  { value: 'inativo', label: 'Fora do monitoramento' },
 ];
 
-function baixarCsv(linhas: ClienteCaixa[]) {
-  const cab = ['Razão social', 'CNPJ', 'Regime', 'Mensagens e-CAC', 'Última consulta', 'Mensagens salvas', 'Não lidas (salvas)'];
-  const corpo = linhas.map((c) => [
-    c.nome, formatarCnpj(c.documento), REGIMES[c.regime ?? ''] ?? c.regime ?? '', seloCaixa(c).label,
-    c.consultado_em ? format(new Date(c.consultado_em), 'dd/MM/yyyy HH:mm') : '', String(c.mensagens_salvas), String(c.nao_lidas_salvas),
-  ]);
-  const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  const csv = '﻿' + [cab, ...corpo].map((l) => l.map(esc).join(';')).join('\r\n');
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `mensagens-ecac-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+function tabelaExport(linhas: ClienteCaixa[]): TabelaExport {
+  return {
+    arquivo: 'mensagens-ecac',
+    titulo: 'Mensagens e-CAC — Caixa Postal por cliente',
+    colunas: ['Razão social', 'CNPJ', 'Regime', 'Mensagens e-CAC', 'Última consulta', 'Mensagens salvas', 'Não lidas (salvas)'],
+    linhas: linhas.map((c) => [
+      c.nome, formatarCnpj(c.documento), REGIMES[c.regime ?? ''] ?? c.regime ?? '', seloCaixa(c).label,
+      c.consultado_em ? format(new Date(c.consultado_em), 'dd/MM/yyyy HH:mm') : '', String(c.mensagens_salvas), String(c.nao_lidas_salvas),
+    ]),
+  };
 }
 
 export default function MensagensEcac() {
@@ -66,7 +65,7 @@ export default function MensagensEcac() {
   };
 
   const stats = useMemo(() => {
-    const contagem = { nao_lida: 0, nova: 0, sem_procuracao: 0, todas_lidas: 0, nao_verificada: 0 } as Record<SeloEstado, number>;
+    const contagem = { inativo: 0, nao_lida: 0, nova: 0, sem_procuracao: 0, todas_lidas: 0, nao_verificada: 0 } as Record<SeloEstado, number>;
     clientes.forEach((c) => { contagem[seloCaixa(c).estado]++; });
     return contagem;
   }, [clientes]);
@@ -75,7 +74,7 @@ export default function MensagensEcac() {
     const q = busca.trim().toLowerCase();
     const qDigitos = q.replace(/\D/g, '');
     return clientes
-      .filter((c) => filtroSelo === 'todos' || seloCaixa(c).estado === filtroSelo)
+      .filter((c) => (filtroSelo === 'todos' ? seloCaixa(c).estado !== 'inativo' : seloCaixa(c).estado === filtroSelo))
       .filter((c) => regime === 'todos' || (c.regime ?? 'outros') === regime)
       .filter((c) => !q || c.nome.toLowerCase().includes(q) || (qDigitos && c.documento.replace(/\D/g, '').includes(qDigitos)));
   }, [clientes, busca, filtroSelo, regime]);
@@ -85,19 +84,15 @@ export default function MensagensEcac() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="~/dashboard federal · mensagens e-cac"
+        kicker="~/mensagens e-cac"
         title="Mensagens e-CAC."
-        subtitle="Caixa Postal da Receita Federal por cliente. O selo é atualizado todo dia às 07:30; a lista completa só é baixada quando você clica em Consultar."
-        actions={(
-          <Button variant="outline" onClick={() => baixarCsv(filtrados)} disabled={filtrados.length === 0}>
-            <Download className="mr-1.5 h-4 w-4" /> Exportar CSV
-          </Button>
-        )}
+        subtitle="Caixa Postal da Receita Federal dos clientes ativos. O selo é atualizado todo dia às 07:30; a lista completa só é baixada quando você clica em Consultar."
+        actions={<ExportarMenu montar={() => tabelaExport(filtrados)} disabled={filtrados.length === 0} />}
       />
 
       <StatCardRow
         items={[
-          { label: 'Clientes monitorados', value: clientes.length, hint: 'com CNPJ e acesso à Receita' },
+          { label: 'Clientes monitorados', value: clientes.length - stats.inativo, hint: 'clientes ativos' },
           { label: 'Msg não lida ou nova', value: stats.nao_lida + stats.nova, hint: 'para consultar', emphasis: stats.nao_lida + stats.nova > 0 ? 'warm' : 'none' },
           { label: 'Sem procuração', value: stats.sem_procuracao, hint: 'coletar no e-CAC', emphasis: stats.sem_procuracao > 0 ? 'warm' : 'none' },
           { label: 'Todas lidas', value: stats.todas_lidas, hint: 'nada a fazer' },
@@ -166,8 +161,8 @@ export default function MensagensEcac() {
                       </Button>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="outline" disabled={consultando || c.procuracao === 'ausente'}
-                        title={c.procuracao === 'ausente' ? 'Sem procuração' : 'Baixar a lista de mensagens'}
+                      <Button size="sm" variant="outline" disabled={consultando || c.procuracao === 'ausente' || selo.estado === 'inativo'}
+                        title={selo.estado === 'inativo' ? `Fora do monitoramento (${c.status_cliente ?? 'sem status'})` : c.procuracao === 'ausente' ? 'Sem procuração' : 'Baixar a lista de mensagens'}
                         onClick={(e) => { e.stopPropagation(); executar(c.contact_id); }}>
                         {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
                         Consultar
@@ -181,7 +176,7 @@ export default function MensagensEcac() {
         )}
       </div>
 
-      <p className="text-meta text-muted-ink-2">Mostrando {filtrados.length} de {clientes.length} clientes.</p>
+      <p className="text-meta text-muted-ink-2">Mostrando {filtrados.length} de {clientes.length - stats.inativo} clientes ativos.</p>
 
       <MensagensClienteSheet cliente={clienteAberto} onClose={() => setAberto(null)} />
       {dialog}

@@ -2,9 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { BadgeTone } from '@/components/ds';
 
-// Tabelas novas (serpro_*) ainda não estão em integrations/supabase/types.ts: regenerar os tipos quando der e
-// trocar este atalho por `supabase` tipado.
-const db = supabase as unknown as { from: (t: string) => any };
+/** Só cliente com este status entra na rotina e nas consultas ao Serpro (o servidor confere de novo a cada chamada). */
+export const STATUS_MONITORADO = 'Ativo';
 
 export type CategoriaMsg = 'intimacao' | 'malha' | 'exclusao_simples' | 'maed' | 'cobranca' | 'processo' | 'informativo';
 export type SituacaoMsg = 'nova' | 'em_tratamento' | 'resolvida' | 'sem_acao';
@@ -31,6 +30,7 @@ export interface ClienteCaixa {
   nome: string;
   documento: string;
   regime: string | null;
+  status_cliente: string | null;
   procuracao: 'ativa' | 'ausente' | 'desconhecida';
   indicador: 0 | 1 | 2 | null;
   indicador_verificado_em: string | null;
@@ -65,9 +65,14 @@ export interface MensagemCaixa {
   sincronizado_em: string;
 }
 
-export type MensagemComCliente = MensagemCaixa & { contacts: { name: string; display_name: string | null; document: string | null } | null };
+export type MensagemComCliente = MensagemCaixa & {
+  contacts: {
+    name: string; display_name: string | null; document: string | null; status_cliente: string | null;
+    email: string | null; whatsapp: string | null; phone: string | null;
+  } | null;
+};
 
-export type SeloEstado = 'sem_procuracao' | 'nao_lida' | 'nova' | 'todas_lidas' | 'nao_verificada';
+export type SeloEstado = 'inativo' | 'sem_procuracao' | 'nao_lida' | 'nova' | 'todas_lidas' | 'nao_verificada';
 
 const dia = (iso: string | null) => (iso ? iso.slice(0, 10) : null);
 
@@ -77,6 +82,7 @@ const dia = (iso: string | null) => (iso ? iso.slice(0, 10) : null);
  * o evento E0601 só diz a data da última mensagem nova, então só conta como novidade o que veio DEPOIS dessa referência.
  */
 export function seloCaixa(c: ClienteCaixa): { estado: SeloEstado; label: string; tone: BadgeTone } {
+  if (c.status_cliente !== STATUS_MONITORADO) return { estado: 'inativo', label: c.status_cliente ?? 'Sem status', tone: 'neutral' };
   if (c.procuracao === 'ausente') return { estado: 'sem_procuracao', label: 'Sem procuração', tone: 'danger' };
   const ref = [dia(c.consultado_em), dia(c.indicador_verificado_em)].filter(Boolean).sort().pop() ?? null;
   const novidade = !!(c.evento_ultima_data && ref && c.evento_ultima_data > ref);
@@ -116,26 +122,27 @@ export function useClientesCaixa() {
   return useQuery({
     queryKey: ['serpro-cp-clientes'],
     queryFn: async (): Promise<ClienteCaixa[]> => {
-      const { data: resumo, error } = await db
+      const { data: resumo, error } = await supabase
         .from('serpro_caixa_postal_resumo')
-        .select('*, contacts:contact_id (name, display_name, document, tax_regime)')
+        .select('*, contacts:contact_id (name, display_name, document, tax_regime, status_cliente)')
         .limit(1000);
       if (error) throw error;
-      const { data: procs, error: e2 } = await db
+      const { data: procs, error: e2 } = await supabase
         .from('serpro_procuracoes')
         .select('contact_id, status')
         .eq('codigo_procuracao', '00006')
         .limit(1000);
       if (e2) throw e2;
-      const porContato = new Map<string, string>((procs ?? []).map((p: any) => [p.contact_id, p.status]));
+      const porContato = new Map<string, string>((procs ?? []).map((p) => [p.contact_id, p.status]));
       return (resumo ?? [])
-        .map((r: any): ClienteCaixa => ({
+        .map((r): ClienteCaixa => ({
           contact_id: r.contact_id,
           nome: r.contacts?.display_name || r.contacts?.name || 'Cliente',
           documento: r.contacts?.document ?? '',
           regime: r.contacts?.tax_regime ?? null,
+          status_cliente: r.contacts?.status_cliente ?? null,
           procuracao: (porContato.get(r.contact_id) as ClienteCaixa['procuracao']) ?? 'desconhecida',
-          indicador: r.indicador_mensagens_novas,
+          indicador: r.indicador_mensagens_novas as ClienteCaixa['indicador'],
           indicador_verificado_em: r.indicador_verificado_em,
           evento_ultima_data: r.evento_ultima_data,
           consultado_em: r.consultado_em,
@@ -153,14 +160,14 @@ export function useMensagensCliente(contactId: string | null) {
     queryKey: ['serpro-cp-mensagens', contactId],
     enabled: !!contactId,
     queryFn: async (): Promise<MensagemCaixa[]> => {
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from('serpro_caixa_postal_mensagens')
         .select('*')
-        .eq('contact_id', contactId)
+        .eq('contact_id', contactId!)
         .order('data_envio', { ascending: false })
         .limit(1000);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as MensagemCaixa[];
     },
   });
 }
@@ -171,14 +178,14 @@ export function useMensagensCriticas() {
     queryKey: ['serpro-cp-criticas'],
     queryFn: async (): Promise<MensagemComCliente[]> => {
       const criticas = (Object.keys(CATEGORIAS) as CategoriaMsg[]).filter((k) => CATEGORIAS[k].critica);
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from('serpro_caixa_postal_mensagens')
-        .select('*, contacts:contact_id (name, display_name, document)')
+        .select('*, contacts:contact_id (name, display_name, document, status_cliente, email, whatsapp, phone)')
         .in('categoria', criticas)
         .order('data_envio', { ascending: false })
         .limit(1000);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as MensagemComCliente[];
     },
   });
 }
@@ -186,7 +193,15 @@ export function useMensagensCriticas() {
 // ---------------------------------------------------------------- ações (edge function serpro-caixa-postal)
 async function chamarCaixa<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke('serpro-caixa-postal', { body });
-  if (error) throw error;
+  if (error) {
+    // Respostas 4xx/5xx chegam sem corpo no `error`: lê o motivo que o servidor mandou.
+    let motivo = error.message;
+    try {
+      const corpo = await (error as { context?: Response }).context?.json();
+      if (corpo?.error) motivo = corpo.error;
+    } catch { /* corpo não é JSON */ }
+    throw new Error(motivo);
+  }
   return data as T;
 }
 
@@ -245,5 +260,39 @@ export function useAcompanharMensagem() {
       return chamarCaixa<{ ok?: boolean; error?: string }>({ action: 'acompanhar', mensagem_id: mensagemId, ...campos });
     },
     onSuccess: (_d, v) => invalidar(v.contactId),
+  });
+}
+
+// ---------------------------------------------------------------- aviso ao cliente (Termos de Intimação)
+export type CanalAviso = 'email' | 'whatsapp' | 'copiar';
+export interface AvisoCaixa { mensagem_id: string; canal: CanalAviso; enviado_em: string }
+
+/** Último aviso enviado por mensagem (histórico completo fica na tabela). */
+export function useAvisosCaixa() {
+  return useQuery({
+    queryKey: ['serpro-cp-avisos'],
+    queryFn: async (): Promise<Map<string, AvisoCaixa>> => {
+      const { data, error } = await supabase
+        .from('serpro_caixa_postal_avisos')
+        .select('mensagem_id, canal, enviado_em')
+        .order('enviado_em', { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      const ultimo = new Map<string, AvisoCaixa>();
+      for (const a of (data ?? []) as unknown as AvisoCaixa[]) if (!ultimo.has(a.mensagem_id)) ultimo.set(a.mensagem_id, a);
+      return ultimo;
+    },
+  });
+}
+
+/** E-mail sai pelo servidor; WhatsApp/copiar só registram o histórico (o envio acontece no navegador de quem clicou). */
+export function useAvisarCliente() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { mensagemId: string; canal: CanalAviso; mensagem: string; assunto?: string }) =>
+      chamarCaixa<{ ok?: boolean; error?: string; aviso?: string }>({
+        action: 'avisar', mensagem_id: v.mensagemId, canal: v.canal, mensagem: v.mensagem, assunto: v.assunto,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['serpro-cp-avisos'] }),
   });
 }

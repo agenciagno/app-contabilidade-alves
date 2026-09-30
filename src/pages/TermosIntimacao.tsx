@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { FileText, MailOpen } from 'lucide-react';
+import { FileText, MailOpen, Send } from 'lucide-react';
 
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
@@ -9,11 +9,14 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AvisarClienteDialog } from '@/components/serpro/AvisarClienteDialog';
+import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { useAbrirMensagemFlow } from '@/components/serpro/AbrirMensagemFlow';
 import {
-  CATEGORIAS, SITUACOES, diasParaPrazo, useAcompanharMensagem, useMensagensCriticas,
+  CATEGORIAS, SITUACOES, STATUS_MONITORADO, diasParaPrazo, useAcompanharMensagem, useAvisosCaixa, useMensagensCriticas,
   type CategoriaMsg, type MensagemComCliente, type SituacaoMsg,
 } from '@/hooks/useSerproCaixaPostal';
+import type { TabelaExport } from '@/lib/exportarTabela';
 
 const nomeCliente = (m: MensagemComCliente) => m.contacts?.display_name || m.contacts?.name || 'Cliente';
 
@@ -21,6 +24,8 @@ export default function TermosIntimacao() {
   const { data: mensagens = [], isLoading } = useMensagensCriticas();
   const acompanhar = useAcompanharMensagem();
   const { solicitar, dialogs } = useAbrirMensagemFlow();
+  const { data: avisos } = useAvisosCaixa();
+  const [avisando, setAvisando] = useState<MensagemComCliente | null>(null);
   const [busca, setBusca] = useState('');
   const [categoria, setCategoria] = useState<'todas' | CategoriaMsg>('todas');
   const [situacao, setSituacao] = useState<'abertas' | 'todas' | SituacaoMsg>('abertas');
@@ -45,6 +50,22 @@ export default function TermosIntimacao() {
         || (m.contacts?.document ?? '').replace(/\D/g, '').includes(q.replace(/\D/g, '') || '§'));
   }, [mensagens, busca, categoria, situacao]);
 
+  const tabelaExport = (): TabelaExport => ({
+    arquivo: 'termos-de-intimacao',
+    titulo: 'Termos de intimação — mensagens da Receita que exigem ação',
+    colunas: ['Cliente', 'CNPJ', 'Tipo', 'Assunto', 'Lida', 'Envio', 'Validade', 'Situação', 'Observação', 'Cliente avisado'],
+    linhas: filtradas.map((m) => {
+      const prazo = diasParaPrazo(m.data_validade);
+      const av = avisos?.get(m.id);
+      return [
+        nomeCliente(m), m.contacts?.document ?? '', CATEGORIAS[m.categoria].label, m.assunto, m.lida ? 'Sim' : 'Não',
+        m.data_envio ? format(new Date(m.data_envio), 'dd/MM/yyyy') : '',
+        m.data_validade ? format(new Date(`${m.data_validade}T00:00:00`), 'dd/MM/yyyy') : (prazo === null ? '' : String(prazo)),
+        SITUACOES[m.situacao].label, m.observacoes ?? '', av ? format(new Date(av.enviado_em), 'dd/MM/yyyy') : '',
+      ];
+    }),
+  });
+
   const salvar = (m: MensagemComCliente, campos: { situacao?: SituacaoMsg; observacoes?: string | null }) =>
     acompanhar.mutate({ mensagemId: m.id, contactId: m.contact_id, ...campos }, { onError: () => toast.error('Não foi possível salvar.') });
 
@@ -54,6 +75,7 @@ export default function TermosIntimacao() {
         kicker="~/dashboard federal · termos de intimação"
         title="Termos de intimação."
         subtitle="Mensagens da Receita que exigem ação (intimação, malha, exclusão do Simples, multa, cobrança e processo), já classificadas. Só aparecem clientes cuja lista foi baixada em Mensagens e-CAC."
+        actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} />}
       />
 
       <StatCardRow
@@ -119,6 +141,9 @@ export default function TermosIntimacao() {
                     <TableCell>
                       <p className="text-ui text-ink">{nomeCliente(m)}</p>
                       <p className="font-mono text-meta text-muted-ink-2">{m.contacts?.document}</p>
+                      {m.contacts?.status_cliente !== STATUS_MONITORADO && (
+                        <DsBadge tone="neutral" dot={false}>{m.contacts?.status_cliente ?? 'Sem status'}</DsBadge>
+                      )}
                     </TableCell>
                     <TableCell><DsBadge tone={cat.tone}>{cat.label}</DsBadge></TableCell>
                     <TableCell className="max-w-[280px] text-ui text-ink">{m.assunto}</TableCell>
@@ -147,10 +172,18 @@ export default function TermosIntimacao() {
                       />
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant={m.corpo ? 'outline' : 'default'} onClick={() => solicitar(m, nomeCliente(m))}>
-                        {m.corpo ? <FileText className="mr-1.5 h-4 w-4" /> : <MailOpen className="mr-1.5 h-4 w-4" />}
-                        {m.corpo ? 'Ver' : 'Abrir'}
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setAvisando(m)}>
+                          <Send className="mr-1.5 h-4 w-4" /> Avisar cliente
+                        </Button>
+                        <Button size="sm" variant={m.corpo ? 'outline' : 'default'} onClick={() => solicitar(m, nomeCliente(m))}>
+                          {m.corpo ? <FileText className="mr-1.5 h-4 w-4" /> : <MailOpen className="mr-1.5 h-4 w-4" />}
+                          {m.corpo ? 'Ver' : 'Abrir'}
+                        </Button>
+                      </div>
+                      {avisos?.get(m.id) && (
+                        <p className="mt-1 text-meta text-muted-ink-2">Avisado em {format(new Date(avisos.get(m.id)!.enviado_em), 'dd/MM')}</p>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -161,6 +194,7 @@ export default function TermosIntimacao() {
       </div>
 
       {dialogs}
+      <AvisarClienteDialog mensagem={avisando} onClose={() => setAvisando(null)} />
     </div>
   );
 }
