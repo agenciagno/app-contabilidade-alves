@@ -142,7 +142,7 @@ export function FaturamentoClienteSheet({
 
         {meses.length > 0 && (
           <div className="mt-5">
-            <p className="mb-2 text-ui font-medium text-ink">Receita dos 12 meses anteriores</p>
+            <p className="mb-2 text-ui font-medium text-ink">Receita mensal anterior</p>
             <div className="overflow-hidden rounded-lg border border-line bg-paper">
               <Table>
                 <TableHeader>

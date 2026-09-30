@@ -152,6 +152,22 @@ export function lerDeclaracaoPgdasd(texto: string): DeclaracaoPgdasd {
       if (Math.abs(soma - d.rbt12.total) > 0.05) avisos.push(`RBT12 (${d.rbt12.total}) não bate com a soma dos 12 meses anteriores (${soma.toFixed(2)})`);
     } else avisos.push("histórico não cobre os 12 meses anteriores: RBT12 não conferido");
   }
+  if (d.periodo_apuracao && interno.length) {
+    // Declaração real (30/09/2026): o histórico traz o ano anterior inteiro + o ano corrente até o mês anterior ao PA (19 meses em agosto).
+    // RBA = meses do ano corrente anteriores ao PA + RPA; RBAA = os 12 meses do ano anterior. Só confere quando o histórico cobre o trecho todo.
+    const [a, m] = d.periodo_apuracao.split("-").map(Number);
+    const mi = new Map(interno.map((x) => [x.mes, x.valor])), me = new Map(externo.map((x) => [x.mes, x.valor]));
+    const chave = (ano: number, mes: number) => `${ano}-${String(mes).padStart(2, "0")}`;
+    const somaMeses = (ks: string[]) => (ks.every((k) => mi.has(k)) ? ks.reduce((s, k) => s + (mi.get(k) ?? 0) + (me.get(k) ?? 0), 0) : null);
+    if (d.rba && d.rpa) {
+      const soma = somaMeses(Array.from({ length: m - 1 }, (_, i) => chave(a, i + 1)));
+      if (soma !== null && Math.abs(soma + d.rpa.total - d.rba.total) > 0.05) avisos.push(`RBA (${d.rba.total}) não bate com os meses do ano mais a receita do período (${(soma + d.rpa.total).toFixed(2)})`);
+    }
+    if (d.rbaa) {
+      const soma = somaMeses(Array.from({ length: 12 }, (_, i) => chave(a - 1, i + 1)));
+      if (soma !== null && Math.abs(soma - d.rbaa.total) > 0.05) avisos.push(`RBAA (${d.rbaa.total}) não bate com a soma do ano anterior (${soma.toFixed(2)})`);
+    }
+  }
   if (d.debito_declarado) {
     const b = d.debito_declarado;
     const soma = b.irpj + b.csll + b.cofins + b.pis + b.cpp + b.icms + b.ipi + b.iss;
