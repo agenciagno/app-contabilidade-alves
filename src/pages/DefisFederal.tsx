@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, FileText, Loader2, Receipt, RefreshCw } from 'lucide-react';
 
+import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -48,7 +49,8 @@ export default function DefisFederal() {
   const { data: linhas = [], isLoading } = useMatrizDefis();
   const { executar, emAndamento, dialog } = useConsultaDefis();
   const { ocupado, abrir } = useAbrirDefis();
-  const [busca, setBusca] = useState('');
+  const buscaInicial = useBuscaInicial();
+  const [busca, setBusca] = useState(buscaInicial);
   const [situacao, setSituacao] = useState<Situacao>('todos');
 
   const prazo = prazoDefis(ano);

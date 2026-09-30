@@ -9,14 +9,16 @@ import { useMatrizDctfwebMit, type LinhaDctfwebMit } from '@/hooks/useSerproDctf
 import { useProcuracoes, type LinhaProcuracao } from '@/hooks/useSerproProcuracoes';
 import { competenciaAtual, estadoParcelamento, parcelasAtrasadas, rotuloParcela, useMatrizParcelamentos, type LinhaParcelamentos } from '@/hooks/useSerproParcelamentos';
 import { estadoSitfis, useMatrizSitfis, type LinhaSitfis } from '@/hooks/useSerproSitfis';
+import { anoDe, useMatrizPgdasd, type LinhaPgdasd } from '@/hooks/useSerproPgdasd';
 
 /**
  * Fila do dia: junta, por cliente, o que a Receita mexeu ou avisou e pede ação. Só lê o que já está salvo (nenhuma chamada ao Serpro, custo zero).
  * Os avisos dos sensores somem sozinhos quando a equipe consulta aquele cliente na tela própria.
  */
-export type MotivoFila = 'intimacao' | 'mensagem_nova' | 'pagamento_novo' | 'dctfweb' | 'procuracao' | 'parcela_atrasada' | 'sitfis';
+export type MotivoFila = 'das_vencimento' | 'intimacao' | 'mensagem_nova' | 'pagamento_novo' | 'dctfweb' | 'procuracao' | 'parcela_atrasada' | 'sitfis';
 
 export const MOTIVOS_FILA: Record<MotivoFila, { rotulo: string; rota: string; dica: string }> = {
+  das_vencimento: { rotulo: 'DAS no vencimento', rota: '/dashboard-federal/das', dica: 'Abre a tela DAS já filtrada neste cliente. Consulte de novo lá se quiser confirmar o pagamento antes de avisar o cliente.' },
   intimacao: { rotulo: 'Mensagem que exige ação', rota: '/dashboard-federal/intimacoes', dica: 'Abre a tela de Termos de Intimação já filtrada neste cliente.' },
   mensagem_nova: { rotulo: 'Mensagem nova', rota: '/mensagens', dica: 'Abre Mensagens e-CAC já filtrada neste cliente. Consultar custa uma consulta ao Serpro.' },
   pagamento_novo: { rotulo: 'Pagamento novo', rota: '/dashboard-federal/pagamentos', dica: 'Abre Pagamentos já filtrada neste cliente. O aviso some quando você consulta.' },
@@ -33,6 +35,8 @@ export interface MotivoItem {
   tom: BadgeTone;
   /** Quanto maior, mais alto o cliente sobe na fila. */
   peso: number;
+  /** Texto pronto para copiar e colar no WhatsApp do cliente (só nos lembretes de DAS). */
+  mensagem?: string | null;
 }
 
 export interface ItemFila {
@@ -51,6 +55,10 @@ export interface ResumoFila {
   /** Fora da fila de propósito: estado permanente, não novidade do dia. */
   caixasComMensagemNaoLida: number;
   semProcuracao: number;
+  /** Hoje é o dia do vencimento do DAS (dia 20, ou a segunda seguinte) ou há lembrete de DAS na fila. */
+  diaDoDas: boolean;
+  /** Clientes do Simples que não foram consultados neste mês: não dá para saber se pagaram o DAS. */
+  simplesSemConsultaNoMes: number;
   carregando: boolean;
 }
 
@@ -65,10 +73,31 @@ export interface DadosFila {
   procuracoes: LinhaProcuracao[];
   parcelamentos: LinhaParcelamentos[];
   sitfis: LinhaSitfis[];
+  simples: LinhaPgdasd[];
+}
+
+const hojeISO = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+const diasEntre = (de: string, ate: string) => Math.round((Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${de}T00:00:00Z`)) / 86_400_000);
+const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+/** Vencimento do DAS do mês de `hoje`: dia 20, empurrado para a segunda quando cai no fim de semana (feriado não é tratado). */
+export function vencimentoDoDas(hoje: string): string {
+  const d = new Date(`${hoje.slice(0, 7)}-20T00:00:00Z`);
+  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Texto para o WhatsApp do cliente. No dia diz o valor da guia; depois do vencimento não diz (multa e juros mudam o valor). */
+export function mensagemLembreteDas(p: { nome: string; pa: string; valor: number | null; vencimento: string; diasAtraso: number }): string {
+  const mes = `${p.pa.slice(5, 7)}/${p.pa.slice(0, 4)}`;
+  if (p.diasAtraso <= 0) {
+    return `Olá! Aqui é da Contabilidade Alves. Passando para lembrar que o DAS (Simples Nacional) da ${p.nome} referente a ${mes}${p.valor ? `, no valor de ${reais(p.valor)},` : ''} vence hoje, ${dataBR(p.vencimento).slice(0, 5)}. Até agora não consta o pagamento na Receita Federal. Se você já pagou, pode desconsiderar esta mensagem. Qualquer dúvida, é só nos chamar.`;
+  }
+  return `Olá! Aqui é da Contabilidade Alves. O DAS (Simples Nacional) da ${p.nome} referente a ${mes} venceu em ${dataBR(p.vencimento).slice(0, 5)} e ainda não consta o pagamento na Receita Federal. Pagando logo, você reduz a multa e os juros. Se precisar da guia atualizada, é só nos pedir. Se você já pagou, pode desconsiderar esta mensagem.`;
 }
 
 /** Monta a fila a partir do que já está carregado nas telas. Função pura: a mesma entrada dá sempre a mesma fila. */
-export function montarFila(d: DadosFila): Omit<ResumoFila, 'carregando'> {
+export function montarFila(d: DadosFila, hoje = hojeISO()): Omit<ResumoFila, 'carregando'> {
   const clientesCaixa = (d.caixa).filter((c) => c.status_cliente === STATUS_MONITORADO);
   const itens = new Map<string, ItemFila>();
   const adicionar = (base: { contact_id: string; nome: string; documento: string; regime?: string | null }, m: MotivoItem) => {
@@ -80,6 +109,41 @@ export function montarFila(d: DadosFila): Omit<ResumoFila, 'carregando'> {
       itens.set(base.contact_id, { contact_id: base.contact_id, nome: base.nome, documento: base.documento, regime: base.regime ?? null, motivos: [m], prioridade: 0 });
     }
   };
+
+  // DAS no vencimento: declarado, sem pagamento registrado pela Receita, vencendo hoje ou vencido há até 15 dias. Vem da última consulta do cliente.
+  let temLembreteDas = false;
+  const inicioDoMes = `${hoje.slice(0, 7)}-01`;
+  let simplesSemConsultaNoMes = 0;
+  for (const l of d.simples) {
+    if (l.filial) continue;
+    if (!l.consultadoEm || l.consultadoEm.slice(0, 10) < inicioDoMes) simplesSemConsultaNoMes++;
+    if (!l.consultadoEm) continue;
+    const porPeriodo = new Map<string, LinhaPgdasd['das']>();
+    for (const x of l.das) {
+      const k = x.periodo_apuracao.slice(0, 7);
+      porPeriodo.set(k, [...(porPeriodo.get(k) ?? []), x]);
+    }
+    for (const [pa, lista] of porPeriodo) {
+      if (lista.some((x) => x.das_pago === true)) continue;
+      const maisRecente = [...lista].sort((a, b) => (b.emitido_em ?? '').localeCompare(a.emitido_em ?? ''))[0];
+      const venc = maisRecente.vencimento;
+      if (!venc) continue;
+      const atraso = diasEntre(venc, hoje);
+      if (atraso < 0 || atraso > 15) continue;
+      temLembreteDas = true;
+      const dadoEm = new Date(l.consultadoEm);
+      const dadoTxt = `${dataBR(l.consultadoEm.slice(0, 10))} ${dadoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+      const velho = Date.now() - dadoEm.getTime() > 24 * 3600_000;
+      adicionar(l, {
+        motivo: 'das_vencimento',
+        texto: atraso === 0 ? 'DAS vence hoje' : `DAS venceu há ${atraso} dia${atraso === 1 ? '' : 's'}`,
+        detalhe: [`${pa.slice(5, 7)}/${pa.slice(0, 4)}`, atraso === 0 && maisRecente.valor_total ? reais(maisRecente.valor_total) : null, `consulta de ${dadoTxt}${velho ? ' (confirme antes de avisar)' : ''}`].filter(Boolean).join(' · '),
+        tom: 'danger',
+        peso: atraso === 0 ? 110 : 85,
+        mensagem: mensagemLembreteDas({ nome: l.nome, pa, valor: maisRecente.valor_total, vencimento: venc, diasAtraso: atraso }),
+      });
+    }
+  }
 
   // Mensagens que exigem ação (intimação, malha, exclusão do Simples, MAED, cobrança, processo) ainda abertas, agrupadas por cliente.
   const porCliente = new Map<string, MensagemComCliente[]>();
@@ -167,7 +231,7 @@ export function montarFila(d: DadosFila): Omit<ResumoFila, 'carregando'> {
     return i;
   }).sort((a, b) => b.prioridade - a.prioridade || a.nome.localeCompare(b.nome, 'pt-BR'));
 
-  return { itens: lista, totalAtivos: clientesCaixa.length, caixasComMensagemNaoLida, semProcuracao };
+  return { itens: lista, totalAtivos: clientesCaixa.length, caixasComMensagemNaoLida, semProcuracao, diaDoDas: temLembreteDas || hoje === vencimentoDoDas(hoje), simplesSemConsultaNoMes };
 }
 
 export function useFilaDoDia(): ResumoFila {
@@ -179,13 +243,14 @@ export function useFilaDoDia(): ResumoFila {
   const procuracoes = useProcuracoes();
   const parcelamentos = useMatrizParcelamentos();
   const sitfis = useMatrizSitfis();
+  const simples = useMatrizPgdasd(anoDe(competencia));
 
-  const carregando = [caixa, criticas, pagamentos, dctfweb, procuracoes, parcelamentos, sitfis].some((q) => q.isLoading);
+  const carregando = [caixa, criticas, pagamentos, dctfweb, procuracoes, parcelamentos, sitfis, simples].some((q) => q.isLoading);
 
   const resumo = useMemo(() => montarFila({
     caixa: caixa.data ?? SEM_DADOS, criticas: criticas.data ?? SEM_DADOS, pagamentos: pagamentos.data ?? SEM_DADOS, dctfweb: dctfweb.data ?? SEM_DADOS,
-    procuracoes: procuracoes.data ?? SEM_DADOS, parcelamentos: parcelamentos.data ?? SEM_DADOS, sitfis: sitfis.data ?? SEM_DADOS,
-  }), [caixa.data, criticas.data, pagamentos.data, dctfweb.data, procuracoes.data, parcelamentos.data, sitfis.data]);
+    procuracoes: procuracoes.data ?? SEM_DADOS, parcelamentos: parcelamentos.data ?? SEM_DADOS, sitfis: sitfis.data ?? SEM_DADOS, simples: simples.data ?? SEM_DADOS,
+  }), [caixa.data, criticas.data, pagamentos.data, dctfweb.data, procuracoes.data, parcelamentos.data, sitfis.data, simples.data]);
 
   return { ...resumo, carregando };
 }

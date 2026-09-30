@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Copy } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ const somenteDigitos = (v: string) => v.replace(/\D/g, '');
 type Filtro = 'todos' | MotivoFila;
 const FILTROS: { value: Filtro; label: string }[] = [
   { value: 'todos', label: 'Todos os motivos' },
+  { value: 'das_vencimento', label: 'DAS no vencimento' },
   { value: 'intimacao', label: 'Mensagem que exige ação' },
   { value: 'mensagem_nova', label: 'Mensagem nova' },
   { value: 'pagamento_novo', label: 'Pagamento novo' },
@@ -34,7 +36,7 @@ const FILTROS: { value: Filtro; label: string }[] = [
 ];
 
 export default function FilaDoDiaFederal() {
-  const { itens, totalAtivos, caixasComMensagemNaoLida, semProcuracao, carregando } = useFilaDoDia();
+  const { itens, totalAtivos, caixasComMensagemNaoLida, semProcuracao, diaDoDas, simplesSemConsultaNoMes, carregando } = useFilaDoDia();
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState<Filtro>('todos');
 
@@ -42,7 +44,7 @@ export default function FilaDoDiaFederal() {
     const com = (...ms: MotivoFila[]) => itens.filter((i) => i.motivos.some((m) => ms.includes(m.motivo))).length;
     return {
       total: itens.length,
-      acao: com('intimacao'),
+      acao: com('intimacao', 'das_vencimento'),
       novidades: com('mensagem_nova', 'pagamento_novo', 'dctfweb'),
       conhecidas: com('parcela_atrasada', 'sitfis', 'procuracao'),
     };
@@ -55,6 +57,15 @@ export default function FilaDoDiaFederal() {
       .filter((i) => filtro === 'todos' || i.motivos.some((m) => m.motivo === filtro))
       .filter((i) => !q || i.nome.toLowerCase().includes(q) || (qDigitos && somenteDigitos(i.documento).includes(qDigitos)));
   }, [itens, busca, filtro]);
+
+  const copiar = async (texto: string) => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      toast.success('Mensagem copiada. É só colar no WhatsApp do cliente.');
+    } catch {
+      toast.error('Não foi possível copiar. Selecione e copie o texto à mão.');
+    }
+  };
 
   const tabelaExport = (): TabelaExport => ({
     arquivo: 'fila-do-dia',
@@ -78,7 +89,7 @@ export default function FilaDoDiaFederal() {
       <StatCardRow
         items={[
           { label: 'Clientes na fila', value: `${stats.total} de ${totalAtivos}`, hint: 'clientes ativos acompanhados' },
-          { label: 'Exigem ação', value: stats.acao, hint: 'mensagem da Receita com ação pendente', emphasis: stats.acao > 0 ? 'warm' : 'none' },
+          { label: 'Exigem ação', value: stats.acao, hint: 'mensagem da Receita ou DAS no vencimento', emphasis: stats.acao > 0 ? 'warm' : 'none' },
           { label: 'Novidades da Receita', value: stats.novidades, hint: 'mensagem, pagamento ou DCTFWeb', emphasis: stats.novidades > 0 ? 'warm' : 'none' },
           { label: 'Pendências conhecidas', value: stats.conhecidas, hint: 'parcela, situação fiscal ou procuração' },
         ]}
@@ -122,6 +133,13 @@ export default function FilaDoDiaFederal() {
                         <div key={m.motivo + m.texto} className="flex flex-wrap items-center gap-2">
                           <DsBadge tone={m.tom}>{m.texto}</DsBadge>
                           {m.detalhe && <span className="text-meta text-muted-ink-2">{m.detalhe}</span>}
+                          {m.mensagem && (
+                            <DicaBotao texto="Copia o texto pronto para colar no WhatsApp do cliente. Se a consulta for antiga, confirme o pagamento na tela DAS antes de enviar.">
+                              <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => copiar(m.mensagem!)}>
+                                <Copy className="mr-1 h-3.5 w-3.5" />Copiar mensagem
+                              </Button>
+                            </DicaBotao>
+                          )}
                           <DicaBotao texto={MOTIVOS_FILA[m.motivo].dica}>
                             <Button asChild size="sm" variant="ghost" className="h-7 px-2">
                               <Link to={`${MOTIVOS_FILA[m.motivo].rota}?q=${somenteDigitos(i.documento)}`}>
@@ -139,6 +157,14 @@ export default function FilaDoDiaFederal() {
           </Table>
         )}
       </div>
+
+      {diaDoDas && (
+        <p className="text-meta text-muted-ink">
+          Dia do vencimento do DAS: {simplesSemConsultaNoMes} clientes do Simples não foram consultados neste mês, então não dá para saber se já pagaram.
+          Consulte em <Link className="underline underline-offset-2" to="/dashboard-federal/pgdas">PGDAS</Link> e{' '}
+          <Link className="underline underline-offset-2" to="/dashboard-federal/pagamentos">Pagamentos</Link> antes de avisar. Só entram na fila os clientes consultados com DAS sem pagamento registrado.
+        </p>
+      )}
 
       <p className="text-meta text-muted-ink-2">
         Fora da fila de propósito, por serem situação antiga e não novidade do dia:{' '}

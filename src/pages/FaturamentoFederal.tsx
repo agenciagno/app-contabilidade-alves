@@ -14,6 +14,7 @@ import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { FaturamentoClienteSheet, NivelLimiteBadge, ROTULO_REGIME, moeda } from '@/components/serpro/FaturamentoClienteSheet';
 import { useLeituraFaturamento } from '@/components/serpro/useLeituraFaturamento';
+import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { competenciaPadrao, mesDeData, rotuloCompetencia, siglaCompetencia } from '@/hooks/useSerproPagamentos';
 import { anoDe, declaracaoVigente, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
 import {
@@ -49,7 +50,8 @@ export default function FaturamentoFederal() {
   const { data: linhas = [], isLoading } = useMatrizPgdasd(ano);
   const { data: leituras = [], isLoading: carregandoLeituras } = useFaturamentoAno(ano);
   const { executar, emAndamento } = useLeituraFaturamento();
-  const [busca, setBusca] = useState('');
+  const buscaInicial = useBuscaInicial();
+  const [busca, setBusca] = useState(buscaInicial);
   const [situacao, setSituacao] = useState<Situacao>(SITUACOES.some((s) => s.value === filtroInicial) ? (filtroInicial as Situacao) : 'todos');
   const [aberto, setAberto] = useState<string | null>(null);
 

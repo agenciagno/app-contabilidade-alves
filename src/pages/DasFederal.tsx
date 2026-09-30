@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { CompetenciaNav } from '@/components/serpro/CompetenciaNav';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { useAbrirArquivo, useConsultaPgdasd, useGerarDasComConfirmacao } from '@/components/serpro/pgdasdUi';
+import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { competenciaPadrao, mesDeData, rotuloCompetencia, siglaCompetencia } from '@/hooks/useSerproPagamentos';
 import { anoDe, dasDoPeriodo, dasReaproveitavel, duplicidadeDas, statusDas, useMatrizPgdasd, type LinhaPgdasd, type StatusDas } from '@/hooks/useSerproPgdasd';
 import type { TabelaExport } from '@/lib/exportarTabela';
@@ -56,7 +57,8 @@ export default function DasFederal() {
   const { executar, emAndamento, dialog } = useConsultaPgdasd(ano);
   const { ocupado, abrirExtrato } = useAbrirArquivo();
   const { pedir, gerando, dialog: dialogGerar } = useGerarDasComConfirmacao();
-  const [busca, setBusca] = useState('');
+  const buscaInicial = useBuscaInicial();
+  const [busca, setBusca] = useState(buscaInicial);
   const [situacao, setSituacao] = useState<Situacao>('todos');
 
   const vencido = new Date() > prazo(pa);

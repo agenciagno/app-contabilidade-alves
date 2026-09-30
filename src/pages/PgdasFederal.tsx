@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { CompetenciaNav } from '@/components/serpro/CompetenciaNav';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { useAbrirArquivo, useConsultaPgdasd } from '@/components/serpro/pgdasdUi';
+import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { competenciaPadrao, mesDeData, rotuloCompetencia, siglaCompetencia } from '@/hooks/useSerproPagamentos';
 import {
   anoDe, declaracaoVigente, statusPgdas, useMatrizPgdasd, type LinhaPgdasd, type StatusPgdas,
@@ -60,7 +61,8 @@ export default function PgdasFederal() {
   const { data: linhas = [], isLoading } = useMatrizPgdasd(ano);
   const { executar, emAndamento, dialog } = useConsultaPgdasd(ano);
   const { ocupado, abrirDeclaracao } = useAbrirArquivo();
-  const [busca, setBusca] = useState('');
+  const buscaInicial = useBuscaInicial();
+  const [busca, setBusca] = useState(buscaInicial);
   const [situacao, setSituacao] = useState<Situacao>('todos');
 
   const vencido = new Date() > prazo(pa);

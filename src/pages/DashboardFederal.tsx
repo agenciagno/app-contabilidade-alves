@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BadgeCheck, Banknote, BarChart3, ClipboardList, CreditCard, FileCheck, FileSignature, FileSpreadsheet, FileX,
-  Calculator, Gauge, Gavel, Landmark, ListChecks, Mail, Percent, Receipt, Scale, ShieldCheck, UserX, ArrowRight,
+  Calculator, ClipboardCheck, Gauge, Gavel, Landmark, Lightbulb, ListChecks, Mail, Percent, Receipt, Scale, ShieldCheck, UserX, ArrowRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -20,6 +20,8 @@ import { estadoSitfis, useMatrizSitfis } from '@/hooks/useSerproSitfis';
 import { useDarfsGerados } from '@/hooks/useSerproDarf';
 import { estadoDctfweb, estadoMit, useMatrizDctfwebMit } from '@/hooks/useSerproDctfweb';
 import { useFilaDoDia } from '@/hooks/useSerproFilaDoDia';
+import { useOportunidades } from '@/hooks/useSerproOportunidades';
+import { useConferenciaCadastro } from '@/hooks/useSerproConferenciaCadastro';
 import { competenciaAtual, estadoParcelamento, parcelasDoMes, somaValor, useMatrizParcelamentos } from '@/hooks/useSerproParcelamentos';
 
 type Tom = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
@@ -62,6 +64,8 @@ export default function DashboardFederal() {
   const { data: darfs = [], isLoading: carregandoDarf } = useDarfsGerados();
   const { data: declMensais = [], isLoading: carregandoDecl } = useMatrizDctfwebMit(competencia);
   const fila = useFilaDoDia();
+  const oport = useOportunidades();
+  const conferencia = useConferenciaCadastro();
 
   const ativos = useMemo<CartaoAtivo[]>(() => {
     const selos = clientes.map((c) => seloCaixa(c).estado);
@@ -113,11 +117,19 @@ export default function DashboardFederal() {
     const dfConsultados = defis.filter((l) => !l.filial && l.consultadoEm).length;
     const dfEntregues = dfStatus.filter((s) => s === 'entregue' || s === 'retificada').length;
     const dfAtraso = dfStatus.filter((s) => s === 'em_atraso').length;
-    const filaAcao = fila.itens.filter((i) => i.motivos.some((m) => m.motivo === 'intimacao')).length;
+    const filaAcao = fila.itens.filter((i) => i.motivos.some((m) => m.motivo === 'intimacao' || m.motivo === 'das_vencimento')).length;
     return [
       {
         titulo: 'Fila do dia', icone: ListChecks, to: '/dashboard-federal/fila-do-dia', tom: filaAcao > 0 ? 'danger' : fila.itens.length > 0 ? 'warn' : 'ok',
-        linhas: [`${fila.itens.length} clientes na fila`, `${filaAcao} com mensagem que exige ação`],
+        linhas: [`${fila.itens.length} clientes na fila`, `${filaAcao} exigem ação (mensagem da Receita ou DAS)`],
+      },
+      {
+        titulo: 'Oportunidades', icone: Lightbulb, to: '/dashboard-federal/oportunidades', tom: oport.lidos === 0 ? 'neutral' : oport.linhas.length > 0 ? 'warn' : 'ok',
+        linhas: [`${oport.linhas.length} clientes com oportunidade (fator r, limite ou sublimite)`, `${oport.lidos} de ${oport.totalSimples} declarações do Simples lidas`],
+      },
+      {
+        titulo: 'Conferência do cadastro', icone: ClipboardCheck, to: '/dashboard-federal/conferencia-cadastro', tom: conferencia.linhas.length > 0 ? 'warn' : 'ok',
+        linhas: [`${conferencia.linhas.length} clientes com algo que não bate`, `${conferencia.totalAtivos} clientes ativos conferidos`],
       },
       {
         titulo: 'Mensagens e-CAC', icone: Mail, to: '/mensagens', tom: comMensagem > 0 ? 'warn' : 'ok',
@@ -185,9 +197,9 @@ export default function DashboardFederal() {
         linhas: [`${vencidos} vencidos`, `${aVencer} vencem em 30 dias · ${certificados.length} no total`],
       },
     ];
-  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, sitfis, parcelamentos, darfs, declMensais, fila.itens, competencia]);
+  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, sitfis, parcelamentos, darfs, declMensais, fila.itens, oport.linhas, oport.lidos, oport.totalSimples, conferencia.linhas, conferencia.totalAtivos, competencia]);
 
-  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc || carregandoSitfis || carregandoParc || carregandoDarf || carregandoDecl;
+  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc || carregandoSitfis || carregandoParc || carregandoDarf || carregandoDecl || fila.carregando || oport.carregando || conferencia.carregando;
 
   return (
     <div className="space-y-6">
