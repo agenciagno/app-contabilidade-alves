@@ -4762,6 +4762,109 @@ export type Database = {
           },
         ]
       }
+      serpro_darfs: {
+        Row: {
+          codigo_barras: string | null
+          codigo_receita: string
+          company_id: string
+          contact_id: string
+          created_at: string
+          created_by: string | null
+          data_consolidacao: string
+          data_pa: string
+          extensao: string
+          id: string
+          numero_documento: string | null
+          numero_referencia: string | null
+          observacao: string | null
+          pdf_path: string | null
+          percentual_juros: number | null
+          percentual_multa: number | null
+          tipo_pa: string
+          valido_ate: string | null
+          valor_imposto: number
+          valor_juros: number | null
+          valor_multa: number | null
+          valor_principal: number | null
+          valor_total: number | null
+          vencimento: string
+        }
+        Insert: {
+          codigo_barras?: string | null
+          codigo_receita: string
+          company_id: string
+          contact_id: string
+          created_at?: string
+          created_by?: string | null
+          data_consolidacao: string
+          data_pa: string
+          extensao?: string
+          id?: string
+          numero_documento?: string | null
+          numero_referencia?: string | null
+          observacao?: string | null
+          pdf_path?: string | null
+          percentual_juros?: number | null
+          percentual_multa?: number | null
+          tipo_pa: string
+          valido_ate?: string | null
+          valor_imposto: number
+          valor_juros?: number | null
+          valor_multa?: number | null
+          valor_principal?: number | null
+          valor_total?: number | null
+          vencimento: string
+        }
+        Update: {
+          codigo_barras?: string | null
+          codigo_receita?: string
+          company_id?: string
+          contact_id?: string
+          created_at?: string
+          created_by?: string | null
+          data_consolidacao?: string
+          data_pa?: string
+          extensao?: string
+          id?: string
+          numero_documento?: string | null
+          numero_referencia?: string | null
+          observacao?: string | null
+          pdf_path?: string | null
+          percentual_juros?: number | null
+          percentual_multa?: number | null
+          tipo_pa?: string
+          valido_ate?: string | null
+          valor_imposto?: number
+          valor_juros?: number | null
+          valor_multa?: number | null
+          valor_principal?: number | null
+          valor_total?: number | null
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_darfs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_darfs_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_darfs_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
       serpro_defis: {
         Row: {
           ano_calendario: number

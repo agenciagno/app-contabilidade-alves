@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BadgeCheck, Banknote, BarChart3, ClipboardList, CreditCard, FileCheck, FileSignature, FileSpreadsheet, FileX,
-  Gauge, Gavel, Landmark, Mail, Percent, Receipt, Scale, ShieldCheck, UserX, ArrowRight,
+  Calculator, Gauge, Gavel, Landmark, Mail, Percent, Receipt, Scale, ShieldCheck, UserX, ArrowRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -17,6 +17,7 @@ import { faturamentoVigente, nivelLimite, nivelSublimite, useFaturamentoAno } fr
 import { statusDefis, useMatrizDefis } from '@/hooks/useSerproDefis';
 import { useProcuracoes, vencendo as procVencendo } from '@/hooks/useSerproProcuracoes';
 import { estadoSitfis, useMatrizSitfis } from '@/hooks/useSerproSitfis';
+import { useDarfsGerados } from '@/hooks/useSerproDarf';
 import { competenciaAtual, estadoParcelamento, parcelasDoMes, somaValor, useMatrizParcelamentos } from '@/hooks/useSerproParcelamentos';
 
 type Tom = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
@@ -58,6 +59,7 @@ export default function DashboardFederal() {
   const { data: procuracoes = [], isLoading: carregandoProc } = useProcuracoes();
   const { data: sitfis = [], isLoading: carregandoSitfis } = useMatrizSitfis();
   const { data: parcelamentos = [], isLoading: carregandoParc } = useMatrizParcelamentos();
+  const { data: darfs = [], isLoading: carregandoDarf } = useDarfsGerados();
 
   const ativos = useMemo<CartaoAtivo[]>(() => {
     const selos = clientes.map((c) => seloCaixa(c).estado);
@@ -79,6 +81,9 @@ export default function DashboardFederal() {
     const fatAcima = fatConfiaveis.filter((f) => nivelLimite(f) === 'acima' || nivelSublimite(f) === 'acima').length;
     const fatPertoSub = fatConfiaveis.filter((f) => nivelSublimite(f) === 'perto').length;
     const fatFatorR = fatConfiaveis.filter((f) => f.fator_r_aplica === true).length;
+    const mesDarf = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 7);
+    const darfsMes = darfs.filter((d) => d.created_at.slice(0, 7) === mesDarf);
+    const darfsTotal = darfsMes.reduce((s, d) => s + (d.valor_total ?? 0), 0);
     const pcAtual = competenciaAtual();
     const parcEstados = parcelamentos.filter((l) => !l.filial).map((l) => estadoParcelamento(l, pcAtual));
     const parcAtivos = parcEstados.filter((e) => e === 'em_dia' || e === 'atrasado').length;
@@ -141,6 +146,10 @@ export default function DashboardFederal() {
         linhas: [`${parcAtivos} com parcelamento ativo · ${parcAtrasados} com parcela em atraso`, `${parcConsultados} de ${parcEstados.length} consultados · parcelas do mês ${parcDoMes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`],
       },
       {
+        titulo: 'DARF atualizado', icone: Calculator, to: '/dashboard-federal/darf', tom: 'neutral',
+        linhas: [`${darfsMes.length} gerados este mês`, `total de ${darfsTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} com multa e juros`],
+      },
+      {
         titulo: 'Termos de intimação', icone: Gavel, to: '/dashboard-federal/intimacoes', tom: abertas.length > 0 ? 'danger' : 'ok',
         linhas: [`${abertas.length} em aberto`, `${abertas.filter((m) => m.situacao === 'nova').length} novas sem responsável`],
       },
@@ -154,9 +163,9 @@ export default function DashboardFederal() {
         linhas: [`${vencidos} vencidos`, `${aVencer} vencem em 30 dias · ${certificados.length} no total`],
       },
     ];
-  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, sitfis, parcelamentos, competencia]);
+  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, sitfis, parcelamentos, darfs, competencia]);
 
-  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc || carregandoSitfis || carregandoParc;
+  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc || carregandoSitfis || carregandoParc || carregandoDarf;
 
   return (
     <div className="space-y-6">
@@ -168,7 +177,7 @@ export default function DashboardFederal() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {carregando
-          ? Array.from({ length: 13 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
+          ? Array.from({ length: 14 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
           : ativos.map((c) => {
             const Icone = c.icone;
             return (
