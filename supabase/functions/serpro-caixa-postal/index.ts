@@ -323,14 +323,21 @@ async function rotinaEventos(payload: any, uid: string | null, origem: "manual" 
     const s = await serpro({ tipo: "Monitorar", idSistema: "EVENTOSATUALIZACAO", idServico: "SOLICEVENTOSPJ132",
       contribuinte: { numero: lista, tipo: 4 }, dados: JSON.stringify({ evento: "E0601" }), autor, uid, origem, finalidade: fin });
     if (s.status !== 200) return { erro: `solicitar HTTP ${s.status}: ${s.resposta?.mensagens?.[0]?.texto ?? s.resposta?.error ?? ""}` };
-    const protocolo = s.resposta?.dados?.protocolo;
-    if (!protocolo) return { erro: "Serpro não devolveu o protocolo" };
-    const espera = Math.max(Number(s.resposta?.dados?.TempoEsperaMedioEmMs ?? 3000), 3000) + 1500;
-    await sleep(espera);
+    // "dados" pode chegar como objeto ou como texto (o trial devolve um JSON quebrado): lê dos dois jeitos.
+    const d = s.resposta?.dados;
+    const texto = typeof d === "string" ? d : JSON.stringify(d ?? {});
+    const protocolo = (d && typeof d === "object" && d.protocolo) || /"protocolo"\s*:\s*"([^"]+)"/.exec(texto)?.[1];
+    if (!protocolo) return { erro: `Serpro não devolveu o protocolo. Formato recebido: ${texto.slice(0, 300)}` };
+    const tempoMs = Number((d && typeof d === "object" && (d.TempoEsperaMedioEmMs ?? d.tempoEsperaMedioEmMs)) || /"TempoEsperaMedioEmMs"\s*:\s*(\d+)/i.exec(texto)?.[1] || 3000);
+    await sleep(Math.max(tempoMs, 3000) + 1500);
     for (let tentativa = 0; tentativa < 4; tentativa++) {
       const o = await serpro({ tipo: "Monitorar", idSistema: "EVENTOSATUALIZACAO", idServico: "OBTEREVENTOSPJ134",
         contribuinte: { numero: "", tipo: 4 }, dados: JSON.stringify({ protocolo, evento: "E0601" }), autor, uid, origem, finalidade: fin });
-      if (o.status === 200 && Array.isArray(o.resposta?.dados)) return { linhas: o.resposta.dados as [string, string][] };
+      let matriz: any = o.resposta?.dados;
+      if (typeof matriz === "string") { try { matriz = JSON.parse(matriz); } catch { /* segue */ } }
+      if (matriz && !Array.isArray(matriz) && Array.isArray(matriz.elementos)) matriz = matriz.elementos;
+      if (o.status === 200 && Array.isArray(matriz)) return { linhas: matriz as [string, string][] };
+      if (o.status === 200) return { erro: `Formato inesperado no resultado dos eventos: ${JSON.stringify(o.resposta?.dados ?? null).slice(0, 300)}` };
       if (![202, 204].includes(o.status)) return { erro: `obter HTTP ${o.status}: ${o.resposta?.mensagens?.[0]?.texto ?? o.resposta?.error ?? ""}` };
       await sleep(4000);
     }
