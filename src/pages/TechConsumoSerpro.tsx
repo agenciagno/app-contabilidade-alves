@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { DsAlert, PageHeader, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
+import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -132,6 +133,28 @@ export default function TechConsumoSerpro() {
           {foraPorStatus.size > 0 && ` · fora: ${[...foraPorStatus.entries()].map(([s, n]) => `${n} ${s}`).join(', ')}`}
           {!foraPorStatus.has('Suspensa - Contabilidade') && ' · nenhum suspenso por falta de pagamento'}.
         </p>
+      </section>
+
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-line bg-paper p-5">
+        <div className="min-w-[260px] flex-1 space-y-1">
+          <h2 className="text-h4-card text-ink">Concluir tarefas fiscais sozinho</h2>
+          <p className="text-ui text-muted-ink">
+            Quando você consulta um cliente e a Receita mostra o DAS do mês <strong className="text-ink">pago</strong>, ou uma declaração
+            transmitida <strong className="text-ink">sem receita e sem débito</strong>, a tarefa "DAS - Simples Nacional" daquele mês é
+            concluída na hora (protocolo PAGO ou ZERADO, com a origem registrada na tarefa). Declaração transmitida sozinha não conclui:
+            a tarefa inclui enviar o DAS ao cliente.
+          </p>
+        </div>
+        <DicaBotao texto={config?.auto_concluir_tarefas === false ? 'Desligado: nenhuma tarefa é concluída sozinha. Ligue para voltar a concluir.' : 'Ligado: desligue se quiser que as tarefas fiquem sempre por conta da equipe.'}>
+          <Switch
+            checked={config?.auto_concluir_tarefas ?? true}
+            disabled={!config || salvar.isPending}
+            onCheckedChange={async (v) => {
+              try { await salvar.mutateAsync({ auto_concluir_tarefas: v }); toast.success(v ? 'Conclusão automática ligada.' : 'Conclusão automática desligada.'); }
+              catch { toast.error('Não foi possível salvar.'); }
+            }}
+          />
+        </DicaBotao>
       </section>
 
       {passouAlerta && (

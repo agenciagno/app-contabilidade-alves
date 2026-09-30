@@ -4,6 +4,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { criarSerpro, onlyDigits } from "../_shared/serpro-core.ts";
 import { lerIndicePgdasd, pega } from "../_shared/pgdasd-indice.ts";
 import { lerDeclaracaoPgdasd, type DeclaracaoPgdasd } from "../_shared/pgdasd-extrair.ts";
+import { concluirTarefaDas } from "../_shared/tarefas-fiscais.ts";
 
 // ---------------------------------------------------------------------------
 // PGDAS-D e DAS (Serpro Integra Contador, Simples Nacional) — F4 Onda 2, passo 2, 30/09/2026. Só leitura + emissão de DAS.
@@ -18,6 +19,8 @@ import { lerDeclaracaoPgdasd, type DeclaracaoPgdasd } from "../_shared/pgdasd-ex
 //   gerar_das    { contact_id, periodo, confirmar_emissao: true, dataConsolidacao?, novo? }  GERARDAS12 (Emitir): gera o DAS do mês.
 //                                                    Só com confirmação explícita; se já há DAS gerado aqui e ainda no prazo, devolve o
 //                                                    arquivo guardado em vez de emitir outro.
+//   (conclusão automática) consultar conclui a tarefa fiscal "DAS - Simples Nacional" dos períodos com DAS pago; ler_faturamento conclui a de
+//                                                    declaração zerada. Transmitir sozinho não conclui. Ver _shared/tarefas-fiscais.ts.
 //   ler_faturamento { contact_id, periodo }          Passo 3: lê o PDF da declaração do mês (regra fixa de texto, sem IA) e grava em
 //                                                    serpro_faturamento (receita do mês, RBT12, RBA, limite, sublimite, fator r, regime).
 //                                                    Se o PDF já está guardado, não chama o Serpro (custo zero); se não, baixa antes.
@@ -133,7 +136,13 @@ async function consultar(payload: any, uid: string) {
   await supabase.from("serpro_pgdasd_consultas").upsert(
     { contact_id: c.contato!.id, company_id: COMPANY_ID, ano, consultado_em: agora, consultado_por: uid, declaracoes: declaracoes.length, das: das.length },
     { onConflict: "contact_id,ano" });
-  return json({ ok: true, declaracoes: declaracoes.length, das: das.length, novas: novasDecl + novosDas, sem_declaracao: semDeclaracao });
+
+  // DAS pago no índice → conclui a tarefa fiscal "DAS - Simples Nacional" do período (ver _shared/tarefas-fiscais.ts).
+  const pagos = new Map<string, string>();
+  for (const d of das) if (d.das_pago === true && !pagos.has(d.periodo)) pagos.set(d.periodo, d.numero_das);
+  let tarefasConcluidas = 0;
+  for (const [periodo, numero] of pagos) tarefasConcluidas += await concluirTarefaDas(supabase, COMPANY_ID, c.contato!.id, periodo, "pago", `DAS nº ${numero} pago (informação do PGDAS-D)`);
+  return json({ ok: true, declaracoes: declaracoes.length, das: das.length, novas: novasDecl + novosDas, sem_declaracao: semDeclaracao, tarefas_concluidas: tarefasConcluidas });
 }
 
 async function documentos(payload: any, uid: string) {
@@ -305,7 +314,12 @@ async function lerEGravar(decl: DeclaracaoBase, cnpj: string) {
   };
   const { data, error } = await supabase.from("serpro_faturamento").upsert(linha, { onConflict: "contact_id,numero_declaracao" }).select("id").maybeSingle();
   if (error) throw new Error(`não foi possível gravar a leitura: ${error.message}`);
-  return { id: data?.id as string | undefined, confiavel, avisos };
+  // Declaração zerada (receita e débito zero, leitura confiável) → conclui a tarefa fiscal do período como "ZERADO".
+  let tarefasConcluidas = 0;
+  if (confiavel && d.rpa?.total === 0 && d.debito_declarado?.total === 0) {
+    tarefasConcluidas = await concluirTarefaDas(supabase, COMPANY_ID, decl.contact_id, decl.periodo_apuracao, "zerado", `declaração nº ${decl.numero_declaracao} transmitida sem receita e sem débito`);
+  }
+  return { id: data?.id as string | undefined, confiavel, avisos, tarefasConcluidas };
 }
 
 async function lerFaturamento(payload: any, uid: string) {
@@ -329,7 +343,7 @@ async function lerFaturamento(payload: any, uid: string) {
   }
   try {
     const f = await lerEGravar(decl, c.cnpj!);
-    return json({ ok: true, baixou, id: f.id, confiavel: f.confiavel, avisos: f.avisos });
+    return json({ ok: true, baixou, id: f.id, confiavel: f.confiavel, avisos: f.avisos, tarefas_concluidas: f.tarefasConcluidas });
   } catch (e) {
     return json({ ok: false, baixou, error: `O PDF está guardado, mas não consegui lê-lo: ${(e as Error).message}` });
   }

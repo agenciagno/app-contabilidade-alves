@@ -19,6 +19,8 @@ export interface ChamadaSerpro {
 export interface SerproConfig {
   alerta_gasto_mensal: number;
   volume_declarado_mes: number | null;
+  /** Conclui sozinha a tarefa fiscal "DAS - Simples Nacional" quando a Receita mostra DAS pago ou declaração zerada. */
+  auto_concluir_tarefas: boolean;
 }
 
 // Tabela de preços do contrato Serpro nº 599032 (Anexo I, 28/09/2026). Cada faixa: quantidade máxima na faixa e valor por requisição.
@@ -92,9 +94,13 @@ export function useSerproConfig() {
     queryKey: ['serpro-config', company?.id],
     enabled: !!company?.id,
     queryFn: async (): Promise<SerproConfig> => {
-      const { data, error } = await supabase.from('serpro_config').select('alerta_gasto_mensal, volume_declarado_mes').eq('company_id', company!.id).maybeSingle();
+      const { data, error } = await supabase.from('serpro_config').select('alerta_gasto_mensal, volume_declarado_mes, auto_concluir_tarefas').eq('company_id', company!.id).maybeSingle();
       if (error) throw error;
-      return { alerta_gasto_mensal: Number(data?.alerta_gasto_mensal ?? 100), volume_declarado_mes: data?.volume_declarado_mes ?? null };
+      return {
+        alerta_gasto_mensal: Number(data?.alerta_gasto_mensal ?? 100),
+        volume_declarado_mes: data?.volume_declarado_mes ?? null,
+        auto_concluir_tarefas: data?.auto_concluir_tarefas ?? true,
+      };
     },
   });
 }
@@ -103,11 +109,8 @@ export function useSalvarSerproConfig() {
   const qc = useQueryClient();
   const { company } = useCompany();
   return useMutation({
-    mutationFn: async (v: SerproConfig) => {
-      const { error } = await supabase
-        .from('serpro_config')
-        .update({ alerta_gasto_mensal: v.alerta_gasto_mensal, volume_declarado_mes: v.volume_declarado_mes })
-        .eq('company_id', company!.id);
+    mutationFn: async (v: Partial<SerproConfig>) => {
+      const { error } = await supabase.from('serpro_config').update(v).eq('company_id', company!.id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['serpro-config'] }),

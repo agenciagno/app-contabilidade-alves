@@ -4,6 +4,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { invocarSerpro } from '@/lib/invocarSerpro';
 import { fetchAllPages } from '@/lib/fetch-all';
 import { declaracaoVigente, type LinhaPgdasd } from '@/hooks/useSerproPgdasd';
+import { recarregarTarefasFiscais } from '@/lib/tarefasConcluidas';
 
 export interface MesValor { mes: string; valor: number }
 export interface TributosDeclarados { irpj: number; csll: number; cofins: number; pis: number; cpp: number; icms: number; ipi: number; iss: number; total: number }
@@ -126,14 +127,16 @@ export interface ResultadoFaturamento {
   foraDoMonitoramento?: boolean;
   filial?: boolean;
   error?: string;
+  tarefas_concluidas?: number;
 }
 
 function useInvalidar() {
   const qc = useQueryClient();
-  return () => {
+  return (r?: unknown) => {
     qc.invalidateQueries({ queryKey: ['serpro-faturamento'] });
     qc.invalidateQueries({ queryKey: ['serpro-pgdasd-matriz'] });
     qc.invalidateQueries({ queryKey: ['serpro-consumo'] });
+    recarregarTarefasFiscais(qc, (r as { tarefas_concluidas?: number } | undefined)?.tarefas_concluidas);
   };
 }
 
@@ -142,6 +145,6 @@ export function useLerFaturamento() {
   return useMutation({
     mutationFn: (v: { contactId: string; periodo: string }) =>
       invocarSerpro<ResultadoFaturamento>('serpro-pgdasd', { action: 'ler_faturamento', contact_id: v.contactId, periodo: v.periodo }),
-    onSuccess: invalidar,
+    onSuccess: (d) => invalidar(d),
   });
 }

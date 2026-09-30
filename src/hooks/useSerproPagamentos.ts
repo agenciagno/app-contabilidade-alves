@@ -1,3 +1,4 @@
+import { recarregarTarefasFiscais } from '@/lib/tarefasConcluidas';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
@@ -195,14 +196,16 @@ export interface ResultadoConsultaPag {
   documentos?: number;
   do_mes?: number;
   novos?: number;
+  tarefas_concluidas?: number;
 }
 
 function useInvalidarPagamentos() {
   const qc = useQueryClient();
-  return (contactId?: string) => {
+  return (contactId?: string, tarefasConcluidas?: number) => {
     qc.invalidateQueries({ queryKey: ['serpro-pag-matriz'] });
     qc.invalidateQueries({ queryKey: ['serpro-consumo'] });
     if (contactId) qc.invalidateQueries({ queryKey: ['serpro-pag-cliente', contactId] });
+    recarregarTarefasFiscais(qc, tarefasConcluidas);
   };
 }
 
@@ -214,7 +217,7 @@ export function useConsultarPagamentos() {
       invocarSerpro<ResultadoConsultaPag>('serpro-pagamentos', {
         action: 'consultar', contact_id: v.contactId, competencia: v.competencia, force: v.force, filtros: v.filtros,
       }),
-    onSuccess: (_d, v) => invalidar(v.contactId),
+    onSuccess: (d, v) => invalidar(v.contactId, d?.tarefas_concluidas),
   });
 }
 

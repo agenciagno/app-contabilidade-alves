@@ -7,6 +7,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useConsultarPagamentos } from '@/hooks/useSerproPagamentos';
+import { sufixoTarefas } from '@/lib/tarefasConcluidas';
 
 /**
  * Consulta de pagamentos de UM cliente num mês, sempre por clique (sem lote).
@@ -26,7 +27,7 @@ export function useConsultaPagamentos(competencia: string) {
       if (r.foraDoMonitoramento) { toast.error(r.error ?? 'Cliente fora do monitoramento.'); return; }
       if (r.semProcuracao) { toast.error('Este cliente não tem procuração para consultar pagamentos.'); return; }
       if (!r.ok) { toast.error(r.error ?? 'Falha na consulta ao Serpro.'); return; }
-      toast.success(`${r.do_mes ?? 0} pagamentos no mês (${r.novos ?? 0} novos)`);
+      toast.success(`${r.do_mes ?? 0} pagamentos no mês (${r.novos ?? 0} novos)${sufixoTarefas(r.tarefas_concluidas)}`);
     } catch (e) {
       toast.error((e as Error)?.message || 'Falha na consulta. Tente novamente em instantes.');
     } finally {

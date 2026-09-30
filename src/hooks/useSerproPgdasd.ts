@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
 import { invocarSerpro } from '@/lib/invocarSerpro';
 import { STATUS_MONITORADO } from '@/hooks/useSerproCaixaPostal';
+import { recarregarTarefasFiscais } from '@/lib/tarefasConcluidas';
 
 export interface DeclaracaoRow {
   id: string;
@@ -184,13 +185,15 @@ export interface ResultadoPgdasd {
   numero_das?: string;
   vencimento?: string | null;
   valor_total?: number | null;
+  tarefas_concluidas?: number;
 }
 
 function useInvalidarPgdasd() {
   const qc = useQueryClient();
-  return () => {
+  return (r?: unknown) => {
     qc.invalidateQueries({ queryKey: ['serpro-pgdasd-matriz'] });
     qc.invalidateQueries({ queryKey: ['serpro-consumo'] });
+    recarregarTarefasFiscais(qc, (r as { tarefas_concluidas?: number } | undefined)?.tarefas_concluidas);
   };
 }
 
@@ -199,7 +202,7 @@ export function useConsultarPgdasd() {
   return useMutation({
     mutationFn: (v: { contactId: string; ano: number; force?: boolean }) =>
       invocarSerpro<ResultadoPgdasd>('serpro-pgdasd', { action: 'consultar', contact_id: v.contactId, ano: v.ano, force: v.force }),
-    onSuccess: invalidar,
+    onSuccess: (d) => invalidar(d),
   });
 }
 
@@ -208,7 +211,7 @@ export function useDocumentosPgdasd() {
   return useMutation({
     mutationFn: (v: { contactId: string; periodo: string }) =>
       invocarSerpro<ResultadoPgdasd>('serpro-pgdasd', { action: 'documentos', contact_id: v.contactId, periodo: v.periodo }),
-    onSuccess: invalidar,
+    onSuccess: (d) => invalidar(d),
   });
 }
 
@@ -216,7 +219,7 @@ export function useExtratoDas() {
   const invalidar = useInvalidarPgdasd();
   return useMutation({
     mutationFn: (v: { dasId: string }) => invocarSerpro<ResultadoPgdasd>('serpro-pgdasd', { action: 'extrato', das_id: v.dasId }),
-    onSuccess: invalidar,
+    onSuccess: (d) => invalidar(d),
   });
 }
 
@@ -227,7 +230,7 @@ export function useGerarDas() {
       invocarSerpro<ResultadoPgdasd>('serpro-pgdasd', {
         action: 'gerar_das', contact_id: v.contactId, periodo: v.periodo, confirmar_emissao: true, novo: v.novo,
       }),
-    onSuccess: invalidar,
+    onSuccess: (d) => invalidar(d),
   });
 }
 
@@ -243,7 +246,7 @@ export function usePublicarPgdasd() {
   return useMutation({
     mutationFn: (v: { tabela: 'das' | 'declaracao'; id: string; visivel: boolean }) =>
       invocarSerpro<{ ok?: boolean; error?: string }>('serpro-pgdasd', { action: 'publicar', tabela: v.tabela, id: v.id, visivel_portal: v.visivel }),
-    onSuccess: invalidar,
+    onSuccess: (d) => invalidar(d),
   });
 }
 

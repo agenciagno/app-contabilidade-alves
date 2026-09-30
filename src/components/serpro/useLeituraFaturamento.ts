@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useLerFaturamento, type ResultadoFaturamento } from '@/hooks/useSerproFaturamento';
+import { sufixoTarefas } from '@/lib/tarefasConcluidas';
 
 /** Avisos comuns das respostas do servidor. Devolve true se já tratou (mostrou o aviso). */
 export function avisarFalhaFaturamento(r: ResultadoFaturamento): boolean {
@@ -23,7 +24,7 @@ export function useLeituraFaturamento() {
     try {
       const r = await ler.mutateAsync({ contactId, periodo });
       if (avisarFalhaFaturamento(r)) return;
-      if (r.confiavel) toast.success('Declaração lida.');
+      if (r.confiavel) toast.success(`Declaração lida.${sufixoTarefas(r.tarefas_concluidas)}`);
       else toast.warning(`Li o PDF, mas há pontos a conferir${r.avisos?.length ? `: ${r.avisos[0]}` : ''}. O número não será usado nos alertas.`);
     } catch (e) {
       toast.error((e as Error)?.message || 'Não foi possível ler a declaração. Tente novamente em instantes.');

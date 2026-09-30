@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { criarSerpro, jwtRole, onlyDigits } from "../_shared/serpro-core.ts";
+import { concluirTarefaDas } from "../_shared/tarefas-fiscais.ts";
 
 // ---------------------------------------------------------------------------
 // Pagamentos (Serpro Integra Contador, PAGTOWEB + evento E0701) — F4 Onda 1, 01/10/2026. Só leitura.
@@ -182,7 +183,13 @@ async function consultar(payload: any, uid: string) {
       { contact_id: contato.id, company_id: COMPANY_ID, competencia, consultado_em: new Date().toISOString(), consultado_por: uid, documentos: doMes },
       { onConflict: "contact_id,competencia" });
   }
-  return json({ ok: true, status: ultimoStatus, documentos: linhas.length, do_mes: doMes, novos: novas });
+
+  // DAS pago (PAGTOWEB) → conclui a tarefa fiscal "DAS - Simples Nacional" do período (ver _shared/tarefas-fiscais.ts).
+  const dasPagos = new Map<string, string>();
+  for (const l of linhas) if (l.tipo_sigla === "DAS" && l.periodo_apuracao && !dasPagos.has(l.periodo_apuracao.slice(0, 7))) dasPagos.set(l.periodo_apuracao.slice(0, 7), l.numero_documento);
+  let tarefasConcluidas = 0;
+  for (const [periodo, numero] of dasPagos) tarefasConcluidas += await concluirTarefaDas(supabase, COMPANY_ID, contato.id, periodo, "pago", `DAS nº ${numero} com pagamento confirmado pela Receita`);
+  return json({ ok: true, status: ultimoStatus, documentos: linhas.length, do_mes: doMes, novos: novas, tarefas_concluidas: tarefasConcluidas });
 }
 
 function bytesDeBase64(b64: string): Uint8Array {

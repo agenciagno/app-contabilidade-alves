@@ -4733,18 +4733,21 @@ export type Database = {
       serpro_config: {
         Row: {
           alerta_gasto_mensal: number
+          auto_concluir_tarefas: boolean
           company_id: string
           updated_at: string
           volume_declarado_mes: number | null
         }
         Insert: {
           alerta_gasto_mensal?: number
+          auto_concluir_tarefas?: boolean
           company_id: string
           updated_at?: string
           volume_declarado_mes?: number | null
         }
         Update: {
           alerta_gasto_mensal?: number
+          auto_concluir_tarefas?: boolean
           company_id?: string
           updated_at?: string
           volume_declarado_mes?: number | null
@@ -4756,6 +4759,125 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      serpro_defis: {
+        Row: {
+          ano_calendario: number
+          company_id: string
+          contact_id: string
+          created_at: string
+          declaracao_path: string | null
+          documentos_em: string | null
+          id: string
+          id_defis: string
+          recibo_path: string | null
+          sincronizado_em: string
+          tipo: number
+          transmitida_em: string | null
+          updated_at: string
+          visivel_portal: boolean
+        }
+        Insert: {
+          ano_calendario: number
+          company_id: string
+          contact_id: string
+          created_at?: string
+          declaracao_path?: string | null
+          documentos_em?: string | null
+          id?: string
+          id_defis: string
+          recibo_path?: string | null
+          sincronizado_em?: string
+          tipo: number
+          transmitida_em?: string | null
+          updated_at?: string
+          visivel_portal?: boolean
+        }
+        Update: {
+          ano_calendario?: number
+          company_id?: string
+          contact_id?: string
+          created_at?: string
+          declaracao_path?: string | null
+          documentos_em?: string | null
+          id?: string
+          id_defis?: string
+          recibo_path?: string | null
+          sincronizado_em?: string
+          tipo?: number
+          transmitida_em?: string | null
+          updated_at?: string
+          visivel_portal?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_defis_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_defis_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_defis_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_defis_consultas: {
+        Row: {
+          company_id: string
+          consultado_em: string
+          consultado_por: string | null
+          contact_id: string
+          declaracoes: number
+        }
+        Insert: {
+          company_id: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id: string
+          declaracoes?: number
+        }
+        Update: {
+          company_id?: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id?: string
+          declaracoes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_defis_consultas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_defis_consultas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_defis_consultas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
           },
         ]
       }

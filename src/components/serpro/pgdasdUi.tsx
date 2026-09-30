@@ -11,6 +11,7 @@ import {
   type DasRow, type DeclaracaoRow, type ResultadoPgdasd, type TipoArquivoPgdasd,
 } from '@/hooks/useSerproPgdasd';
 import { useLerFaturamento } from '@/hooks/useSerproFaturamento';
+import { sufixoTarefas } from '@/lib/tarefasConcluidas';
 
 /** Erros comuns das respostas do servidor. Devolve true se já tratou (mostrou o aviso). */
 function avisarFalha(r: ResultadoPgdasd): boolean {
@@ -37,7 +38,7 @@ export function useConsultaPgdasd(ano: number) {
       const r = await consultar.mutateAsync({ contactId, ano, force });
       if (r.recente) { setAConfirmar(contactId); return; }
       if (avisarFalha(r)) return;
-      toast.success(r.sem_declaracao ? `Nenhuma declaração em ${ano}` : `${r.declaracoes ?? 0} declarações e ${r.das ?? 0} DAS em ${ano} (${r.novas ?? 0} novos)`);
+      toast.success((r.sem_declaracao ? `Nenhuma declaração em ${ano}` : `${r.declaracoes ?? 0} declarações e ${r.das ?? 0} DAS em ${ano} (${r.novas ?? 0} novos)`) + sufixoTarefas(r.tarefas_concluidas));
     } catch (e) {
       toast.error(msg(e, 'Falha na consulta. Tente novamente em instantes.'));
     } finally {
