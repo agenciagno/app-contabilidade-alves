@@ -10,15 +10,15 @@ export const DICA_LARGURA_TOTAL = 'flex [&>button]:w-full';
 /**
  * Explica o botão depois de 1 segundo com o mouse em cima. O `span` faz a dica aparecer também em botão desabilitado
  * (botão desabilitado não recebe o mouse). Não repetir `title` no botão: apareceriam duas dicas.
- * `custo`: quando o clique gera cobrança no Serpro, a dica mostra o valor, mas só para administrador e super administrador.
+ * `custo`: quando o clique gera cobrança no Serpro, a dica mostra o valor, mas só para administrador e super administrador. `vezes`: chamadas por clique.
  */
-export function DicaBotao({ texto, custo, className = 'inline-flex', children }: { texto: string; custo?: 'Consultar' | 'Emitir'; className?: string; children: ReactNode }) {
+export function DicaBotao({ texto, custo, vezes, className = 'inline-flex', children }: { texto: string; custo?: 'Consultar' | 'Emitir'; vezes?: number; className?: string; children: ReactNode }) {
   return (
     <Tooltip delayDuration={1000}>
       <TooltipTrigger asChild><span className={className}>{children}</span></TooltipTrigger>
       <TooltipContent className="max-w-[300px] text-meta leading-snug">
         <p>{texto}</p>
-        {custo && <LinhaCusto tipo={custo} />}
+        {custo && <LinhaCusto tipo={custo} vezes={vezes} />}
       </TooltipContent>
     </Tooltip>
   );

@@ -5207,6 +5207,241 @@ export type Database = {
           },
         ]
       }
+      serpro_parcelamentos: {
+        Row: {
+          ativo: boolean
+          company_id: string
+          contact_id: string
+          created_at: string
+          data_pedido: string | null
+          data_situacao: string | null
+          id: string
+          modalidade: string
+          numero: number
+          sincronizado_em: string
+          situacao: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          company_id: string
+          contact_id: string
+          created_at?: string
+          data_pedido?: string | null
+          data_situacao?: string | null
+          id?: string
+          modalidade: string
+          numero: number
+          sincronizado_em?: string
+          situacao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          company_id?: string
+          contact_id?: string
+          created_at?: string
+          data_pedido?: string | null
+          data_situacao?: string | null
+          id?: string
+          modalidade?: string
+          numero?: number
+          sincronizado_em?: string
+          situacao?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_parcelamentos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_parcelamentos_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_parcelamentos_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_parcelamentos_consultas: {
+        Row: {
+          ativos: number
+          company_id: string
+          consultado_em: string
+          consultado_por: string | null
+          contact_id: string
+          erro: string | null
+          modalidade: string
+          pedidos: number
+          sem_procuracao: boolean
+        }
+        Insert: {
+          ativos?: number
+          company_id: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id: string
+          erro?: string | null
+          modalidade: string
+          pedidos?: number
+          sem_procuracao?: boolean
+        }
+        Update: {
+          ativos?: number
+          company_id?: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id?: string
+          erro?: string | null
+          modalidade?: string
+          pedidos?: number
+          sem_procuracao?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_parcelamentos_consultas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_parcelamentos_consultas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_parcelamentos_consultas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_parcelas_abertas: {
+        Row: {
+          company_id: string
+          contact_id: string
+          id: string
+          modalidade: string
+          parcela: number
+          sincronizado_em: string
+          valor: number | null
+        }
+        Insert: {
+          company_id: string
+          contact_id: string
+          id?: string
+          modalidade: string
+          parcela: number
+          sincronizado_em?: string
+          valor?: number | null
+        }
+        Update: {
+          company_id?: string
+          contact_id?: string
+          id?: string
+          modalidade?: string
+          parcela?: number
+          sincronizado_em?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_parcelas_abertas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_parcelas_abertas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_parcelas_abertas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_parcelas_guias: {
+        Row: {
+          company_id: string
+          contact_id: string
+          created_at: string
+          gerado_em: string
+          gerado_por: string | null
+          id: string
+          modalidade: string
+          parcela: number
+          pdf_path: string
+        }
+        Insert: {
+          company_id: string
+          contact_id: string
+          created_at?: string
+          gerado_em?: string
+          gerado_por?: string | null
+          id?: string
+          modalidade: string
+          parcela: number
+          pdf_path: string
+        }
+        Update: {
+          company_id?: string
+          contact_id?: string
+          created_at?: string
+          gerado_em?: string
+          gerado_por?: string | null
+          id?: string
+          modalidade?: string
+          parcela?: number
+          pdf_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_parcelas_guias_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_parcelas_guias_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_parcelas_guias_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
       serpro_pgdasd_consultas: {
         Row: {
           ano: number

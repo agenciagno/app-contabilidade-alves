@@ -17,6 +17,7 @@ import { faturamentoVigente, nivelLimite, nivelSublimite, useFaturamentoAno } fr
 import { statusDefis, useMatrizDefis } from '@/hooks/useSerproDefis';
 import { useProcuracoes, vencendo as procVencendo } from '@/hooks/useSerproProcuracoes';
 import { estadoSitfis, useMatrizSitfis } from '@/hooks/useSerproSitfis';
+import { competenciaAtual, estadoParcelamento, parcelasDoMes, somaValor, useMatrizParcelamentos } from '@/hooks/useSerproParcelamentos';
 
 type Tom = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
 
@@ -37,7 +38,6 @@ interface CartaoEmBreve {
 
 // Cartões que ainda não têm dado: acendem conforme cada onda do Integra Contador entra (relatório serpro-integra-contador-oportunidades-set2026).
 const EM_BREVE: CartaoEmBreve[] = [
-  { titulo: 'Parcelamentos', icone: CreditCard, onda: 'Onda 3', fonte: 'Parcela do mês e guia' },
   { titulo: 'e-Processo', icone: Scale, onda: 'Onda 3', fonte: 'Processos por interessado' },
   { titulo: 'DCTFWeb', icone: FileSpreadsheet, onda: 'Onda 4', fonte: 'Transmitidas e não entregues' },
   { titulo: 'MIT', icone: FileSignature, onda: 'Onda 4', fonte: 'Encerradas e não encerradas' },
@@ -57,6 +57,7 @@ export default function DashboardFederal() {
   const { data: defis = [], isLoading: carregandoDefis } = useMatrizDefis();
   const { data: procuracoes = [], isLoading: carregandoProc } = useProcuracoes();
   const { data: sitfis = [], isLoading: carregandoSitfis } = useMatrizSitfis();
+  const { data: parcelamentos = [], isLoading: carregandoParc } = useMatrizParcelamentos();
 
   const ativos = useMemo<CartaoAtivo[]>(() => {
     const selos = clientes.map((c) => seloCaixa(c).estado);
@@ -78,6 +79,12 @@ export default function DashboardFederal() {
     const fatAcima = fatConfiaveis.filter((f) => nivelLimite(f) === 'acima' || nivelSublimite(f) === 'acima').length;
     const fatPertoSub = fatConfiaveis.filter((f) => nivelSublimite(f) === 'perto').length;
     const fatFatorR = fatConfiaveis.filter((f) => f.fator_r_aplica === true).length;
+    const pcAtual = competenciaAtual();
+    const parcEstados = parcelamentos.filter((l) => !l.filial).map((l) => estadoParcelamento(l, pcAtual));
+    const parcAtivos = parcEstados.filter((e) => e === 'em_dia' || e === 'atrasado').length;
+    const parcAtrasados = parcEstados.filter((e) => e === 'atrasado').length;
+    const parcConsultados = parcEstados.filter((e) => e !== 'nao_consultado').length;
+    const parcDoMes = parcelamentos.filter((l) => !l.filial && l.consultas.length).reduce((s, l) => s + somaValor(parcelasDoMes(l, pcAtual)), 0);
     const sfEstados = sitfis.filter((l) => !l.filial).map(estadoSitfis);
     const sfSemPend = sfEstados.filter((e) => e === 'sem_pendencias').length;
     const sfComPend = sfEstados.filter((e) => e === 'com_pendencias').length;
@@ -130,6 +137,10 @@ export default function DashboardFederal() {
         linhas: [`${sfSemPend} sem pendências · ${sfComPend} com pendências`, `${sfGerados} de ${sfEstados.length} clientes com relatório${sfConferir ? ` · ${sfConferir} a conferir` : ''}`],
       },
       {
+        titulo: 'Parcelamentos', icone: CreditCard, to: '/dashboard-federal/parcelamentos', tom: parcConsultados === 0 ? 'neutral' : parcAtrasados > 0 ? 'danger' : 'ok',
+        linhas: [`${parcAtivos} com parcelamento ativo · ${parcAtrasados} com parcela em atraso`, `${parcConsultados} de ${parcEstados.length} consultados · parcelas do mês ${parcDoMes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`],
+      },
+      {
         titulo: 'Termos de intimação', icone: Gavel, to: '/dashboard-federal/intimacoes', tom: abertas.length > 0 ? 'danger' : 'ok',
         linhas: [`${abertas.length} em aberto`, `${abertas.filter((m) => m.situacao === 'nova').length} novas sem responsável`],
       },
@@ -143,9 +154,9 @@ export default function DashboardFederal() {
         linhas: [`${vencidos} vencidos`, `${aVencer} vencem em 30 dias · ${certificados.length} no total`],
       },
     ];
-  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, sitfis, competencia]);
+  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, sitfis, parcelamentos, competencia]);
 
-  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc || carregandoSitfis;
+  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc || carregandoSitfis || carregandoParc;
 
   return (
     <div className="space-y-6">
@@ -157,7 +168,7 @@ export default function DashboardFederal() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {carregando
-          ? Array.from({ length: 12 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
+          ? Array.from({ length: 13 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
           : ativos.map((c) => {
             const Icone = c.icone;
             return (
