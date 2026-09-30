@@ -14,6 +14,7 @@ import { STATUS_MONITORADO, seloCaixa, useClientesCaixa, useMensagensCriticas } 
 import { competenciaPadrao, rotuloCompetencia, useMatrizPagamentos } from '@/hooks/useSerproPagamentos';
 import { anoDe, declaracaoVigente, statusDas, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
 import { faturamentoVigente, nivelLimite, nivelSublimite, useFaturamentoAno } from '@/hooks/useSerproFaturamento';
+import { statusDefis, useMatrizDefis } from '@/hooks/useSerproDefis';
 
 type Tom = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
 
@@ -34,7 +35,6 @@ interface CartaoEmBreve {
 
 // Cartões que ainda não têm dado: acendem conforme cada onda do Integra Contador entra (relatório serpro-integra-contador-oportunidades-set2026).
 const EM_BREVE: CartaoEmBreve[] = [
-  { titulo: 'DEFIS', icone: ClipboardList, onda: 'Onda 2', fonte: 'Entregues e pendentes' },
   { titulo: 'Situação fiscal', icone: Landmark, onda: 'Onda 3', fonte: 'Pendências e regulares' },
   { titulo: 'Parcelamentos', icone: CreditCard, onda: 'Onda 3', fonte: 'Parcela do mês e guia' },
   { titulo: 'e-Processo', icone: Scale, onda: 'Onda 3', fonte: 'Processos por interessado' },
@@ -53,6 +53,7 @@ export default function DashboardFederal() {
   const { data: pagamentos = [], isLoading: carregandoPag } = useMatrizPagamentos(competencia);
   const { data: simples = [], isLoading: carregandoSn } = useMatrizPgdasd(anoDe(competencia));
   const { data: leituras = [], isLoading: carregandoFat } = useFaturamentoAno(anoDe(competencia));
+  const { data: defis = [], isLoading: carregandoDefis } = useMatrizDefis();
 
   const ativos = useMemo<CartaoAtivo[]>(() => {
     const selos = clientes.map((c) => seloCaixa(c).estado);
@@ -74,6 +75,11 @@ export default function DashboardFederal() {
     const fatAcima = fatConfiaveis.filter((f) => nivelLimite(f) === 'acima' || nivelSublimite(f) === 'acima').length;
     const fatPertoSub = fatConfiaveis.filter((f) => nivelSublimite(f) === 'perto').length;
     const fatFatorR = fatConfiaveis.filter((f) => f.fator_r_aplica === true).length;
+    const anoDefis = new Date().getFullYear() - 1;
+    const dfStatus = defis.filter((l) => !l.filial).map((l) => statusDefis(l, anoDefis));
+    const dfConsultados = defis.filter((l) => !l.filial && l.consultadoEm).length;
+    const dfEntregues = dfStatus.filter((s) => s === 'entregue' || s === 'retificada').length;
+    const dfAtraso = dfStatus.filter((s) => s === 'em_atraso').length;
     return [
       {
         titulo: 'Mensagens e-CAC', icone: Mail, to: '/mensagens', tom: comMensagem > 0 ? 'warn' : 'ok',
@@ -104,6 +110,10 @@ export default function DashboardFederal() {
         linhas: [`${fatFatorR} com fator r na declaração`, 'valor como a Receita escreve no PDF'],
       },
       {
+        titulo: 'DEFIS', icone: ClipboardList, to: '/dashboard-federal/defis', tom: dfConsultados === 0 ? 'neutral' : dfAtraso > 0 ? 'warn' : 'ok',
+        linhas: [`${dfEntregues} entregues em ${anoDefis}`, `${dfAtraso} não entregues · ${dfConsultados} clientes consultados`],
+      },
+      {
         titulo: 'Termos de intimação', icone: Gavel, to: '/dashboard-federal/intimacoes', tom: abertas.length > 0 ? 'danger' : 'ok',
         linhas: [`${abertas.length} em aberto`, `${abertas.filter((m) => m.situacao === 'nova').length} novas sem responsável`],
       },
@@ -116,9 +126,9 @@ export default function DashboardFederal() {
         linhas: [`${vencidos} vencidos`, `${aVencer} vencem em 30 dias · ${certificados.length} no total`],
       },
     ];
-  }, [clientes, criticas, certificados, pagamentos, simples, leituras, competencia]);
+  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, competencia]);
 
-  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat;
+  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis;
 
   return (
     <div className="space-y-6">
@@ -130,7 +140,7 @@ export default function DashboardFederal() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {carregando
-          ? Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
+          ? Array.from({ length: 11 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
           : ativos.map((c) => {
             const Icone = c.icone;
             return (

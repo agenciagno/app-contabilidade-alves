@@ -27,12 +27,13 @@ const formatarCnpj = (d: string) => {
   return n.length === 14 ? n.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : d;
 };
 
-type Situacao = 'todos' | 'limite' | 'sublimite' | 'fator_r' | 'lidos' | 'nao_lidos' | 'conferir';
+type Situacao = 'todos' | 'limite' | 'sublimite' | 'fator_r' | 'caixa' | 'lidos' | 'nao_lidos' | 'conferir';
 const SITUACOES: { value: Situacao; label: string }[] = [
   { value: 'todos', label: 'Todos os clientes' },
   { value: 'limite', label: 'Perto do limite (80% ou mais)' },
   { value: 'sublimite', label: 'Perto ou acima do sublimite' },
   { value: 'fator_r', label: 'Com fator r' },
+  { value: 'caixa', label: 'Regime de caixa' },
   { value: 'lidos', label: 'Declaração lida' },
   { value: 'nao_lidos', label: 'Declaração não lida' },
   { value: 'conferir', label: 'Leitura a conferir' },
@@ -83,6 +84,7 @@ export default function FaturamentoFederal() {
           case 'limite': return !!fat && ['atencao', 'critico', 'acima'].includes(nivelLimite(fat) ?? '');
           case 'sublimite': return !!fat && ['perto', 'acima'].includes(nivelSublimite(fat) ?? '');
           case 'fator_r': return !!fat && fat.fator_r_aplica === true;
+          case 'caixa': return !!fat && fat.regime_apuracao === 'caixa';
           case 'lidos': return !!fat;
           case 'nao_lidos': return !fat;
           case 'conferir': return !!fat && !fat.confiavel;
