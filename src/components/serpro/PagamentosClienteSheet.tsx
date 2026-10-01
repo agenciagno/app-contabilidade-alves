@@ -225,6 +225,70 @@ export function PagamentosClienteSheet({
           </SheetDescription>
         </SheetHeader>
 
+        <div className="mt-5 space-y-3 rounded-lg border border-line bg-bg-2 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <DicaBotao custo="Consultar" texto={`Baixa da Receita os pagamentos da competência ${siglaCompetencia(competencia)} deste cliente.`}>
+              <Button onClick={() => onConsultar(linha.contact_id)} disabled={consultando}>
+                {consultando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                Consultar pagamentos<Preco tipo="Consultar" />
+              </Button>
+            </DicaBotao>
+            <DicaBotao texto="Mostra ou esconde os filtros para procurar pagamentos por tipo, documento, receita, datas e valores.">
+              <Button variant="outline" onClick={() => setAvancada((v) => !v)}>
+                <Search className="mr-2 h-4 w-4" /> Busca avançada
+              </Button>
+            </DicaBotao>
+            <p className="min-w-[200px] flex-1 text-meta text-muted-ink">
+              Baixa os pagamentos da competência {siglaCompetencia(competencia)} (DARF, DAS, DAE e DJE). A Receita só informa o que foi pago.
+            </p>
+          </div>
+
+          {avancada && (
+            <div className="space-y-3 border-t border-line pt-3">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="space-y-1 text-meta text-muted-ink">
+                  Tipo
+                  <Select value={f.tipo} onValueChange={(v) => setF({ ...f, tipo: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{TIPOS_FILTRO.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </label>
+                <label className="space-y-1 text-meta text-muted-ink">
+                  Nº do documento
+                  <Input value={f.numero} onChange={(e) => setF({ ...f, numero: e.target.value })} placeholder="um ou mais, separados por vírgula" />
+                </label>
+                <label className="space-y-1 text-meta text-muted-ink">
+                  Código da receita
+                  <Input value={f.receita} onChange={(e) => setF({ ...f, receita: e.target.value })} placeholder="ex.: 1475" />
+                </label>
+                <label className="space-y-1 text-meta text-muted-ink">
+                  Pago de
+                  <Input type="date" value={f.de} onChange={(e) => setF({ ...f, de: e.target.value })} />
+                </label>
+                <label className="space-y-1 text-meta text-muted-ink">
+                  Pago até
+                  <Input type="date" value={f.ate} onChange={(e) => setF({ ...f, ate: e.target.value })} />
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="space-y-1 text-meta text-muted-ink">
+                    Valor de (R$)
+                    <Input inputMode="decimal" value={f.valorDe} onChange={(e) => setF({ ...f, valorDe: e.target.value })} />
+                  </label>
+                  <label className="space-y-1 text-meta text-muted-ink">
+                    Valor até (R$)
+                    <Input inputMode="decimal" value={f.valorAte} onChange={(e) => setF({ ...f, valorAte: e.target.value })} />
+                  </label>
+                </div>
+              </div>
+              <DicaBotao custo="Consultar" texto="Procura na Receita os pagamentos que batem com os filtros preenchidos.">
+                <Button onClick={buscaAvancada} disabled={buscar.isPending}>
+                  {buscar.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Buscar<Preco tipo="Consultar" />
+                </Button>
+              </DicaBotao>
+            </div>
+          )}
+        </div>
+
         {linha.das.estado !== 'nao_simples' && linha.das.estado !== 'filial' && (() => {
           const d = linha.das;
           const r = resumoDas(d);
@@ -322,70 +386,6 @@ export function PagamentosClienteSheet({
             </div>
           );
         })()}
-
-        <div className="mt-5 space-y-3 rounded-lg border border-line bg-bg-2 p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <DicaBotao custo="Consultar" texto={`Baixa da Receita os pagamentos da competência ${siglaCompetencia(competencia)} deste cliente.`}>
-              <Button onClick={() => onConsultar(linha.contact_id)} disabled={consultando}>
-                {consultando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                Consultar pagamentos<Preco tipo="Consultar" />
-              </Button>
-            </DicaBotao>
-            <DicaBotao texto="Mostra ou esconde os filtros para procurar pagamentos por tipo, documento, receita, datas e valores.">
-              <Button variant="outline" onClick={() => setAvancada((v) => !v)}>
-                <Search className="mr-2 h-4 w-4" /> Busca avançada
-              </Button>
-            </DicaBotao>
-            <p className="min-w-[200px] flex-1 text-meta text-muted-ink">
-              Baixa os pagamentos da competência {siglaCompetencia(competencia)} (DARF, DAS, DAE e DJE). A Receita só informa o que foi pago.
-            </p>
-          </div>
-
-          {avancada && (
-            <div className="space-y-3 border-t border-line pt-3">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="space-y-1 text-meta text-muted-ink">
-                  Tipo
-                  <Select value={f.tipo} onValueChange={(v) => setF({ ...f, tipo: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{TIPOS_FILTRO.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-                  </Select>
-                </label>
-                <label className="space-y-1 text-meta text-muted-ink">
-                  Nº do documento
-                  <Input value={f.numero} onChange={(e) => setF({ ...f, numero: e.target.value })} placeholder="um ou mais, separados por vírgula" />
-                </label>
-                <label className="space-y-1 text-meta text-muted-ink">
-                  Código da receita
-                  <Input value={f.receita} onChange={(e) => setF({ ...f, receita: e.target.value })} placeholder="ex.: 1475" />
-                </label>
-                <label className="space-y-1 text-meta text-muted-ink">
-                  Pago de
-                  <Input type="date" value={f.de} onChange={(e) => setF({ ...f, de: e.target.value })} />
-                </label>
-                <label className="space-y-1 text-meta text-muted-ink">
-                  Pago até
-                  <Input type="date" value={f.ate} onChange={(e) => setF({ ...f, ate: e.target.value })} />
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="space-y-1 text-meta text-muted-ink">
-                    Valor de (R$)
-                    <Input inputMode="decimal" value={f.valorDe} onChange={(e) => setF({ ...f, valorDe: e.target.value })} />
-                  </label>
-                  <label className="space-y-1 text-meta text-muted-ink">
-                    Valor até (R$)
-                    <Input inputMode="decimal" value={f.valorAte} onChange={(e) => setF({ ...f, valorAte: e.target.value })} />
-                  </label>
-                </div>
-              </div>
-              <DicaBotao custo="Consultar" texto="Procura na Receita os pagamentos que batem com os filtros preenchidos.">
-                <Button onClick={buscaAvancada} disabled={buscar.isPending}>
-                  {buscar.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Buscar<Preco tipo="Consultar" />
-                </Button>
-              </DicaBotao>
-            </div>
-          )}
-        </div>
 
         <div className="mt-5 flex items-center justify-between gap-3">
           <p className="text-meta text-muted-ink">{visiveis.length} documento(s) {soMes ? `da competência ${siglaCompetencia(competencia)}` : 'de todos os meses salvos'}</p>
