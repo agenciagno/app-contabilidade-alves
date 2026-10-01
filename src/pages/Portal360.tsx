@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  ArrowRight, Gavel, Landmark, Receipt, Scale, ShieldAlert, ShieldX, UserX, FileX,
+  Gavel, Landmark, Receipt, Scale, ShieldAlert, ShieldX, UserX, FileX,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -8,15 +8,18 @@ import { DsAlert, DsBadge, PageHeader } from '@/components/ds';
 import { CartaoIndicador, tomPor, type Tom } from '@/components/gestao360/CartaoIndicador';
 import { ClienteFiltro } from '@/components/gestao360/ClienteFiltro';
 import { FichaCliente } from '@/components/gestao360/FichaCliente';
+import { FilaParaAgir } from '@/components/gestao360/FilaParaAgir';
 import { GraficosCarteiraView } from '@/components/gestao360/GraficosCarteira';
 import { ListaClientesSheet, TOM_NIVEL, type ListaAberta } from '@/components/gestao360/ListaClientesSheet';
 import { ResponsavelFiltro } from '@/components/gestao360/ResponsavelFiltro';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAcompanhamentos } from '@/hooks/useAcompanhamentoAusencia';
 import { useFiltroCarteira } from '@/hooks/useFiltroCarteira';
 import { rotuloCompetencia } from '@/hooks/useSerproPagamentos';
 import { useSituacaoCarteira } from '@/hooks/useSituacaoCarteira';
+import { montarFila } from '@/lib/filaDoDia';
 import {
-  contar, FILTROS, montarGraficos, ROTULO_NIVEL, topEmRisco, totalPendencias,
+  contar, FILTROS, montarGraficos, ROTULO_NIVEL, totalPendencias,
   type Filtro, type LinhaCarteira, type NivelRisco,
 } from '@/lib/situacaoCarteira';
 
@@ -125,7 +128,8 @@ export default function Portal360() {
 
   const niveis = (['critico', 'atencao', 'sem_cobertura', 'em_dia'] as NivelRisco[]).map((nv) => ({ nv, n: visiveis.filter((l) => l.nivel === nv).length }));
   const graficos = useMemo(() => montarGraficos(visiveis, competencia, hoje), [visiveis, competencia, hoje]);
-  const top = useMemo(() => topEmRisco(visiveis, 5), [visiveis]);
+  const acompanhamentos = useAcompanhamentos();
+  const fila = useMemo(() => montarFila(visiveis, acompanhamentos.data ?? new Map(), hoje), [visiveis, acompanhamentos.data, hoje]);
 
   const abrir = (c: Cartao) => setLista({ titulo: c.titulo, descricao: c.descricao, linhas: visiveis.filter(c.filtro), detalhe: c.detalhe, to: c.to });
   const abrirNivel = (nv: NivelRisco) => setLista({
@@ -177,31 +181,11 @@ export default function Portal360() {
             <FichaCliente linha={escolhida} />
           ) : (
             <>
+              <FilaParaAgir itens={fila} onEscolherCliente={escolher} />
+
               <section className="space-y-3">
                 <h2 className="text-h4-card text-ink">Análise visual</h2>
                 <GraficosCarteiraView g={graficos} />
-              </section>
-
-              <section className="space-y-3 rounded-lg border border-line bg-paper p-5">
-                <div>
-                  <h2 className="text-h4-card text-ink">Clientes em risco</h2>
-                  <p className="text-meta text-muted-ink">Crítico antes de Atenção; dentro do nível, mais pendências primeiro. O motivo vem ao lado, sem nota.</p>
-                </div>
-                {top.length === 0 ? (
-                  <p className="py-6 text-center text-ui text-muted-ink">Nenhum cliente em Crítico ou Atenção com os dados que temos hoje.</p>
-                ) : (
-                  <div className="divide-y divide-line-2">
-                    {top.map((l) => (
-                      <button key={l.contact_id} type="button" onClick={() => escolher(l.contact_id)} className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 py-3 text-left hover:bg-bg-2/50">
-                        <span className="w-[260px] shrink-0 truncate text-ui-strong text-ink">{l.nome}</span>
-                        <span className="w-[120px] shrink-0 truncate text-meta text-muted-ink-2">{l.responsavel?.nome ?? 'Sem responsável'}</span>
-                        <DsBadge tone={TOM_NIVEL[l.nivel]}>{ROTULO_NIVEL[l.nivel]}</DsBadge>
-                        <span className="min-w-0 flex-1 truncate text-meta text-muted-ink">{l.motivos.slice(0, 3).join(' · ')}{l.motivos.length > 3 ? ` · +${l.motivos.length - 3}` : ''}</span>
-                        <ArrowRight className="h-4 w-4 shrink-0 text-muted-ink-2" />
-                      </button>
-                    ))}
-                  </div>
-                )}
               </section>
             </>
           )}

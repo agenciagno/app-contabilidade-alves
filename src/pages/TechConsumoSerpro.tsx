@@ -21,6 +21,24 @@ import { STATUS_MONITORADO, useClientesCaixa } from '@/hooks/useSerproCaixaPosta
 import { ROTINAS, cobra, type InterruptorRotina, type RotinaSerpro, type TipoRotina } from '@/lib/rotinasSerpro';
 
 const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const ALERTAS_EQUIPE: { chave: 'alerta_pgdas_antes_prazo' | 'alerta_mensagem_parada' | 'alerta_baixa_sem_declaracao' | 'alerta_sem_resposta'; titulo: string; texto: string }[] = [
+  {
+    chave: 'alerta_pgdas_antes_prazo', titulo: 'PGDAS-D faltando até 3 dias para o prazo',
+    texto: 'Do dia 17 até o prazo (dia 20, ou o próximo dia útil), avisa quais clientes do Simples ainda estão sem PGDAS-D transmitido na última leitura. Só entra cliente lido nos últimos 7 dias. Um aviso por cliente e por competência.',
+  },
+  {
+    chave: 'alerta_mensagem_parada', titulo: 'Mensagem da Receita sem tratamento',
+    texto: 'Mensagem crítica da Caixa Postal (intimação, malha, exclusão do Simples, multa MAED, cobrança, processo) que continua como "nova" 3 dias depois de enviada, dentro dos últimos 30 dias. Um aviso por mensagem.',
+  },
+  {
+    chave: 'alerta_baixa_sem_declaracao', titulo: 'Tarefa de DAS concluída sem declaração na Receita',
+    texto: 'Tarefa de DAS concluída de uma competência dos últimos 3 meses, mas a Receita não mostra o PGDAS-D (consulta depois do prazo). Leva ao Cross-check, onde dá para reabrir a tarefa.',
+  },
+  {
+    chave: 'alerta_sem_resposta', titulo: 'Cliente avisado sem resposta',
+    texto: 'Cliente avisado por e-mail ou WhatsApp a partir de CA · Ausências há 3 dias ou mais e com a declaração ainda em aberto, enquanto o acompanhamento estiver em "A tratar", "Cliente avisado" ou "Aguardando cliente".',
+  },
+];
 const ROTULO_TIPO: Record<TipoRotina, string> = { Monitorar: 'Monitorar (grátis)', Consultar: 'Consultar', Emitir: 'Emitir', sem_chamada: 'Sem chamada ao Serpro' };
 
 function useNomesUsuarios() {
@@ -329,6 +347,39 @@ export default function TechConsumoSerpro() {
                 }}
               />
             </DicaBotao>
+          </section>
+
+          <section className="space-y-4 rounded-lg border border-line bg-paper p-5">
+            <div className="space-y-1">
+              <h2 className="text-h4-card text-ink">Alertas da equipe no sino</h2>
+              <p className="text-ui text-muted-ink">
+                Todo dia às 08:15, o sistema olha o que já está salvo e avisa no sino o <strong className="text-ink">responsável do cliente</strong> (ou quem o cobre na ausência);
+                cliente sem responsável vai para os administradores. Um aviso por item: nunca repete. Não chama o Serpro e não custa nada.
+              </p>
+            </div>
+            <div className="divide-y divide-line-2">
+              {ALERTAS_EQUIPE.map((a) => {
+                const ligado = config ? config[a.chave] : true;
+                return (
+                  <div key={a.chave} className="flex flex-wrap items-center justify-between gap-4 py-3">
+                    <div className="min-w-[260px] flex-1 space-y-0.5">
+                      <h3 className="flex flex-wrap items-center gap-2 text-ui-strong text-ink">{a.titulo}<DsBadge tone={ligado ? 'ok' : 'neutral'}>{ligado ? 'Ligado' : 'Desligado'}</DsBadge></h3>
+                      <p className="text-meta text-muted-ink">{a.texto}</p>
+                    </div>
+                    <DicaBotao texto={ligado ? 'Ligado: desligue se a equipe não quiser mais esse aviso no sino.' : 'Desligado: nenhum aviso deste tipo. Ligue quando quiser.'}>
+                      <Switch
+                        checked={ligado}
+                        disabled={!config || salvar.isPending}
+                        onCheckedChange={async (v) => {
+                          try { await salvar.mutateAsync({ [a.chave]: v }); toast.success(v ? `${a.titulo}: ligado.` : `${a.titulo}: desligado.`); }
+                          catch { toast.error('Não foi possível salvar.'); }
+                        }}
+                      />
+                    </DicaBotao>
+                  </div>
+                );
+              })}
+            </div>
           </section>
 
           {INTERRUPTORES_QUE_COBRAM.map((it) => {

@@ -37,6 +37,11 @@ export interface SerproConfig {
   auto_rotina_sitfis: boolean;
   /** Rotina mensal da DCTFWeb e MIT: no dia 30, consulta só os clientes do Presumido e do Real marcados como "movimento novo". Cobra 2 consultas por cliente. Padrão: ligado. */
   auto_rotina_dctfweb: boolean;
+  /** Alertas da equipe no sino (Gestão 360°), todo dia às 08:15; só leem o que já está salvo. Padrão: ligados. */
+  alerta_pgdas_antes_prazo: boolean;
+  alerta_mensagem_parada: boolean;
+  alerta_baixa_sem_declaracao: boolean;
+  alerta_sem_resposta: boolean;
 }
 
 // Tabela de preços do contrato Serpro nº 599032 (Anexo I, 28/09/2026). Cada faixa: quantidade máxima na faixa e valor por requisição.
@@ -110,7 +115,7 @@ export function useSerproConfig() {
     queryKey: ['serpro-config', company?.id],
     enabled: !!company?.id,
     queryFn: async (): Promise<SerproConfig> => {
-      const { data, error } = await supabase.from('serpro_config').select('alerta_gasto_mensal, volume_declarado_mes, auto_concluir_tarefas, auto_criar_tarefas, auto_rotina_pgdas, auto_lote_pagamentos_simples, auto_lote_pagamentos_presumido_real, auto_leitura_faturamento, auto_rotina_defis, auto_rotina_sitfis, auto_rotina_dctfweb').eq('company_id', company!.id).maybeSingle();
+      const { data, error } = await supabase.from('serpro_config').select('alerta_gasto_mensal, volume_declarado_mes, auto_concluir_tarefas, auto_criar_tarefas, auto_rotina_pgdas, auto_lote_pagamentos_simples, auto_lote_pagamentos_presumido_real, auto_leitura_faturamento, auto_rotina_defis, auto_rotina_sitfis, auto_rotina_dctfweb, alerta_pgdas_antes_prazo, alerta_mensagem_parada, alerta_baixa_sem_declaracao, alerta_sem_resposta').eq('company_id', company!.id).maybeSingle();
       if (error) throw error;
       return {
         alerta_gasto_mensal: Number(data?.alerta_gasto_mensal ?? 100),
@@ -124,6 +129,10 @@ export function useSerproConfig() {
         auto_rotina_defis: data?.auto_rotina_defis ?? true,
         auto_rotina_sitfis: data?.auto_rotina_sitfis ?? true,
         auto_rotina_dctfweb: data?.auto_rotina_dctfweb ?? true,
+        alerta_pgdas_antes_prazo: data?.alerta_pgdas_antes_prazo ?? true,
+        alerta_mensagem_parada: data?.alerta_mensagem_parada ?? true,
+        alerta_baixa_sem_declaracao: data?.alerta_baixa_sem_declaracao ?? true,
+        alerta_sem_resposta: data?.alerta_sem_resposta ?? true,
       };
     },
   });

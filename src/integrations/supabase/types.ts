@@ -4876,7 +4876,11 @@ export type Database = {
       }
       serpro_config: {
         Row: {
+          alerta_baixa_sem_declaracao: boolean
           alerta_gasto_mensal: number
+          alerta_mensagem_parada: boolean
+          alerta_pgdas_antes_prazo: boolean
+          alerta_sem_resposta: boolean
           auto_concluir_tarefas: boolean
           auto_criar_tarefas: boolean
           auto_rotina_defis: boolean
@@ -4891,7 +4895,11 @@ export type Database = {
           volume_declarado_mes: number | null
         }
         Insert: {
+          alerta_baixa_sem_declaracao?: boolean
           alerta_gasto_mensal?: number
+          alerta_mensagem_parada?: boolean
+          alerta_pgdas_antes_prazo?: boolean
+          alerta_sem_resposta?: boolean
           auto_concluir_tarefas?: boolean
           auto_criar_tarefas?: boolean
           auto_rotina_defis?: boolean
@@ -4906,7 +4914,11 @@ export type Database = {
           volume_declarado_mes?: number | null
         }
         Update: {
+          alerta_baixa_sem_declaracao?: boolean
           alerta_gasto_mensal?: number
+          alerta_mensagem_parada?: boolean
+          alerta_pgdas_antes_prazo?: boolean
+          alerta_sem_resposta?: boolean
           auto_concluir_tarefas?: boolean
           auto_criar_tarefas?: boolean
           auto_rotina_defis?: boolean

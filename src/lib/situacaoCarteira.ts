@@ -427,18 +427,6 @@ export function montarGraficos(linhas: LinhaCarteira[], competencia: string, hoj
   };
 }
 
-/** Quantas pendências abertas o cliente tem (competência em falta, mensagem aberta, DAS vencido, pendência na Situação fiscal). Só serve para desempatar. */
-export const itensEmAberto = (l: LinhaCarteira) =>
-  l.ausencias.filter((a) => a.situacao === 'em_falta').length + l.mensagens.total + (l.das === 'vencido' ? 1 : 0) + (l.sitfis === 'com_pendencias' ? 1 : 0);
-
-/** Top de clientes em risco: Crítico antes de Atenção; empata por mais pendências abertas e depois pelo nome. Sem nota. */
-export function topEmRisco(linhas: LinhaCarteira[], n = 5): LinhaCarteira[] {
-  return linhas
-    .filter((l) => l.nivel === 'critico' || l.nivel === 'atencao')
-    .sort((a, b) => ORDEM_NIVEL[a.nivel] - ORDEM_NIVEL[b.nivel] || itensEmAberto(b) - itensEmAberto(a) || a.nome.localeCompare(b.nome, 'pt-BR'))
-    .slice(0, n);
-}
-
 // ---------------------------------------------------------------- "Atualizado em" por fonte
 export interface FonteAtualizada { rotulo: string; em: string | null }
 
@@ -474,16 +462,6 @@ export function listarAusencias(linhas: LinhaCarteira[]): { linha: LinhaCarteira
       || (a.ausencia.prazo ?? '9999').localeCompare(b.ausencia.prazo ?? '9999')
       || a.linha.nome.localeCompare(b.linha.nome, 'pt-BR')
       || a.ausencia.obrigacao.localeCompare(b.ausencia.obrigacao));
-}
-
-/** Top de urgência: quem tem mais competências em falta primeiro; empata pelo prazo mais antigo e pelo nome. */
-export function topEmFalta(linhas: LinhaCarteira[], n = 5): LinhaCarteira[] {
-  const faltas = (l: LinhaCarteira) => l.ausencias.filter((a) => a.situacao === 'em_falta');
-  const maisAntigo = (l: LinhaCarteira) => faltas(l).map((a) => a.prazo ?? '9999').sort()[0] ?? '9999';
-  return linhas
-    .filter((l) => faltas(l).length > 0)
-    .sort((a, b) => faltas(b).length - faltas(a).length || maisAntigo(a).localeCompare(maisAntigo(b)) || a.nome.localeCompare(b.nome, 'pt-BR'))
-    .slice(0, n);
 }
 
 /** Radar CND: o que pode impedir a certidão federal do cliente. Só o que já está salvo; não é a situação oficial da certidão. */

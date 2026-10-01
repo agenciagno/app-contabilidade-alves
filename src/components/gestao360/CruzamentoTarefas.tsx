@@ -1,11 +1,18 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 
 import { DsAlert, DsBadge } from '@/components/ds';
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
+import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useAcoesTarefaCruzamento } from '@/hooks/useAcoesTarefaCruzamento';
 import type { TabelaExport } from '@/lib/exportarTabela';
 import {
   ORDEM_CRUZAMENTO, ROTULO_STATUS_TAREFA, TIPOS_CRUZAMENTO, type LinhaCruzamento, type TipoCruzamento,
@@ -17,9 +24,25 @@ const FONTE: Record<string, { rotulo: string; tela: string }> = {
   'DAS - Simples Nacional': { rotulo: 'PGDAS-D', tela: 'pgdas' }, MIT: { rotulo: 'MIT', tela: 'dctfweb-mit' }, DCTF: { rotulo: 'DCTFWeb', tela: 'dctfweb-mit' },
 };
 
-/** Receita (Serpro) × tarefa do Gestor Fiscal. Só aponta a divergência: não conclui nem reabre tarefa. */
+type Acao = { tipo: 'reabrir' | 'concluir'; linha: LinhaCruzamento };
+
+/** Receita (Serpro) × tarefa do Gestor Fiscal. Aponta a divergência e deixa reabrir (baixada sem declaração) ou concluir (a Receita já mostra a declaração), com confirmação. */
 export function CruzamentoTarefas({ linhas, carregando, erro }: { linhas: LinhaCruzamento[]; carregando: boolean; erro: unknown }) {
   const [tipo, setTipo] = useState<TipoCruzamento | 'todos'>('todos');
+  const [acao, setAcao] = useState<Acao | null>(null);
+  const { reabrir, concluir, bloqueada } = useAcoesTarefaCruzamento();
+  const ocupada = reabrir.isPending || concluir.isPending;
+
+  const executar = async () => {
+    if (!acao) return;
+    try {
+      await (acao.tipo === 'reabrir' ? reabrir : concluir).mutateAsync(acao.linha);
+      toast.success(acao.tipo === 'reabrir' ? 'Tarefa reaberta.' : 'Tarefa concluída.');
+      setAcao(null);
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Não foi possível atualizar a tarefa.');
+    }
+  };
   const contagem = useMemo(() => Object.fromEntries(TIPOS.map((t) => [t, linhas.filter((l) => l.tipo === t).length])) as Record<TipoCruzamento, number>, [linhas]);
   const visiveis = tipo === 'todos' ? linhas : linhas.filter((l) => l.tipo === tipo);
 
@@ -82,6 +105,13 @@ export function CruzamentoTarefas({ linhas, carregando, erro }: { linhas: LinhaC
                   <TableCell className="max-w-[260px] whitespace-normal text-ui text-muted-ink">{l.receita}</TableCell>
                   <TableCell className="whitespace-nowrap"><DsBadge tone={TIPOS_CRUZAMENTO[l.tipo].tom}>{TIPOS_CRUZAMENTO[l.tipo].titulo}</DsBadge></TableCell>
                   <TableCell className="whitespace-nowrap text-right">
+                    {(l.tipo === 'baixa_sem_declaracao' || l.tipo === 'pode_baixar') && (
+                      <DicaBotao texto={bloqueada(l) ? 'Competência encerrada no Fiscal: a tarefa está bloqueada para edição.' : l.tipo === 'baixa_sem_declaracao' ? 'Volta a tarefa para "A fazer" e anota o motivo nela.' : 'Conclui a tarefa, porque a Receita já mostra a declaração.'}>
+                        <Button variant="outline" size="sm" className="mr-3" disabled={bloqueada(l) || ocupada} onClick={() => setAcao({ tipo: l.tipo === 'baixa_sem_declaracao' ? 'reabrir' : 'concluir', linha: l })}>
+                          {l.tipo === 'baixa_sem_declaracao' ? 'Reabrir' : 'Concluir'}
+                        </Button>
+                      </DicaBotao>
+                    )}
                     <Link to={`/fiscal/tarefas?contact_id=${l.contact_id}`} className="text-ui-strong text-action hover:underline">Tarefa</Link>
                     {l.tipo !== 'fora_do_monitoramento' && (
                       <Link to={`/dashboard-federal/${FONTE[l.obrigacao]?.tela ?? 'pgdas'}?q=${digitos(l.documento)}`} className="ml-3 text-ui-strong text-action hover:underline">Receita</Link>
@@ -93,6 +123,28 @@ export function CruzamentoTarefas({ linhas, carregando, erro }: { linhas: LinhaC
           </Table>
         )}
       </div>
+
+      <AlertDialog open={!!acao} onOpenChange={(o) => !o && !ocupada && setAcao(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{acao?.tipo === 'reabrir' ? 'Reabrir a tarefa?' : 'Concluir a tarefa?'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {acao && (
+                <>
+                  Tarefa de {FONTE[acao.linha.obrigacao]?.rotulo ?? acao.linha.obrigacao} {sigla(acao.linha.competencia)} de <strong className="text-ink">{acao.linha.nome}</strong>. A Receita mostra: {acao.linha.receita}.{' '}
+                  {acao.tipo === 'reabrir'
+                    ? 'A tarefa volta para "A fazer" e o motivo fica anotado nela.'
+                    : 'A tarefa passa para concluída e o motivo fica na nota de conclusão.'}
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={ocupada}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={ocupada} onClick={(e) => { e.preventDefault(); void executar(); }}>{acao?.tipo === 'reabrir' ? 'Reabrir' : 'Concluir'}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
