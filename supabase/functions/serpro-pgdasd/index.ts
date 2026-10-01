@@ -124,7 +124,11 @@ async function consultarCliente(contactId: string, ano: number, uid: string | nu
   const semDeclaracao = r.status !== 200 && /MSG_ISN_0(05|27)/.test(codigoErro(r));
   if (r.status !== 200 && !semDeclaracao) return resp({ ok: false, status: r.status, error: msgErro(r) });
 
-  const { declaracoes, das } = semDeclaracao ? { declaracoes: [], das: [] } : lerIndicePgdasd(r.resposta?.dados);
+  const lido = semDeclaracao ? { declaracoes: [], das: [] } : lerIndicePgdasd(r.resposta?.dados);
+  // A Receita pode listar o mesmo número duas vezes na mesma resposta (ex.: o mesmo DAS em duas operações). O banco recusa a gravação
+  // em lote com chave repetida ("cannot affect row a second time"): fica um por número, o último.
+  const declaracoes = [...new Map(lido.declaracoes.map((d) => [d.numero_declaracao, d])).values()];
+  const das = [...new Map(lido.das.map((d) => [d.numero_das, d])).values()];
   const agora = new Date().toISOString();
   const base = { company_id: COMPANY_ID, contact_id: contato.id, sincronizado_em: agora };
 
