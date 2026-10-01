@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Eye, Loader2, RefreshCw } from 'lucide-react';
+import { Eye } from 'lucide-react';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
-import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,7 +16,7 @@ import { useConsultaPagamentos } from '@/components/serpro/useConsultaPagamentos
 import { useConsultaPgdasd } from '@/components/serpro/pgdasdUi';
 import { competenciaPadrao, mesDeData, siglaCompetencia, useMatrizPagamentos, type TipoDoc } from '@/hooks/useSerproPagamentos';
 import { anoDe, duplicidadeDas, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
-import { ehSimplesConsultavel, unificarLinhas, type DasUnificado, type LinhaUnificada } from '@/hooks/useSerproDasUnificado';
+import { unificarLinhas, type DasUnificado, type LinhaUnificada } from '@/hooks/useSerproDasUnificado';
 import type { TabelaExport } from '@/lib/exportarTabela';
 
 const REGIMES: Record<string, string> = {
@@ -141,15 +140,12 @@ export default function PagamentosFederal() {
     return <DsBadge tone={n > 0 ? 'ok' : 'neutral'} dot={false}>{n}</DsBadge>;
   };
 
-  const consultarLinha = (l: LinhaUnificada) => (ehSimplesConsultavel(l) ? consultaDas.executar(l.contact_id) : consultaPag.executar(l.contact_id));
-  const emConsulta = (l: LinhaUnificada) => consultaDas.emAndamento === l.contact_id || consultaPag.emAndamento === l.contact_id;
-
   return (
     <div className="space-y-6">
       <PageHeader
         kicker="~/dashboard federal · pagamentos e das"
         title="Pagamentos e DAS."
-        subtitle="Documentos de arrecadação pagos na Receita (DARF e DAE) e o DAS do Simples (gerado, pago, a vencer ou vencido) por cliente ativo e competência. No Simples, uma consulta traz o ano inteiro e diz se o DAS está pago; no Presumido e no Real, a consulta traz os pagamentos do mês. A Receita só informa o que foi pago: zero em um mês consultado não prova que não havia o que pagar. O aviso de pagamento novo vem da rotina diária das 07:35."
+        subtitle="Documentos de arrecadação pagos na Receita (DARF e DAE) e o DAS do Simples (gerado, pago, a vencer ou vencido) por cliente ativo e competência. O aviso de pagamento novo vem da rotina diária das 07:35, sem custo. A situação do DAS é atualizada pela rotina do PGDAS (dia 16 e dia seguinte ao prazo) ou por Atualizar DAS no painel do cliente. Para ver valor, data e composição, abra o cliente e use Consultar pagamentos. A Receita só informa o que foi pago: zero em um mês consultado não prova que não havia o que pagar."
         actions={<ExportarMenu montar={() => tabelaExport(filtradas, competencia)} disabled={filtradas.length === 0} escolherColunas />}
       />
 
@@ -195,14 +191,11 @@ export default function PagamentosFederal() {
                 {TIPOS_COLUNA.map((t) => <TableHead key={t} className="text-center">{t}</TableHead>)}
                 <TableHead>Situação</TableHead>
                 <TableHead className="text-center">Ver</TableHead>
-                <TableHead className="text-right">Atualizar</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtradas.map((l) => {
-                const consultando = emConsulta(l);
                 const r = rotuloDas(l.das);
-                const doSimples = ehSimplesConsultavel(l);
                 return (
                   <TableRow key={l.contact_id} className="cursor-pointer" onClick={() => setAberto(l.contact_id)}>
                     <TableCell>
@@ -236,18 +229,6 @@ export default function PagamentosFederal() {
                       <DicaBotao texto="Abre o painel do cliente com o DAS e os pagamentos já salvos. Não consulta a Receita.">
                         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setAberto(l.contact_id); }}>
                           <Eye className="h-4 w-4" />
-                        </Button>
-                      </DicaBotao>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DicaBotao custo="Consultar"
-                        texto={doSimples
-                          ? `Consulta na Receita as declarações e os DAS do ano ${ano} deste cliente numa só chamada: mostra se o DAS foi gerado e se está pago. Para ver data e valor do pagamento, ou emitir comprovante, abra o painel.`
-                          : 'Baixa da Receita os pagamentos do mês deste cliente (DARF, DAS, DAE e DJE).'}>
-                        <Button size="sm" variant="outline" disabled={consultando}
-                          onClick={(e) => { e.stopPropagation(); consultarLinha(l); }}>
-                          {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-                          Consultar<Preco tipo="Consultar" />
                         </Button>
                       </DicaBotao>
                     </TableCell>
