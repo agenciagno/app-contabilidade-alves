@@ -218,10 +218,25 @@ async function rotinaEventos(payload: any, uid: string | null, origem: "manual" 
   const estadoAntes = new Map((antes ?? []).map((r: any) => [r.contact_id, r]));
   const procAntes = new Map((procsAntes ?? []).map((p: any) => [p.contact_id, p.status]));
   const novidades: string[] = [];
+  // Procuração PERDIDA: o "x" do sensor é grátis e vale para a carteira toda, todo dia. Perdeu = vem "x" agora e antes estava ativa
+  // (pela sonda de ontem ou, sem sonda, pelo mapa pago do Integra Procurações). "x" que já era "x" não é novidade.
+  const { data: sondaAntes } = await supabase.from("serpro_procuracoes").select("contact_id,status")
+    .eq("company_id", COMPANY_ID).eq("codigo_procuracao", "00006").eq("fonte", "sonda_caixa_postal").limit(1000);
+  const { data: mapaAntes } = await supabase.from("serpro_procuracoes").select("contact_id,status,data_fim")
+    .eq("company_id", COMPANY_ID).eq("codigo_procuracao", "00006").eq("fonte", "integra_procuracoes").limit(1000);
+  const sondaPor = new Map<string, string>((sondaAntes ?? []).map((r: any) => [r.contact_id as string, r.status as string] as [string, string]));
+  const hojeIso = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+  const mapaAtiva = new Set<string>((mapaAntes ?? []).filter((r: any) => r.status === "ativa" && (!r.data_fim || r.data_fim >= hojeIso)).map((r: any) => r.contact_id as string));
+  const perdidas: string[] = [];
   for (const [cnpj, d] of res.linhas) {
     const id = porCnpj.get(onlyDigits(cnpj));
     if (!id) continue;
-    if (d === "x") { semProcuracao++; ausentes.push(id); linhas.push({ contact_id: id, company_id: COMPANY_ID, evento_verificado_em: agora }); continue; }
+    if (d === "x") {
+      semProcuracao++; ausentes.push(id);
+      if (sondaPor.get(id) === "ativa" || (!sondaPor.has(id) && mapaAtiva.has(id))) perdidas.push(id);
+      linhas.push({ contact_id: id, company_id: COMPANY_ID, evento_verificado_em: agora });
+      continue;
+    }
     ativos.push(id);
     let data: string | null = null;
     if (/^\d{6}$/.test(d)) { data = `20${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4, 6)}`; comEvento++; } else semEvento++;
@@ -237,7 +252,8 @@ async function rotinaEventos(payload: any, uid: string | null, origem: "manual" 
   await marca(ausentes, "ausente");
   await marca(ativos, "ativa");
   if (novidades.length) await notificarNovidades(novidades);
-  return json({ ok: true, modo_autor: res.modo, consultados: res.linhas.length, com_evento: comEvento, sem_evento: semEvento, sem_procuracao: semProcuracao, novidades: novidades.length });
+  if (perdidas.length) await notificarPerdas(perdidas);
+  return json({ ok: true, modo_autor: res.modo, consultados: res.linhas.length, com_evento: comEvento, sem_evento: semEvento, sem_procuracao: semProcuracao, novidades: novidades.length, procuracoes_perdidas: perdidas.length });
 }
 
 // Um aviso interno por rodada (não um por cliente): lista os primeiros nomes e leva para a tela de Mensagens.
@@ -260,6 +276,25 @@ async function notificarNovidades(ids: string[]) {
     })));
   } catch (e) {
     console.error("Falha ao notificar novas mensagens:", String((e as Error).message || e));
+  }
+}
+
+// Aviso interno de procuração perdida (um por rodada): admins e quem tem o módulo dashboard_federal.
+async function notificarPerdas(ids: string[]) {
+  try {
+    const { data: nomes } = await supabase.from("contacts").select("id,name,display_name").in("id", ids.slice(0, 100));
+    const lista = (nomes ?? []).map((c: any) => (c.display_name || c.name) as string).sort((a, b) => a.localeCompare(b, "pt-BR"));
+    const corpo = lista.slice(0, 5).join(", ") + (ids.length > 5 ? ` e mais ${ids.length - 5}` : "") + ". O sensor diário da Receita não reconhece mais a procuração. Peça ao cliente para outorgar de novo.";
+    const { data: alvos } = await supabase.from("profiles").select("user_id")
+      .eq("company_id", COMPANY_ID).eq("status_active", true).or("role.in.(admin,super_admin),allowed_modules.cs.{dashboard_federal}");
+    if (!alvos?.length) return;
+    await supabase.from("notifications").insert(alvos.map((t: { user_id: string }) => ({
+      user_id: t.user_id, company_id: COMPANY_ID, type: "serpro_procuracao",
+      title: ids.length === 1 ? "Cliente perdeu a procuração" : `${ids.length} clientes perderam a procuração`,
+      body: corpo, action_url: "/dashboard-federal/procuracoes",
+    })));
+  } catch (e) {
+    console.error("Falha ao notificar procurações perdidas:", String((e as Error).message || e));
   }
 }
 

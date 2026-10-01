@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { ChevronDown, FileDown, Loader2, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, FileDown, Loader2, Receipt, RefreshCw, Search } from 'lucide-react';
 
 import { DsBadge } from '@/components/ds';
 import { Button } from '@/components/ui/button';
@@ -12,10 +12,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useAbrirArquivo, useGerarDasComConfirmacao } from '@/components/serpro/pgdasdUi';
 import {
   siglaCompetencia, useComprovantePagamento, useConsultarPagamentos, usePagamentosCliente, usePublicarPagamento,
-  type FiltrosPagamentos, type LinhaPagamentos, type PagamentoRow,
+  type FiltrosPagamentos, type PagamentoRow,
 } from '@/hooks/useSerproPagamentos';
+import { dasReaproveitavel } from '@/hooks/useSerproPgdasd';
+import { ehSimplesConsultavel, type DasUnificado, type LinhaUnificada } from '@/hooks/useSerproDasUnificado';
 
 const moeda = (v: number | null) => (v === null ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
 const dataBR = (iso: string | null) => (iso ? format(new Date(`${iso}T00:00:00`), 'dd/MM/yyyy') : '—');
@@ -30,24 +33,46 @@ const TIPOS_FILTRO = [
 
 const lista = (texto: string) => texto.split(/[\s,;]+/).map((t) => t.replace(/\D/g, '')).filter(Boolean);
 
+const dataHoraBR = (iso: string | null) => (iso ? format(new Date(iso), 'dd/MM/yyyy HH:mm') : '—');
+
+function resumoDas(d: DasUnificado): { badge: { label: string; tone: 'ok' | 'warn' | 'danger' | 'info' | 'neutral' }; texto: string } {
+  const venc = d.vencimento ? dataBR(d.vencimento) : '—';
+  switch (d.estado) {
+    case 'pago': {
+      const origem = d.origemPago === 'ambos' ? 'confirmado pelo PGDAS e por Pagamentos'
+        : d.origemPago === 'pagamentos' ? 'confirmado em Pagamentos'
+          : 'segundo o PGDAS (para ver data e valor do pagamento, use "Consultar pagamentos")';
+      return { badge: { label: 'Pago', tone: 'ok' }, texto: `${d.pagoEm ? `Pago em ${dataBR(d.pagoEm)} · ` : ''}${origem}.` };
+    }
+    case 'a_vencer': return { badge: { label: `Vence ${venc.slice(0, 5)}`, tone: 'warn' }, texto: `Vence em ${venc}${d.vencimentoCalculado ? ' (data calculada: dia 20, segunda-feira se cair no fim de semana)' : ''}. Ainda sem pagamento registrado pela Receita.` };
+    case 'vencido': return { badge: { label: `Vencido ${venc.slice(0, 5)}`, tone: 'danger' }, texto: `Venceu em ${venc}${d.vencimentoCalculado ? ' (data calculada)' : ''} e a Receita não registra pagamento. Se o cliente pagou há pouco, a Receita pode levar 1 a 2 dias úteis para marcar.` };
+    case 'sem_das': return { badge: { label: 'Sem DAS', tone: 'info' }, texto: 'Nenhum DAS gerado para este período na Receita.' };
+    default: return { badge: { label: 'Não consultado', tone: 'neutral' }, texto: 'Ainda não consultado. Use "Atualizar DAS" para ver se o DAS foi gerado e se está pago.' };
+  }
+}
+
 /**
  * Painel de UM cliente. Abrir = documentos já salvos (grátis). "Consultar" baixa os pagamentos do mês de apuração;
  * a busca avançada usa os filtros do serviço (tipo, documento, receita, datas e valores). O comprovante é emitido por
  * clique, uma vez: depois só se reabre o arquivo guardado.
  */
 export function PagamentosClienteSheet({
-  linha, competencia, consultando, onConsultar, onClose,
+  linha, competencia, consultando, consultandoDas, onConsultar, onConsultarDas, onClose,
 }: {
-  linha: LinhaPagamentos | null;
+  linha: LinhaUnificada | null;
   competencia: string;
   consultando: boolean;
+  consultandoDas: boolean;
   onConsultar: (contactId: string) => void;
+  onConsultarDas: (contactId: string) => void;
   onClose: () => void;
 }) {
   const { data: todos = [], isLoading } = usePagamentosCliente(linha?.contact_id ?? null);
   const buscar = useConsultarPagamentos();
   const comprovante = useComprovantePagamento();
   const publicar = usePublicarPagamento();
+  const { ocupado, abrirExtrato } = useAbrirArquivo();
+  const { pedir: pedirDas, gerando, dialog: dialogGerar } = useGerarDasComConfirmacao();
   const [soMes, setSoMes] = useState(true);
   const [avancada, setAvancada] = useState(false);
   const [abertos, setAbertos] = useState<Record<string, boolean>>({});
@@ -123,12 +148,82 @@ export function PagamentosClienteSheet({
           </SheetDescription>
         </SheetHeader>
 
+        {linha.das.estado !== 'nao_simples' && linha.das.estado !== 'filial' && (() => {
+          const d = linha.das;
+          const r = resumoDas(d);
+          const consultavel = ehSimplesConsultavel(linha);
+          const pg = linha.simples;
+          const reaproveitavel = !!pg && dasReaproveitavel(pg, competencia);
+          const naoConsultado = d.estado === 'nao_consultado';
+          return (
+            <div className="mt-5 space-y-3 rounded-lg border border-line bg-paper p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <DsBadge tone="info">DAS</DsBadge>
+                    <span className="text-ui text-ink">{siglaCompetencia(competencia)}</span>
+                    <DsBadge tone={r.badge.tone}>{r.badge.label}</DsBadge>
+                  </div>
+                  <p className="mt-1 text-meta text-muted-ink">{r.texto}</p>
+                  {pg?.consultadoEm && <p className="text-meta text-muted-ink-2">Consulta do PGDAS em {dataHoraBR(pg.consultadoEm)}</p>}
+                </div>
+                {d.valor != null && <p className="text-[18px] font-medium text-ink">{moeda(d.valor)}</p>}
+              </div>
+
+              {d.casados.length > 0 && (
+                <div className="divide-y divide-line rounded-md border border-line">
+                  {d.casados.map(({ das, doc }) => (
+                    <div key={das.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-meta">
+                      <span className="min-w-0 text-ink">
+                        <span className="font-mono">{das.numero_das}</span>
+                        <span className="text-muted-ink-2"> · emitido em {dataHoraBR(das.emitido_em)}{doc ? ' · conferido em Pagamentos' : ''}</span>
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <DsBadge tone={das.das_pago === true ? 'ok' : 'warn'} dot={false}>{das.das_pago === true ? 'Pago' : 'Não pago'}</DsBadge>
+                        <DicaBotao custo={das.extrato_path ? undefined : 'Consultar'}
+                          texto={das.extrato_path ? 'Abre o extrato do DAS em PDF, que já está guardado.' : 'Baixa da Receita o extrato do DAS em PDF e guarda. Depois, é só reabrir o arquivo.'}>
+                          <Button size="sm" variant="outline" disabled={ocupado === `${das.id}:extrato`} onClick={() => abrirExtrato(das)}>
+                            {ocupado === `${das.id}:extrato` ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileDown className="mr-1.5 h-4 w-4" />}
+                            Extrato{!das.extrato_path && <Preco tipo="Consultar" />}
+                          </Button>
+                        </DicaBotao>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3">
+                <DicaBotao custo={consultavel ? 'Consultar' : undefined}
+                  texto={consultavel ? `Consulta na Receita as declarações e os DAS do ano inteiro deste cliente, numa só chamada: mostra se o DAS foi gerado e se está pago.` : 'Filial: o DAS é da matriz. Consulte o CNPJ da matriz.'}>
+                  <Button variant="outline" disabled={!consultavel || consultandoDas} onClick={() => onConsultarDas(linha.contact_id)}>
+                    {consultandoDas ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    Atualizar DAS{consultavel && <Preco tipo="Consultar" />}
+                  </Button>
+                </DicaBotao>
+                {d.estado !== 'pago' && (
+                  <DicaBotao custo={!consultavel || naoConsultado || reaproveitavel ? undefined : 'Emitir'}
+                    texto={naoConsultado ? 'Consulte o ano deste cliente antes de gerar o DAS.'
+                      : reaproveitavel ? 'Já existe um DAS gerado aqui e dentro do prazo: abre o arquivo guardado, sem emitir outro.'
+                        : 'Gera o DAS deste período na Receita e guarda o PDF. Fica registrada uma emissão. Pede confirmação antes.'}>
+                    <Button disabled={!consultavel || naoConsultado || gerando === linha.contact_id} onClick={() => pedirDas(linha.contact_id, competencia, linha.nome, reaproveitavel)}>
+                      {gerando === linha.contact_id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Receipt className="mr-2 h-4 w-4" />}
+                      Gerar DAS{consultavel && !naoConsultado && !reaproveitavel && <Preco tipo="Emitir" />}
+                    </Button>
+                  </DicaBotao>
+                )}
+                <p className="min-w-[200px] flex-1 text-meta text-muted-ink-2">Guia, extrato e comprovante são documentos diferentes e só saem no clique. O comprovante fica no documento pago, logo abaixo.</p>
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="mt-5 space-y-3 rounded-lg border border-line bg-bg-2 p-4">
           <div className="flex flex-wrap items-center gap-3">
             <DicaBotao custo="Consultar" texto={`Baixa da Receita os pagamentos da competência ${siglaCompetencia(competencia)} deste cliente.`}>
               <Button onClick={() => onConsultar(linha.contact_id)} disabled={consultando}>
                 {consultando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                Consultar<Preco tipo="Consultar" />
+                Consultar pagamentos<Preco tipo="Consultar" />
               </Button>
             </DicaBotao>
             <DicaBotao texto="Mostra ou esconde os filtros para procurar pagamentos por tipo, documento, receita, datas e valores.">
@@ -277,6 +372,7 @@ export function PagamentosClienteSheet({
             })
           )}
         </div>
+        {dialogGerar}
       </SheetContent>
     </Sheet>
   );

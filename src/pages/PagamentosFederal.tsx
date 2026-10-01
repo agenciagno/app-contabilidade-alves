@@ -14,10 +14,10 @@ import { CompetenciaNav } from '@/components/serpro/CompetenciaNav';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { PagamentosClienteSheet } from '@/components/serpro/PagamentosClienteSheet';
 import { useConsultaPagamentos } from '@/components/serpro/useConsultaPagamentos';
-import {
-  TIPOS_DOC, competenciaPadrao, mesDeData, siglaCompetencia, useMatrizPagamentos,
-  type LinhaPagamentos, type TipoDoc,
-} from '@/hooks/useSerproPagamentos';
+import { useConsultaPgdasd } from '@/components/serpro/pgdasdUi';
+import { competenciaPadrao, mesDeData, siglaCompetencia, useMatrizPagamentos, type TipoDoc } from '@/hooks/useSerproPagamentos';
+import { anoDe, duplicidadeDas, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
+import { ehSimplesConsultavel, unificarLinhas, type DasUnificado, type LinhaUnificada } from '@/hooks/useSerproDasUnificado';
 import type { TabelaExport } from '@/lib/exportarTabela';
 
 const REGIMES: Record<string, string> = {
@@ -32,30 +32,52 @@ const formatarCnpj = (d: string) => {
   const n = d.replace(/\D/g, '');
   return n.length === 14 ? n.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : d;
 };
+const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const ddmm = (iso: string) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
 
-type Situacao = 'todos' | 'consultados' | 'nao_consultados' | 'novo' | 'alerta' | 'sem_das';
+const TIPOS_COLUNA: TipoDoc[] = ['DARF', 'DAE', 'DJE'];
+
+type Situacao = 'todos' | 'das_pago' | 'das_vencido' | 'das_a_vencer' | 'sem_das' | 'novo' | 'nao_consultados' | 'consultados' | 'alerta';
 const SITUACOES: { value: Situacao; label: string }[] = [
   { value: 'todos', label: 'Todos os ativos' },
+  { value: 'das_pago', label: 'DAS pago' },
+  { value: 'das_vencido', label: 'DAS vencido, sem pagamento' },
+  { value: 'das_a_vencer', label: 'DAS a vencer' },
+  { value: 'sem_das', label: 'Sem DAS gerado' },
   { value: 'novo', label: 'Pagamento novo' },
-  { value: 'nao_consultados', label: 'Não consultados no mês' },
-  { value: 'consultados', label: 'Consultados no mês' },
-  { value: 'sem_das', label: 'Consultados sem DAS' },
+  { value: 'nao_consultados', label: 'Não consultados' },
+  { value: 'consultados', label: 'Consultados' },
   { value: 'alerta', label: 'Com alerta' },
 ];
 
-const alertasTexto = (l: LinhaPagamentos) => [l.duplicidade && 'Duplicidade', l.saldo && 'Saldo a verificar'].filter(Boolean).join(' · ');
+/** Rótulo do DAS na matriz. Cliente sem dado (não consultado, filial, outro regime) fica com traço. */
+function rotuloDas(d: DasUnificado): { label: string; tone: 'ok' | 'warn' | 'danger' | 'info' } | null {
+  switch (d.estado) {
+    case 'pago': return { label: 'Pago', tone: 'ok' };
+    case 'a_vencer': return { label: `Vence ${ddmm(d.vencimento!)}`, tone: 'warn' };
+    case 'vencido': return { label: `Vencido ${ddmm(d.vencimento!)}`, tone: 'danger' };
+    case 'sem_das': return { label: 'Sem DAS', tone: 'info' };
+    default: return null;
+  }
+}
 
-function tabelaExport(linhas: LinhaPagamentos[], competencia: string): TabelaExport {
+const duplicidade = (l: LinhaUnificada, pa: string) => l.duplicidade || (!!l.simples && duplicidadeDas(l.simples, pa));
+const alerta = (l: LinhaUnificada, pa: string) => duplicidade(l, pa) || l.saldo;
+const alertasTexto = (l: LinhaUnificada, pa: string) => [duplicidade(l, pa) && 'Duplicidade', l.saldo && 'Saldo a verificar'].filter(Boolean).join(' · ');
+
+function tabelaExport(linhas: LinhaUnificada[], competencia: string): TabelaExport {
   return {
-    arquivo: `pagamentos-${competencia}`,
-    titulo: `Pagamentos na Receita — competência ${siglaCompetencia(competencia)}`,
-    colunas: ['Razão social', 'CNPJ', 'Regime', 'Competência', 'DARF', 'DAS', 'DAE', 'DJE', 'Outros', 'Alertas', 'Pagamento novo', 'Consultado em'],
+    arquivo: `das-e-pagamentos-${competencia}`,
+    titulo: `DAS e pagamentos na Receita — competência ${siglaCompetencia(competencia)}`,
+    colunas: ['Razão social', 'CNPJ', 'Regime', 'Competência', 'DAS', 'Vencimento do DAS', 'Valor do DAS', 'DARF', 'DAE', 'DJE', 'Outros', 'Alertas', 'Pagamento novo', 'Consultado em'],
     linhas: linhas.map((l) => {
       const c = l.consultadoEm !== null;
+      const r = rotuloDas(l.das);
       return [
         l.nome, formatarCnpj(l.documento), REGIMES[l.regime ?? ''] ?? l.regime ?? '', siglaCompetencia(competencia),
-        ...(['DARF', 'DAS', 'DAE', 'DJE', 'OUTRO'] as TipoDoc[]).map((t) => (c ? String(l.contagem[t]) : '')),
-        alertasTexto(l), l.novo ? 'Sim' : '', l.consultadoEm ? format(new Date(l.consultadoEm), 'dd/MM/yyyy HH:mm') : '',
+        r?.label ?? '', r && l.das.vencimento ? format(new Date(`${l.das.vencimento}T00:00:00`), 'dd/MM/yyyy') : '', l.das.valor != null ? moeda(l.das.valor) : '',
+        ...(['DARF', 'DAE', 'DJE', 'OUTRO'] as TipoDoc[]).map((t) => (c ? String(l.contagem[t]) : '')),
+        alertasTexto(l, competencia), l.novo ? 'Sim' : '', l.ultimaConsulta ? format(new Date(l.ultimaConsulta), 'dd/MM/yyyy HH:mm') : '',
       ];
     }),
   };
@@ -63,23 +85,29 @@ function tabelaExport(linhas: LinhaPagamentos[], competencia: string): TabelaExp
 
 export default function PagamentosFederal() {
   const [competencia, setCompetencia] = useState(competenciaPadrao());
-  const { data: linhas = [], isLoading } = useMatrizPagamentos(competencia);
-  const { executar, emAndamento, dialog } = useConsultaPagamentos(competencia);
+  const ano = anoDe(competencia);
+  const { data: pagamentos = [], isLoading: carregandoPag } = useMatrizPagamentos(competencia);
+  const { data: simples = [], isLoading: carregandoSn } = useMatrizPgdasd(ano);
+  const consultaPag = useConsultaPagamentos(competencia);
+  const consultaDas = useConsultaPgdasd(ano);
   const buscaInicial = useBuscaInicial();
   const [busca, setBusca] = useState(buscaInicial);
   const [regime, setRegime] = useState('todos');
   const [situacao, setSituacao] = useState<Situacao>('todos');
   const [aberto, setAberto] = useState<string | null>(null);
 
+  const isLoading = carregandoPag || carregandoSn;
+  const linhas = useMemo(() => unificarLinhas(pagamentos, simples, competencia), [pagamentos, simples, competencia]);
   const limite = mesDeData(new Date());
+
   const stats = useMemo(() => {
-    const consultados = linhas.filter((l) => l.consultadoEm);
+    const consultados = linhas.filter((l) => l.ultimaConsulta);
     return {
       total: linhas.length,
       consultados: consultados.length,
-      comDas: consultados.filter((l) => l.contagem.DAS > 0).length,
+      dasPagos: linhas.filter((l) => l.das.estado === 'pago').length,
+      dasVencidos: linhas.filter((l) => l.das.estado === 'vencido').length,
       novos: linhas.filter((l) => l.novo).length,
-      alertas: linhas.filter((l) => l.duplicidade || l.saldo).length,
     };
   }, [linhas]);
 
@@ -89,32 +117,38 @@ export default function PagamentosFederal() {
     return linhas
       .filter((l) => {
         switch (situacao) {
-          case 'consultados': return !!l.consultadoEm;
-          case 'nao_consultados': return !l.consultadoEm;
+          case 'das_pago': return l.das.estado === 'pago';
+          case 'das_vencido': return l.das.estado === 'vencido';
+          case 'das_a_vencer': return l.das.estado === 'a_vencer';
+          case 'sem_das': return l.das.estado === 'sem_das';
           case 'novo': return l.novo;
-          case 'alerta': return l.duplicidade || l.saldo;
-          case 'sem_das': return !!l.consultadoEm && l.contagem.DAS === 0;
+          case 'nao_consultados': return !l.ultimaConsulta;
+          case 'consultados': return !!l.ultimaConsulta;
+          case 'alerta': return alerta(l, competencia);
           default: return true;
         }
       })
       .filter((l) => regime === 'todos' || (l.regime ?? 'outros') === regime)
       .filter((l) => !q || l.nome.toLowerCase().includes(q) || (qDigitos && l.documento.replace(/\D/g, '').includes(qDigitos)));
-  }, [linhas, busca, situacao, regime]);
+  }, [linhas, busca, situacao, regime, competencia]);
 
   const linhaAberta = linhas.find((l) => l.contact_id === aberto) ?? null;
 
-  const chip = (l: LinhaPagamentos, tipo: TipoDoc) => {
+  const chip = (l: LinhaUnificada, tipo: TipoDoc) => {
     if (!l.consultadoEm) return <span className="text-muted-ink-2">—</span>;
     const n = l.contagem[tipo];
     return <DsBadge tone={n > 0 ? 'ok' : 'neutral'} dot={false}>{n}</DsBadge>;
   };
 
+  const consultarLinha = (l: LinhaUnificada) => (ehSimplesConsultavel(l) ? consultaDas.executar(l.contact_id) : consultaPag.executar(l.contact_id));
+  const emConsulta = (l: LinhaUnificada) => consultaDas.emAndamento === l.contact_id || consultaPag.emAndamento === l.contact_id;
+
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="~/dashboard federal · pagamentos"
-        title="Pagamentos."
-        subtitle="Documentos de arrecadação pagos na Receita (DARF, DAS, DAE e DJE) por cliente ativo e competência. A Receita só informa o que foi pago: zero em um mês consultado não prova que não havia o que pagar. O aviso de pagamento novo vem da rotina diária das 07:35."
+        kicker="~/dashboard federal · pagamentos e das"
+        title="Pagamentos e DAS."
+        subtitle="Documentos de arrecadação pagos na Receita (DARF, DAE e DJE) e o DAS do Simples (gerado, pago, a vencer ou vencido) por cliente ativo e competência. No Simples, uma consulta traz o ano inteiro e diz se o DAS está pago; no Presumido e no Real, a consulta traz os pagamentos do mês. A Receita só informa o que foi pago: zero em um mês consultado não prova que não havia o que pagar. O aviso de pagamento novo vem da rotina diária das 07:35."
         actions={<ExportarMenu montar={() => tabelaExport(filtradas, competencia)} disabled={filtradas.length === 0} escolherColunas />}
       />
 
@@ -122,17 +156,17 @@ export default function PagamentosFederal() {
 
       <StatCardRow
         items={[
-          { label: 'Consultados no mês', value: `${stats.consultados} de ${stats.total}`, hint: 'clientes ativos, um por vez' },
-          { label: 'Com DAS pago', value: stats.comDas, hint: 'entre os consultados' },
+          { label: 'Consultados', value: `${stats.consultados} de ${stats.total}`, hint: 'clientes ativos, um por vez' },
+          { label: 'DAS pagos', value: stats.dasPagos, hint: 'segundo a Receita' },
+          { label: 'DAS vencidos', value: stats.dasVencidos, hint: 'sem pagamento registrado', emphasis: stats.dasVencidos > 0 ? 'warm' : 'none' },
           { label: 'Pagamento novo', value: stats.novos, hint: 'a Receita mexeu; consulte', emphasis: stats.novos > 0 ? 'warm' : 'none' },
-          { label: 'Alertas', value: stats.alertas, hint: 'duplicidade ou saldo a verificar', emphasis: stats.alertas > 0 ? 'warm' : 'none' },
         ]}
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <SearchField placeholder="Buscar por razão social ou CNPJ..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px] flex-1" />
         <Select value={situacao} onValueChange={(v) => setSituacao(v as Situacao)}>
-          <SelectTrigger className="w-[210px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
           <SelectContent>{SITUACOES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
         </Select>
         <Select value={regime} onValueChange={setRegime}>
@@ -156,7 +190,8 @@ export default function PagamentosFederal() {
               <TableRow>
                 <TableHead>Razão social</TableHead>
                 <TableHead>CNPJ</TableHead>
-                {TIPOS_DOC.map((t) => <TableHead key={t} className="text-center">{t}</TableHead>)}
+                <TableHead>DAS</TableHead>
+                {TIPOS_COLUNA.map((t) => <TableHead key={t} className="text-center">{t}</TableHead>)}
                 <TableHead>Situação</TableHead>
                 <TableHead className="text-center">Ver</TableHead>
                 <TableHead className="text-right">Atualizar</TableHead>
@@ -164,7 +199,9 @@ export default function PagamentosFederal() {
             </TableHeader>
             <TableBody>
               {filtradas.map((l) => {
-                const consultando = emAndamento === l.contact_id;
+                const consultando = emConsulta(l);
+                const r = rotuloDas(l.das);
+                const doSimples = ehSimplesConsultavel(l);
                 return (
                   <TableRow key={l.contact_id} className="cursor-pointer" onClick={() => setAberto(l.contact_id)}>
                     <TableCell>
@@ -172,31 +209,45 @@ export default function PagamentosFederal() {
                       <p className="text-meta text-muted-ink-2">{REGIMES[l.regime ?? ''] ?? l.regime ?? 'Sem regime'}</p>
                     </TableCell>
                     <TableCell className="font-mono text-ui">{formatarCnpj(l.documento)}</TableCell>
-                    {TIPOS_DOC.map((t) => <TableCell key={t} className="text-center">{chip(l, t)}</TableCell>)}
+                    <TableCell>
+                      {r ? (
+                        <div className="space-y-0.5">
+                          <DsBadge tone={r.tone}>{r.label}</DsBadge>
+                          <p className="text-meta text-muted-ink-2">
+                            {l.das.estado === 'pago' && l.das.pagoEm ? `pago em ${ddmm(l.das.pagoEm)}` : ''}
+                            {l.das.valor != null ? `${l.das.estado === 'pago' && l.das.pagoEm ? ' · ' : ''}${moeda(l.das.valor)}` : ''}
+                          </p>
+                        </div>
+                      ) : <span className="text-muted-ink-2">—</span>}
+                    </TableCell>
+                    {TIPOS_COLUNA.map((t) => <TableCell key={t} className="text-center">{chip(l, t)}</TableCell>)}
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {l.novo && <DsBadge tone="warn">Pagamento novo</DsBadge>}
-                        {l.duplicidade && <DsBadge tone="danger">Duplicidade</DsBadge>}
+                        {duplicidade(l, competencia) && <DsBadge tone="danger">Duplicidade</DsBadge>}
                         {l.saldo && <DsBadge tone="info">Saldo</DsBadge>}
                         {l.semProcuracao && <DsBadge tone="neutral">Sem procuração</DsBadge>}
-                        {!l.novo && !l.duplicidade && !l.saldo && !l.semProcuracao && (
+                        {!l.novo && !duplicidade(l, competencia) && !l.saldo && !l.semProcuracao && (
                           <span className="text-meta text-muted-ink-2">
-                            {l.consultadoEm ? `Consultado ${format(new Date(l.consultadoEm), 'dd/MM HH:mm')}` : 'Não consultado'}
+                            {l.ultimaConsulta ? `Consultado ${format(new Date(l.ultimaConsulta), 'dd/MM HH:mm')}` : 'Não consultado'}
                           </span>
                         )}
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <DicaBotao texto="Abre o painel do cliente com os pagamentos já salvos. Não consulta a Receita.">
+                      <DicaBotao texto="Abre o painel do cliente com o DAS e os pagamentos já salvos. Não consulta a Receita.">
                         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setAberto(l.contact_id); }}>
                           <Eye className="h-4 w-4" />
                         </Button>
                       </DicaBotao>
                     </TableCell>
                     <TableCell className="text-right">
-                      <DicaBotao custo="Consultar" texto="Baixa da Receita os pagamentos do mês deste cliente (DARF, DAS, DAE e DJE).">
+                      <DicaBotao custo="Consultar"
+                        texto={doSimples
+                          ? `Consulta na Receita as declarações e os DAS do ano ${ano} deste cliente numa só chamada: mostra se o DAS foi gerado e se está pago. Para ver data e valor do pagamento, ou emitir comprovante, abra o painel.`
+                          : 'Baixa da Receita os pagamentos do mês deste cliente (DARF, DAS, DAE e DJE).'}>
                         <Button size="sm" variant="outline" disabled={consultando}
-                          onClick={(e) => { e.stopPropagation(); executar(l.contact_id); }}>
+                          onClick={(e) => { e.stopPropagation(); consultarLinha(l); }}>
                           {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
                           Consultar<Preco tipo="Consultar" />
                         </Button>
@@ -215,11 +266,14 @@ export default function PagamentosFederal() {
       <PagamentosClienteSheet
         linha={linhaAberta}
         competencia={competencia}
-        consultando={!!linhaAberta && emAndamento === linhaAberta.contact_id}
-        onConsultar={(id) => executar(id)}
+        consultando={!!linhaAberta && consultaPag.emAndamento === linhaAberta.contact_id}
+        consultandoDas={!!linhaAberta && consultaDas.emAndamento === linhaAberta.contact_id}
+        onConsultar={(id) => consultaPag.executar(id)}
+        onConsultarDas={(id) => consultaDas.executar(id)}
         onClose={() => setAberto(null)}
       />
-      {dialog}
+      {consultaPag.dialog}
+      {consultaDas.dialog}
     </div>
   );
 }

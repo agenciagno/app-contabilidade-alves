@@ -61,7 +61,6 @@ const MensagensEcac = lazy(() => import("@/pages/MensagensEcac"));
 const TermosIntimacao = lazy(() => import("@/pages/TermosIntimacao"));
 const PagamentosFederal = lazy(() => import("@/pages/PagamentosFederal"));
 const PgdasFederal = lazy(() => import("@/pages/PgdasFederal"));
-const DasFederal = lazy(() => import("@/pages/DasFederal"));
 const FaturamentoFederal = lazy(() => import("@/pages/FaturamentoFederal"));
 const DefisFederal = lazy(() => import("@/pages/DefisFederal"));
 const ProcuracoesFederal = lazy(() => import("@/pages/ProcuracoesFederal"));
@@ -186,7 +185,7 @@ const App = () => (
               <Route path="/dashboard-federal/intimacoes" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><TermosIntimacao /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/pagamentos" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><PagamentosFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/pgdas" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><PgdasFederal /></ModuleGuard></AppLayout>} />
-              <Route path="/dashboard-federal/das" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><DasFederal /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal/das" element={<Navigate to="/dashboard-federal/pagamentos" replace />} />
               <Route path="/dashboard-federal/faturamento" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><FaturamentoFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/defis" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><DefisFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/procuracoes" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><ProcuracoesFederal /></ModuleGuard></AppLayout>} />

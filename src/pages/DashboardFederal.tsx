@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  BadgeCheck, Banknote, BarChart3, ClipboardList, CreditCard, FileCheck, FileSignature, FileSpreadsheet, FileX,
+  BadgeCheck, BarChart3, ClipboardList, CreditCard, FileCheck, FileSignature, FileSpreadsheet, FileX,
   Calculator, ClipboardCheck, Gauge, Gavel, Landmark, Lightbulb, ListChecks, Mail, Percent, Receipt, Scale, ShieldCheck, UserX, ArrowRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -12,7 +12,8 @@ import { cn } from '@/lib/utils';
 import { diasParaVencer, useCertificates } from '@/hooks/useCertificates';
 import { STATUS_MONITORADO, seloCaixa, useClientesCaixa, useMensagensCriticas } from '@/hooks/useSerproCaixaPostal';
 import { competenciaPadrao, rotuloCompetencia, useMatrizPagamentos } from '@/hooks/useSerproPagamentos';
-import { anoDe, declaracaoVigente, statusDas, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
+import { anoDe, declaracaoVigente, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
+import { unificarLinhas } from '@/hooks/useSerproDasUnificado';
 import { faturamentoVigente, nivelLimite, nivelSublimite, useFaturamentoAno } from '@/hooks/useSerproFaturamento';
 import { statusDefis, useMatrizDefis } from '@/hooks/useSerproDefis';
 import { useProcuracoes, vencendo as procVencendo } from '@/hooks/useSerproProcuracoes';
@@ -78,8 +79,10 @@ export default function DashboardFederal() {
     const pagConsultados = pagamentos.filter((l) => l.consultadoEm).length;
     const snConsultados = simples.filter((l) => !l.filial && l.consultadoEm);
     const snTransmitidas = snConsultados.filter((l) => declaracaoVigente(l, competencia)).length;
-    const snPagos = snConsultados.filter((l) => statusDas(l, competencia) === 'pago').length;
-    const snNaoPagos = snConsultados.filter((l) => ['nao_pago', 'parcial'].includes(statusDas(l, competencia))).length;
+    const unif = unificarLinhas(pagamentos, simples, competencia);
+    const dasPagos = unif.filter((l) => l.das.estado === 'pago').length;
+    const dasVencidos = unif.filter((l) => l.das.estado === 'vencido').length;
+    const dasAVencer = unif.filter((l) => l.das.estado === 'a_vencer').length;
     const snTotal = simples.filter((l) => !l.filial).length;
     const fatLidos = simples.filter((l) => !l.filial).map((l) => faturamentoVigente(l, leituras, competencia)).filter((f): f is NonNullable<typeof f> => !!f);
     const fatConfiaveis = fatLidos.filter((f) => f.confiavel);
@@ -117,11 +120,11 @@ export default function DashboardFederal() {
     const dfConsultados = defis.filter((l) => !l.filial && l.consultadoEm).length;
     const dfEntregues = dfStatus.filter((s) => s === 'entregue' || s === 'retificada').length;
     const dfAtraso = dfStatus.filter((s) => s === 'em_atraso').length;
-    const filaAcao = fila.itens.filter((i) => i.motivos.some((m) => m.motivo === 'intimacao' || m.motivo === 'das_vencimento')).length;
+    const filaAcao = fila.itens.filter((i) => i.motivos.some((m) => m.motivo === 'intimacao' || m.motivo === 'das_vencimento' || m.motivo === 'pgdas_nao_transmitida')).length;
     return [
       {
         titulo: 'Fila do dia', icone: ListChecks, to: '/dashboard-federal/fila-do-dia', tom: filaAcao > 0 ? 'danger' : fila.itens.length > 0 ? 'warn' : 'ok',
-        linhas: [`${fila.itens.length} clientes na fila`, `${filaAcao} exigem ação (mensagem da Receita ou DAS)`],
+        linhas: [`${fila.itens.length} clientes na fila`, `${filaAcao} exigem ação (mensagem, DAS ou PGDAS)`],
       },
       {
         titulo: 'Oportunidades', icone: Lightbulb, to: '/dashboard-federal/oportunidades', tom: oport.lidos === 0 ? 'neutral' : oport.linhas.length > 0 ? 'warn' : 'ok',
@@ -136,16 +139,13 @@ export default function DashboardFederal() {
         linhas: [`${comMensagem} com mensagem não lida ou nova`, `${clientes.length - semProc} clientes monitorados`],
       },
       {
-        titulo: 'Pagamentos', icone: Receipt, to: '/dashboard-federal/pagamentos', tom: pagNovos > 0 ? 'warn' : pagConsultados > 0 ? 'ok' : 'neutral',
-        linhas: [`${pagNovos} com pagamento novo`, `${pagConsultados} de ${pagamentos.length} consultados em ${rotuloCompetencia(competencia)}`],
+        titulo: 'Pagamentos e DAS', icone: Receipt, to: '/dashboard-federal/pagamentos',
+        tom: dasVencidos > 0 ? 'danger' : pagNovos > 0 || dasAVencer > 0 ? 'warn' : dasPagos > 0 || pagConsultados > 0 ? 'ok' : 'neutral',
+        linhas: [`${dasPagos} DAS pagos · ${dasVencidos} vencidos · ${pagNovos} com pagamento novo`, `${pagConsultados} de ${pagamentos.length} consultados em ${rotuloCompetencia(competencia)}`],
       },
       {
         titulo: 'PGDAS', icone: FileCheck, to: '/dashboard-federal/pgdas', tom: snConsultados.length === 0 ? 'neutral' : snTransmitidas < snConsultados.length ? 'warn' : 'ok',
         linhas: [`${snTransmitidas} de ${snConsultados.length} transmitidas em ${rotuloCompetencia(competencia)}`, `${snConsultados.length} de ${snTotal} clientes do Simples consultados`],
-      },
-      {
-        titulo: 'DAS', icone: Banknote, to: '/dashboard-federal/das', tom: snNaoPagos > 0 ? 'warn' : snPagos > 0 ? 'ok' : 'neutral',
-        linhas: [`${snPagos} pagos · ${snNaoPagos} não pagos`, `em ${rotuloCompetencia(competencia)}, entre os consultados`],
       },
       {
         titulo: 'Faturamento', icone: BarChart3, to: '/dashboard-federal/faturamento', tom: fatConfiaveis.length === 0 ? 'neutral' : fatAcima > 0 ? 'danger' : fatAtencao > 0 ? 'warn' : 'ok',

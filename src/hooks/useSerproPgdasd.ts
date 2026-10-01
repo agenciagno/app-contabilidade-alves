@@ -4,6 +4,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { invocarSerpro } from '@/lib/invocarSerpro';
 import { STATUS_MONITORADO } from '@/hooks/useSerproCaixaPostal';
 import { recarregarTarefasFiscais } from '@/lib/tarefasConcluidas';
+import { semZeros } from '@/lib/prazosFederais';
 
 export interface DeclaracaoRow {
   id: string;
@@ -84,22 +85,21 @@ export function statusPgdas(l: LinhaPgdasd, pa: string): StatusPgdas {
   return d.tipo === 'retificadora' ? 'retificada' : 'transmitida';
 }
 
-export type StatusDas = 'filial' | 'nao_consultado' | 'sem_das' | 'pago' | 'nao_pago' | 'parcial';
+export type StatusDas = 'filial' | 'nao_consultado' | 'sem_das' | 'pago' | 'nao_pago';
+/** Um mês pode ter mais de um DAS (o 1º não pago, trocado por outro): qualquer DAS pago no período conta como pago. */
 export function statusDas(l: LinhaPgdasd, pa: string): StatusDas {
   if (l.filial) return 'filial';
   if (!l.consultadoEm) return 'nao_consultado';
   const lista = dasDoPeriodo(l, pa);
   if (!lista.length) return 'sem_das';
-  const pagos = lista.filter((d) => d.das_pago === true).length;
-  if (pagos === lista.length) return 'pago';
-  return pagos > 0 ? 'parcial' : 'nao_pago';
+  return lista.some((d) => d.das_pago === true) ? 'pago' : 'nao_pago';
 }
 
 /** Mais de um DAS pago no período, ou o mesmo DAS com mais de um pagamento na Receita (Onda 1). */
 export function duplicidadeDas(l: LinhaPgdasd, pa: string): boolean {
   const lista = dasDoPeriodo(l, pa);
   if (lista.filter((d) => d.das_pago === true).length > 1) return true;
-  return lista.some((d) => (l.pagamentosPorDocumento.get(d.numero_das) ?? 0) > 1);
+  return lista.some((d) => (l.pagamentosPorDocumento.get(semZeros(d.numero_das)) ?? 0) > 1);
 }
 
 export function useMatrizPgdasd(ano: number) {
@@ -146,7 +146,7 @@ export function useMatrizPgdasd(ano: number) {
       const pagPor = new Map<string, Map<string, number>>();
       for (const p of pagos) {
         const m = pagPor.get(p.contact_id) ?? new Map<string, number>();
-        m.set(p.numero_documento, (m.get(p.numero_documento) ?? 0) + 1);
+        m.set(semZeros(p.numero_documento), (m.get(semZeros(p.numero_documento)) ?? 0) + 1);
         pagPor.set(p.contact_id, m);
       }
 

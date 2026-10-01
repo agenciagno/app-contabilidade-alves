@@ -19,17 +19,15 @@ import {
   anoDe, declaracaoVigente, statusPgdas, useMatrizPgdasd, type LinhaPgdasd, type StatusPgdas,
 } from '@/hooks/useSerproPgdasd';
 import type { TabelaExport } from '@/lib/exportarTabela';
+import { hojeBR, vencimentoDoPeriodo } from '@/lib/prazosFederais';
 
 const formatarCnpj = (d: string) => {
   const n = d.replace(/\D/g, '');
   return n.length === 14 ? n.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : d;
 };
 
-/** Vencimento do PGDAS-D: dia 20 do mês seguinte ao período (não ajusta fim de semana/feriado). */
-function prazo(pa: string): Date {
-  const [a, m] = pa.split('-').map(Number);
-  return new Date(a, m, 20, 23, 59, 59);
-}
+/** Prazo do PGDAS-D (AAAA-MM-DD): dia 20 do mês seguinte, segunda se cair no fim de semana. */
+const prazoDe = (pa: string) => vencimentoDoPeriodo(pa);
 
 type Situacao = 'todos' | 'nao_consultados' | 'transmitidas' | 'nao_transmitidas' | 'malha';
 const SITUACOES: { value: Situacao; label: string }[] = [
@@ -45,11 +43,14 @@ const emMalha = (l: LinhaPgdasd, pa: string) => {
   return !!m && !/liberad/i.test(m);
 };
 
-function rotuloStatus(s: StatusPgdas, vencido: boolean): { label: string; tone: 'ok' | 'warn' | 'danger' | 'info' | 'neutral' } {
+/** `consultaDepoisDoPrazo`: só uma consulta feita depois do prazo prova que não foi transmitida (antes do prazo, ainda podia ser transmitida). */
+function rotuloStatus(s: StatusPgdas, vencido: boolean, consultaDepoisDoPrazo: boolean): { label: string; tone: 'ok' | 'warn' | 'danger' | 'info' | 'neutral' } {
   switch (s) {
     case 'transmitida': return { label: 'Transmitida', tone: 'ok' };
     case 'retificada': return { label: 'Retificada', tone: 'ok' };
-    case 'sem_declaracao': return vencido ? { label: 'Não transmitida', tone: 'danger' } : { label: 'A transmitir', tone: 'info' };
+    case 'sem_declaracao':
+      if (!vencido) return { label: 'A transmitir', tone: 'info' };
+      return consultaDepoisDoPrazo ? { label: 'Não transmitida', tone: 'danger' } : { label: 'Sem declaração (consultar de novo)', tone: 'warn' };
     case 'filial': return { label: 'Filial (matriz)', tone: 'neutral' };
     default: return { label: 'Não consultado', tone: 'neutral' };
   }
@@ -65,21 +66,26 @@ export default function PgdasFederal() {
   const [busca, setBusca] = useState(buscaInicial);
   const [situacao, setSituacao] = useState<Situacao>('todos');
 
-  const vencido = new Date() > prazo(pa);
+  const prazo = prazoDe(pa);
+  const vencido = hojeBR() > prazo;
+  const depoisDoPrazo = (l: LinhaPgdasd) => !!l.consultadoEm && l.consultadoEm.slice(0, 10) > prazo;
   const limite = mesDeData(new Date());
 
   const stats = useMemo(() => {
     const ativos = linhas.filter((l) => !l.filial);
     const consultados = ativos.filter((l) => l.consultadoEm);
     const transmitidas = consultados.filter((l) => declaracaoVigente(l, pa)).length;
+    const semDecl = consultados.filter((l) => !declaracaoVigente(l, pa));
     return {
       total: ativos.length,
       consultados: consultados.length,
       transmitidas,
-      semDeclaracao: consultados.length - transmitidas,
+      semDeclaracao: semDecl.length,
+      /** Sem declaração E consultado depois do prazo: o único caso em que "não transmitida" é prova. */
+      naoTransmitidas: semDecl.filter((l) => depoisDoPrazo(l)).length,
       malha: consultados.filter((l) => emMalha(l, pa)).length,
     };
-  }, [linhas, pa]);
+  }, [linhas, pa, prazo]);
 
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -107,7 +113,7 @@ export default function PgdasFederal() {
       const st = statusPgdas(l, pa);
       return [
         l.nome, formatarCnpj(l.documento), siglaCompetencia(pa), d?.numero_declaracao ?? '', d ? (d.tipo === 'retificadora' ? 'Retificadora' : 'Original') : '',
-        d?.transmitida_em ? format(new Date(d.transmitida_em), 'dd/MM/yyyy HH:mm') : '', d?.malha ?? '', rotuloStatus(st, vencido).label,
+        d?.transmitida_em ? format(new Date(d.transmitida_em), 'dd/MM/yyyy HH:mm') : '', d?.malha ?? '', rotuloStatus(st, vencido, depoisDoPrazo(l)).label,
         l.consultadoEm ? format(new Date(l.consultadoEm), 'dd/MM/yyyy HH:mm') : '',
       ];
     }),
@@ -129,9 +135,11 @@ export default function PgdasFederal() {
           { label: 'Consultados no ano', value: `${stats.consultados} de ${stats.total}`, hint: `clientes do Simples, ${ano}` },
           { label: `Transmitidas em ${siglaCompetencia(pa)}`, value: stats.transmitidas, hint: 'entre os consultados' },
           {
-            label: vencido ? 'Não transmitidas' : 'A transmitir', value: stats.semDeclaracao,
-            hint: vencido ? 'prazo do período já passou' : `vence em ${format(prazo(pa), 'dd/MM')}`,
-            emphasis: vencido && stats.semDeclaracao > 0 ? 'warm' : 'none',
+            label: vencido ? 'Não transmitidas' : 'A transmitir', value: vencido ? stats.naoTransmitidas : stats.semDeclaracao,
+            hint: vencido
+              ? (stats.semDeclaracao > stats.naoTransmitidas ? `${stats.semDeclaracao - stats.naoTransmitidas} consultados antes do prazo: consulte de novo` : 'consultados depois do prazo')
+              : `vence em ${format(new Date(`${prazo}T00:00:00`), 'dd/MM')}`,
+            emphasis: vencido && stats.naoTransmitidas > 0 ? 'warm' : 'none',
           },
           { label: 'Em malha', value: stats.malha, hint: 'retida, intimada ou rejeitada', emphasis: stats.malha > 0 ? 'warm' : 'none' },
         ]}
@@ -167,7 +175,7 @@ export default function PgdasFederal() {
               {filtradas.map((l) => {
                 const d = declaracaoVigente(l, pa);
                 const st = statusPgdas(l, pa);
-                const r = rotuloStatus(st, vencido);
+                const r = rotuloStatus(st, vencido, depoisDoPrazo(l));
                 const consultando = emAndamento === l.contact_id;
                 const maed = !!(d?.maed_notificacao_path || d?.maed_darf_path);
                 return (

@@ -1,10 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { criarSerpro, onlyDigits } from "../_shared/serpro-core.ts";
+import { criarSerpro, onlyDigits, sleep } from "../_shared/serpro-core.ts";
 import { lerIndicePgdasd, pega } from "../_shared/pgdasd-indice.ts";
 import { lerDeclaracaoPgdasd, type DeclaracaoPgdasd } from "../_shared/pgdasd-extrair.ts";
-import { concluirTarefaDas } from "../_shared/tarefas-fiscais.ts";
+import { avisarConclusoes, concluirTarefaDas, concluirTarefaFiscal } from "../_shared/tarefas-fiscais.ts";
 
 // ---------------------------------------------------------------------------
 // PGDAS-D e DAS (Serpro Integra Contador, Simples Nacional) — F4 Onda 2, passo 2, 30/09/2026. Só leitura + emissão de DAS.
@@ -40,7 +40,9 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-const { serpro, MODE } = criarSerpro(supabase, COMPANY_ID);
+const { serpro, MODE, CONTRATANTE_NI, AUTOR_NI } = criarSerpro(supabase, COMPANY_ID);
+const CNPJS_DA_CA = new Set([CONTRATANTE_NI, AUTOR_NI]);
+const CODIGOS_PROCURACAO = ["00146", "00006", "00004", "00060", "00002", "00103", "00050", "00051"]; // mesmos do mapa de procurações
 
 const hojeBR = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 const anoBR = () => Number(hojeBR().slice(0, 4));
@@ -49,16 +51,28 @@ const periodoAAAAMM = (p: unknown): string | null => (/^\d{4}-\d{2}$/.test(Strin
 const msgErro = (r: { resposta: any }) => r.resposta?.mensagens?.[0]?.texto ?? r.resposta?.error ?? "Falha na consulta ao Serpro";
 const codigoErro = (r: { resposta: any }) => String(r.resposta?.mensagens?.[0]?.codigo ?? "");
 
-async function carregarCliente(contactId: string) {
+type Resp = { corpo: Record<string, unknown>; http: number };
+const resp = (corpo: Record<string, unknown>, http = 200): Resp => ({ corpo, http });
+
+type ContatoPgdasd = { id: string; name: string | null; document: string | null; status_cliente: string | null };
+
+/** Confere se o cliente pode ser consultado: existe, está Ativo, tem CNPJ de 14 dígitos e é matriz (o PGDAS-D é da matriz). */
+async function validarCliente(contactId: string): Promise<{ erro?: Resp; contato?: ContatoPgdasd; cnpj?: string }> {
   const { data: c } = await supabase.from("contacts").select("id,name,document,status_cliente").eq("id", contactId).eq("company_id", COMPANY_ID).maybeSingle();
-  if (!c) return { resp: json({ error: "Cliente não encontrado" }, 404) };
+  if (!c) return { erro: resp({ error: "Cliente não encontrado" }, 404) };
   if (c.status_cliente !== STATUS_MONITORADO) {
-    return { resp: json({ ok: false, foraDoMonitoramento: true, error: `Cliente fora do monitoramento (status: ${c.status_cliente ?? "sem status"}). O Serpro só é consultado para clientes com status "${STATUS_MONITORADO}".` }) };
+    return { erro: resp({ ok: false, foraDoMonitoramento: true, error: `Cliente fora do monitoramento (status: ${c.status_cliente ?? "sem status"}). O Serpro só é consultado para clientes com status "${STATUS_MONITORADO}".` }) };
   }
   const cnpj = onlyDigits(c.document);
-  if (cnpj.length !== 14) return { resp: json({ error: "Cliente sem CNPJ válido" }, 400) };
-  if (cnpj.slice(8, 12) !== "0001") return { resp: json({ ok: false, filial: true, error: "Este CNPJ é de filial. O PGDAS-D é transmitido pela matriz: consulte o CNPJ da matriz." }) };
-  return { contato: c, cnpj };
+  if (cnpj.length !== 14) return { erro: resp({ error: "Cliente sem CNPJ válido" }, 400) };
+  if (cnpj.slice(8, 12) !== "0001") return { erro: resp({ ok: false, filial: true, error: "Este CNPJ é de filial. O PGDAS-D é transmitido pela matriz: consulte o CNPJ da matriz." }) };
+  return { contato: c as ContatoPgdasd, cnpj };
+}
+
+async function carregarCliente(contactId: string) {
+  const v = await validarCliente(contactId);
+  if (v.erro) return { resp: json(v.erro.corpo, v.erro.http) };
+  return { contato: v.contato!, cnpj: v.cnpj! };
 }
 
 function bytesDeBase64(b64: string): Uint8Array {
@@ -85,62 +99,143 @@ async function assinar(path: string, nome: string) {
 }
 
 // ---------- ações ----------
-async function consultar(payload: any, uid: string) {
-  const c = await carregarCliente(String(payload.contact_id ?? ""));
-  if (c.resp) return c.resp;
-  const ano = Number(payload.ano);
-  if (!Number.isInteger(ano) || ano < 2018 || ano > anoBR()) return json({ error: "Ano inválido" }, 400);
+/**
+ * Consulta o ANO de UM cliente (CONSDECLARACAO13, 1 chamada cobrada), grava declarações e DAS e conclui as tarefas "DAS - Simples Nacional"
+ * dos períodos com declaração transmitida. Quem chama decide o aviso (um por consulta ou um por lote): `tarefas_concluidas` vem no resultado.
+ */
+async function consultarCliente(contactId: string, ano: number, uid: string | null, origem: "manual" | "cron", force: boolean, finalidade: string): Promise<Resp & { nome?: string }> {
+  const v = await validarCliente(contactId);
+  if (v.erro) return v.erro;
+  const contato = v.contato!;
+  const cnpj = v.cnpj!;
 
-  if (!payload.force) {
-    const { data: ja } = await supabase.from("serpro_pgdasd_consultas").select("consultado_em").eq("contact_id", c.contato!.id).eq("ano", ano).maybeSingle();
-    if (ja?.consultado_em && Date.now() - Date.parse(ja.consultado_em) < RECENTE_MIN * 60_000) return json({ ok: true, recente: true, consultado_em: ja.consultado_em });
+  if (!force) {
+    const { data: ja } = await supabase.from("serpro_pgdasd_consultas").select("consultado_em").eq("contact_id", contato.id).eq("ano", ano).maybeSingle();
+    if (ja?.consultado_em && Date.now() - Date.parse(ja.consultado_em) < RECENTE_MIN * 60_000) return resp({ ok: true, recente: true, consultado_em: ja.consultado_em });
   }
 
   const r = await serpro({
     tipo: "Consultar", idSistema: "PGDASD", idServico: "CONSDECLARACAO13",
-    contribuinte: { numero: c.cnpj!, tipo: 2 }, dados: JSON.stringify({ anoCalendario: String(ano) }),
-    uid, contactId: c.contato!.id, origem: "manual",
-    finalidade: `Consulta do índice de declarações e DAS do PGDAS-D (ano ${ano}) acionada por usuário para acompanhamento fiscal do cliente`,
+    contribuinte: { numero: cnpj, tipo: 2 }, dados: JSON.stringify({ anoCalendario: String(ano) }),
+    uid, contactId: contato.id, origem, finalidade,
   });
-  if (r.status === 403) return json({ ok: false, semProcuracao: true, status: 403, error: "Sem procuração eletrônica para o PGDAS-D deste cliente" });
+  if (r.status === 403) return resp({ ok: false, semProcuracao: true, status: 403, error: "Sem procuração eletrônica para o PGDAS-D deste cliente" });
   // "Não há declaração transmitida" (MSG_ISN_005 / 027) não é falha: o ano foi consultado e não tem nada.
   const semDeclaracao = r.status !== 200 && /MSG_ISN_0(05|27)/.test(codigoErro(r));
-  if (r.status !== 200 && !semDeclaracao) return json({ ok: false, status: r.status, error: msgErro(r) });
+  if (r.status !== 200 && !semDeclaracao) return resp({ ok: false, status: r.status, error: msgErro(r) });
 
   const { declaracoes, das } = semDeclaracao ? { declaracoes: [], das: [] } : lerIndicePgdasd(r.resposta?.dados);
   const agora = new Date().toISOString();
-  const base = { company_id: COMPANY_ID, contact_id: c.contato!.id, sincronizado_em: agora };
+  const base = { company_id: COMPANY_ID, contact_id: contato.id, sincronizado_em: agora };
 
   let novasDecl = 0, novosDas = 0;
   if (declaracoes.length) {
-    const { data: ex } = await supabase.from("serpro_pgdasd_declaracoes").select("numero_declaracao").eq("contact_id", c.contato!.id).in("numero_declaracao", declaracoes.map((d) => d.numero_declaracao));
+    const { data: ex } = await supabase.from("serpro_pgdasd_declaracoes").select("numero_declaracao").eq("contact_id", contato.id).in("numero_declaracao", declaracoes.map((d) => d.numero_declaracao));
     const ja = new Set((ex ?? []).map((e: { numero_declaracao: string }) => e.numero_declaracao));
     novasDecl = declaracoes.filter((d) => !ja.has(d.numero_declaracao)).length;
     const { error } = await supabase.from("serpro_pgdasd_declaracoes").upsert(
       declaracoes.map((d) => ({ ...base, periodo_apuracao: d.periodo, numero_declaracao: d.numero_declaracao, tipo: d.tipo, transmitida_em: d.transmitida_em, malha: d.malha })),
       { onConflict: "contact_id,numero_declaracao" });
-    if (error) return json({ ok: false, error: `Consulta feita, mas não foi possível gravar: ${error.message}` }, 500);
+    if (error) return resp({ ok: false, error: `Consulta feita, mas não foi possível gravar: ${error.message}` }, 500);
   }
   if (das.length) {
-    const { data: ex } = await supabase.from("serpro_pgdasd_das").select("numero_das").eq("contact_id", c.contato!.id).in("numero_das", das.map((d) => d.numero_das));
+    const { data: ex } = await supabase.from("serpro_pgdasd_das").select("numero_das").eq("contact_id", contato.id).in("numero_das", das.map((d) => d.numero_das));
     const ja = new Set((ex ?? []).map((e: { numero_das: string }) => e.numero_das));
     novosDas = das.filter((d) => !ja.has(d.numero_das)).length;
     // Só as colunas do índice: o PDF e os valores de um DAS gerado aqui não são apagados.
     const { error } = await supabase.from("serpro_pgdasd_das").upsert(
       das.map((d) => ({ ...base, periodo_apuracao: d.periodo, numero_das: d.numero_das, tipo_operacao: d.tipo_operacao, emitido_em: d.emitido_em, das_pago: d.das_pago })),
       { onConflict: "contact_id,numero_das" });
-    if (error) return json({ ok: false, error: `Consulta feita, mas não foi possível gravar: ${error.message}` }, 500);
+    if (error) return resp({ ok: false, error: `Consulta feita, mas não foi possível gravar: ${error.message}` }, 500);
   }
   await supabase.from("serpro_pgdasd_consultas").upsert(
-    { contact_id: c.contato!.id, company_id: COMPANY_ID, ano, consultado_em: agora, consultado_por: uid, declaracoes: declaracoes.length, das: das.length },
+    { contact_id: contato.id, company_id: COMPANY_ID, ano, consultado_em: agora, consultado_por: uid, declaracoes: declaracoes.length, das: das.length },
     { onConflict: "contact_id,ano" });
+  // O "pago" do índice responde ao aviso "pagamento novo" do sensor de Pagamentos: a consulta apaga o aviso (só esta coluna).
+  await supabase.from("serpro_pagamentos_sensor").upsert({ contact_id: contato.id, company_id: COMPANY_ID, ultima_consulta_em: agora }, { onConflict: "contact_id" });
 
-  // DAS pago no índice → conclui a tarefa fiscal "DAS - Simples Nacional" do período (ver _shared/tarefas-fiscais.ts).
-  const pagos = new Map<string, string>();
-  for (const d of das) if (d.das_pago === true && !pagos.has(d.periodo)) pagos.set(d.periodo, d.numero_das);
+  // Declaração TRANSMITIDA → conclui a tarefa fiscal "DAS - Simples Nacional" do período (decisão de Gabriel, 01/10/2026).
+  // Vale a primeira transmissão do período e a data de entrega é a da transmissão. Tarefa já concluída pela equipe é ignorada.
+  const primeira = new Map<string, (typeof declaracoes)[number]>();
+  for (const d of declaracoes) {
+    const a = primeira.get(d.periodo);
+    if (!a || (d.transmitida_em ?? "9999") < (a.transmitida_em ?? "9999")) primeira.set(d.periodo, d);
+  }
   let tarefasConcluidas = 0;
-  for (const [periodo, numero] of pagos) tarefasConcluidas += await concluirTarefaDas(supabase, COMPANY_ID, c.contato!.id, periodo, "pago", `DAS nº ${numero} pago (informação do PGDAS-D)`);
-  return json({ ok: true, declaracoes: declaracoes.length, das: das.length, novas: novasDecl + novosDas, sem_declaracao: semDeclaracao, tarefas_concluidas: tarefasConcluidas });
+  for (const [periodo, d] of primeira) {
+    tarefasConcluidas += await concluirTarefaFiscal(supabase, COMPANY_ID, contato.id, {
+      obrigacao: "DAS - Simples Nacional", periodo, tipo: "transmitted", protocolo: d.numero_declaracao,
+      detalhe: `PGDAS-D nº ${d.numero_declaracao} transmitido${d.transmitida_em ? ` em ${d.transmitida_em.slice(0, 10).split("-").reverse().join("/")}` : ""} (informação da Receita)`,
+      dataEntrega: d.transmitida_em ? d.transmitida_em.slice(0, 10) : undefined,
+    });
+  }
+  return { ...resp({ ok: true, declaracoes: declaracoes.length, das: das.length, novas: novasDecl + novosDas, sem_declaracao: semDeclaracao, tarefas_concluidas: tarefasConcluidas }), nome: contato.name ?? "Cliente" };
+}
+
+async function consultar(payload: any, uid: string) {
+  const ano = Number(payload.ano);
+  if (!Number.isInteger(ano) || ano < 2018 || ano > anoBR()) return json({ error: "Ano inválido" }, 400);
+  const r = await consultarCliente(String(payload.contact_id ?? ""), ano, uid, "manual", !!payload.force,
+    `Consulta do índice de declarações e DAS do PGDAS-D (ano ${ano}) acionada por usuário para acompanhamento fiscal do cliente`);
+  if (r.nome && Number(r.corpo.tarefas_concluidas) > 0) await avisarConclusoes(supabase, COMPANY_ID, r.nome, Number(r.corpo.tarefas_concluidas));
+  return json(r.corpo, r.http);
+}
+
+/**
+ * Passe ÚNICO na carteira do Simples (aprovado por Gabriel em 01/10/2026; não é rotina agendada): consulta o ano de cada cliente que ainda não
+ * foi consultado nas últimas 24 h. Guardas: só Ativo, matriz, CNPJ válido, sem os CNPJs da CA; cliente mapeado sem nenhuma procuração ativa nem é tentado
+ * (a tentativa seria cobrada e voltaria 403); no máximo `limite` clientes por chamada (padrão 40) e 100 s de relógio; para depois de 5 falhas seguidas.
+ * Pode ser chamada de novo: quem já foi consultado é pulado. Um aviso-resumo no fim.
+ */
+async function consultarCarteira(payload: any, uid: string | null) {
+  const ano = Number(payload.ano) || anoBR();
+  if (!Number.isInteger(ano) || ano < 2018 || ano > anoBR()) return json({ error: "Ano inválido" }, 400);
+  const limite = Math.max(1, Math.min(Number(payload.limite) || 40, 60));
+  const inicio = Date.now();
+
+  const { data: contatos } = await supabase.from("contacts").select("id,name,display_name,document")
+    .eq("company_id", COMPANY_ID).eq("is_active", true).eq("status_cliente", STATUS_MONITORADO).eq("tax_regime", "simples_nacional").order("name");
+  const { data: consultas } = await supabase.from("serpro_pgdasd_consultas").select("contact_id,consultado_em").eq("company_id", COMPANY_ID).eq("ano", ano).limit(1000);
+  const recentes = new Set((consultas ?? []).filter((c: any) => Date.now() - Date.parse(c.consultado_em) < 24 * 3600_000).map((c: any) => c.contact_id));
+  const { data: procs } = await supabase.from("serpro_procuracoes").select("contact_id,status,data_fim")
+    .eq("company_id", COMPANY_ID).eq("fonte", "integra_procuracoes").in("codigo_procuracao", CODIGOS_PROCURACAO).limit(5000);
+  const hoje = hojeBR();
+  const comMapa = new Map<string, boolean>();
+  for (const r of (procs ?? []) as { contact_id: string; status: string; data_fim: string | null }[]) {
+    const ativa = r.status === "ativa" && (!r.data_fim || r.data_fim >= hoje);
+    comMapa.set(r.contact_id, (comMapa.get(r.contact_id) ?? false) || ativa);
+  }
+
+  const elegiveis = (contatos ?? []).filter((c: any) => {
+    const cnpj = onlyDigits(c.document);
+    return cnpj.length === 14 && cnpj.slice(8, 12) === "0001" && !CNPJS_DA_CA.has(cnpj);
+  });
+  const semProcuracao = elegiveis.filter((c: any) => comMapa.has(c.id) && comMapa.get(c.id) === false);
+  const pendentes = elegiveis.filter((c: any) => !recentes.has(c.id) && !(comMapa.has(c.id) && comMapa.get(c.id) === false));
+
+  const resumo = { consultados: 0, transmitidas: 0, sem_declaracao_no_ano: 0, erros: 0, sem_procuracao_pulados: semProcuracao.length, ja_consultados: elegiveis.length - pendentes.length - semProcuracao.length, tarefas_concluidas: 0 };
+  const falhas: string[] = [];
+  let seguidas = 0, processados = 0;
+  for (const c of pendentes) {
+    if (processados >= limite || Date.now() - inicio > 100_000 || seguidas >= 5) break;
+    processados++;
+    const r = await consultarCliente(c.id, ano, uid, "manual", true,
+      `Consulta do índice do PGDAS-D (ano ${ano}) no primeiro passe da carteira do Simples, aprovado por Gabriel em 01/10/2026, para acompanhamento fiscal`);
+    if (r.corpo.ok === true) {
+      seguidas = 0;
+      resumo.consultados++;
+      resumo.tarefas_concluidas += Number(r.corpo.tarefas_concluidas ?? 0);
+      if (r.corpo.sem_declaracao === true || Number(r.corpo.declaracoes ?? 0) === 0) resumo.sem_declaracao_no_ano++; else resumo.transmitidas++;
+    } else {
+      seguidas++;
+      resumo.erros++;
+      if (falhas.length < 10) falhas.push(`${c.display_name || c.name}: ${String(r.corpo.error ?? r.corpo.status ?? "falha")}`);
+    }
+    await sleep(150);
+  }
+  const restantes = pendentes.length - processados;
+  if (resumo.tarefas_concluidas > 0) await avisarConclusoes(supabase, COMPANY_ID, `${resumo.consultados} clientes do Simples (consulta da carteira)`, resumo.tarefas_concluidas);
+  return json({ ok: true, ano, ...resumo, restantes, parou_por_falhas: seguidas >= 5, falhas, segundos: Math.round((Date.now() - inicio) / 1000) });
 }
 
 async function documentos(payload: any, uid: string) {
@@ -341,6 +436,7 @@ async function lerFaturamento(payload: any, uid: string) {
   }
   try {
     const f = await lerEGravar(decl, c.cnpj!);
+    await avisarConclusoes(supabase, COMPANY_ID, c.contato!.name ?? "Cliente", f.tarefasConcluidas);
     return json({ ok: true, baixou, id: f.id, confiavel: f.confiavel, avisos: f.avisos, tarefas_concluidas: f.tarefasConcluidas });
   } catch (e) {
     return json({ ok: false, baixou, error: `O PDF está guardado, mas não consegui lê-lo: ${(e as Error).message}` });
@@ -381,6 +477,18 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   const payload = await req.json().catch(() => ({}));
+
+  // Passe único da carteira por chave de uso único: a chave (guardada só como hash no banco, com validade curta) é criada por quem tem acesso ao banco.
+  if (payload.action === "consultar_carteira" && req.headers.get("x-lote-token")) {
+    const dados = new TextEncoder().encode(String(req.headers.get("x-lote-token")));
+    const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", dados))].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const { data: cfg } = await supabase.from("serpro_config").select("lote_token_hash,lote_token_expira").eq("company_id", COMPANY_ID).maybeSingle();
+    if (cfg?.lote_token_hash && cfg.lote_token_hash === hash && cfg.lote_token_expira && Date.parse(cfg.lote_token_expira) > Date.now()) {
+      return await consultarCarteira(payload, null);
+    }
+    return json({ error: "Chave do passe inválida ou vencida" }, 403);
+  }
+
   const { data: userData } = await supabase.auth.getUser(bearer);
   const uid = userData?.user?.id;
   if (!uid) return json({ error: "Não autenticado" }, 401);
@@ -391,12 +499,15 @@ Deno.serve(async (req) => {
 
   switch (payload.action) {
     case "consultar": return await consultar(payload, uid);
+    case "consultar_carteira":
+      if (!admin) return json({ error: "Só administradores consultam a carteira" }, 403);
+      return await consultarCarteira(payload, uid);
     case "documentos": return await documentos(payload, uid);
     case "extrato": return await extrato(payload, uid);
     case "gerar_das": return await gerarDas(payload, uid);
     case "ler_faturamento": return await lerFaturamento(payload, uid);
     case "link": return await link(payload);
     case "publicar": return await publicar(payload);
-    default: return json({ error: "action inválida (consultar | documentos | extrato | gerar_das | ler_faturamento | link | publicar)" }, 400);
+    default: return json({ error: "action inválida (consultar | consultar_carteira | documentos | extrato | gerar_das | ler_faturamento | link | publicar)" }, 400);
   }
 });

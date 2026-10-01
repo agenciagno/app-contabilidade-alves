@@ -17,8 +17,10 @@ import {
   cicloAtual, custoEstimado, useConsumoSerpro, useSalvarSerproConfig, useSerproConfig,
 } from '@/hooks/useSerproConsumo';
 import { STATUS_MONITORADO, useClientesCaixa } from '@/hooks/useSerproCaixaPostal';
+import { ROTINAS_ATIVAS, ROTINAS_NAO_ATIVADAS, cobra, type TipoRotina } from '@/lib/rotinasSerpro';
 
 const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const ROTULO_TIPO: Record<TipoRotina, string> = { Monitorar: 'Monitorar (grátis)', Consultar: 'Consultar', Emitir: 'Emitir', sem_chamada: 'Sem chamada ao Serpro' };
 
 function useNomesUsuarios() {
   const { company } = useCompany();
@@ -70,6 +72,7 @@ export default function TechConsumoSerpro() {
       us.total++; if (c.cobravel) us.cobradas++;
       porUsuario.set(u, us);
     }
+    const cronCobradas = cobradas.filter((c) => c.origem === 'cron');
     const erros = {
       semProcuracao: prod.filter((c) => c.status_http === 403).length,
       timeout: prod.filter((c) => c.status_http === 504).length,
@@ -78,6 +81,8 @@ export default function TechConsumoSerpro() {
     };
     return {
       total: prod.length, cobradas: cobradas.length, gratis: prod.length - cobradas.length, custo,
+      rotinaCobradas: cronCobradas.length,
+      rotinaCusto: (['Consultar', 'Emitir', 'Declarar'] as const).reduce((acc, t) => acc + custoEstimado(t, cronCobradas.filter((c) => c.tipo_chamada === t).length), 0),
       consulta: qtd('Consultar'), emissao: qtd('Emitir'), declaracao: qtd('Declarar'), erros, testes: chamadas.length - prod.length,
       servicos: [...porServico.entries()].sort((a, b) => b[1].total - a[1].total),
       dias: [...porDia.entries()].slice(0, 14),
@@ -90,6 +95,11 @@ export default function TechConsumoSerpro() {
   for (const c of clientesCaixa) {
     if (c.status_cliente !== STATUS_MONITORADO) foraPorStatus.set(c.status_cliente ?? 'Sem status', (foraPorStatus.get(c.status_cliente ?? 'Sem status') ?? 0) + 1);
   }
+
+  // Custo fixo por mês = soma do que as rotinas ATIVAS que cobram gastam (hoje nenhuma cobra).
+  const fixas = ROTINAS_ATIVAS.filter(cobra);
+  const custoFixoMes = fixas.length ? custoEstimado('Consultar', fixas.filter((x) => x.tipo === 'Consultar').reduce((n, x) => n + x.chamadasPorMes, 0)) + custoEstimado('Emitir', fixas.filter((x) => x.tipo === 'Emitir').reduce((n, x) => n + x.chamadasPorMes, 0)) : 0;
+  const custoNaoAtivadas = custoEstimado('Consultar', ROTINAS_NAO_ATIVADAS.reduce((n, x) => n + x.consultasPorMes, 0));
 
   const alertaValor = config?.alerta_gasto_mensal ?? 100;
   const passouAlerta = r.custo >= alertaValor;
@@ -178,6 +188,62 @@ export default function TechConsumoSerpro() {
             }}
           />
         </DicaBotao>
+      </section>
+
+      <section className="space-y-4 rounded-lg border border-line bg-paper p-5">
+        <div className="space-y-1">
+          <h2 className="text-h4-card text-ink">Rotinas automáticas e custo fixo por mês</h2>
+          <p className="text-ui text-muted-ink">
+            Tudo o que roda sozinho, sem ninguém clicar, e quanto isso custa no Serpro. É o seu custo fixo: o que passar disso vem de cliques da equipe.
+            Os avisos do sino e as tarefas criadas leem só o que já está salvo no sistema.
+          </p>
+        </div>
+
+        <StatCardRow
+          items={[
+            { label: 'Custo fixo por mês', value: reais(custoFixoMes), hint: custoFixoMes === 0 ? 'nenhuma rotina automática cobra' : 'rotinas automáticas que cobram' },
+            { label: 'Rotinas ativas', value: ROTINAS_ATIVAS.length, hint: `${ROTINAS_ATIVAS.length - fixas.length} grátis ou sem chamada ao Serpro` },
+            { label: 'Cobrado por rotina neste ciclo', value: r.rotinaCobradas, hint: `${reais(r.rotinaCusto)} medido no registro de chamadas`, emphasis: r.rotinaCobradas > 0 ? 'warm' : 'none' },
+            { label: 'Se ligar as ideias abaixo', value: reais(custoNaoAtivadas), hint: 'por mês (estimativa); hoje nada disso roda' },
+          ]}
+        />
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Rotina</TableHead>
+              <TableHead>Quando</TableHead>
+              <TableHead>O que faz</TableHead>
+              <TableHead>Tipo de chamada</TableHead>
+              <TableHead className="text-right">Chamadas por mês</TableHead>
+              <TableHead className="text-right">Custo por mês</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {ROTINAS_ATIVAS.map((x) => (
+              <TableRow key={x.id}>
+                <TableCell className="align-top text-ui text-ink">{x.nome}</TableCell>
+                <TableCell className="align-top text-ui text-muted-ink">{x.quando}</TableCell>
+                <TableCell className="max-w-[420px] align-top text-meta text-muted-ink">{x.faz}</TableCell>
+                <TableCell className="align-top text-ui text-muted-ink">{ROTULO_TIPO[x.tipo]}</TableCell>
+                <TableCell className="text-right align-top text-ui text-ink">{x.chamadasPorMes}</TableCell>
+                <TableCell className="text-right align-top text-ui text-ink">{cobra(x) ? reais(custoEstimado(x.tipo as 'Consultar' | 'Emitir', x.chamadasPorMes)) : 'R$ 0,00'}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+
+        <div className="space-y-2 rounded-md border border-dashed border-line p-4">
+          <p className="text-ui text-ink">Ideias estudadas que não estão ligadas</p>
+          {ROTINAS_NAO_ATIVADAS.map((x) => (
+            <p key={x.nome} className="text-meta text-muted-ink">
+              {x.nome}: cerca de {x.consultasPorMes} consultas por mês, ≈ {reais(custoEstimado('Consultar', x.consultasPorMes))}. {x.nota}.
+            </p>
+          ))}
+          <p className="text-meta text-muted-ink-2">
+            Há também o passe único do PGDAS da carteira do Simples, aprovado em 01/10/2026: uma consulta por cliente, feita uma vez, que não se repete sozinha. Ele aparece como gasto manual no ciclo.
+          </p>
+        </div>
       </section>
 
       {passouAlerta && (

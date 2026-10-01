@@ -4,7 +4,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { criarSerpro, jwtRole, onlyDigits } from "../_shared/serpro-core.ts";
 import { assinar, guardarPdf } from "../_shared/serpro-arquivos.ts";
 import { lerApuracoesMit, pdfDoRecibo, semDeclaracaoDctfweb } from "../_shared/dctfweb-mit.ts";
-import { concluirTarefaFiscal } from "../_shared/tarefas-fiscais.ts";
+import { avisarConclusoes, concluirTarefaFiscal } from "../_shared/tarefas-fiscais.ts";
 
 // ---------------------------------------------------------------------------
 // DCTFWeb e MIT (Serpro Integra Contador) — F4 Onda 4, fase 1 (quem entregou), 30/09/2026. Só leitura.
@@ -161,6 +161,7 @@ async function consultar(payload: any, uid: string) {
   }
 
   if (!dctf.ok && !mit.ok) return json({ ok: false, error: dctf.erro ?? mit.erro ?? "Falha na consulta ao Serpro", dctfweb: dctf, mit });
+  await avisarConclusoes(supabase, COMPANY_ID, c.contato!.name ?? "Cliente", tarefasConcluidas);
   return json({ ok: true, dctfweb: dctf, mit, tarefas_concluidas: tarefasConcluidas });
 }
 

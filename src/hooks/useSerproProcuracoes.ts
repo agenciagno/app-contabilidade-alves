@@ -39,6 +39,11 @@ export interface LinhaProcuracao {
   /** Serviços sem procuração ativa (rótulos). */
   faltam: string[];
   mapeadoEm: string | null;
+  /**
+   * O sensor diário grátis da Caixa Postal devolveu "x" (sem procuração) para um cliente que o mapa pago dava como completo ou parcial:
+   * data da última leitura do sensor. Quando o cliente outorgar de novo e o sensor voltar a ler, some. Mapear (R$ 0,24) confirma.
+   */
+  perdidaEm: string | null;
 }
 
 const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
@@ -81,19 +86,27 @@ export function useProcuracoes() {
       const linhas = await fetchAllPages<ProcuracaoRow>(
         () => supabase.from('serpro_procuracoes').select('contact_id, codigo_procuracao, status, data_fim, verificado_em')
           .eq('company_id', companyId).eq('fonte', 'integra_procuracoes').order('contact_id').order('codigo_procuracao'));
+      const sonda = await fetchAllPages<{ contact_id: string; status: string; verificado_em: string | null }>(
+        () => supabase.from('serpro_procuracoes').select('contact_id, status, verificado_em')
+          .eq('company_id', companyId).eq('fonte', 'sonda_caixa_postal').eq('codigo_procuracao', '00006').order('contact_id'));
+      const sondaAusente = new Map(sonda.filter((x) => x.status === 'ausente').map((x) => [x.contact_id, x.verificado_em]));
       const porCliente = new Map<string, ProcuracaoRow[]>();
       for (const r of linhas) { const a = porCliente.get(r.contact_id) ?? []; a.push(r); porCliente.set(r.contact_id, a); }
 
       return contatos
         .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
-        .map((c): LinhaProcuracao => ({
-          contact_id: c.id,
-          nome: c.display_name || c.name || 'Cliente',
-          documento: c.document ?? '',
-          regime: c.tax_regime ?? null,
-          filial: digitos(c.document).slice(8, 12) !== '0001',
-          ...derivarProcuracao(porCliente.get(c.id) ?? []),
-        }));
+        .map((c): LinhaProcuracao => {
+          const d = derivarProcuracao(porCliente.get(c.id) ?? []);
+          return {
+            contact_id: c.id,
+            nome: c.display_name || c.name || 'Cliente',
+            documento: c.document ?? '',
+            regime: c.tax_regime ?? null,
+            filial: digitos(c.document).slice(8, 12) !== '0001',
+            ...d,
+            perdidaEm: d.situacao === 'total' || d.situacao === 'parcial' ? sondaAusente.get(c.id) ?? null : null,
+          };
+        });
     },
   });
 }

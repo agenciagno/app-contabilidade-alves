@@ -26,6 +26,7 @@ type Filtro = 'todos' | MotivoFila;
 const FILTROS: { value: Filtro; label: string }[] = [
   { value: 'todos', label: 'Todos os motivos' },
   { value: 'das_vencimento', label: 'DAS no vencimento' },
+  { value: 'pgdas_nao_transmitida', label: 'PGDAS não transmitida' },
   { value: 'intimacao', label: 'Mensagem que exige ação' },
   { value: 'mensagem_nova', label: 'Mensagem nova' },
   { value: 'pagamento_novo', label: 'Pagamento novo' },
@@ -44,7 +45,7 @@ export default function FilaDoDiaFederal() {
     const com = (...ms: MotivoFila[]) => itens.filter((i) => i.motivos.some((m) => ms.includes(m.motivo))).length;
     return {
       total: itens.length,
-      acao: com('intimacao', 'das_vencimento'),
+      acao: com('intimacao', 'das_vencimento', 'pgdas_nao_transmitida'),
       novidades: com('mensagem_nova', 'pagamento_novo', 'dctfweb'),
       conhecidas: com('parcela_atrasada', 'sitfis', 'procuracao'),
     };
@@ -89,7 +90,7 @@ export default function FilaDoDiaFederal() {
       <StatCardRow
         items={[
           { label: 'Clientes na fila', value: `${stats.total} de ${totalAtivos}`, hint: 'clientes ativos acompanhados' },
-          { label: 'Exigem ação', value: stats.acao, hint: 'mensagem da Receita ou DAS no vencimento', emphasis: stats.acao > 0 ? 'warm' : 'none' },
+          { label: 'Exigem ação', value: stats.acao, hint: 'mensagem da Receita, DAS ou PGDAS', emphasis: stats.acao > 0 ? 'warm' : 'none' },
           { label: 'Novidades da Receita', value: stats.novidades, hint: 'mensagem, pagamento ou DCTFWeb', emphasis: stats.novidades > 0 ? 'warm' : 'none' },
           { label: 'Pendências conhecidas', value: stats.conhecidas, hint: 'parcela, situação fiscal ou procuração' },
         ]}

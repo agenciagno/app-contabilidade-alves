@@ -169,7 +169,16 @@ export default function ProcuracoesFederal() {
                       <p className="text-meta text-muted-ink-2">{REGIMES[l.regime ?? ''] ?? l.regime ?? 'Sem regime'}{l.filial ? ' · Filial' : ''}</p>
                     </TableCell>
                     <TableCell className="font-mono text-ui">{formatarCnpj(l.documento)}</TableCell>
-                    <TableCell><DsBadge tone={r.tone}>{r.label}</DsBadge></TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <DsBadge tone={r.tone}>{r.label}</DsBadge>
+                        {l.perdidaEm && (
+                          <DicaBotao texto="O sensor diário da Receita não reconhece mais a procuração deste cliente, mesmo o mapa dando como ativa. Peça para outorgar de novo e use Mapear para confirmar.">
+                            <DsBadge tone="danger">Perdida (sensor)</DsBadge>
+                          </DicaBotao>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="whitespace-nowrap text-ui">
                       {l.venceEm ? (
                         <span className={l.diasParaVencer !== null && l.diasParaVencer <= DIAS_AVISO_PROCURACAO ? 'text-danger' : 'text-muted-ink'}>

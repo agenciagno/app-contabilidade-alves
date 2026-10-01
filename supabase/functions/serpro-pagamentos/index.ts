@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { criarSerpro, jwtRole, onlyDigits } from "../_shared/serpro-core.ts";
-import { concluirTarefaDas, concluirTarefasPorPagamentos } from "../_shared/tarefas-fiscais.ts";
+import { avisarConclusoes, concluirTarefaDas, concluirTarefasPorPagamentos } from "../_shared/tarefas-fiscais.ts";
 
 // ---------------------------------------------------------------------------
 // Pagamentos (Serpro Integra Contador, PAGTOWEB + evento E0701) — F4 Onda 1, 01/10/2026. Só leitura.
@@ -192,6 +192,7 @@ async function consultar(payload: any, uid: string) {
   // DARF pago com PIS e COFINS (ou IRPJ e CSLL) no período → conclui "PIS/ COFINS" (ou "IRPJ/ CSLL") do mesmo mês.
   tarefasConcluidas += await concluirTarefasPorPagamentos(supabase, COMPANY_ID, contato.id,
     linhas.filter((l) => l.tipo_sigla === "DARF" && l.periodo_apuracao).map((l) => l.periodo_apuracao!.slice(0, 7)));
+  await avisarConclusoes(supabase, COMPANY_ID, contato.name ?? "Cliente", tarefasConcluidas);
   return json({ ok: true, status: ultimoStatus, documentos: linhas.length, do_mes: doMes, novos: novas, tarefas_concluidas: tarefasConcluidas });
 }
 

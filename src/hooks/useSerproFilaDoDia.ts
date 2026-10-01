@@ -9,16 +9,19 @@ import { useMatrizDctfwebMit, type LinhaDctfwebMit } from '@/hooks/useSerproDctf
 import { useProcuracoes, type LinhaProcuracao } from '@/hooks/useSerproProcuracoes';
 import { competenciaAtual, estadoParcelamento, parcelasAtrasadas, rotuloParcela, useMatrizParcelamentos, type LinhaParcelamentos } from '@/hooks/useSerproParcelamentos';
 import { estadoSitfis, useMatrizSitfis, type LinhaSitfis } from '@/hooks/useSerproSitfis';
-import { anoDe, useMatrizPgdasd, type LinhaPgdasd } from '@/hooks/useSerproPgdasd';
+import { anoDe, statusPgdas, useMatrizPgdasd, type LinhaPgdasd } from '@/hooks/useSerproPgdasd';
+import { dasUnificado } from '@/hooks/useSerproDasUnificado';
+import { diasEntre, hojeBR, vencimentoDoPeriodo } from '@/lib/prazosFederais';
 
 /**
  * Fila do dia: junta, por cliente, o que a Receita mexeu ou avisou e pede ação. Só lê o que já está salvo (nenhuma chamada ao Serpro, custo zero).
  * Os avisos dos sensores somem sozinhos quando a equipe consulta aquele cliente na tela própria.
  */
-export type MotivoFila = 'das_vencimento' | 'intimacao' | 'mensagem_nova' | 'pagamento_novo' | 'dctfweb' | 'procuracao' | 'parcela_atrasada' | 'sitfis';
+export type MotivoFila = 'das_vencimento' | 'pgdas_nao_transmitida' | 'intimacao' | 'mensagem_nova' | 'pagamento_novo' | 'dctfweb' | 'procuracao' | 'parcela_atrasada' | 'sitfis';
 
 export const MOTIVOS_FILA: Record<MotivoFila, { rotulo: string; rota: string; dica: string }> = {
-  das_vencimento: { rotulo: 'DAS no vencimento', rota: '/dashboard-federal/das', dica: 'Abre a tela DAS já filtrada neste cliente. Consulte de novo lá se quiser confirmar o pagamento antes de avisar o cliente.' },
+  das_vencimento: { rotulo: 'DAS no vencimento', rota: '/dashboard-federal/pagamentos', dica: 'Abre Pagamentos e DAS já filtrada neste cliente. Consulte de novo lá se quiser confirmar o pagamento antes de avisar o cliente.' },
+  pgdas_nao_transmitida: { rotulo: 'PGDAS não transmitida', rota: '/dashboard-federal/pgdas', dica: 'Abre a tela PGDAS já filtrada neste cliente. A informação vem da última consulta, feita depois do prazo.' },
   intimacao: { rotulo: 'Mensagem que exige ação', rota: '/dashboard-federal/intimacoes', dica: 'Abre a tela de Termos de Intimação já filtrada neste cliente.' },
   mensagem_nova: { rotulo: 'Mensagem nova', rota: '/mensagens', dica: 'Abre Mensagens e-CAC já filtrada neste cliente. Consultar custa uma consulta ao Serpro.' },
   pagamento_novo: { rotulo: 'Pagamento novo', rota: '/dashboard-federal/pagamentos', dica: 'Abre Pagamentos já filtrada neste cliente. O aviso some quando você consulta.' },
@@ -76,16 +79,11 @@ export interface DadosFila {
   simples: LinhaPgdasd[];
 }
 
-const hojeISO = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
-const diasEntre = (de: string, ate: string) => Math.round((Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${de}T00:00:00Z`)) / 86_400_000);
+const mesAnterior = (ym: string, n: number) => new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 - n, 1)).toISOString().slice(0, 7);
 const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-/** Vencimento do DAS do mês de `hoje`: dia 20, empurrado para a segunda quando cai no fim de semana (feriado não é tratado). */
-export function vencimentoDoDas(hoje: string): string {
-  const d = new Date(`${hoje.slice(0, 7)}-20T00:00:00Z`);
-  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
+/** Vencimento do DAS do mês de `hoje` (o do período anterior): dia 20, segunda se cair no fim de semana (feriado não é tratado). */
+export const vencimentoDoDas = (hoje: string) => vencimentoDoPeriodo(mesAnterior(hoje.slice(0, 7), 1));
 
 /** Texto para o WhatsApp do cliente. No dia diz o valor da guia; depois do vencimento não diz (multa e juros mudam o valor). */
 export function mensagemLembreteDas(p: { nome: string; pa: string; valor: number | null; vencimento: string; diasAtraso: number }): string {
@@ -97,7 +95,7 @@ export function mensagemLembreteDas(p: { nome: string; pa: string; valor: number
 }
 
 /** Monta a fila a partir do que já está carregado nas telas. Função pura: a mesma entrada dá sempre a mesma fila. */
-export function montarFila(d: DadosFila, hoje = hojeISO()): Omit<ResumoFila, 'carregando'> {
+export function montarFila(d: DadosFila, hoje = hojeBR()): Omit<ResumoFila, 'carregando'> {
   const clientesCaixa = (d.caixa).filter((c) => c.status_cliente === STATUS_MONITORADO);
   const itens = new Map<string, ItemFila>();
   const adicionar = (base: { contact_id: string; nome: string; documento: string; regime?: string | null }, m: MotivoItem) => {
@@ -110,7 +108,9 @@ export function montarFila(d: DadosFila, hoje = hojeISO()): Omit<ResumoFila, 'ca
     }
   };
 
-  // DAS no vencimento: declarado, sem pagamento registrado pela Receita, vencendo hoje ou vencido há até 15 dias. Vem da última consulta do cliente.
+  // Períodos que ainda podem estar pendentes: os dois meses anteriores ao mês de `hoje`.
+  const periodos = [mesAnterior(hoje.slice(0, 7), 1), mesAnterior(hoje.slice(0, 7), 2)];
+  const docsPor = new Map(d.pagamentos.map((l) => [l.contact_id, l.docs]));
   let temLembreteDas = false;
   const inicioDoMes = `${hoje.slice(0, 7)}-01`;
   let simplesSemConsultaNoMes = 0;
@@ -118,30 +118,39 @@ export function montarFila(d: DadosFila, hoje = hojeISO()): Omit<ResumoFila, 'ca
     if (l.filial) continue;
     if (!l.consultadoEm || l.consultadoEm.slice(0, 10) < inicioDoMes) simplesSemConsultaNoMes++;
     if (!l.consultadoEm) continue;
-    const porPeriodo = new Map<string, LinhaPgdasd['das']>();
-    for (const x of l.das) {
-      const k = x.periodo_apuracao.slice(0, 7);
-      porPeriodo.set(k, [...(porPeriodo.get(k) ?? []), x]);
-    }
-    for (const [pa, lista] of porPeriodo) {
-      if (lista.some((x) => x.das_pago === true)) continue;
-      const maisRecente = [...lista].sort((a, b) => (b.emitido_em ?? '').localeCompare(a.emitido_em ?? ''))[0];
-      const venc = maisRecente.vencimento;
-      if (!venc) continue;
-      const atraso = diasEntre(venc, hoje);
-      if (atraso < 0 || atraso > 15) continue;
-      temLembreteDas = true;
-      const dadoEm = new Date(l.consultadoEm);
-      const dadoTxt = `${dataBR(l.consultadoEm.slice(0, 10))} ${dadoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-      const velho = Date.now() - dadoEm.getTime() > 24 * 3600_000;
-      adicionar(l, {
-        motivo: 'das_vencimento',
-        texto: atraso === 0 ? 'DAS vence hoje' : `DAS venceu há ${atraso} dia${atraso === 1 ? '' : 's'}`,
-        detalhe: [`${pa.slice(5, 7)}/${pa.slice(0, 4)}`, atraso === 0 && maisRecente.valor_total ? reais(maisRecente.valor_total) : null, `consulta de ${dadoTxt}${velho ? ' (confirme antes de avisar)' : ''}`].filter(Boolean).join(' · '),
-        tom: 'danger',
-        peso: atraso === 0 ? 110 : 85,
-        mensagem: mensagemLembreteDas({ nome: l.nome, pa, valor: maisRecente.valor_total, vencimento: venc, diasAtraso: atraso }),
-      });
+    const dadoEm = new Date(l.consultadoEm);
+    const dadoTxt = `${dataBR(l.consultadoEm.slice(0, 10))} ${dadoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+
+    for (const pa of periodos) {
+      const mesTxt = `${pa.slice(5, 7)}/${pa.slice(0, 4)}`;
+
+      // DAS no vencimento: gerado, sem pagamento registrado (PGDAS ou Pagamentos), vencendo hoje ou vencido há até 15 dias.
+      // O PGDAS não traz o vencimento: vale o calculado (dia 20, segunda se cair no fim de semana).
+      const u = dasUnificado(l, docsPor.get(l.contact_id) ?? [], pa, hoje);
+      if (u.estado === 'a_vencer' || u.estado === 'vencido') {
+        const atraso = diasEntre(u.vencimento!, hoje);
+        if (atraso >= 0 && atraso <= 15) {
+          temLembreteDas = true;
+          const velho = Date.now() - dadoEm.getTime() > 24 * 3600_000;
+          adicionar(l, {
+            motivo: 'das_vencimento',
+            texto: atraso === 0 ? 'DAS vence hoje' : `DAS venceu há ${atraso} dia${atraso === 1 ? '' : 's'}`,
+            detalhe: [mesTxt, atraso === 0 && u.valor ? reais(u.valor) : null, `consulta de ${dadoTxt}${velho ? ' (confirme antes de avisar)' : ''}`].filter(Boolean).join(' · '),
+            tom: 'danger',
+            peso: atraso === 0 ? 110 : 85,
+            mensagem: mensagemLembreteDas({ nome: l.nome, pa, valor: u.valor, vencimento: u.vencimento!, diasAtraso: atraso }),
+          });
+        }
+      }
+
+      // PGDAS não transmitida: só depois do prazo e só quando a consulta foi feita DEPOIS do prazo (consulta anterior não prova nada).
+      const prazo = vencimentoDoPeriodo(pa);
+      if (hoje > prazo && statusPgdas(l, pa) === 'sem_declaracao' && l.consultadoEm.slice(0, 10) > prazo) {
+        adicionar(l, {
+          motivo: 'pgdas_nao_transmitida', texto: `PGDAS de ${mesTxt} não transmitida`,
+          detalhe: `prazo era ${dataBR(prazo).slice(0, 5)} · consulta de ${dadoTxt}`, tom: 'danger', peso: 108,
+        });
+      }
     }
   }
 
@@ -199,7 +208,9 @@ export function montarFila(d: DadosFila, hoje = hojeISO()): Omit<ResumoFila, 'ca
   for (const l of d.procuracoes) {
     if (l.filial) continue;
     if (l.situacao === 'sem') semProcuracao++;
-    if (l.situacao === 'vencida') {
+    if (l.perdidaEm) {
+      adicionar(l, { motivo: 'procuracao', texto: 'Procuração perdida (aviso do sensor)', detalhe: `lida em ${dataBR(l.perdidaEm)}`, tom: 'danger', peso: 95 });
+    } else if (l.situacao === 'vencida') {
       adicionar(l, { motivo: 'procuracao', texto: 'Procuração vencida', detalhe: l.venceEm ? `venceu em ${dataBR(l.venceEm)}` : null, tom: 'danger', peso: 90 });
     } else if ((l.situacao === 'total' || l.situacao === 'parcial') && l.diasParaVencer !== null && l.diasParaVencer <= 60) {
       adicionar(l, {
