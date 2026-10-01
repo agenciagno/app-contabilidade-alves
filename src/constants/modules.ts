@@ -325,11 +325,6 @@ export const EM_BREVE: Record<string, EmBreveInfo> = {
       'Prontidão CBS/IBS da carteira, apoio à decisão de setembro do Simples e radar de CNAE.',
     fase: 'F5 · Gestor RT IBS/CBS',
   },
-  gestao360_ausencias: {
-    titulo: 'CA · Ausências',
-    descricao:
-      'Declarações em falta de cada cliente (PGDAS-D e DEFIS, com DCTFWeb e MIT a confirmar), radar de certidão e cruzamento entre a Receita e as tarefas do Fiscal.',
-  },
   gestao360_diagnosticos: {
     titulo: 'CA · Diagnósticos',
     descricao: 'Diagnósticos internos da operação da CA por setor.',

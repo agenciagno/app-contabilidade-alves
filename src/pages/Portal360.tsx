@@ -5,21 +5,19 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-import { DsAlert, DsBadge, IconBox, PageHeader } from '@/components/ds';
+import { DsAlert, DsBadge, PageHeader } from '@/components/ds';
+import { CartaoIndicador, tomPor, type Tom } from '@/components/gestao360/CartaoIndicador';
 import { ClienteFiltro } from '@/components/gestao360/ClienteFiltro';
 import { FichaCliente } from '@/components/gestao360/FichaCliente';
 import { GraficosCarteiraView } from '@/components/gestao360/GraficosCarteira';
 import { ListaClientesSheet, TOM_NIVEL, type ListaAberta } from '@/components/gestao360/ListaClientesSheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 import { rotuloCompetencia } from '@/hooks/useSerproPagamentos';
 import { useSituacaoCarteira } from '@/hooks/useSituacaoCarteira';
 import {
   contar, FILTROS, montarGraficos, ROTULO_NIVEL, topEmRisco,
   type Filtro, type LinhaCarteira, type NivelRisco,
 } from '@/lib/situacaoCarteira';
-
-type Tom = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
 
 const sigla = (pa: string) => `${pa.slice(5, 7)}/${pa.slice(0, 4)}`;
 const dataBR = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '');
@@ -40,9 +38,6 @@ interface Cartao {
   to?: string;
   detalhe: (l: LinhaCarteira) => string;
 }
-
-/** Cinza enquanto não há dado, vermelho/laranja quando há problema, verde quando há dado e está tudo certo. */
-const tomPor = (problemas: number, comDado: number, gravidade: Tom = 'danger'): Tom => (comDado === 0 ? 'neutral' : problemas > 0 ? gravidade : 'ok');
 
 export default function Portal360() {
   const { linhas, carregando, erro, competencia, hoje, fontesAtualizadas } = useSituacaoCarteira();
@@ -194,28 +189,9 @@ export default function Portal360() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {cartoes.map((c) => {
-              const Icone = c.icone;
-              const parcial = c.cobertura && c.cobertura.total > 0 && c.cobertura.n / c.cobertura.total < 0.5;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => abrir(c)}
-                  className={cn('group flex min-h-[150px] flex-col gap-3 rounded-lg border border-line bg-paper p-5 text-left transition-colors hover:border-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40')}
-                >
-                  <div className="flex items-center justify-between">
-                    <IconBox tone={c.tom} icon={<Icone className="h-5 w-5" />} />
-                    {parcial ? <DsBadge tone="neutral" dot={false}>Dados parciais</DsBadge> : <ArrowRight className="h-4 w-4 text-muted-ink-2 transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />}
-                  </div>
-                  <div>
-                    <p className="text-kicker uppercase text-muted-ink">{c.titulo}</p>
-                    <p className="text-metric-xl text-ink">{c.valor}</p>
-                  </div>
-                  <p className="text-meta text-muted-ink">{c.hint}</p>
-                </button>
-              );
-            })}
+            {cartoes.map((c) => (
+              <CartaoIndicador key={c.id} titulo={c.titulo} icone={c.icone} valor={c.valor} hint={c.hint} tom={c.tom} cobertura={c.cobertura} onClick={() => abrir(c)} />
+            ))}
           </div>
 
           {escolhida ? (

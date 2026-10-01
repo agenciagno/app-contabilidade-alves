@@ -52,7 +52,7 @@ export interface Ausencia {
   competencia: string;
   /** AAAA-MM-DD; DCTFWeb e MIT não têm prazo calculado aqui. */
   prazo: string | null;
-  situacao: 'em_falta' | 'a_vencer' | 'a_confirmar';
+  situacao: 'em_falta' | 'a_vencer' | 'a_confirmar' | 'nao_consultado';
 }
 
 export interface AvaliacaoPgdas {
@@ -60,6 +60,8 @@ export interface AvaliacaoPgdas {
   emFalta: string[];
   aConfirmar: string[];
   aVencer: string[];
+  /** Competências (AAAA-MM) com declaração transmitida no ano consultado. */
+  declaradas: string[];
   consultadoEm: string | null;
 }
 
@@ -84,6 +86,8 @@ export interface LinhaCarteira {
   procuracao: { situacao: SituacaoProcuracao | 'desconhecida'; diasParaVencer: number | null; vencendo: boolean };
   limite: { nivel: NivelLimite | null; sublimite: NivelSublimite | null; percentual: number | null };
   riscoExclusaoSimples: boolean;
+  /** Multa por atraso (MAED) que a Receita notificou: mensagem aberta ou documento da MAED na declaração. Sem estimativa. */
+  multa: { maed: number };
   ausencias: Ausencia[];
   nivel: NivelRisco;
   motivos: string[];
@@ -120,7 +124,7 @@ const mesesAte = (ano: number, ate: string): string[] => {
 
 /** Competências em falta de um cliente do Simples, no ano consultado. Função pura. */
 export function avaliarPgdas(l: LinhaPgdasd | undefined, abertura: string | null, ano: number, competencia: string, hoje: string): AvaliacaoPgdas {
-  const base: AvaliacaoPgdas = { estado: 'nao_se_aplica', emFalta: [], aConfirmar: [], aVencer: [], consultadoEm: null };
+  const base: AvaliacaoPgdas = { estado: 'nao_se_aplica', emFalta: [], aConfirmar: [], aVencer: [], declaradas: [], consultadoEm: null };
   if (!l || l.filial) return base;
   if (abertura && Number(abertura.slice(0, 4)) > ano) return base;
   if (!l.consultadoEm) return { ...base, estado: 'nao_consultado' };
@@ -139,7 +143,7 @@ export function avaliarPgdas(l: LinhaPgdasd | undefined, abertura: string | null
     else aConfirmar.push(pa);
   }
   const estado: EstadoPgdas = emFalta.length ? 'em_falta' : aConfirmar.length ? 'a_confirmar' : 'em_dia';
-  return { estado, emFalta, aConfirmar, aVencer, consultadoEm: l.consultadoEm };
+  return { estado, emFalta, aConfirmar, aVencer, declaradas: [...feitas].sort(), consultadoEm: l.consultadoEm };
 }
 
 // ---------------------------------------------------------------- certidão (Situação fiscal)
@@ -150,7 +154,8 @@ export function situacaoCertidao(tipo: string | null, validade: string | null, c
 }
 
 const isoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const sigla = (pa: string) => `${pa.slice(5, 7)}/${pa.slice(0, 4)}`;
+export const sigla = (pa: string) => `${pa.slice(5, 7)}/${pa.slice(0, 4)}`;
+export const dataBR = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '');
 const lista = (pas: string[]) => (pas.length <= 3 ? pas.map(sigla).join(', ') : `${pas.slice(0, 3).map(sigla).join(', ')} e mais ${pas.length - 3}`);
 
 // ---------------------------------------------------------------- montagem
@@ -241,17 +246,20 @@ export function montarCarteira(e: EntradaCarteira): LinhaCarteira[] {
     if (defisEstado === 'em_atraso' || defisEstado === 'a_entregar') {
       ausencias.push({ contact_id: id, obrigacao: 'DEFIS', competencia: String(anoDefis), prazo: isoLocal(prazoDefis(anoDefis)), situacao: defisEstado === 'em_atraso' ? 'em_falta' : 'a_vencer' });
     }
+    if (simples && pgdas.estado === 'nao_consultado') ausencias.push({ contact_id: id, obrigacao: 'PGDAS-D', competencia: e.competencia, prazo: vencimentoDoPeriodo(e.competencia), situacao: 'nao_consultado' });
+    if (simples && defisEstado === 'nao_consultado') ausencias.push({ contact_id: id, obrigacao: 'DEFIS', competencia: String(anoDefis), prazo: isoLocal(prazoDefis(anoDefis)), situacao: 'nao_consultado' });
     if (dctfweb === 'sem_declaracao') ausencias.push({ contact_id: id, obrigacao: 'DCTFWeb', competencia: e.competencia, prazo: null, situacao: 'a_confirmar' });
     if (mit === 'sem_apuracao') ausencias.push({ contact_id: id, obrigacao: 'MIT', competencia: e.competencia, prazo: null, situacao: 'a_confirmar' });
 
     const riscoExclusaoSimples = mensagens.exclusaoSimples > 0 || pgdas.emFalta.length >= 3;
+    const maed = (mensagens.atencao.maed ?? 0) + (lp?.declaracoes.filter((d) => d.maed_notificacao_path || d.maed_darf_path).length ?? 0);
 
     const linha: LinhaCarteira = {
       contact_id: id, nome: c.nome, documento: c.documento, regime, regimeRotulo: rotuloRegime(regime),
       declaracoes, pgdas, defis: { estado: defisEstado, ano: anoDefis }, dctfweb, mit,
       das: dasEstado, dasCompetencia: e.competencia,
       sitfis, sitfisEm: ultimo?.gerado_em ?? null, certidao,
-      caixa: selo, mensagens, procuracao, limite, riscoExclusaoSimples, ausencias,
+      caixa: selo, mensagens, procuracao, limite, riscoExclusaoSimples, multa: { maed }, ausencias,
       nivel: 'em_dia', motivos: [],
     };
     const { nivel, motivos } = calcularNivel(linha);
@@ -316,6 +324,7 @@ export const FILTROS = {
   intimacaoAberta: ((l) => l.mensagens.total > 0) as Filtro,
   procuracaoSemOuVencendo: ((l) => l.procuracao.situacao === 'sem' || l.procuracao.situacao === 'vencida' || l.procuracao.vencendo) as Filtro,
   semProcuracaoCaixa: ((l) => l.caixa !== 'sem_procuracao') as Filtro,
+  multaMaed: ((l) => l.multa.maed > 0) as Filtro,
 };
 
 export const contar = (linhas: LinhaCarteira[], f: Filtro) => linhas.filter(f).length;
@@ -413,4 +422,48 @@ export function atualizacoes(e: EntradaCarteira): FonteAtualizada[] {
     { rotulo: 'Caixa Postal', em: maior(e.clientes.map((c) => c.indicador_verificado_em)) },
     { rotulo: 'Procurações', em: maior(e.procuracoes.map((l) => l.mapeadoEm)) },
   ];
+}
+
+// ---------------------------------------------------------------- CA · Ausências
+export const ROTULO_SITUACAO_AUSENCIA: Record<Ausencia['situacao'], string> = {
+  em_falta: 'Em falta', a_confirmar: 'A confirmar', a_vencer: 'A vencer', nao_consultado: 'Não consultado',
+};
+export const ORDEM_SITUACAO_AUSENCIA: Record<Ausencia['situacao'], number> = { em_falta: 0, a_confirmar: 1, nao_consultado: 2, a_vencer: 3 };
+
+/** Competências e obrigações em falta (um cliente com 3 competências sem PGDAS-D soma 3). */
+export const totalPendencias = (linhas: LinhaCarteira[]) => linhas.reduce((s, l) => s + l.ausencias.filter((a) => a.situacao === 'em_falta').length, 0);
+
+/** Texto curto de uma ausência: "PGDAS-D 08/2026" ou "DEFIS 2025". */
+export const rotuloAusencia = (a: Ausencia) => (a.obrigacao === 'DEFIS' ? `DEFIS ${a.competencia}` : `${a.obrigacao} ${sigla(a.competencia)}`);
+
+/** Linhas da lista de ausências, mais antigas primeiro dentro de cada situação. */
+export function listarAusencias(linhas: LinhaCarteira[]): { linha: LinhaCarteira; ausencia: Ausencia }[] {
+  return linhas
+    .flatMap((linha) => linha.ausencias.map((ausencia) => ({ linha, ausencia })))
+    .sort((a, b) =>
+      ORDEM_SITUACAO_AUSENCIA[a.ausencia.situacao] - ORDEM_SITUACAO_AUSENCIA[b.ausencia.situacao]
+      || (a.ausencia.prazo ?? '9999').localeCompare(b.ausencia.prazo ?? '9999')
+      || a.linha.nome.localeCompare(b.linha.nome, 'pt-BR')
+      || a.ausencia.obrigacao.localeCompare(b.ausencia.obrigacao));
+}
+
+/** Top de urgência: quem tem mais competências em falta primeiro; empata pelo prazo mais antigo e pelo nome. */
+export function topEmFalta(linhas: LinhaCarteira[], n = 5): LinhaCarteira[] {
+  const faltas = (l: LinhaCarteira) => l.ausencias.filter((a) => a.situacao === 'em_falta');
+  const maisAntigo = (l: LinhaCarteira) => faltas(l).map((a) => a.prazo ?? '9999').sort()[0] ?? '9999';
+  return linhas
+    .filter((l) => faltas(l).length > 0)
+    .sort((a, b) => faltas(b).length - faltas(a).length || maisAntigo(a).localeCompare(maisAntigo(b)) || a.nome.localeCompare(b.nome, 'pt-BR'))
+    .slice(0, n);
+}
+
+/** Radar CND: o que pode impedir a certidão federal do cliente. Só o que já está salvo; não é a situação oficial da certidão. */
+export const IMPACTO_CERTIDAO = 'Pode impedir a certidão federal';
+export function pendenciasCertidao(l: LinhaCarteira): string[] {
+  const out: string[] = [];
+  if (l.sitfis === 'com_pendencias') out.push('Pendência na Situação fiscal');
+  if (l.das === 'vencido') out.push(`DAS de ${sigla(l.dasCompetencia)} vencido`);
+  if (l.pgdas.emFalta.length) out.push(`PGDAS-D em falta: ${lista(l.pgdas.emFalta)}`);
+  if (l.defis.estado === 'em_atraso') out.push(`DEFIS ${l.defis.ano} não entregue`);
+  return out;
 }

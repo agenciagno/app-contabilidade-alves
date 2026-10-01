@@ -13,7 +13,7 @@ const COR: Record<string, string> = {
 const COR_BARRA = 'var(--action)';
 const TICK = { fill: 'var(--muted-ink)', fontSize: 12 };
 
-function Cartao({ titulo, subtitulo, children, className }: { titulo: string; subtitulo: string; children: ReactNode; className?: string }) {
+export function Cartao({ titulo, subtitulo, children, className }: { titulo: string; subtitulo: string; children: ReactNode; className?: string }) {
   return (
     <section className={`space-y-3 rounded-lg border border-line bg-paper p-5 ${className ?? ''}`}>
       <div>
@@ -61,7 +61,7 @@ function Rosca({ fatias, vazio }: { fatias: FatiaGrafico[]; vazio: string }) {
   );
 }
 
-function BarrasHorizontais({ dados, vazio }: { dados: { nome: string; valor: number }[]; vazio: string }) {
+export function BarrasHorizontais({ dados, vazio }: { dados: { nome: string; valor: number }[]; vazio: string }) {
   if (dados.length === 0 || dados.every((d) => d.valor === 0)) return <Vazio texto={vazio} />;
   return (
     <div style={{ height: Math.max(140, dados.length * 44 + 20) }}>
@@ -79,7 +79,7 @@ function BarrasHorizontais({ dados, vazio }: { dados: { nome: string; valor: num
   );
 }
 
-function BarrasPorObrigacao({ dados }: { dados: GraficosCarteira['porObrigacao'] }) {
+export function BarrasPorObrigacao({ dados }: { dados: GraficosCarteira['porObrigacao'] }) {
   if (dados.every((d) => d.emFalta === 0 && d.aConfirmar === 0)) return <Vazio texto="Nenhuma declaração em falta nem a confirmar." />;
   return (
     <div>
@@ -106,7 +106,7 @@ function BarrasPorObrigacao({ dados }: { dados: GraficosCarteira['porObrigacao']
   );
 }
 
-function Evolucao({ dados }: { dados: GraficosCarteira['evolucao'] }) {
+export function Evolucao({ dados }: { dados: GraficosCarteira['evolucao'] }) {
   if (dados.length === 0) return <Vazio texto="Ainda não há competência com prazo vencido neste ano." />;
   const serie = dados.map((d) => ({ nome: `${d.competencia.slice(5, 7)}/${d.competencia.slice(2, 4)}`, valor: d.emFalta }));
   return (
@@ -145,6 +145,23 @@ export function GraficosCarteiraView({ g }: { g: GraficosCarteira }) {
       </Cartao>
       <Cartao titulo="Certidão federal" subtitulo="Lida do relatório de Situação fiscal; estadual, municipal, FGTS e trabalhista não entram">
         <Rosca fatias={g.certidoes} vazio="Sem certidão lida ainda." />
+      </Cartao>
+      <Cartao className="lg:col-span-2" titulo="Evolução no ano" subtitulo="Clientes sem PGDAS-D em cada competência com prazo vencido. Mostra a situação de hoje, não o retrato da época">
+        <Evolucao dados={g.evolucao} />
+      </Cartao>
+    </div>
+  );
+}
+
+/** Gráficos da aba Visão geral de CA · Ausências: só o que é declaração em falta. */
+export function GraficosAusencias({ g }: { g: GraficosCarteira }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <Cartao titulo="Em falta por obrigação" subtitulo="Clientes com a obrigação em falta ou a confirmar">
+        <BarrasPorObrigacao dados={g.porObrigacao} />
+      </Cartao>
+      <Cartao titulo="Em falta por regime" subtitulo="Clientes com PGDAS-D ou DEFIS em falta">
+        <BarrasHorizontais dados={g.porRegime} vazio="Nenhum cliente com declaração em falta." />
       </Cartao>
       <Cartao className="lg:col-span-2" titulo="Evolução no ano" subtitulo="Clientes sem PGDAS-D em cada competência com prazo vencido. Mostra a situação de hoje, não o retrato da época">
         <Evolucao dados={g.evolucao} />

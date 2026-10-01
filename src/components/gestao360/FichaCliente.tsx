@@ -121,6 +121,7 @@ export function FichaCliente({ linha: l }: { linha: LinhaCarteira }) {
         </div>
         <div className="flex items-center gap-3">
           <DsBadge tone={TOM_NIVEL[l.nivel]}>{ROTULO_NIVEL[l.nivel]}</DsBadge>
+          <Link to={`/gestao-360/ausencias?cliente=${l.contact_id}&aba=ausencias`} className="text-ui-strong text-action hover:underline">Ausências do cliente</Link>
           <Link to={`/crm/cliente/${l.contact_id}`} className="text-ui-strong text-action hover:underline">Abrir cadastro</Link>
         </div>
       </div>
