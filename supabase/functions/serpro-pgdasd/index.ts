@@ -234,7 +234,7 @@ async function consultarCarteira(payload: any, uid: string | null) {
     await sleep(150);
   }
   const restantes = pendentes.length - processados;
-  if (resumo.tarefas_concluidas > 0) await avisarConclusoes(supabase, COMPANY_ID, `${resumo.consultados} clientes do Simples (consulta da carteira)`, resumo.tarefas_concluidas);
+  if (resumo.tarefas_concluidas > 0) await avisarConclusoes(supabase, COMPANY_ID, `${resumo.consultados} ${resumo.consultados === 1 ? "cliente" : "clientes"} do Simples (consulta da carteira)`, resumo.tarefas_concluidas);
   return json({ ok: true, ano, ...resumo, restantes, parou_por_falhas: seguidas >= 5, falhas, segundos: Math.round((Date.now() - inicio) / 1000) });
 }
 
