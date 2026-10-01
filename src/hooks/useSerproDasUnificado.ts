@@ -60,6 +60,18 @@ export function dasUnificado(pg: LinhaPgdasd | null | undefined, docsDoMes: Paga
   };
 }
 
+const dataBR = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
+const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+/** Texto para o WhatsApp do cliente. No dia diz o valor da guia; depois do vencimento não diz (multa e juros mudam o valor). */
+export function mensagemLembreteDas(p: { nome: string; pa: string; valor: number | null; vencimento: string; diasAtraso: number }): string {
+  const mes = `${p.pa.slice(5, 7)}/${p.pa.slice(0, 4)}`;
+  if (p.diasAtraso <= 0) {
+    return `Olá! Aqui é da Contabilidade Alves. Passando para lembrar que o DAS (Simples Nacional) da ${p.nome} referente a ${mes}${p.valor ? `, no valor de ${reais(p.valor)},` : ''} vence hoje, ${dataBR(p.vencimento).slice(0, 5)}. Até agora não consta o pagamento na Receita Federal. Se você já pagou, pode desconsiderar esta mensagem. Qualquer dúvida, é só nos chamar.`;
+  }
+  return `Olá! Aqui é da Contabilidade Alves. O DAS (Simples Nacional) da ${p.nome} referente a ${mes} venceu em ${dataBR(p.vencimento).slice(0, 5)} e ainda não consta o pagamento na Receita Federal. Pagando logo, você reduz a multa e os juros. Se precisar da guia atualizada, é só nos pedir. Se você já pagou, pode desconsiderar esta mensagem.`;
+}
+
 export interface LinhaUnificada extends LinhaPagamentos {
   /** Linha do PGDAS (só clientes do Simples). */
   simples: LinhaPgdasd | null;

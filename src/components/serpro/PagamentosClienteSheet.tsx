@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { ChevronDown, FileDown, Loader2, Receipt, RefreshCw, Search } from 'lucide-react';
+import { ChevronDown, Copy, FileDown, Loader2, Receipt, RefreshCw, Search } from 'lucide-react';
 
 import { DsBadge } from '@/components/ds';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,8 @@ import {
   type FiltrosPagamentos, type PagamentoRow,
 } from '@/hooks/useSerproPagamentos';
 import { dasReaproveitavel } from '@/hooks/useSerproPgdasd';
-import { ehSimplesConsultavel, type DasUnificado, type LinhaUnificada } from '@/hooks/useSerproDasUnificado';
+import { ehSimplesConsultavel, mensagemLembreteDas, type DasUnificado, type LinhaUnificada } from '@/hooks/useSerproDasUnificado';
+import { diasEntre, hojeBR } from '@/lib/prazosFederais';
 
 const moeda = (v: number | null) => (v === null ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
 const dataBR = (iso: string | null) => (iso ? format(new Date(`${iso}T00:00:00`), 'dd/MM/yyyy') : '—');
@@ -155,6 +156,19 @@ export function PagamentosClienteSheet({
           const pg = linha.simples;
           const reaproveitavel = !!pg && dasReaproveitavel(pg, competencia);
           const naoConsultado = d.estado === 'nao_consultado';
+          // Lembrete para o cliente: DAS vencido, ou vencendo hoje e ainda sem pagamento registrado.
+          const hoje = hojeBR();
+          const lembrete = d.vencimento && (d.estado === 'vencido' || (d.estado === 'a_vencer' && d.vencimento === hoje))
+            ? mensagemLembreteDas({ nome: linha.nome, pa: competencia, valor: d.valor, vencimento: d.vencimento, diasAtraso: diasEntre(d.vencimento, hoje) })
+            : null;
+          const copiarLembrete = async (texto: string) => {
+            try {
+              await navigator.clipboard.writeText(texto);
+              toast.success('Mensagem copiada. É só colar no WhatsApp do cliente.');
+            } catch {
+              toast.error('Não foi possível copiar. Tente de novo.');
+            }
+          };
           return (
             <div className="mt-5 space-y-3 rounded-lg border border-line bg-paper p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
@@ -209,6 +223,13 @@ export function PagamentosClienteSheet({
                     <Button disabled={!consultavel || naoConsultado || gerando === linha.contact_id} onClick={() => pedirDas(linha.contact_id, competencia, linha.nome, reaproveitavel)}>
                       {gerando === linha.contact_id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Receipt className="mr-2 h-4 w-4" />}
                       Gerar DAS{consultavel && !naoConsultado && !reaproveitavel && <Preco tipo="Emitir" />}
+                    </Button>
+                  </DicaBotao>
+                )}
+                {lembrete && (
+                  <DicaBotao texto="Copia o texto pronto para colar no WhatsApp do cliente. Antes de enviar, use Atualizar DAS para confirmar que o pagamento ainda não aparece.">
+                    <Button variant="outline" onClick={() => copiarLembrete(lembrete)}>
+                      <Copy className="mr-2 h-4 w-4" />Copiar mensagem
                     </Button>
                   </DicaBotao>
                 )}
