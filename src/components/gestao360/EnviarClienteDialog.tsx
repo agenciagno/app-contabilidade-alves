@@ -22,7 +22,7 @@ interface Props {
   nome: string;
   modelo: ModeloMensagem;
   /** De onde o envio saiu: grava no histórico e, na ausência, anota "cliente avisado". */
-  origem: 'ausencia' | 'ficha';
+  origem: 'ausencia' | 'ficha' | 'oportunidade';
   referencia?: PedidoEnvio['referencia'];
   /** Documentos já marcados ao abrir (`tipo:id`). */
   marcadosInicial?: string[];

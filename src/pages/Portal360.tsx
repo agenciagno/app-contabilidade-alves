@@ -9,7 +9,6 @@ import { CartaoIndicador, tomPor, type Tom } from '@/components/gestao360/Cartao
 import { ClienteFiltro } from '@/components/gestao360/ClienteFiltro';
 import { FichaCliente } from '@/components/gestao360/FichaCliente';
 import { FilaParaAgir } from '@/components/gestao360/FilaParaAgir';
-import { GraficosCarteiraView } from '@/components/gestao360/GraficosCarteira';
 import { ListaClientesSheet, TOM_NIVEL, type ListaAberta } from '@/components/gestao360/ListaClientesSheet';
 import { ResponsavelFiltro } from '@/components/gestao360/ResponsavelFiltro';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,7 +19,7 @@ import { useSituacaoCarteira } from '@/hooks/useSituacaoCarteira';
 import { montarFila } from '@/lib/filaDoDia';
 import { ultimaLeituraFaturamento } from '@/lib/relatoriosCliente';
 import {
-  contar, FILTROS, montarGraficos, ROTULO_NIVEL, totalPendencias,
+  contar, FILTROS, ROTULO_NIVEL, totalPendencias,
   type Filtro, type LinhaCarteira, type NivelRisco,
 } from '@/lib/situacaoCarteira';
 
@@ -128,7 +127,6 @@ export default function Portal360() {
   }, [visiveis, competencia]);
 
   const niveis = (['critico', 'atencao', 'sem_cobertura', 'em_dia'] as NivelRisco[]).map((nv) => ({ nv, n: visiveis.filter((l) => l.nivel === nv).length }));
-  const graficos = useMemo(() => montarGraficos(visiveis, competencia, hoje), [visiveis, competencia, hoje]);
   const acompanhamentos = useAcompanhamentos();
   const fila = useMemo(() => montarFila(visiveis, acompanhamentos.data ?? new Map(), hoje), [visiveis, acompanhamentos.data, hoje]);
 
@@ -183,11 +181,6 @@ export default function Portal360() {
           ) : (
             <>
               <FilaParaAgir itens={fila} onEscolherCliente={escolher} />
-
-              <section className="space-y-3">
-                <h2 className="text-h4-card text-ink">Análise visual</h2>
-                <GraficosCarteiraView g={graficos} />
-              </section>
             </>
           )}
         </>

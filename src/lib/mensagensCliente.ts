@@ -60,3 +60,17 @@ export const modeloRelatorioFaturamento = (): ModeloMensagem => ({
   assunto: 'Relatório de faturamento dos últimos 12 meses',
   texto: `${ABERTURA} Segue o relatório de faturamento dos últimos 12 meses da sua empresa, com a assinatura do nosso contador.\n\n${ASSINATURA}`,
 });
+
+/** Aviso consultivo de limite do Simples (abre conversa, não é cobrança). `margem` em R$ até o limite. */
+export function modeloLimite(percentual: number, margem: number, acima: boolean): ModeloMensagem {
+  const reais = margem.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/\u00a0/g, ' ');
+  return acima
+    ? {
+      assunto: 'Faturamento da sua empresa acima do limite do Simples Nacional',
+      texto: `${ABERTURA} Acompanhando o faturamento da sua empresa, ele passou do limite anual do Simples Nacional. Precisamos conversar o quanto antes para avaliar o enquadramento. Podemos marcar uma conversa rápida?\n\n${ASSINATURA}`,
+    }
+    : {
+      assunto: 'Faturamento da sua empresa e o limite do Simples Nacional',
+      texto: `${ABERTURA} Acompanhando o faturamento da sua empresa, ela está em ${Math.round(percentual)}% do limite anual do Simples Nacional. Ainda há ${reais} até o limite, mas vale conversarmos para planejar o resto do ano e evitar surpresa com o enquadramento. Podemos marcar uma conversa rápida?\n\n${ASSINATURA}`,
+    };
+}

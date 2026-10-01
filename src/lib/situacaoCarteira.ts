@@ -23,7 +23,7 @@ import {
 import { estadoSitfis, type EstadoSitfis, type LinhaSitfis } from '@/hooks/useSerproSitfis';
 import { unificarLinhas, type EstadoDas } from '@/hooks/useSerproDasUnificado';
 import {
-  faturamentoVigente, nivelLimite, nivelSublimite, percentualLimite,
+  nivelLimite, nivelSublimite, percentualLimite,
   type FaturamentoRow, type NivelLimite, type NivelSublimite,
 } from '@/hooks/useSerproFaturamento';
 import { vencendo as procuracaoVencendo, type LinhaProcuracao, type SituacaoProcuracao } from '@/hooks/useSerproProcuracoes';
@@ -164,6 +164,19 @@ export const sigla = (pa: string) => `${pa.slice(5, 7)}/${pa.slice(0, 4)}`;
 export const dataBR = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '');
 const lista = (pas: string[]) => (pas.length <= 3 ? pas.map(sigla).join(', ') : `${pas.slice(0, 3).map(sigla).join(', ')} e mais ${pas.length - 3}`);
 
+/**
+ * Leitura de faturamento confiável mais recente do cliente, até a competência em aberto. O limite do Simples é do acumulado, não de um mês:
+ * no começo do mês a declaração da competência ainda não existe, e a leitura do mês anterior continua valendo.
+ */
+function ultimaLeituraAte(rows: FaturamentoRow[], contactId: string, competencia: string): FaturamentoRow | null {
+  let melhor: FaturamentoRow | null = null;
+  for (const r of rows) {
+    if (r.contact_id !== contactId || !r.confiavel || r.periodo_apuracao.slice(0, 7) > competencia) continue;
+    if (!melhor || r.periodo_apuracao > melhor.periodo_apuracao || (r.periodo_apuracao === melhor.periodo_apuracao && r.lido_em > melhor.lido_em)) melhor = r;
+  }
+  return melhor;
+}
+
 // ---------------------------------------------------------------- montagem
 export function montarCarteira(e: EntradaCarteira): LinhaCarteira[] {
   const ano = Number(e.competencia.slice(0, 4));
@@ -239,7 +252,7 @@ export function montarCarteira(e: EntradaCarteira): LinhaCarteira[] {
       ? { situacao: lc.situacao, diasParaVencer: lc.diasParaVencer, vencendo: lc.situacao !== 'vencida' && procuracaoVencendo(lc) }
       : { situacao: 'desconhecida' as const, diasParaVencer: null, vencendo: false };
 
-    const fat = simples && lp ? faturamentoVigente(lp, e.faturamento, e.competencia) : null;
+    const fat = simples ? ultimaLeituraAte(e.faturamento, id, e.competencia) : null;
     const limite = { nivel: fat ? nivelLimite(fat) : null, sublimite: fat ? nivelSublimite(fat) : null, percentual: fat ? percentualLimite(fat) : null };
 
     const dasEstado = dasPor.get(id) ?? 'nao_simples';

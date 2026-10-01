@@ -646,6 +646,50 @@ export type Database = {
           },
         ]
       }
+      carteira_snapshots: {
+        Row: {
+          company_id: string
+          criado_em: string
+          dia: string
+          mensagens_clientes: number
+          monitorados: number
+          pgdas_clientes_em_falta: number
+          pgdas_competencias_em_falta: number
+          sem_procuracao: number
+          sitfis_com_pendencia: number
+        }
+        Insert: {
+          company_id: string
+          criado_em?: string
+          dia: string
+          mensagens_clientes: number
+          monitorados: number
+          pgdas_clientes_em_falta: number
+          pgdas_competencias_em_falta: number
+          sem_procuracao: number
+          sitfis_com_pendencia: number
+        }
+        Update: {
+          company_id?: string
+          criado_em?: string
+          dia?: string
+          mensagens_clientes?: number
+          monitorados?: number
+          pgdas_clientes_em_falta?: number
+          pgdas_competencias_em_falta?: number
+          sem_procuracao?: number
+          sitfis_com_pendencia?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carteira_snapshots_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           color: string | null
@@ -3520,6 +3564,41 @@ export type Database = {
           versao_termo?: string | null
         }
         Relationships: []
+      }
+      metrica_mae: {
+        Row: {
+          atualizado_em: string
+          company_id: string
+          mes: string
+          nota: string | null
+          registrado_por: string | null
+          valor: number
+        }
+        Insert: {
+          atualizado_em?: string
+          company_id: string
+          mes: string
+          nota?: string | null
+          registrado_por?: string | null
+          valor: number
+        }
+        Update: {
+          atualizado_em?: string
+          company_id?: string
+          mes?: string
+          nota?: string | null
+          registrado_por?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metrica_mae_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       metrics_monthly: {
         Row: {
@@ -7028,6 +7107,10 @@ export type Database = {
       }
     }
     Functions: {
+      gestao360_indicadores_mensais: {
+        Args: { p_meses?: number }
+        Returns: Json
+      }
       archive_old_logs: { Args: never; Returns: undefined }
       can_access_company: { Args: { _company_id: string }; Returns: boolean }
       cofre_decrypt_internal: {
