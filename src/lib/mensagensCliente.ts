@@ -50,3 +50,13 @@ export const modeloDocumentos = (): ModeloMensagem => ({
   assunto: 'Documentos da sua empresa — Contabilidade Alves',
   texto: `${ABERTURA} Seguem os documentos da sua empresa que separamos para você.\n\n${ASSINATURA}`,
 });
+
+export const modeloRelatorioSituacao = (): ModeloMensagem => ({
+  assunto: 'Relatório de situação fiscal da sua empresa',
+  texto: `${ABERTURA} Segue o relatório de situação fiscal da sua empresa, com o que está em dia, o que está pendente e o que precisa ser feito.\n\nSe quiser conversar sobre algum ponto, é só responder por aqui.\n\n${ASSINATURA}`,
+});
+
+export const modeloRelatorioFaturamento = (): ModeloMensagem => ({
+  assunto: 'Relatório de faturamento dos últimos 12 meses',
+  texto: `${ABERTURA} Segue o relatório de faturamento dos últimos 12 meses da sua empresa, com a assinatura do nosso contador.\n\n${ASSINATURA}`,
+});

@@ -2,6 +2,7 @@
 // com ou sem documentos guardados. Substitui o "avisar" solto de cada tela; tudo cai em client_envios.
 //
 //   listar   { contact_id }   documentos já guardados do cliente (só PDF que existe de fato no bucket privado)
+//   guardar_relatorio { contact_id, tipo: situacao|faturamento, periodo?, pdf_base64, resumo? }  guarda o PDF gerado pela tela (relatório para o cliente)
 //   enviar   { contact_id, canal: email|whatsapp|copiar, mensagem, assunto?, documentos?: [{tipo, id}], origem, referencia? }
 //            monta os links assinados (7 dias), manda o e-mail por aqui (API de e-mail da Hostinger) ou devolve o texto
 //            final para a tela abrir o WhatsApp / copiar. O cliente nunca recebe caminho de bucket, só o link com validade.
@@ -36,6 +37,8 @@ interface Spec {
   bucket: string;
   /** colunas de data/competência para ordenar e dar nome */
   extra: string;
+  /** filtro fixo (coluna, valor): vários tipos podem morar na mesma tabela */
+  onde?: [string, string];
   ordem: string;
   rotulo: (r: Record<string, unknown>) => string;
   data: (r: Record<string, unknown>) => string;
@@ -59,6 +62,10 @@ const DOCS: Record<string, Spec> = {
     rotulo: (r) => `Declaração da DEFIS ${r.ano_calendario}`, data: (r) => `${r.ano_calendario}-12-31` },
   comprovante: { tabela: 'serpro_pagamentos', coluna: 'comprovante_path', bucket: 'serpro-comprovantes', extra: 'periodo_apuracao,tipo_sigla,comprovante_emitido_em', ordem: 'comprovante_emitido_em',
     rotulo: (r) => `Comprovante de pagamento ${r.tipo_sigla ? `${r.tipo_sigla} ` : ''}${mesAno(r.periodo_apuracao)}`.trim(), data: (r) => String(r.comprovante_emitido_em ?? r.periodo_apuracao ?? '') },
+  relatorio_situacao: { tabela: 'client_relatorios', coluna: 'path', bucket: 'client-relatorios', extra: 'tipo,gerado_em', ordem: 'gerado_em', onde: ['tipo', 'situacao'],
+    rotulo: (r) => `Relatório de Situação Fiscal (gerado em ${dataBR(r.gerado_em)})`, data: (r) => String(r.gerado_em ?? '') },
+  relatorio_faturamento: { tabela: 'client_relatorios', coluna: 'path', bucket: 'client-relatorios', extra: 'tipo,gerado_em,periodo', ordem: 'gerado_em', onde: ['tipo', 'faturamento'],
+    rotulo: (r) => `Relatório de Faturamento dos últimos 12 meses (até ${mesAno(r.periodo ? `${r.periodo}-01` : r.gerado_em)})`, data: (r) => String(r.gerado_em ?? '') },
   darf: { tabela: 'serpro_darfs', coluna: 'pdf_path', bucket: 'serpro-darf', extra: 'codigo_receita,data_pa,created_at', ordem: 'created_at',
     rotulo: (r) => `DARF ${r.codigo_receita ?? ''} ${r.data_pa ?? ''}`.trim(), data: (r) => String(r.created_at ?? '') },
 };
@@ -80,12 +87,21 @@ async function contatoDaEquipe(perfil: { company_id: string; is_super_admin: boo
   return data;
 }
 
+/** O Relatório de Faturamento leva a assinatura do contador: só sai para o cliente com o modelo validado (decisão de Gabriel, 01/10/2026). */
+async function faturamentoLiberado(companyId: string): Promise<boolean> {
+  const { data } = await admin.from('relatorio_config').select('faturamento_validado').eq('company_id', companyId).maybeSingle();
+  return data?.faturamento_validado === true;
+}
+
 async function listar(contato: { id: string; company_id: string }) {
   const docs: { tipo: string; id: string; rotulo: string; data: string }[] = [];
+  const liberado = await faturamentoLiberado(contato.company_id);
   await Promise.all(Object.entries(DOCS).map(async ([tipo, s]) => {
-    const { data } = await admin.from(s.tabela).select(`id, ${s.coluna}, ${s.extra}`)
-      .eq('contact_id', contato.id).eq('company_id', contato.company_id).not(s.coluna, 'is', null)
-      .order(s.ordem, { ascending: false }).limit(POR_TIPO);
+    if (tipo === 'relatorio_faturamento' && !liberado) return;
+    let q = admin.from(s.tabela).select(`id, ${s.coluna}, ${s.extra}`)
+      .eq('contact_id', contato.id).eq('company_id', contato.company_id).not(s.coluna, 'is', null);
+    if (s.onde) q = q.eq(s.onde[0], s.onde[1]);
+    const { data } = await q.order(s.ordem, { ascending: false }).limit(POR_TIPO);
     for (const r of (data ?? []) as Record<string, unknown>[]) docs.push({ tipo, id: String(r.id), rotulo: s.rotulo(r), data: s.data(r) });
   }));
   docs.sort((a, b) => b.data.localeCompare(a.data));
@@ -107,8 +123,11 @@ async function enviar(payload: Record<string, unknown>, perfil: { id: string }, 
     if (!spec) return json({ error: 'Tipo de documento inválido' }, 400);
     const { data: r } = await admin.from(spec.tabela).select(`id, contact_id, company_id, ${spec.coluna}, ${spec.extra}`).eq('id', String(p.id ?? '')).maybeSingle();
     const linha = r as Record<string, unknown> | null;
-    if (!linha || linha.contact_id !== contato.id || linha.company_id !== contato.company_id || !linha[spec.coluna]) {
+    if (!linha || linha.contact_id !== contato.id || linha.company_id !== contato.company_id || !linha[spec.coluna] || (spec.onde && linha[spec.onde[0]] !== spec.onde[1])) {
       return json({ error: 'Documento não encontrado para este cliente' }, 404);
+    }
+    if (String(p.tipo) === 'relatorio_faturamento' && !(await faturamentoLiberado(contato.company_id))) {
+      return json({ error: 'O Relatório de Faturamento só pode ser enviado depois que o contador validar o modelo.' }, 403);
     }
     const rotulo = spec.rotulo(linha);
     const path = String(linha[spec.coluna]);
@@ -161,6 +180,32 @@ async function enviar(payload: Record<string, unknown>, perfil: { id: string }, 
   return json({ ok: true, texto: final, whatsapp, destino, aviso: logErr ? 'Enviado, mas o histórico não foi gravado.' : undefined });
 }
 
+const RELATORIOS = ['situacao', 'faturamento'];
+const MAX_PDF_BYTES = 4 * 1024 * 1024;
+
+async function guardarRelatorio(payload: Record<string, unknown>, perfil: { id: string }, contato: { id: string; company_id: string }) {
+  const tipo = String(payload.tipo ?? '');
+  if (!RELATORIOS.includes(tipo)) return json({ error: 'Tipo de relatório inválido' }, 400);
+  if (tipo === 'faturamento' && !(await faturamentoLiberado(contato.company_id))) {
+    return json({ error: 'O Relatório de Faturamento só pode ser guardado e enviado depois que o contador validar o modelo.' }, 403);
+  }
+  const b64 = String(payload.pdf_base64 ?? '').replace(/\s/g, '');
+  if (!b64 || b64.length > Math.ceil((MAX_PDF_BYTES * 4) / 3) + 8) return json({ error: 'PDF ausente ou grande demais' }, 400);
+  let bytes: Uint8Array;
+  try { const bin = atob(b64); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); } catch { return json({ error: 'PDF inválido' }, 400); }
+  if (bytes.length < 100 || String.fromCharCode(...bytes.slice(0, 4)) !== '%PDF') return json({ error: 'O arquivo não é um PDF' }, 400);
+  const periodo = typeof payload.periodo === 'string' && /^\d{4}-\d{2}$/.test(payload.periodo) ? payload.periodo : null;
+  const path = `${contato.company_id}/${contato.id}/${tipo}-${Date.now()}.pdf`;
+  const up = await admin.storage.from('client-relatorios').upload(path, bytes, { contentType: 'application/pdf', upsert: false });
+  if (up.error) return json({ error: 'Não foi possível guardar o PDF' }, 500);
+  const resumo = payload.resumo && typeof payload.resumo === 'object' ? payload.resumo : {};
+  const { data, error } = await admin.from('client_relatorios').insert({
+    company_id: contato.company_id, contact_id: contato.id, tipo, periodo, path, resumo, gerado_por: perfil.id,
+  }).select('id').single();
+  if (error || !data) return json({ error: 'O PDF foi guardado, mas o registro falhou' }, 500);
+  return json({ ok: true, id: data.id, tipo: `relatorio_${tipo}` });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
@@ -172,7 +217,8 @@ Deno.serve(async (req) => {
     switch (payload.action) {
       case 'listar': return await listar(contato);
       case 'enviar': return await enviar(payload, perfil, contato);
-      default: return json({ error: 'action inválida (listar | enviar)' }, 400);
+      case 'guardar_relatorio': return await guardarRelatorio(payload, perfil, contato);
+      default: return json({ error: 'action inválida (listar | enviar | guardar_relatorio)' }, 400);
     }
   } catch (e) {
     return json({ error: (e as Error).message }, 500);

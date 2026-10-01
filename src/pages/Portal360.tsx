@@ -18,6 +18,7 @@ import { useFiltroCarteira } from '@/hooks/useFiltroCarteira';
 import { rotuloCompetencia } from '@/hooks/useSerproPagamentos';
 import { useSituacaoCarteira } from '@/hooks/useSituacaoCarteira';
 import { montarFila } from '@/lib/filaDoDia';
+import { ultimaLeituraFaturamento } from '@/lib/relatoriosCliente';
 import {
   contar, FILTROS, montarGraficos, ROTULO_NIVEL, totalPendencias,
   type Filtro, type LinhaCarteira, type NivelRisco,
@@ -44,7 +45,7 @@ interface Cartao {
 }
 
 export default function Portal360() {
-  const { linhas, carregando, erro, competencia, hoje, fontesAtualizadas } = useSituacaoCarteira();
+  const { linhas, carregando, erro, competencia, hoje, fontesAtualizadas, faturamento } = useSituacaoCarteira();
   const [lista, setLista] = useState<ListaAberta | null>(null);
   const { escolhida, resp, doResponsavel, visiveis, escolherCliente: escolher, escolherResponsavel } = useFiltroCarteira(linhas);
 
@@ -178,7 +179,7 @@ export default function Portal360() {
           </div>
 
           {escolhida ? (
-            <FichaCliente linha={escolhida} />
+            <FichaCliente linha={escolhida} faturamento={ultimaLeituraFaturamento(faturamento, escolhida.contact_id)} />
           ) : (
             <>
               <FilaParaAgir itens={fila} onEscolherCliente={escolher} />

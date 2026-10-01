@@ -8,6 +8,7 @@ import { DsAlert, DsBadge, PageHeader, StatCardRow, tabsListClass, tabsTriggerCl
 import { Button } from '@/components/ui/button';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Switch } from '@/components/ui/switch';
+import { ConfigRelatorios } from '@/components/tech/ConfigRelatorios';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -381,6 +382,8 @@ export default function TechConsumoSerpro() {
               })}
             </div>
           </section>
+
+          <ConfigRelatorios />
 
           {INTERRUPTORES_QUE_COBRAM.map((it) => {
             const ligado = config ? config[it.chave] : (it.rotina.padraoLigado ?? true);

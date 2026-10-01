@@ -1,15 +1,22 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Send } from 'lucide-react';
+import { Download, Loader2, Send } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { DsBadge, type BadgeTone } from '@/components/ds';
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
 import { EnviarClienteDialog } from '@/components/gestao360/EnviarClienteDialog';
 import { TOM_NIVEL } from '@/components/gestao360/ListaClientesSheet';
+import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Button } from '@/components/ui/button';
 import { ROTULO_CANAL, useDocumentosCliente, useEnviosCliente } from '@/hooks/useEnvioCliente';
-import { modeloDocumentos } from '@/lib/mensagensCliente';
+import { useGuardarRelatorio, useRelatorioConfig } from '@/hooks/useRelatoriosCliente';
+import type { FaturamentoRow } from '@/hooks/useSerproFaturamento';
+import { modeloDocumentos, modeloRelatorioFaturamento, modeloRelatorioSituacao, type ModeloMensagem } from '@/lib/mensagensCliente';
+import { baixarPdf, brl, carregarLogo, gerarPdfFaturamento, gerarPdfSituacao, mesAno, pdfParaBase64 } from '@/lib/pdfRelatorios';
+import { calcularScore, montarPlanoAcao, montarRelatorioFaturamento } from '@/lib/relatoriosCliente';
+import { hojeBR } from '@/lib/prazosFederais';
 import { digitos, ROTULO_NIVEL, type LinhaCarteira } from '@/lib/situacaoCarteira';
 
 const sigla = (pa: string) => `${pa.slice(5, 7)}/${pa.slice(0, 4)}`;
@@ -119,13 +126,48 @@ function linhasDaFicha(l: LinhaCarteira): Linha[] {
 const DOCS_VISIVEIS = 6;
 
 /** Ficha do cliente escolhido no filtro: o mesmo estado que a carteira soma, só que de um cliente, mais os documentos para enviar. */
-export function FichaCliente({ linha: l }: { linha: LinhaCarteira }) {
+export function FichaCliente({ linha: l, faturamento = null }: { linha: LinhaCarteira; /** Leitura de faturamento mais recente e confiável do cliente. */ faturamento?: FaturamentoRow | null }) {
   const linhas = linhasDaFicha(l);
   const docs = useDocumentosCliente(l.contact_id);
   const envios = useEnviosCliente(l.contact_id);
-  const [envio, setEnvio] = useState<{ marcados: string[] } | null>(null);
+  const config = useRelatorioConfig();
+  const guardar = useGuardarRelatorio();
+  const [envio, setEnvio] = useState<{ marcados: string[]; modelo?: ModeloMensagem } | null>(null);
+  const [gerando, setGerando] = useState<'situacao' | 'faturamento' | null>(null);
   const guardados = docs.data ?? [];
   const ultimo = envios.data?.[0];
+
+  const score = useMemo(() => calcularScore(l), [l]);
+  const relFat = useMemo(() => montarRelatorioFaturamento(l, faturamento), [l, faturamento]);
+  const validado = config.data?.faturamento_validado ?? false;
+  const dados = { nome: l.nome, cnpj: formatarCnpj(l.documento), regime: l.regimeRotulo };
+  const arquivo = (tipo: string) => `${tipo}-${l.nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase()}-${hojeBR()}.pdf`;
+
+  const montarPdf = async (tipo: 'situacao' | 'faturamento'): Promise<ArrayBuffer> => {
+    const logo = await carregarLogo();
+    if (tipo === 'situacao') return gerarPdfSituacao(dados, score, montarPlanoAcao(l, score), hojeBR(), logo);
+    const c = config.data;
+    const assinatura = c && (c.contador_nome || c.contador_crc || c.contador_cpf) ? { nome: c.contador_nome, crc: c.contador_crc, cpf: c.contador_cpf } : null;
+    return gerarPdfFaturamento(dados, relFat!, assinatura, !validado, hojeBR(), logo);
+  };
+  const baixar = async (tipo: 'situacao' | 'faturamento') => {
+    setGerando(tipo);
+    try { baixarPdf(await montarPdf(tipo), arquivo(tipo === 'situacao' ? 'situacao-fiscal' : validado ? 'faturamento' : 'faturamento-rascunho')); }
+    catch { toast.error('Não foi possível gerar o PDF.'); }
+    finally { setGerando(null); }
+  };
+  const enviarRelatorio = async (tipo: 'situacao' | 'faturamento') => {
+    setGerando(tipo);
+    try {
+      const r = await guardar.mutateAsync({
+        contactId: l.contact_id, tipo, periodo: tipo === 'faturamento' ? relFat?.periodo : undefined, pdfBase64: pdfParaBase64(await montarPdf(tipo)),
+        resumo: tipo === 'situacao' ? { percentual: score.percentual, regulares: score.regulares, verificados: score.verificados, naoVerificados: score.naoVerificados } : { periodo: relFat?.periodo, rbt12: relFat?.rbt12 },
+      });
+      setEnvio({ marcados: [`${r.tipo}:${r.id}`], modelo: tipo === 'situacao' ? modeloRelatorioSituacao() : modeloRelatorioFaturamento() });
+    } catch (e) { toast.error((e as Error)?.message || 'Não foi possível guardar o relatório.'); }
+    finally { setGerando(null); }
+  };
+  const ocupado = gerando !== null;
 
   return (
     <section className="space-y-4 rounded-lg border border-line bg-paper p-5">
@@ -160,6 +202,50 @@ export function FichaCliente({ linha: l }: { linha: LinhaCarteira }) {
         ))}
       </div>
 
+      <div className="space-y-3 border-t border-line-2 pt-4">
+        <h3 className="text-ui-strong text-ink">Relatórios para o cliente</h3>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="min-w-[260px] flex-1">
+            <p className="text-ui text-ink">Relatório de situação fiscal</p>
+            <p className="text-meta text-muted-ink">
+              {score.verificados === 0
+                ? 'Nenhum item verificado ainda: o relatório sairia só com itens "não verificados".'
+                : `Score${score.naoVerificados > 0 ? ' parcial' : ''} ${score.percentual}% · ${score.regulares} de ${score.verificados} itens verificados regulares · ${score.naoVerificados} não ${score.naoVerificados === 1 ? 'verificado' : 'verificados'}`}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" disabled={ocupado} onClick={() => baixar('situacao')}>
+            {gerando === 'situacao' ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}Baixar PDF
+          </Button>
+          <DicaBotao texto={score.verificados === 0 ? 'Ainda não há item verificado deste cliente.' : 'Gera o PDF, guarda e abre o envio ao cliente com o relatório já marcado.'}>
+            <Button size="sm" disabled={ocupado || score.verificados === 0} onClick={() => enviarRelatorio('situacao')}><Send className="mr-1.5 h-4 w-4" />Enviar ao cliente</Button>
+          </DicaBotao>
+        </div>
+        {l.regime === 'simples_nacional' && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="min-w-[260px] flex-1">
+              <p className="flex flex-wrap items-center gap-2 text-ui text-ink">Faturamento dos últimos 12 meses {relFat && !validado && <DsBadge tone="warn">Modelo aguardando validação do contador</DsBadge>}</p>
+              <p className="text-meta text-muted-ink">
+                {relFat
+                  ? `Leitura de ${mesAno(relFat.periodo)} · RBT12 ${brl(relFat.rbt12 ?? relFat.somaMeses)}${validado ? ' · com assinatura do contador' : ' · só rascunho: não vai ao cliente até o contador validar o modelo (Tech > Rotinas)'}`
+                  : 'Faturamento ainda não lido para este cliente. A leitura mensal roda no dia 30; para ler agora (1 consulta), abra Faturamento.'}
+              </p>
+            </div>
+            {relFat ? (
+              <>
+                <Button variant="outline" size="sm" disabled={ocupado} onClick={() => baixar('faturamento')}>
+                  {gerando === 'faturamento' ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}{validado ? 'Baixar PDF' : 'Baixar rascunho'}
+                </Button>
+                <DicaBotao texto={validado ? 'Gera o PDF assinado, guarda e abre o envio ao cliente com o relatório já marcado.' : 'O contador ainda não validou o modelo. Enquanto isso, só dá para baixar o rascunho.'}>
+                  <Button size="sm" disabled={ocupado || !validado} onClick={() => enviarRelatorio('faturamento')}><Send className="mr-1.5 h-4 w-4" />Enviar ao cliente</Button>
+                </DicaBotao>
+              </>
+            ) : (
+              <Link to={`/dashboard-federal/faturamento?q=${digitos(l.documento)}`} className="text-ui-strong text-action hover:underline">Abrir Faturamento</Link>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="space-y-2 border-t border-line-2 pt-4">
         <h3 className="text-ui-strong text-ink">Documentos guardados</h3>
         {docs.isLoading ? (
@@ -184,7 +270,7 @@ export function FichaCliente({ linha: l }: { linha: LinhaCarteira }) {
 
       {envio && (
         <EnviarClienteDialog
-          key={envio.marcados.join(',') || 'novo'} contactId={l.contact_id} nome={l.nome} modelo={modeloDocumentos()}
+          key={envio.marcados.join(',') || 'novo'} contactId={l.contact_id} nome={l.nome} modelo={envio.modelo ?? modeloDocumentos()}
           origem="ficha" marcadosInicial={envio.marcados} onClose={() => setEnvio(null)}
         />
       )}

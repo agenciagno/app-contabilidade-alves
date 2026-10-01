@@ -1189,6 +1189,64 @@ export type Database = {
         }
         Relationships: []
       }
+      client_relatorios: {
+        Row: {
+          company_id: string
+          contact_id: string
+          gerado_em: string
+          gerado_por: string | null
+          id: string
+          path: string
+          periodo: string | null
+          resumo: Json
+          tipo: string
+        }
+        Insert: {
+          company_id: string
+          contact_id: string
+          gerado_em?: string
+          gerado_por?: string | null
+          id?: string
+          path: string
+          periodo?: string | null
+          resumo?: Json
+          tipo: string
+        }
+        Update: {
+          company_id?: string
+          contact_id?: string
+          gerado_em?: string
+          gerado_por?: string | null
+          id?: string
+          path?: string
+          periodo?: string | null
+          resumo?: Json
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_relatorios_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_relatorios_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_relatorios_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
       client_revenue: {
         Row: {
           company_id: string
@@ -4274,6 +4332,47 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_cofre_global"
             referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      relatorio_config: {
+        Row: {
+          company_id: string
+          contador_cpf: string | null
+          contador_crc: string | null
+          contador_nome: string | null
+          faturamento_validado: boolean
+          updated_at: string
+          validado_em: string | null
+          validado_por: string | null
+        }
+        Insert: {
+          company_id: string
+          contador_cpf?: string | null
+          contador_crc?: string | null
+          contador_nome?: string | null
+          faturamento_validado?: boolean
+          updated_at?: string
+          validado_em?: string | null
+          validado_por?: string | null
+        }
+        Update: {
+          company_id?: string
+          contador_cpf?: string | null
+          contador_crc?: string | null
+          contador_nome?: string | null
+          faturamento_validado?: boolean
+          updated_at?: string
+          validado_em?: string | null
+          validado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relatorio_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
         ]
       }

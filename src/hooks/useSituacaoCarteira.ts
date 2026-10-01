@@ -86,5 +86,5 @@ export function useSituacaoCarteira() {
   const linhas = useMemo(() => (entrada ? montarCarteira(entrada) : []), [entrada]);
   const fontesAtualizadas = useMemo(() => (entrada ? atualizacoes(entrada) : []), [entrada]);
 
-  return { linhas, carregando, erro, competencia, hoje, fontesAtualizadas };
+  return { linhas, carregando, erro, competencia, hoje, fontesAtualizadas, faturamento: faturamento.data ?? [] };
 }
