@@ -42,12 +42,12 @@ export const ROTINAS: RotinaSerpro[] = [
     faz: 'No dia 16, consulta o ano de todos os clientes do Simples: mostra quem já transmitiu o mês anterior, quais DAS foram gerados e quais estão pagos, e conclui a tarefa "DAS - Simples Nacional" de quem transmitiu. No dia seguinte ao prazo (dia 20, ou o próximo dia útil), consulta de novo só quem ainda não transmitiu: a consulta depois do prazo é a prova de "não transmitida". Estimativa: 146 clientes no dia 16 e até 30 no dia seguinte ao prazo. Quem não tem procuração não é consultado.',
   },
   {
-    id: 'lote-simples', nome: 'Pagamentos do Simples: lote do dia 30 (quem ainda não pagou o DAS)', quando: 'dia 30 (em fevereiro, o último dia do mês), 07:10', tipo: 'Consultar', chamadasPorMes: 25, interruptor: 'auto_lote_pagamentos_simples', padraoLigado: false,
-    faz: 'Consulta Pagamentos na Receita só dos clientes do Simples que têm DAS do mês anterior sem pagamento registrado: mostra quem pagou depois do vencimento (com data e valor) e conclui a tarefa do DAS de quem pagou. Ao terminar, avisa no sino quantos continuam sem pagamento. Estimativa: cerca de 25 clientes por mês.',
+    id: 'lote-simples', nome: 'Pagamentos do Simples: consulta completa no dia 30', quando: 'dia 30 (em fevereiro, o último dia do mês), 07:10', tipo: 'Consultar', chamadasPorMes: 146, interruptor: 'auto_lote_pagamentos_simples', padraoLigado: false,
+    faz: 'Consulta Pagamentos na Receita de todos os clientes do Simples (matriz): traz os documentos pagos com data, valor e composição (o DAS e os demais) e conclui a tarefa do DAS de quem pagou. Ao terminar, avisa no sino quantos DAS continuam sem pagamento. Durante o mês, quem pagou aparece pela rotina gratuita diária. Estimativa: 146 clientes consultáveis.',
   },
   {
-    id: 'lote-presumido-real', nome: 'Pagamentos do Presumido e do Real: lote do dia 30', quando: 'dia 30 (em fevereiro, o último dia do mês), 07:20', tipo: 'Consultar', chamadasPorMes: 36, interruptor: 'auto_lote_pagamentos_presumido_real', padraoLigado: false,
-    faz: 'Consulta Pagamentos na Receita de todos os clientes do Presumido e do Real (matriz): traz os DARF pagos do mês anterior e conclui as tarefas de PIS/COFINS e IRPJ/CSLL quando os dois tributos foram pagos. Estimativa: 36 clientes por mês.',
+    id: 'lote-presumido-real', nome: 'Pagamentos do Presumido e do Real: consulta completa no dia 30', quando: 'dia 30 (em fevereiro, o último dia do mês), 07:20', tipo: 'Consultar', chamadasPorMes: 35, interruptor: 'auto_lote_pagamentos_presumido_real', padraoLigado: false,
+    faz: 'Consulta Pagamentos na Receita de todos os clientes do Presumido e do Real (matriz): traz os DARF pagos do mês anterior e conclui as tarefas de PIS/COFINS e IRPJ/CSLL quando os dois tributos foram pagos. Estimativa: 35 clientes consultáveis.',
   },
   {
     id: 'procuracoes', nome: 'Procurações: aviso de vencimento', quando: 'toda segunda, 08:00', tipo: 'sem_chamada', chamadasPorMes: 0,

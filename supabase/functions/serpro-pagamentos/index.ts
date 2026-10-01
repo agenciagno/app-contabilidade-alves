@@ -20,7 +20,8 @@ import { avisarConclusoes, concluirTarefaDas, concluirTarefasPorPagamentos } fro
 //                    O cron bate todo dia; quem decide é a DATA (dia 30, ou o último dia do mês em fevereiro) e o interruptor de Tech
 //                    (serpro_config.auto_lote_pagamentos_simples / _presumido_real, PADRÃO DESLIGADO: desligado não chama o Serpro).
 //                    Mesma consulta do clique (PAGAMENTOS71 do mês de apuração anterior, que também conclui tarefas), 1 cliente por vez.
-//                    Simples: só quem tem DAS do mês anterior sem pagamento registrado. Presumido e Real: todos (matriz).
+//                    Consulta COMPLETA dos dois grupos (decisão de Gabriel, 01/10/2026): todos os clientes do Simples e todos os do Presumido e Real (matriz).
+//                    Durante o mês, quem pagou aparece pelo sensor gratuito diário (E0701); no dia 30 vêm os detalhes (documento, data, valor e composição).
 //                    Pula quem já foi consultado hoje, quem não tem procuração (sensor "x") e filial. Até 60 clientes por disparo.
 //                    Admin logado pode simular com { dry_run: true, ignorar_data?: true } (não cobra).
 //
@@ -421,8 +422,7 @@ async function rotinaLote(modo: ModoLote, payload: any, uid: string | null) {
   const { elegiveis, tentaveis, semProcuracao } = await clientesDoLote(modo);
   const { data: consultas } = await supabase.from("serpro_pagamentos_consultas").select("contact_id,consultado_em").eq("company_id", COMPANY_ID).eq("competencia", `${competencia}-01`).limit(3000);
   const feitosHoje = new Set((consultas ?? []).filter((c: { consultado_em: string }) => dataBRde(c.consultado_em) === hoje).map((c: { contact_id: string }) => c.contact_id));
-  const semPagamento = modo === "simples" ? await dasSemPagamento(competencia) : null;
-  const alvo = tentaveis.filter((c: any) => !feitosHoje.has(c.id) && (!semPagamento || semPagamento.has(c.id)));
+  const alvo = tentaveis.filter((c: any) => !feitosHoje.has(c.id));
   const mes = `${competencia.slice(5, 7)}/${competencia.slice(0, 4)}`;
 
   if (simulando) {
