@@ -4735,6 +4735,7 @@ export type Database = {
           alerta_gasto_mensal: number
           auto_concluir_tarefas: boolean
           auto_criar_tarefas: boolean
+          auto_rotina_pgdas: boolean
           company_id: string
           updated_at: string
           volume_declarado_mes: number | null
@@ -4743,6 +4744,7 @@ export type Database = {
           alerta_gasto_mensal?: number
           auto_concluir_tarefas?: boolean
           auto_criar_tarefas?: boolean
+          auto_rotina_pgdas?: boolean
           company_id: string
           updated_at?: string
           volume_declarado_mes?: number | null
@@ -4751,6 +4753,7 @@ export type Database = {
           alerta_gasto_mensal?: number
           auto_concluir_tarefas?: boolean
           auto_criar_tarefas?: boolean
+          auto_rotina_pgdas?: boolean
           company_id?: string
           updated_at?: string
           volume_declarado_mes?: number | null

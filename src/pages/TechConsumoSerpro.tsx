@@ -190,6 +190,27 @@ export default function TechConsumoSerpro() {
         </DicaBotao>
       </section>
 
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-line bg-paper p-5">
+        <div className="min-w-[260px] flex-1 space-y-1">
+          <h2 className="text-h4-card text-ink">Consultar o PGDAS-D sozinho <span className="text-meta text-muted-ink-2">(esta rotina cobra)</span></h2>
+          <p className="text-ui text-muted-ink">
+            No <strong className="text-ink">dia 16</strong>, o sistema consulta o ano de cada cliente do Simples (07:45 a 08:00) para mostrar quem já transmitiu o mês anterior e como estão os DAS.
+            No <strong className="text-ink">dia seguinte ao prazo</strong> (dia 20, ou o próximo dia útil se cair em fim de semana ou feriado nacional), consulta de novo só quem ainda não transmitiu.
+            Custa uma consulta por cliente, cerca de <strong className="text-ink">{reais(custoEstimado('Consultar', 176))} por mês</strong>. Quem não tem procuração não é consultado, e quem já foi consultado no dia não é cobrado de novo.
+          </p>
+        </div>
+        <DicaBotao texto={config?.auto_rotina_pgdas === false ? 'Desligado: nenhuma consulta automática do PGDAS-D. Ligue para voltar a consultar nos dias 16 e seguinte ao prazo.' : 'Ligado: desligue se não quiser que o sistema consulte (e cobre) sozinho.'}>
+          <Switch
+            checked={config?.auto_rotina_pgdas ?? true}
+            disabled={!config || salvar.isPending}
+            onCheckedChange={async (v) => {
+              try { await salvar.mutateAsync({ auto_rotina_pgdas: v }); toast.success(v ? 'Consulta automática do PGDAS-D ligada.' : 'Consulta automática do PGDAS-D desligada.'); }
+              catch { toast.error('Não foi possível salvar.'); }
+            }}
+          />
+        </DicaBotao>
+      </section>
+
       <section className="space-y-4 rounded-lg border border-line bg-paper p-5">
         <div className="space-y-1">
           <h2 className="text-h4-card text-ink">Rotinas automáticas e custo fixo por mês</h2>

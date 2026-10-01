@@ -31,6 +31,10 @@ export const ROTINAS_ATIVAS: RotinaSerpro[] = [
     faz: 'Pergunta à Receita quais clientes do Lucro Presumido e do Real tiveram eSocial, EFD-Reinf ou transmissão da DCTFWeb. Só marca "movimento novo".',
   },
   {
+    id: 'pgdas-consulta', nome: 'PGDAS-D: quem transmitiu o mês (consulta do ano de cada cliente do Simples)', quando: 'dia 16 (carteira toda) e no dia seguinte ao prazo (só quem ainda não transmitiu), de 07:45 a 08:00', tipo: 'Consultar', chamadasPorMes: 146 + 30,
+    faz: 'No dia 16, consulta o ano de todos os clientes do Simples: mostra quem já transmitiu o mês anterior, quais DAS foram gerados e quais estão pagos, e conclui a tarefa "DAS - Simples Nacional" de quem transmitiu. No dia seguinte ao prazo (dia 20, ou o próximo dia útil), consulta de novo só quem ainda não transmitiu: a consulta depois do prazo é a prova de "não transmitida". Estimativa: 146 clientes no dia 16 e até 30 no dia seguinte ao prazo. Quem não tem procuração não é consultado.',
+  },
+  {
     id: 'procuracoes', nome: 'Procurações: aviso de vencimento', quando: 'toda segunda, 08:00', tipo: 'sem_chamada', chamadasPorMes: 0,
     faz: 'Avisa no sino as procurações que vencem em até 60 dias. Lê só o que já está salvo.',
   },
@@ -50,6 +54,5 @@ export const ROTINAS_ATIVAS: RotinaSerpro[] = [
 
 /** Ideias estudadas que NÃO estão ligadas: nada disto roda hoje. Estimativa com a carteira de 01/10/2026 (153 do Simples, 37 do Presumido e Real). */
 export const ROTINAS_NAO_ATIVADAS: { nome: string; consultasPorMes: number; nota: string }[] = [
-  { nome: 'PGDAS de toda a carteira do Simples (dia 16 em todos e dia 21 só nos pendentes)', consultasPorMes: 153 + 30, nota: 'diz quem transmitiu e quem não, antes do prazo' },
   { nome: 'Pagamentos dos clientes do Presumido e do Real, uma vez por mês', consultasPorMes: 37, nota: 'alimenta as tarefas de PIS/COFINS e IRPJ/CSLL' },
 ];

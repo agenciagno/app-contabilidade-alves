@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { criarSerpro, onlyDigits, sleep } from "../_shared/serpro-core.ts";
+import { criarSerpro, jwtRole, onlyDigits, sleep } from "../_shared/serpro-core.ts";
 import { lerIndicePgdasd, pega } from "../_shared/pgdasd-indice.ts";
 import { lerDeclaracaoPgdasd, type DeclaracaoPgdasd } from "../_shared/pgdasd-extrair.ts";
 import { avisarConclusoes, concluirTarefaDas, concluirTarefaFiscal } from "../_shared/tarefas-fiscais.ts";
@@ -24,6 +24,11 @@ import { avisarConclusoes, concluirTarefaDas, concluirTarefaFiscal } from "../_s
 //   ler_faturamento { contact_id, periodo }          Passo 3: lê o PDF da declaração do mês (regra fixa de texto, sem IA) e grava em
 //                                                    serpro_faturamento (receita do mês, RBT12, RBA, limite, sublimite, fator r, regime).
 //                                                    Se o PDF já está guardado, não chama o Serpro (custo zero); se não, baixa antes.
+//   rotina_pgdas (cron 07:45, 07:50, 07:55 e 08:00 BRT; decisão de Gabriel, 01/10/2026): decide sozinha pela data. Dia 16: consulta o ano de todos os
+//                                                    clientes do Simples (quem ainda não foi consultado hoje). Dia seguinte ao prazo (dia 20, próximo dia útil se for
+//                                                    fim de semana ou feriado nacional): consulta só quem ainda não transmitiu o mês anterior. Outros dias: nada.
+//                                                    Cada disparo faz até 60 clientes (os 4 horários cobrem a carteira); quem já foi feito é pulado. Interruptor:
+//                                                    serpro_config.auto_rotina_pgdas. Custa 1 consulta por cliente. Admin pode testar com { modo, dry_run: true } (não cobra).
 //   link         { tipo, id }                        link assinado (10 min) de um PDF já guardado (sem chamada ao Serpro).
 //   publicar     { tabela: "das" | "declaracao", id, visivel_portal }
 //
@@ -186,21 +191,14 @@ async function consultar(payload: any, uid: string) {
 }
 
 /**
- * Passe ÚNICO na carteira do Simples (aprovado por Gabriel em 01/10/2026; não é rotina agendada): consulta o ano de cada cliente que ainda não
- * foi consultado nas últimas 24 h. Guardas: só Ativo, matriz, CNPJ válido, sem os CNPJs da CA; cliente mapeado sem nenhuma procuração ativa nem é tentado
- * (a tentativa seria cobrada e voltaria 403); no máximo `limite` clientes por chamada (padrão 40) e 100 s de relógio; para depois de 5 falhas seguidas.
- * Pode ser chamada de novo: quem já foi consultado é pulado. Um aviso-resumo no fim.
+ * Clientes do Simples que uma consulta em lote pode tentar: Ativo, matriz, CNPJ válido, sem os CNPJs da CA. Cliente mapeado nas procurações sem NENHUMA
+ * ativa fica de fora (a tentativa seria cobrada e voltaria 403). `consultadoEm`: última consulta do ANO por cliente.
  */
-async function consultarCarteira(payload: any, uid: string | null) {
-  const ano = Number(payload.ano) || anoBR();
-  if (!Number.isInteger(ano) || ano < 2018 || ano > anoBR()) return json({ error: "Ano inválido" }, 400);
-  const limite = Math.max(1, Math.min(Number(payload.limite) || 40, 60));
-  const inicio = Date.now();
-
+async function carteiraDoSimples(ano: number) {
   const { data: contatos } = await supabase.from("contacts").select("id,name,display_name,document")
     .eq("company_id", COMPANY_ID).eq("is_active", true).eq("status_cliente", STATUS_MONITORADO).eq("tax_regime", "simples_nacional").order("name");
   const { data: consultas } = await supabase.from("serpro_pgdasd_consultas").select("contact_id,consultado_em").eq("company_id", COMPANY_ID).eq("ano", ano).limit(1000);
-  const recentes = new Set((consultas ?? []).filter((c: any) => Date.now() - Date.parse(c.consultado_em) < 24 * 3600_000).map((c: any) => c.contact_id));
+  const consultadoEm = new Map<string, string>((consultas ?? []).map((c: any) => [c.contact_id as string, c.consultado_em as string]));
   const { data: procs } = await supabase.from("serpro_procuracoes").select("contact_id,status,data_fim")
     .eq("company_id", COMPANY_ID).eq("fonte", "integra_procuracoes").in("codigo_procuracao", CODIGOS_PROCURACAO).limit(5000);
   const hoje = hojeBR();
@@ -209,22 +207,27 @@ async function consultarCarteira(payload: any, uid: string | null) {
     const ativa = r.status === "ativa" && (!r.data_fim || r.data_fim >= hoje);
     comMapa.set(r.contact_id, (comMapa.get(r.contact_id) ?? false) || ativa);
   }
-
   const elegiveis = (contatos ?? []).filter((c: any) => {
     const cnpj = onlyDigits(c.document);
     return cnpj.length === 14 && cnpj.slice(8, 12) === "0001" && !CNPJS_DA_CA.has(cnpj);
   });
-  const semProcuracao = elegiveis.filter((c: any) => comMapa.has(c.id) && comMapa.get(c.id) === false);
-  const pendentes = elegiveis.filter((c: any) => !recentes.has(c.id) && !(comMapa.has(c.id) && comMapa.get(c.id) === false));
+  const ehSemProcuracao = (c: any) => comMapa.has(c.id) && comMapa.get(c.id) === false;
+  return { elegiveis, semProcuracao: elegiveis.filter(ehSemProcuracao), tentaveis: elegiveis.filter((c: any) => !ehSemProcuracao(c)), consultadoEm };
+}
 
-  const resumo = { consultados: 0, transmitidas: 0, sem_declaracao_no_ano: 0, erros: 0, sem_procuracao_pulados: semProcuracao.length, ja_consultados: elegiveis.length - pendentes.length - semProcuracao.length, tarefas_concluidas: 0 };
+/**
+ * Consulta o ano de cada cliente da lista, um por vez. Guardas: no máximo `limite` clientes por chamada e 100 s de relógio; para depois de 5 falhas seguidas
+ * (uma falha de serviço da Receita não vira cobrança em série). Quem chama decide o que fazer com o resumo.
+ */
+async function consultarLista(lista: any[], o: { ano: number; uid: string | null; origem: "manual" | "cron"; finalidade: string; limite: number }) {
+  const inicio = Date.now();
+  const resumo = { consultados: 0, transmitidas: 0, sem_declaracao_no_ano: 0, erros: 0, tarefas_concluidas: 0 };
   const falhas: string[] = [];
   let seguidas = 0, processados = 0;
-  for (const c of pendentes) {
-    if (processados >= limite || Date.now() - inicio > 100_000 || seguidas >= 5) break;
+  for (const c of lista) {
+    if (processados >= o.limite || Date.now() - inicio > 100_000 || seguidas >= 5) break;
     processados++;
-    const r = await consultarCliente(c.id, ano, uid, "manual", true,
-      `Consulta do índice do PGDAS-D (ano ${ano}) no primeiro passe da carteira do Simples, aprovado por Gabriel em 01/10/2026, para acompanhamento fiscal`);
+    const r = await consultarCliente(c.id, o.ano, o.uid, o.origem, true, o.finalidade);
     if (r.corpo.ok === true) {
       seguidas = 0;
       resumo.consultados++;
@@ -237,9 +240,76 @@ async function consultarCarteira(payload: any, uid: string | null) {
     }
     await sleep(150);
   }
-  const restantes = pendentes.length - processados;
-  if (resumo.tarefas_concluidas > 0) await avisarConclusoes(supabase, COMPANY_ID, `${resumo.consultados} ${resumo.consultados === 1 ? "cliente" : "clientes"} do Simples (consulta da carteira)`, resumo.tarefas_concluidas);
-  return json({ ok: true, ano, ...resumo, restantes, parou_por_falhas: seguidas >= 5, falhas, segundos: Math.round((Date.now() - inicio) / 1000) });
+  return { ...resumo, restantes: lista.length - processados, parou_por_falhas: seguidas >= 5, falhas, segundos: Math.round((Date.now() - inicio) / 1000) };
+}
+
+/**
+ * Passe ÚNICO na carteira do Simples (aprovado por Gabriel em 01/10/2026; não é rotina agendada): consulta o ano de cada cliente que ainda não
+ * foi consultado nas últimas 24 h. No máximo `limite` clientes por chamada (padrão 40, teto 60). Pode ser chamada de novo: quem já foi consultado é pulado.
+ * Um aviso-resumo no fim.
+ */
+async function consultarCarteira(payload: any, uid: string | null) {
+  const ano = Number(payload.ano) || anoBR();
+  if (!Number.isInteger(ano) || ano < 2018 || ano > anoBR()) return json({ error: "Ano inválido" }, 400);
+  const limite = Math.max(1, Math.min(Number(payload.limite) || 40, 60));
+
+  const { elegiveis, semProcuracao, tentaveis, consultadoEm } = await carteiraDoSimples(ano);
+  const pendentes = tentaveis.filter((c: any) => !(consultadoEm.has(c.id) && Date.now() - Date.parse(consultadoEm.get(c.id)!) < 24 * 3600_000));
+  const r = await consultarLista(pendentes, { ano, uid, origem: "manual", limite,
+    finalidade: `Consulta do índice do PGDAS-D (ano ${ano}) no primeiro passe da carteira do Simples, aprovado por Gabriel em 01/10/2026, para acompanhamento fiscal` });
+  if (r.tarefas_concluidas > 0) await avisarConclusoes(supabase, COMPANY_ID, `${r.consultados} ${r.consultados === 1 ? "cliente" : "clientes"} do Simples (consulta da carteira)`, r.tarefas_concluidas);
+  return json({ ok: true, ano, ...r, sem_procuracao_pulados: semProcuracao.length, ja_consultados: elegiveis.length - pendentes.length - semProcuracao.length });
+}
+
+const diasEntre = (de: string, ate: string) => Math.round((Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${de}T00:00:00Z`)) / 86_400_000);
+const dataBRde = (iso: string) => new Date(Date.parse(iso) - 3 * 3600_000).toISOString().slice(0, 10);
+
+/**
+ * Rotina automática do PGDAS-D (decisão de Gabriel, 01/10/2026). Quem decide o que fazer é a DATA, nunca o pedido: o cron só bate à porta.
+ *  · dia 16: carteira inteira (quem ainda não foi consultado hoje) para saber, antes do prazo, quem já transmitiu o mês anterior e como estão os DAS;
+ *  · dia seguinte ao prazo: só quem ainda não transmitiu o mês anterior e não foi consultado depois do prazo (a consulta depois do prazo é a prova de "não transmitida");
+ *  · demais dias: nada, sem chamada ao Serpro.
+ * O prazo vem de serpro_vencimento_mensal (dia 20; fim de semana e feriado nacional passam ao próximo dia útil). Interruptor: serpro_config.auto_rotina_pgdas.
+ * Cada disparo faz até 60 clientes; os disparos de 5 em 5 minutos cobrem a carteira, e quem já foi feito é pulado (não cobra de novo).
+ * Administrador logado pode testar com { modo: "todos" | "pendentes", dry_run: true }: mostra quantos seriam consultados, sem chamar o Serpro.
+ */
+async function rotinaPgdas(payload: any, uid: string | null) {
+  const hoje = hojeBR();
+  const { data: cfg } = await supabase.from("serpro_config").select("auto_rotina_pgdas").eq("company_id", COMPANY_ID).maybeSingle();
+  if (cfg?.auto_rotina_pgdas === false) return json({ ok: true, desligada: true });
+
+  const { data: prazoBanco, error: ePrazo } = await supabase.rpc("serpro_vencimento_mensal", { p_dia: hoje });
+  if (ePrazo || !prazoBanco) return json({ ok: false, error: `Não foi possível calcular o prazo do mês: ${ePrazo?.message ?? "sem resposta"}` }, 500);
+  const prazo = String(prazoBanco);
+  const pa = new Date(Date.UTC(Number(hoje.slice(0, 4)), Number(hoje.slice(5, 7)) - 2, 1)).toISOString().slice(0, 7); // mês anterior (AAAA-MM)
+  const ano = Number(pa.slice(0, 4));
+
+  let modo: "todos" | "pendentes" | null = hoje.slice(8, 10) === "16" ? "todos" : diasEntre(prazo, hoje) === 1 ? "pendentes" : null;
+  if (uid && (payload.modo === "todos" || payload.modo === "pendentes")) modo = payload.modo;
+  if (!modo) return json({ ok: true, nada_a_fazer: true, hoje, prazo });
+
+  const { semProcuracao, tentaveis, consultadoEm } = await carteiraDoSimples(ano);
+  let alvo: any[];
+  if (modo === "todos") {
+    alvo = tentaveis.filter((c: any) => { const q = consultadoEm.get(c.id); return !q || dataBRde(q) !== hoje; });
+  } else {
+    const { data: decl } = await supabase.from("serpro_pgdasd_declaracoes").select("contact_id").eq("company_id", COMPANY_ID).eq("periodo_apuracao", `${pa}-01`).limit(2000);
+    const transmitiu = new Set((decl ?? []).map((d: { contact_id: string }) => d.contact_id));
+    alvo = tentaveis.filter((c: any) => { const q = consultadoEm.get(c.id); return !transmitiu.has(c.id) && !(q && dataBRde(q) > prazo); });
+  }
+  const mes = `${pa.slice(5, 7)}/${pa.slice(0, 4)}`;
+  if (uid && payload.dry_run === true) {
+    return json({ ok: true, dry_run: true, modo, hoje, prazo, pa, ano, a_consultar: alvo.length, sem_procuracao_pulados: semProcuracao.length, custo_estimado_reais: Math.round(alvo.length * 0.24 * 100) / 100 });
+  }
+
+  const r = await consultarLista(alvo, {
+    ano, uid, origem: uid ? "manual" : "cron", limite: 60,
+    finalidade: modo === "todos"
+      ? `Rotina automática do PGDAS-D no dia 16 (índice do ano ${ano}): conferir, antes do prazo, quem já transmitiu a declaração de ${mes} e a situação dos DAS, para acompanhamento fiscal da carteira`
+      : `Rotina automática do PGDAS-D no dia seguinte ao prazo (índice do ano ${ano}): conferir quem ainda não transmitiu a declaração de ${mes}, para acompanhamento fiscal do cliente`,
+  });
+  if (r.tarefas_concluidas > 0) await avisarConclusoes(supabase, COMPANY_ID, `${r.consultados} ${r.consultados === 1 ? "cliente" : "clientes"} do Simples (rotina automática do PGDAS-D)`, r.tarefas_concluidas);
+  return json({ ok: true, modo, hoje, prazo, pa, ano, a_consultar: alvo.length, sem_procuracao_pulados: semProcuracao.length, ...r });
 }
 
 async function documentos(payload: any, uid: string) {
@@ -493,6 +563,11 @@ Deno.serve(async (req) => {
     return json({ error: "Chave do passe inválida ou vencida" }, 403);
   }
 
+  // Cron chama com a chave anon (padrão do projeto). A rotina decide pela DATA e tem teto por disparo: pedido repetido ou fora de hora não cobra nada.
+  if (payload.action === "rotina_pgdas" && (bearer === Deno.env.get("SUPABASE_ANON_KEY") || jwtRole(bearer) === "anon")) {
+    return await rotinaPgdas({}, null);
+  }
+
   const { data: userData } = await supabase.auth.getUser(bearer);
   const uid = userData?.user?.id;
   if (!uid) return json({ error: "Não autenticado" }, 401);
@@ -506,12 +581,15 @@ Deno.serve(async (req) => {
     case "consultar_carteira":
       if (!admin) return json({ error: "Só administradores consultam a carteira" }, 403);
       return await consultarCarteira(payload, uid);
+    case "rotina_pgdas":
+      if (!admin) return json({ error: "Só administradores rodam a rotina manualmente" }, 403);
+      return await rotinaPgdas(payload, uid);
     case "documentos": return await documentos(payload, uid);
     case "extrato": return await extrato(payload, uid);
     case "gerar_das": return await gerarDas(payload, uid);
     case "ler_faturamento": return await lerFaturamento(payload, uid);
     case "link": return await link(payload);
     case "publicar": return await publicar(payload);
-    default: return json({ error: "action inválida (consultar | consultar_carteira | documentos | extrato | gerar_das | ler_faturamento | link | publicar)" }, 400);
+    default: return json({ error: "action inválida (consultar | consultar_carteira | rotina_pgdas | documentos | extrato | gerar_das | ler_faturamento | link | publicar)" }, 400);
   }
 });
