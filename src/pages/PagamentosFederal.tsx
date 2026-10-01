@@ -35,7 +35,7 @@ const formatarCnpj = (d: string) => {
 const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const ddmm = (iso: string) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
 
-const TIPOS_COLUNA: TipoDoc[] = ['DARF', 'DAE', 'DJE'];
+const TIPOS_COLUNA: TipoDoc[] = ['DARF', 'DAE'];
 
 type Situacao = 'todos' | 'das_pago' | 'das_vencido' | 'das_a_vencer' | 'sem_das' | 'novo' | 'nao_consultados' | 'consultados' | 'alerta';
 const SITUACOES: { value: Situacao; label: string }[] = [
@@ -69,14 +69,15 @@ function tabelaExport(linhas: LinhaUnificada[], competencia: string): TabelaExpo
   return {
     arquivo: `das-e-pagamentos-${competencia}`,
     titulo: `DAS e pagamentos na Receita — competência ${siglaCompetencia(competencia)}`,
-    colunas: ['Razão social', 'CNPJ', 'Regime', 'Competência', 'DAS', 'Vencimento do DAS', 'Valor do DAS', 'DARF', 'DAE', 'DJE', 'Outros', 'Alertas', 'Pagamento novo', 'Consultado em'],
+    colunas: ['Razão social', 'CNPJ', 'Regime', 'Competência', 'DAS', 'Vencimento do DAS', 'Valor do DAS', 'DARF', 'DAE', 'Outros', 'Alertas', 'Pagamento novo', 'Consultado em'],
     linhas: linhas.map((l) => {
       const c = l.consultadoEm !== null;
       const r = rotuloDas(l.das);
       return [
         l.nome, formatarCnpj(l.documento), REGIMES[l.regime ?? ''] ?? l.regime ?? '', siglaCompetencia(competencia),
         r?.label ?? '', r && l.das.vencimento ? format(new Date(`${l.das.vencimento}T00:00:00`), 'dd/MM/yyyy') : '', l.das.valor != null ? moeda(l.das.valor) : '',
-        ...(['DARF', 'DAE', 'DJE', 'OUTRO'] as TipoDoc[]).map((t) => (c ? String(l.contagem[t]) : '')),
+        ...(['DARF', 'DAE'] as TipoDoc[]).map((t) => (c ? String(l.contagem[t]) : '')),
+        c ? String(l.contagem.DJE + l.contagem.OUTRO) : '',
         alertasTexto(l, competencia), l.novo ? 'Sim' : '', l.ultimaConsulta ? format(new Date(l.ultimaConsulta), 'dd/MM/yyyy HH:mm') : '',
       ];
     }),
@@ -148,7 +149,7 @@ export default function PagamentosFederal() {
       <PageHeader
         kicker="~/dashboard federal · pagamentos e das"
         title="Pagamentos e DAS."
-        subtitle="Documentos de arrecadação pagos na Receita (DARF, DAE e DJE) e o DAS do Simples (gerado, pago, a vencer ou vencido) por cliente ativo e competência. No Simples, uma consulta traz o ano inteiro e diz se o DAS está pago; no Presumido e no Real, a consulta traz os pagamentos do mês. A Receita só informa o que foi pago: zero em um mês consultado não prova que não havia o que pagar. O aviso de pagamento novo vem da rotina diária das 07:35."
+        subtitle="Documentos de arrecadação pagos na Receita (DARF e DAE) e o DAS do Simples (gerado, pago, a vencer ou vencido) por cliente ativo e competência. No Simples, uma consulta traz o ano inteiro e diz se o DAS está pago; no Presumido e no Real, a consulta traz os pagamentos do mês. A Receita só informa o que foi pago: zero em um mês consultado não prova que não havia o que pagar. O aviso de pagamento novo vem da rotina diária das 07:35."
         actions={<ExportarMenu montar={() => tabelaExport(filtradas, competencia)} disabled={filtradas.length === 0} escolherColunas />}
       />
 
@@ -213,10 +214,7 @@ export default function PagamentosFederal() {
                       {r ? (
                         <div className="space-y-0.5">
                           <DsBadge tone={r.tone}>{r.label}</DsBadge>
-                          <p className="text-meta text-muted-ink-2">
-                            {l.das.estado === 'pago' && l.das.pagoEm ? `pago em ${ddmm(l.das.pagoEm)}` : ''}
-                            {l.das.valor != null ? `${l.das.estado === 'pago' && l.das.pagoEm ? ' · ' : ''}${moeda(l.das.valor)}` : ''}
-                          </p>
+                          {l.das.valor != null && <p className="text-meta text-muted-ink-2">{moeda(l.das.valor)}</p>}
                         </div>
                       ) : <span className="text-muted-ink-2">—</span>}
                     </TableCell>

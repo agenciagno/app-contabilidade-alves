@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { ChevronDown, Copy, FileDown, Loader2, Receipt, RefreshCw, Search } from 'lucide-react';
@@ -17,6 +17,7 @@ import {
   siglaCompetencia, useComprovantePagamento, useConsultarPagamentos, usePagamentosCliente, usePublicarPagamento,
   type FiltrosPagamentos, type PagamentoRow,
 } from '@/hooks/useSerproPagamentos';
+import type { DasRow } from '@/hooks/useSerproPgdasd';
 import { dasReaproveitavel } from '@/hooks/useSerproPgdasd';
 import { ehSimplesConsultavel, mensagemLembreteDas, type DasUnificado, type LinhaUnificada } from '@/hooks/useSerproDasUnificado';
 import { diasEntre, hojeBR } from '@/lib/prazosFederais';
@@ -80,9 +81,11 @@ export function PagamentosClienteSheet({
   const [emitindo, setEmitindo] = useState<string | null>(null);
   const [f, setF] = useState({ tipo: 'todos', numero: '', receita: '', de: '', ate: '', valorDe: '', valorAte: '' });
 
+  // O DAS da competência aparece uma vez só, no bloco do DAS (com o documento pago, a composição e o comprovante); a lista traz os demais documentos.
+  const idsNoBlocoDas = useMemo(() => new Set((linha?.das.docs ?? []).map((x) => x.id)), [linha]);
   const visiveis = useMemo(
-    () => todos.filter((p) => !soMes || (p.periodo_apuracao ?? '').slice(0, 7) === competencia),
-    [todos, soMes, competencia],
+    () => todos.filter((p) => !idsNoBlocoDas.has(p.id) && (!soMes || (p.periodo_apuracao ?? '').slice(0, 7) === competencia)),
+    [todos, idsNoBlocoDas, soMes, competencia],
   );
   const duplicados = useMemo(() => {
     const n = new Map<string, number>();
@@ -128,6 +131,79 @@ export function PagamentosClienteSheet({
     }
   };
 
+  const renderDocumento = (p: PagamentoRow, opcoes?: { emitidoEm?: string | null; extrato?: ReactNode }) => {
+    const comp = p.desmembramentos ?? [];
+    const aberto = !!abertos[p.id];
+    return (
+                <div key={p.id} className="space-y-3 rounded-lg border border-line bg-paper p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <DsBadge tone="info">{p.tipo_sigla}</DsBadge>
+                        <span className="font-mono text-ui text-ink">{p.numero_documento}</span>
+                        {duplicados.has(p.numero_documento) && <DsBadge tone="danger">Duplicidade</DsBadge>}
+                        {(p.valor_saldo_total ?? 0) > 0 && <DsBadge tone="info">Saldo {moeda(p.valor_saldo_total)}</DsBadge>}
+                      </div>
+                      <p className="mt-1 text-meta text-muted-ink">
+                        PA {p.periodo_apuracao ? `${p.periodo_apuracao.slice(5, 7)}/${p.periodo_apuracao.slice(0, 4)}` : '—'}
+                        {' · '}Pago em {dataBR(p.data_arrecadacao)} · Vence em {dataBR(p.data_vencimento)}{opcoes?.emitidoEm ? ` · Emitido em ${dataHoraBR(opcoes.emitidoEm)}` : ''}
+                      </p>
+                      {(p.receita_codigo || p.receita_descricao) && (
+                        <p className="text-meta text-muted-ink-2">Receita {p.receita_codigo}{p.receita_descricao ? ` · ${p.receita_descricao}` : ''}</p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[18px] font-medium text-ink">{moeda(p.valor_total)}</p>
+                      {(p.valor_multa || p.valor_juros) ? (
+                        <p className="text-meta text-muted-ink-2">principal {moeda(p.valor_principal)} · multa {moeda(p.valor_multa)} · juros {moeda(p.valor_juros)}</p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {comp.length > 0 && (
+                    <div>
+                      <DicaBotao texto="Mostra ou esconde a composição deste documento: quais receitas e valores formam o total.">
+                        <button type="button" className="flex items-center gap-1 text-meta text-muted-ink hover:text-ink" onClick={() => setAbertos((a) => ({ ...a, [p.id]: !aberto }))}>
+                          <ChevronDown className={`h-4 w-4 transition-transform ${aberto ? 'rotate-180' : ''}`} /> Composição ({comp.length})
+                        </button>
+                      </DicaBotao>
+                      {aberto && (
+                        <div className="mt-2 divide-y divide-line rounded-md border border-line">
+                          {comp.map((d, i) => (
+                            <div key={`${d.sequencial ?? i}`} className="flex items-center justify-between gap-3 px-3 py-2 text-meta">
+                              <span className="min-w-0 text-ink">{d.receitaPrincipal?.codigo}{d.receitaPrincipal?.descricao ? ` · ${d.receitaPrincipal.descricao}` : ''}</span>
+                              <span className="shrink-0 font-mono text-ink">{moeda(d.valorTotal ?? null)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <DicaBotao custo={p.comprovante_path ? undefined : 'Emitir'}
+                      texto={p.comprovante_path ? 'Baixa o comprovante de pagamento que já está guardado. Não consulta a Receita.' : 'Emite na Receita o comprovante deste pagamento e guarda o PDF. Depois, é só reabrir o arquivo.'}>
+                      <Button size="sm" variant={p.comprovante_path ? 'outline' : 'default'} onClick={() => baixarComprovante(p)} disabled={emitindo === p.id}>
+                        {emitindo === p.id ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileDown className="mr-1.5 h-4 w-4" />}
+                        {p.comprovante_path ? 'Baixar comprovante' : 'Emitir comprovante'}{!p.comprovante_path && <Preco tipo="Emitir" />}
+                      </Button>
+                    </DicaBotao>
+                    {opcoes?.extrato}
+                    <label className="flex items-center gap-2 text-meta text-muted-ink">
+                      <Switch
+                        checked={p.visivel_portal}
+                        onCheckedChange={(v) => publicar.mutate(
+                          { pagamentoId: p.id, contactId: p.contact_id, visivel: v },
+                          { onError: () => toast.error('Não foi possível salvar.') },
+                        )}
+                      />
+                      Publicar no portal
+                    </label>
+                  </div>
+                </div>
+    );
+  };
+
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-[780px]">
@@ -156,6 +232,19 @@ export function PagamentosClienteSheet({
           const pg = linha.simples;
           const reaproveitavel = !!pg && dasReaproveitavel(pg, competencia);
           const naoConsultado = d.estado === 'nao_consultado';
+          // Documento pago em Pagamentos: a versão completa (com composição) vem da lista salva do cliente.
+          const docCompleto = (doc: PagamentoRow) => todos.find((x) => x.id === doc.id) ?? doc;
+          const idsCasados = new Set(d.casados.flatMap((c) => (c.doc ? [c.doc.id] : [])));
+          const docsSemPar = d.docs.filter((x) => !idsCasados.has(x.id));
+          const botaoExtrato = (das: DasRow) => (
+            <DicaBotao custo={das.extrato_path ? undefined : 'Consultar'}
+              texto={das.extrato_path ? 'Abre o extrato do DAS em PDF, que já está guardado.' : 'Baixa da Receita o extrato do DAS em PDF e guarda. Depois, é só reabrir o arquivo.'}>
+              <Button size="sm" variant="outline" disabled={ocupado === `${das.id}:extrato`} onClick={() => abrirExtrato(das)}>
+                {ocupado === `${das.id}:extrato` ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileDown className="mr-1.5 h-4 w-4" />}
+                Extrato{!das.extrato_path && <Preco tipo="Consultar" />}
+              </Button>
+            </DicaBotao>
+          );
           // Lembrete para o cliente: DAS vencido, ou vencendo hoje e ainda sem pagamento registrado.
           const hoje = hojeBR();
           const lembrete = d.vencimento && (d.estado === 'vencido' || (d.estado === 'a_vencer' && d.vencimento === hoje))
@@ -181,29 +270,24 @@ export function PagamentosClienteSheet({
                   <p className="mt-1 text-meta text-muted-ink">{r.texto}</p>
                   {pg?.consultadoEm && <p className="text-meta text-muted-ink-2">Consulta do PGDAS em {dataHoraBR(pg.consultadoEm)}</p>}
                 </div>
-                {d.valor != null && <p className="text-[18px] font-medium text-ink">{moeda(d.valor)}</p>}
+                {d.valor != null && d.docs.length === 0 && <p className="text-[18px] font-medium text-ink">{moeda(d.valor)}</p>}
               </div>
 
-              {d.casados.length > 0 && (
-                <div className="divide-y divide-line rounded-md border border-line">
-                  {d.casados.map(({ das, doc }) => (
-                    <div key={das.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-meta">
+              {(d.casados.length > 0 || docsSemPar.length > 0) && (
+                <div className="space-y-3">
+                  {d.casados.map(({ das, doc }) => doc ? renderDocumento(docCompleto(doc), { emitidoEm: das.emitido_em, extrato: botaoExtrato(das) }) : (
+                    <div key={das.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line px-3 py-2 text-meta">
                       <span className="min-w-0 text-ink">
                         <span className="font-mono">{das.numero_das}</span>
-                        <span className="text-muted-ink-2"> · emitido em {dataHoraBR(das.emitido_em)}{doc ? ' · conferido em Pagamentos' : ''}</span>
+                        <span className="text-muted-ink-2"> · emitido em {dataHoraBR(das.emitido_em)}</span>
                       </span>
                       <span className="flex items-center gap-2">
                         <DsBadge tone={das.das_pago === true ? 'ok' : 'warn'} dot={false}>{das.das_pago === true ? 'Pago' : 'Não pago'}</DsBadge>
-                        <DicaBotao custo={das.extrato_path ? undefined : 'Consultar'}
-                          texto={das.extrato_path ? 'Abre o extrato do DAS em PDF, que já está guardado.' : 'Baixa da Receita o extrato do DAS em PDF e guarda. Depois, é só reabrir o arquivo.'}>
-                          <Button size="sm" variant="outline" disabled={ocupado === `${das.id}:extrato`} onClick={() => abrirExtrato(das)}>
-                            {ocupado === `${das.id}:extrato` ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileDown className="mr-1.5 h-4 w-4" />}
-                            Extrato{!das.extrato_path && <Preco tipo="Consultar" />}
-                          </Button>
-                        </DicaBotao>
+                        {botaoExtrato(das)}
                       </span>
                     </div>
                   ))}
+                  {docsSemPar.map((doc) => renderDocumento(docCompleto(doc)))}
                 </div>
               )}
 
@@ -233,7 +317,7 @@ export function PagamentosClienteSheet({
                     </Button>
                   </DicaBotao>
                 )}
-                <p className="min-w-[200px] flex-1 text-meta text-muted-ink-2">Guia, extrato e comprovante são documentos diferentes e só saem no clique. O comprovante fica no documento pago, logo abaixo.</p>
+                <p className="min-w-[200px] flex-1 text-meta text-muted-ink-2">Guia, extrato e comprovante são documentos diferentes e só saem no clique.</p>
               </div>
             </div>
           );
@@ -316,81 +400,11 @@ export function PagamentosClienteSheet({
           ) : visiveis.length === 0 ? (
             <div className="rounded-lg border border-dashed border-line p-8 text-center text-ui text-muted-ink">
               {linha.consultadoEm && soMes
-                ? 'Nenhum pagamento registrado pela Receita para esta competência.'
+                ? (linha.das.docs.length > 0 ? 'Sem outros documentos (DARF, DAE) nesta competência além do DAS.' : 'Nenhum pagamento registrado pela Receita para esta competência.')
                 : 'Nenhum pagamento salvo ainda. Use "Consultar" para baixar.'}
             </div>
           ) : (
-            visiveis.map((p) => {
-              const comp = p.desmembramentos ?? [];
-              const aberto = !!abertos[p.id];
-              return (
-                <div key={p.id} className="space-y-3 rounded-lg border border-line bg-paper p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <DsBadge tone="info">{p.tipo_sigla}</DsBadge>
-                        <span className="font-mono text-ui text-ink">{p.numero_documento}</span>
-                        {duplicados.has(p.numero_documento) && <DsBadge tone="danger">Duplicidade</DsBadge>}
-                        {(p.valor_saldo_total ?? 0) > 0 && <DsBadge tone="info">Saldo {moeda(p.valor_saldo_total)}</DsBadge>}
-                      </div>
-                      <p className="mt-1 text-meta text-muted-ink">
-                        PA {p.periodo_apuracao ? `${p.periodo_apuracao.slice(5, 7)}/${p.periodo_apuracao.slice(0, 4)}` : '—'}
-                        {' · '}Pago em {dataBR(p.data_arrecadacao)} · Vence em {dataBR(p.data_vencimento)}
-                      </p>
-                      {(p.receita_codigo || p.receita_descricao) && (
-                        <p className="text-meta text-muted-ink-2">Receita {p.receita_codigo}{p.receita_descricao ? ` · ${p.receita_descricao}` : ''}</p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[18px] font-medium text-ink">{moeda(p.valor_total)}</p>
-                      {(p.valor_multa || p.valor_juros) ? (
-                        <p className="text-meta text-muted-ink-2">principal {moeda(p.valor_principal)} · multa {moeda(p.valor_multa)} · juros {moeda(p.valor_juros)}</p>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  {comp.length > 0 && (
-                    <div>
-                      <DicaBotao texto="Mostra ou esconde a composição deste documento: quais receitas e valores formam o total.">
-                        <button type="button" className="flex items-center gap-1 text-meta text-muted-ink hover:text-ink" onClick={() => setAbertos((a) => ({ ...a, [p.id]: !aberto }))}>
-                          <ChevronDown className={`h-4 w-4 transition-transform ${aberto ? 'rotate-180' : ''}`} /> Composição ({comp.length})
-                        </button>
-                      </DicaBotao>
-                      {aberto && (
-                        <div className="mt-2 divide-y divide-line rounded-md border border-line">
-                          {comp.map((d, i) => (
-                            <div key={`${d.sequencial ?? i}`} className="flex items-center justify-between gap-3 px-3 py-2 text-meta">
-                              <span className="min-w-0 text-ink">{d.receitaPrincipal?.codigo}{d.receitaPrincipal?.descricao ? ` · ${d.receitaPrincipal.descricao}` : ''}</span>
-                              <span className="shrink-0 font-mono text-ink">{moeda(d.valorTotal ?? null)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    <DicaBotao custo={p.comprovante_path ? undefined : 'Emitir'}
-                      texto={p.comprovante_path ? 'Baixa o comprovante de pagamento que já está guardado. Não consulta a Receita.' : 'Emite na Receita o comprovante deste pagamento e guarda o PDF. Depois, é só reabrir o arquivo.'}>
-                      <Button size="sm" variant={p.comprovante_path ? 'outline' : 'default'} onClick={() => baixarComprovante(p)} disabled={emitindo === p.id}>
-                        {emitindo === p.id ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileDown className="mr-1.5 h-4 w-4" />}
-                        {p.comprovante_path ? 'Baixar comprovante' : 'Emitir comprovante'}{!p.comprovante_path && <Preco tipo="Emitir" />}
-                      </Button>
-                    </DicaBotao>
-                    <label className="flex items-center gap-2 text-meta text-muted-ink">
-                      <Switch
-                        checked={p.visivel_portal}
-                        onCheckedChange={(v) => publicar.mutate(
-                          { pagamentoId: p.id, contactId: p.contact_id, visivel: v },
-                          { onError: () => toast.error('Não foi possível salvar.') },
-                        )}
-                      />
-                      Publicar no portal
-                    </label>
-                  </div>
-                </div>
-              );
-            })
+            visiveis.map((p) => renderDocumento(p))
           )}
         </div>
         {dialogGerar}
