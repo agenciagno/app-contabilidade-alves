@@ -4740,6 +4740,7 @@ export type Database = {
           auto_lote_pagamentos_presumido_real: boolean
           auto_lote_pagamentos_simples: boolean
           auto_rotina_pgdas: boolean
+          auto_rotina_sitfis: boolean
           company_id: string
           updated_at: string
           volume_declarado_mes: number | null
@@ -4753,6 +4754,7 @@ export type Database = {
           auto_lote_pagamentos_presumido_real?: boolean
           auto_lote_pagamentos_simples?: boolean
           auto_rotina_pgdas?: boolean
+          auto_rotina_sitfis?: boolean
           company_id: string
           updated_at?: string
           volume_declarado_mes?: number | null
@@ -4766,6 +4768,7 @@ export type Database = {
           auto_lote_pagamentos_presumido_real?: boolean
           auto_lote_pagamentos_simples?: boolean
           auto_rotina_pgdas?: boolean
+          auto_rotina_sitfis?: boolean
           company_id?: string
           updated_at?: string
           volume_declarado_mes?: number | null
