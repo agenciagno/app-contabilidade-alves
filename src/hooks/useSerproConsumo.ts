@@ -29,11 +29,11 @@ export interface SerproConfig {
   auto_lote_pagamentos_simples: boolean;
   /** Lote do dia 30: consulta Pagamentos de todos os clientes do Presumido e do Real. Cobra 1 consulta por cliente. Padrão: desligado. */
   auto_lote_pagamentos_presumido_real: boolean;
-  /** Leitura bimestral do PDF da declaração (faturamento), no dia 30 dos meses pares. Cobra 1 consulta por declaração baixada. Padrão: ligado. */
+  /** Leitura mensal do PDF da declaração (faturamento), no dia 30 de todo mês. Cobra 1 consulta por declaração baixada. Padrão: ligado. */
   auto_leitura_faturamento: boolean;
   /** Rotina anual da DEFIS: 15/03 consulta quem ainda não entregou; dia seguinte ao prazo, só quem continua sem a DEFIS do ano. Cobra 1 consulta por cliente consultado. Padrão: ligado. */
   auto_rotina_defis: boolean;
-  /** Rotina bimestral da Situação Fiscal: no dia 30 dos meses pares, gera o relatório de todos os clientes ativos (matriz). Cobra R$ 0,32 por relatório. Padrão: ligado. */
+  /** Rotina mensal da Situação Fiscal: no dia 30 de todo mês, gera o relatório de todos os clientes ativos (matriz). Cobra R$ 0,32 por relatório. Padrão: ligado. */
   auto_rotina_sitfis: boolean;
   /** Rotina mensal da DCTFWeb e MIT: no dia 30, consulta só os clientes do Presumido e do Real marcados como "movimento novo". Cobra 2 consultas por cliente. Padrão: ligado. */
   auto_rotina_dctfweb: boolean;

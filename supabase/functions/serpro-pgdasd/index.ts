@@ -30,8 +30,8 @@ import { lerTodas } from "../_shared/paginar.ts";
 //                                                    fim de semana ou feriado nacional): consulta só quem ainda não transmitiu o mês anterior. Outros dias: nada.
 //                                                    Cada disparo faz até 60 clientes (os 4 horários cobrem a carteira); quem já foi feito é pulado. Interruptor:
 //                                                    serpro_config.auto_rotina_pgdas. Custa 1 consulta por cliente. Admin pode testar com { modo, dry_run: true } (não cobra).
-//   rotina_faturamento (cron 18:20 a 18:55 BRT, de 5 em 5 min; decisão de Gabriel, 01/10/2026, "opção C, a cada bimestre, primeira leitura em 30/10"): a cada dois meses
-//                                                    (dia 30 de outubro, dezembro, fevereiro [último dia], abril, junho e agosto) baixa e lê o PDF da declaração do mês anterior de
+//   rotina_faturamento (cron 18:20 a 18:55 BRT, de 5 em 5 min; decisão de Gabriel, 01/10/2026, primeira leitura em 30/10; de bimestral para mensal em 02/10/2026): todo mês
+//                                                    (dia 30; em fevereiro, o último dia) baixa e lê o PDF da declaração do mês anterior de
 //                                                    TODOS os clientes do Simples (CONSULTIMADECREC14, Consultar, R$ 0,24; PDF já guardado não cobra) e grava receita, RBT12, limite,
 //                                                    sublimite e fator r em serpro_faturamento. Quem já foi lido (mesma declaração) é pulado. Até 60 por disparo; os 8 horários cobrem a
 //                                                    carteira. No fim, avisa no sino quantos estão acima do limite, em atenção ou perto do sublimite. Interruptor:
@@ -528,12 +528,12 @@ async function lerFaturamento(payload: any, uid: string | null, via?: Via) {
   }
 }
 
-// ---------- rotina bimestral de faturamento ----------
+// ---------- rotina mensal de faturamento ----------
 const LIMITE_SIMPLES = 4_800_000;
-/** Dia 30 dos meses pares (out, dez, fev, abr, jun, ago); em fevereiro, o último dia do mês. */
-const ehDiaDoBimestre = (hoje: string) => {
+/** Dia 30 de todo mês; em fevereiro, o último dia do mês. */
+const ehDiaDaRodada = (hoje: string) => {
   const ano = Number(hoje.slice(0, 4)), mes = Number(hoje.slice(5, 7));
-  return mes % 2 === 0 && Number(hoje.slice(8, 10)) === Math.min(30, new Date(Date.UTC(ano, mes, 0)).getUTCDate());
+  return Number(hoje.slice(8, 10)) === Math.min(30, new Date(Date.UTC(ano, mes, 0)).getUTCDate());
 };
 
 /** Mesmos cortes da tela de Faturamento (src/hooks/useSerproFaturamento.ts): base = maior entre RBA e RBT12; 80% atenção, 95% crítico; sublimite perto a partir de 80%. */
@@ -567,7 +567,7 @@ async function avisarRotina(titulo: string, corpo: string, hoje: string) {
 }
 
 /**
- * Rotina bimestral de faturamento (decisão de Gabriel, 01/10/2026). O cron bate todo dia, em 8 horários; quem decide é o interruptor de Tech
+ * Rotina mensal de faturamento (decisão de Gabriel, 01/10/2026; de bimestral para mensal em 02/10/2026). O cron bate todo dia, em 8 horários; quem decide é o interruptor de Tech
  * (padrão ligado) e a DATA. Mês de referência = mês anterior. Lê a declaração vigente de cada cliente do Simples que já está no índice e ainda não foi lida.
  * Guardas: até 60 clientes e 100 s por disparo; para depois de 5 falhas seguidas do Serpro (PDF que não consigo ler não conta como falha do Serpro e não custa nada de novo).
  */
@@ -576,7 +576,7 @@ async function rotinaFaturamento(payload: any, uid: string | null) {
   const simulando = !!uid && payload.dry_run === true;
   const { data: cfg } = await supabase.from("serpro_config").select("auto_leitura_faturamento").eq("company_id", COMPANY_ID).maybeSingle();
   if (!simulando && cfg?.auto_leitura_faturamento === false) return json({ ok: true, desligada: true });
-  if (!(uid && payload.ignorar_data === true) && !ehDiaDoBimestre(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
+  if (!(uid && payload.ignorar_data === true) && !ehDiaDaRodada(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
 
   const pa = new Date(Date.UTC(Number(hoje.slice(0, 4)), Number(hoje.slice(5, 7)) - 2, 1)).toISOString().slice(0, 7);
   const periodo = `${pa}-01`;
@@ -610,7 +610,7 @@ async function rotinaFaturamento(payload: any, uid: string | null) {
     processados++;
     const resp = await lerFaturamento({ contact_id: c.id, periodo: pa }, uid, {
       origem: uid ? "manual" : "cron", semAviso: true,
-      finalidade: `Rotina bimestral de faturamento do Simples: baixar a declaração do PGDAS-D de ${mes} e ler receita e limites, para acompanhamento fiscal da carteira`,
+      finalidade: `Rotina mensal de faturamento do Simples: baixar a declaração do PGDAS-D de ${mes} e ler receita e limites, para acompanhamento fiscal da carteira`,
     });
     const j = await resp.json().catch(() => null);
     if (j?.ok === true) {
@@ -628,7 +628,7 @@ async function rotinaFaturamento(payload: any, uid: string | null) {
     await sleep(150);
   }
   const restantes = alvo.length - processados;
-  if (resumo.tarefas_concluidas > 0) await avisarConclusoes(supabase, COMPANY_ID, `${resumo.lidos} ${resumo.lidos === 1 ? "cliente" : "clientes"} do Simples (leitura bimestral de faturamento)`, resumo.tarefas_concluidas);
+  if (resumo.tarefas_concluidas > 0) await avisarConclusoes(supabase, COMPANY_ID, `${resumo.lidos} ${resumo.lidos === 1 ? "cliente" : "clientes"} do Simples (leitura mensal de faturamento)`, resumo.tarefas_concluidas);
 
   if (seguidas >= 5) {
     await avisarRotina("Leitura de faturamento do Simples parou por falhas", `A Receita falhou ${resumo.erros} vezes seguidas. Nada mais foi cobrado. Veja o registro de chamadas em Tech.`, hoje);
@@ -700,7 +700,7 @@ Deno.serve(async (req) => {
     return await rotinaPgdas({}, null);
   }
 
-  // Rotina bimestral de faturamento: cron com a chave anon; quem decide é o interruptor e a data (fora do dia, não cobra nada).
+  // Rotina mensal de faturamento: cron com a chave anon; quem decide é o interruptor e a data (fora do dia, não cobra nada).
   if (payload.action === "rotina_faturamento" && (bearer === Deno.env.get("SUPABASE_ANON_KEY") || jwtRole(bearer) === "anon")) {
     return await rotinaFaturamento({}, null);
   }

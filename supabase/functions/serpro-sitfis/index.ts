@@ -15,8 +15,8 @@ import { lerTodas } from "../_shared/paginar.ts";
 //                                   cobrada em 200 E em 202). Guarda o PDF no bucket privado e lê o resultado (sem pendências / com
 //                                   pendências / não lido). Se o relatório ainda estiver em processamento (202), o protocolo fica guardado e
 //                                   o próximo clique só repete o /Emitir, sem pedir protocolo novo.
-//   rotina_sitfis (cron de 5 em 5 min, 19:00 a 19:55 BRT; decisão de Gabriel, 01/10/2026: "consulta bimestral, rodada um em 30/10, sem rodada inaugural"):
-//                                   a cada dois meses (dia 30 de outubro, dezembro, fevereiro [último dia], abril, junho e agosto) gera o relatório de TODOS os clientes
+//   rotina_sitfis (cron de 5 em 5 min, 19:00 a 19:55 BRT; decisão de Gabriel, 01/10/2026: "rodada um em 30/10, sem rodada inaugural"; de bimestral para mensal em 02/10/2026):
+//                                   todo mês (dia 30; em fevereiro, o último dia) gera o relatório de TODOS os clientes
 //                                   ativos (matriz). Cada disparo faz um lote (até 30): pede os protocolos (grátis), espera o tempo informado UMA vez e emite cada relatório
 //                                   (R$ 0,32, cobrado também no 202, por isso a espera). Quem já tem relatório de hoje é pulado; protocolo em aberto (até 10 min) é reaproveitado.
 //                                   Cliente sem procuração para a Situação Fiscal (00002) fica de fora. Para após 5 falhas seguidas; limite de solicitações do Serpro (AV02/AV03)
@@ -122,7 +122,7 @@ async function emitirRelatorio(contactId: string, cnpj: string, registroId: stri
     finalidade: via.finalidadeEmissao ?? "Emissão do relatório de situação fiscal confirmada por usuário para acompanhamento fiscal do cliente",
   });
   // Na rotina, emissão que falha (cobrada) fecha o registro como erro: a rotina não tenta de novo o mesmo cliente no mesmo dia (cada tentativa custa).
-  const fechar = async () => { if (via.marcarErro) await supabase.from("serpro_sitfis").update({ status: "erro", protocolo: null, avisos: ["falha na emissão pela rotina bimestral"] }).eq("id", registroId); };
+  const fechar = async () => { if (via.marcarErro) await supabase.from("serpro_sitfis").update({ status: "erro", protocolo: null, avisos: ["falha na emissão pela rotina mensal"] }).eq("id", registroId); };
   if (e.status === 403) { await fechar(); return resp({ ok: false, semProcuracao: true, status: 403, error: "Sem procuração eletrônica para a Situação Fiscal deste cliente" }); }
   if (e.status === 202) {
     const seg = Math.ceil(esperaMs(pega(e.resposta?.dados, "tempoEspera")) / 1000);
@@ -175,15 +175,15 @@ async function gerar(payload: any, uid: string) {
   return json(r.corpo, r.http);
 }
 
-// ---------- rotina bimestral ----------
+// ---------- rotina mensal ----------
 const hojeBR = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 const dataBRde = (iso: string) => new Date(Date.parse(iso) - 3 * 3600_000).toISOString().slice(0, 10);
 const LOTE = 30;               // relatórios por disparo
 const PRECO_EMITIR = 0.32;     // R$ por relatório (faixa até 500 emissões no ciclo)
-/** Dia 30 dos meses pares (out, dez, fev, abr, jun, ago); em fevereiro, o último dia do mês. */
-const ehDiaDoBimestre = (hoje: string) => {
+/** Dia 30 de todo mês; em fevereiro, o último dia do mês. */
+const ehDiaDaRodada = (hoje: string) => {
   const ano = Number(hoje.slice(0, 4)), mes = Number(hoje.slice(5, 7));
-  return mes % 2 === 0 && Number(hoje.slice(8, 10)) === Math.min(30, new Date(Date.UTC(ano, mes, 0)).getUTCDate());
+  return Number(hoje.slice(8, 10)) === Math.min(30, new Date(Date.UTC(ano, mes, 0)).getUTCDate());
 };
 
 /** Um aviso por rodada e por dia no sino (admins e quem tem o módulo dashboard_federal). */
@@ -223,7 +223,7 @@ async function clientesDaRodada() {
 }
 
 /**
- * Rotina bimestral (decisão de Gabriel, 01/10/2026). O cron bate de 5 em 5 minutos; quem decide é o interruptor (padrão ligado) e a DATA. Cada disparo faz um lote:
+ * Rotina mensal (decisão de Gabriel, 01/10/2026; de bimestral para mensal em 02/10/2026). O cron bate de 5 em 5 minutos; quem decide é o interruptor (padrão ligado) e a DATA. Cada disparo faz um lote:
  * pede os protocolos (grátis), espera uma vez e emite. Guardas: 100 s de relógio, 5 falhas seguidas, limite de solicitações do Serpro interrompe os pedidos sem custo.
  */
 async function rotinaSitfis(payload: any, uid: string | null) {
@@ -231,7 +231,7 @@ async function rotinaSitfis(payload: any, uid: string | null) {
   const simulando = !!uid && payload.dry_run === true;
   const { data: cfg } = await supabase.from("serpro_config").select("auto_rotina_sitfis").eq("company_id", COMPANY_ID).maybeSingle();
   if (!simulando && cfg?.auto_rotina_sitfis === false) return json({ ok: true, desligada: true });
-  if (!(uid && payload.ignorar_data === true) && !ehDiaDoBimestre(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
+  if (!(uid && payload.ignorar_data === true) && !ehDiaDaRodada(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
 
   const { elegiveis, tentaveis, semProcuracao } = await clientesDaRodada();
   // Hoje: quem já tem relatório pronto, quem falhou na emissão (não repete no mesmo dia: cada emissão custa) e quem já gastou 3 solicitações (relatório que não fecha).
@@ -253,8 +253,8 @@ async function rotinaSitfis(payload: any, uid: string | null) {
   const lote = alvo.slice(0, LOTE);
   const via: Via = {
     origem: uid ? "manual" : "cron", marcarErro: true,
-    finalidadeProtocolo: "Rotina bimestral da Situação Fiscal: solicitar o protocolo do relatório de situação fiscal, para acompanhamento fiscal da carteira",
-    finalidadeEmissao: "Rotina bimestral da Situação Fiscal: emitir o relatório de situação fiscal da carteira, para acompanhamento fiscal do cliente",
+    finalidadeProtocolo: "Rotina mensal da Situação Fiscal: solicitar o protocolo do relatório de situação fiscal, para acompanhamento fiscal da carteira",
+    finalidadeEmissao: "Rotina mensal da Situação Fiscal: emitir o relatório de situação fiscal da carteira, para acompanhamento fiscal do cliente",
   };
   // Protocolos em aberto (menos de 10 min, de um disparo que não terminou): só falta emitir.
   const { data: abertas } = await supabase.from("serpro_sitfis").select("id,contact_id,protocolo,solicitado_em").eq("company_id", COMPANY_ID).eq("status", "aguardando").not("protocolo", "is", null).limit(5000);
@@ -318,7 +318,7 @@ async function rotinaSitfis(payload: any, uid: string | null) {
     const sem = lista.filter((x) => x.confiavel && x.resultado === "sem_pendencias").length;
     const conferir = lista.length - com - sem;
     const falharam = falhouHoje.size + resumo.erros;
-    await avisarRodada("Situação fiscal: rodada bimestral concluída",
+    await avisarRodada("Situação fiscal: rodada mensal concluída",
       `${lista.length} relatórios gerados de ${tentaveis.length} clientes · ${com} com pendências · ${sem} sem pendências · ${conferir} a conferir${falharam ? ` · ${falharam} falharam (sem nova tentativa hoje)` : ""}. ${semProcuracao} sem procuração não entram. A tarefa de quem tem pendência é criada amanhã às 08:00.`, hoje);
   }
   return json({ ok: true, hoje, no_escopo: tentaveis.length, sem_procuracao_pulados: semProcuracao, a_gerar: alvo.length, lote: lote.length, protocolos_pedidos: prontos.length, ...resumo, restantes: Math.max(restantes, 0),
@@ -349,7 +349,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   const payload = await req.json().catch(() => ({}));
-  // Rotina bimestral: cron com a chave anon; quem decide é o interruptor e a data (fora do dia 30 dos meses pares, não cobra nada).
+  // Rotina mensal: cron com a chave anon; quem decide é o interruptor e a data (fora do dia 30, não cobra nada).
   if (payload.action === "rotina_sitfis" && (bearer === Deno.env.get("SUPABASE_ANON_KEY") || jwtRole(bearer) === "anon")) {
     return await rotinaSitfis({}, null);
   }
