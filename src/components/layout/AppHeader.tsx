@@ -1,8 +1,11 @@
-import { Moon, Sun, LifeBuoy } from 'lucide-react';
+import { Moon, Sun, LifeBuoy, Landmark, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { UserMenu } from './UserMenu';
+import { HeaderMensagensEcac } from './HeaderMensagensEcac';
+import { HeaderResumoTarefas } from './HeaderResumoTarefas';
+import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { AccountSwitcher } from './AccountSwitcher';
 import { Logo } from '@/components/brand/Logo';
 import { isDevEnvironment } from '@/lib/environment';
@@ -15,7 +18,7 @@ import { isDevEnvironment } from '@/lib/environment';
  * Fundo --nav-surface, sem canto arredondado próprio (o único raio do shell
  * agora vive no conteúdo, ver AppLayout.tsx). Logo + AccountSwitcher (o
  * cartão de conta, que morava na sidebar) ficam à esquerda; à direita:
- * tema, notificações, Suporte e Perfil (avatar só, mais perto da borda) —
+ * tema, Mensagens e-CAC, notificações por categoria (Federais, Tarefas, Financeiras), Suporte e Perfil (avatar só, mais perto da borda) —
  * Agente IA saiu daqui e voltou a existir só como sub-item de Tech no menu
  * (decisão Gabriel: não precisa de atalho dedicado no header).
  *
@@ -28,6 +31,7 @@ export function AppHeader() {
   const navigate = useNavigate();
   const isDev = isDevEnvironment();
   const isLight = resolvedTheme !== 'dark';
+  const { isModuleVisible, isSubItemVisible } = useModuleAccess();
 
   return (
     <header className="sticky top-0 z-50 h-16 shrink-0 bg-nav-surface pt-[env(safe-area-inset-top)]">
@@ -61,7 +65,17 @@ export function AppHeader() {
             <span>{isLight ? 'claro' : 'escuro'}</span>
           </button>
 
-          <NotificationBell />
+          {/* Um ícone por categoria (pedido de Gabriel, 01/10/2026), cada um só
+              aparece para quem tem o módulo. Notificações Certidões entra quando
+              existir notificação de certidão (tela ainda "em breve"). */}
+          {isModuleVisible('mensagens') && <HeaderMensagensEcac />}
+          {isModuleVisible('dashboard_federal') && (
+            <NotificationBell title="Notificações Federais" icon={Landmark} filter={{ typePrefix: 'serpro_' }} />
+          )}
+          {isModuleVisible('fiscal') && <HeaderResumoTarefas />}
+          {isModuleVisible('financeiro') && isSubItemVisible('financeiro', 'financeiro_boletos') && (
+            <NotificationBell title="Notificações Financeiras" icon={Wallet} filter={{ types: ['boleto_pago'] }} />
+          )}
 
           <button
             onClick={() => navigate('/suporte')}

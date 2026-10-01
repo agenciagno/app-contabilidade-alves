@@ -28,7 +28,6 @@ export const MODULE_TREE: ModuleNode[] = [
     label: 'Reforma Tributária',
     children: [
       { key: 'reforma_tributaria_painel', label: 'Painel RT' },
-      { key: 'reforma_tributaria_calculadora', label: 'Calculadora RT' },
     ],
   },
   {

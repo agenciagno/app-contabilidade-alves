@@ -54,7 +54,6 @@ const MinhaConta = lazy(() => import("@/pages/MinhaConta"));
 const Suporte = lazy(() => import("@/pages/Suporte"));
 const Faturas = lazy(() => import("@/pages/Faturas"));
 const Equipe = lazy(() => import("@/pages/Equipe"));
-const ReformaTributariaCalculadora = lazy(() => import("@/pages/ReformaTributariaCalculadora"));
 const CadastroCertificados = lazy(() => import("@/pages/CadastroCertificados"));
 const DashboardFederal = lazy(() => import("@/pages/DashboardFederal"));
 const MensagensEcac = lazy(() => import("@/pages/MensagensEcac"));
@@ -161,7 +160,6 @@ const App = () => (
 
               {/* Reforma Tributária */}
               <Route path="/reforma-tributaria" element={<AppLayout><ModuleGuard moduleName="reforma_tributaria" subModule="reforma_tributaria_painel"><EmBreve moduleKey="reforma_tributaria" /></ModuleGuard></AppLayout>} />
-              <Route path="/reforma-tributaria/calculadora" element={<AppLayout><ModuleGuard moduleName="reforma_tributaria" subModule="reforma_tributaria_calculadora"><ReformaTributariaCalculadora /></ModuleGuard></AppLayout>} />
 
               {/* Gestão 360° */}
               <Route path="/gestao-360/portal" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_portal"><EmBreve moduleKey="gestao360_portal" /></ModuleGuard></AppLayout>} />

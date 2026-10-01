@@ -20,21 +20,35 @@ export interface NotificationRow {
   message?: string | null;
 }
 
-export function useNotifications() {
+/** Recorte por categoria — cada sino do header enxerga só os seus tipos. */
+export interface NotificationFilter {
+  /** Tipos exatos (ex.: 'boleto_pago'). */
+  types?: string[];
+  /** Prefixo de tipo (ex.: 'serpro_' pega serpro_mensagem, serpro_defis...). */
+  typePrefix?: string;
+}
+
+export function useNotifications(filter: NotificationFilter = {}) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const userId = user?.id;
+  // Chave por categoria; o prefixo ['notifications', userId] continua invalidando todas.
+  const scope = filter.typePrefix ? `prefix:${filter.typePrefix}` : filter.types ? `types:${filter.types.join(',')}` : 'all';
+  const queryKey = ['notifications', userId, scope];
 
   const query = useQuery<NotificationRow[]>({
-    queryKey: ['notifications', userId],
+    queryKey,
     queryFn: async () => {
       if (!userId) return [];
-      const { data, error } = await (supabase as any)
+      let q = (supabase as any)
         .from('notifications')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(20);
+      if (filter.typePrefix) q = q.like('type', `${filter.typePrefix}%`);
+      else if (filter.types) q = q.in('type', filter.types);
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as NotificationRow[];
     },
@@ -58,28 +72,29 @@ export function useNotifications() {
   const markAllAsRead = useMutation({
     mutationFn: async () => {
       if (!userId) return;
-      const unreadIds = (query.data ?? []).filter((n) => !n.read_at).map((n) => n.id);
-      if (unreadIds.length === 0) return;
-      const nowIso = new Date().toISOString();
-      // Sem .eq('user_id') — a RLS de UPDATE já limita ao que o admin pode gerenciar
-      // (próprias + as da empresa). Restringir por user_id deixaria as da empresa sempre não-lidas.
-      const { error } = await (supabase as any)
+      // Marca TODAS as não lidas da categoria, não só as 20 que o popover carrega —
+      // senão quem acumulou milhares (ex.: task_completed) nunca zera o selo.
+      let q = (supabase as any)
         .from('notifications')
-        .update({ read_at: nowIso })
-        .in('id', unreadIds);
+        .update({ read_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .is('read_at', null);
+      if (filter.typePrefix) q = q.like('type', `${filter.typePrefix}%`);
+      else if (filter.types) q = q.in('type', filter.types);
+      const { error } = await q;
       if (error) throw error;
     },
     onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ['notifications', userId] });
-      const previous = queryClient.getQueryData<NotificationRow[]>(['notifications', userId]);
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<NotificationRow[]>(queryKey);
       const nowIso = new Date().toISOString();
-      queryClient.setQueryData<NotificationRow[]>(['notifications', userId], (old) =>
+      queryClient.setQueryData<NotificationRow[]>(queryKey, (old) =>
         (old ?? []).map((n) => (n.read_at ? n : { ...n, read_at: nowIso }))
       );
       return { previous };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(['notifications', userId], ctx.previous);
+      if (ctx?.previous) queryClient.setQueryData(queryKey, ctx.previous);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['notifications', userId] }),
   });
@@ -96,13 +111,13 @@ export function useNotifications() {
       if (error) throw error;
     },
     onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ['notifications', userId] });
-      const previous = queryClient.getQueryData<NotificationRow[]>(['notifications', userId]);
-      queryClient.setQueryData<NotificationRow[]>(['notifications', userId], []);
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<NotificationRow[]>(queryKey);
+      queryClient.setQueryData<NotificationRow[]>(queryKey, []);
       return { previous };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(['notifications', userId], ctx.previous);
+      if (ctx?.previous) queryClient.setQueryData(queryKey, ctx.previous);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['notifications', userId] }),
   });
@@ -110,7 +125,7 @@ export function useNotifications() {
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
-      .channel(`notifications-${userId}-${Math.random().toString(36).slice(2)}`)
+      .channel(`notifications-${userId}-${scope}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes' as any,
         { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
@@ -122,7 +137,7 @@ export function useNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, queryClient]);
+  }, [userId, queryClient, scope]);
 
   return {
     notifications,

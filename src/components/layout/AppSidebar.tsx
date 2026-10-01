@@ -46,6 +46,7 @@ import {
   LifeBuoy,
   type LucideIcon,
 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { NavLink } from '@/components/NavLink';
 import { usePinnedShortcuts, PinnedShortcut } from '@/hooks/usePinnedShortcuts';
 import { useModuleAccess, type RoleGated } from '@/hooks/useModuleAccess';
@@ -159,6 +160,17 @@ interface SimpleModule extends RoleGated {
   iconName: string;
   /** Ausente = sem gate de módulo (rota já é aberta a qualquer usuário logado, ex. Suporte). */
   moduleKey?: string;
+  /**
+   * Submódulo checado contra `moduleKey`. Usado quando o item mora no menu de
+   * outro grupo que o dono da permissão (ex.: Certificados, do Cadastro,
+   * exibido em Monitoramento).
+   */
+  subKey?: string;
+  /**
+   * Rotas filhas que têm item próprio no menu: dentro delas este item NÃO
+   * fica ativo (senão Dashboard Federal acende junto com Procurações).
+   */
+  activeExcept?: string[];
 }
 
 interface CollapsibleModule extends RoleGated {
@@ -201,16 +213,6 @@ export const menuEntries: MenuEntry[] = [
   },
   {
     kind: 'collapsible',
-    title: 'Reforma Tributária',
-    icon: Scale,
-    moduleKey: 'reforma_tributaria',
-    items: [
-      { title: 'Painel RT', url: '/reforma-tributaria', icon: Scale, iconName: 'scale', subKey: 'reforma_tributaria_painel' },
-      { title: 'Calculadora RT', url: '/reforma-tributaria/calculadora', icon: Calculator, iconName: 'calculator', subKey: 'reforma_tributaria_calculadora' },
-    ],
-  },
-  {
-    kind: 'collapsible',
     title: 'Gestão 360°',
     icon: Compass,
     moduleKey: 'gestao360',
@@ -233,7 +235,6 @@ export const menuEntries: MenuEntry[] = [
       { title: 'Obrigações e Declarações', url: '/fiscal/obrigacoes', icon: BookOpen, iconName: 'book-open', subKey: 'fiscal_obrigacoes_declaracoes', requireAdmin: true },
       { title: 'Calendário Fiscal', url: '/fiscal/calendario', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_calendario', requireAdmin: true },
       { title: 'Obrigações Fiscais', url: '/fiscal/obrigacoes-fiscais', icon: FileCheck, iconName: 'file-check', subKey: 'fiscal_obrigacoes', requireAdmin: true },
-      { title: 'Agenda', url: '/fiscal/agenda', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_agenda', requireAdmin: true },
     ],
   },
 
@@ -245,6 +246,8 @@ export const menuEntries: MenuEntry[] = [
     icon: Landmark,
     iconName: 'landmark',
     moduleKey: 'dashboard_federal',
+    // Situação Fiscal e Procurações viraram itens próprios (01/10/2026).
+    activeExcept: ['/dashboard-federal/situacao-fiscal', '/dashboard-federal/procuracoes'],
   },
   {
     kind: 'simple',
@@ -256,11 +259,19 @@ export const menuEntries: MenuEntry[] = [
   },
   {
     kind: 'simple',
-    title: 'Parcelamentos',
-    url: '/parcelamentos',
-    icon: CreditCard,
-    iconName: 'credit-card',
-    moduleKey: 'parcelamentos',
+    title: 'Situação Fiscal',
+    url: '/dashboard-federal/situacao-fiscal',
+    icon: ShieldCheck,
+    iconName: 'shield-check',
+    moduleKey: 'dashboard_federal',
+  },
+  {
+    kind: 'simple',
+    title: 'Procurações',
+    url: '/dashboard-federal/procuracoes',
+    icon: FileSignature,
+    iconName: 'file-signature',
+    moduleKey: 'dashboard_federal',
   },
   {
     kind: 'simple',
@@ -269,6 +280,26 @@ export const menuEntries: MenuEntry[] = [
     icon: ScrollText,
     iconName: 'scroll-text',
     moduleKey: 'certidoes',
+  },
+  // Certificados e Alvarás vieram do grupo Cadastro (01/10/2026): rota e
+  // permissão seguem as do Cadastro, só o lugar no menu mudou.
+  {
+    kind: 'simple',
+    title: 'Certificados',
+    url: '/cadastros/certificados',
+    icon: BadgeCheck,
+    iconName: 'badge-check',
+    moduleKey: 'cadastro',
+    subKey: 'cadastros_certificados',
+  },
+  {
+    kind: 'simple',
+    title: 'Alvarás',
+    url: '/cadastros/alvaras',
+    icon: FileText,
+    iconName: 'file-text',
+    moduleKey: 'cadastro',
+    subKey: 'cadastros_alvaras',
   },
   {
     kind: 'simple',
@@ -287,14 +318,6 @@ export const menuEntries: MenuEntry[] = [
     icon: PackageSearch,
     iconName: 'package-search',
     moduleKey: 'classificacao_fiscal',
-  },
-  {
-    kind: 'simple',
-    title: 'Score Fiscal',
-    url: '/score-fiscal',
-    icon: Gauge,
-    iconName: 'gauge',
-    moduleKey: 'score_fiscal',
   },
   {
     kind: 'simple',
@@ -352,9 +375,6 @@ export const menuEntries: MenuEntry[] = [
     moduleKey: 'cadastro',
     items: [
       { title: 'Empresas', url: '/contatos', icon: Building2, iconName: 'building-2', subKey: 'contatos' },
-      { title: 'Procurações', url: '/cadastros/procuracoes', icon: FileSignature, iconName: 'file-signature', subKey: 'cadastros_procuracoes' },
-      { title: 'Certificados', url: '/cadastros/certificados', icon: BadgeCheck, iconName: 'badge-check', subKey: 'cadastros_certificados' },
-      { title: 'Alvarás', url: '/cadastros/alvaras', icon: FileText, iconName: 'file-text', subKey: 'cadastros_alvaras' },
       { title: 'Acessos', url: '/acessos', icon: LockKeyhole, iconName: 'lock-keyhole', subKey: 'acessos' },
       { title: 'Equipe', url: '/cadastros/equipe', icon: UsersRound, iconName: 'users-round', subKey: 'equipe' },
       // Veio do grupo Financeiro: no Cadastro da visão externa (audiência
@@ -390,6 +410,7 @@ export function AppSidebar() {
   const { pinnedShortcuts, isPinned, togglePin } = usePinnedShortcuts();
   const { isModuleVisible, isSubItemVisible, passesRoleGate } = useModuleAccess();
   const audience = useAudience();
+  const { pathname } = useLocation();
   const { pendingCount } = usePendingApprovals();
   const mensagensNovas = useContadorCaixaNova(isModuleVisible('mensagens'));
 
@@ -409,7 +430,11 @@ export function AppSidebar() {
   const isEntryVisible = (entry: MenuEntry): boolean => {
     if (entry.kind === 'section') return false; // resolvido na montagem da lista
     if (!passesRoleGate(entry)) return false;
-    if (entry.kind === 'simple') return entry.moduleKey ? isModuleVisible(entry.moduleKey) : true;
+    if (entry.kind === 'simple') {
+      if (!entry.moduleKey) return true;
+      if (!isModuleVisible(entry.moduleKey)) return false;
+      return entry.subKey ? isSubItemVisible(entry.moduleKey, entry.subKey) : true;
+    }
     // Grupo sem moduleKey (Cadastros) depende só dos itens.
     if (entry.moduleKey && !isModuleVisible(entry.moduleKey)) return false;
     return visibleItems(entry).length > 0;
@@ -517,7 +542,12 @@ export function AppSidebar() {
     );
   };
 
-  const renderSimpleEntry = (entry: SimpleModule) => (
+  const renderSimpleEntry = (entry: SimpleModule) => {
+    // Item com rotas filhas que têm item próprio: o destaque é calculado aqui
+    // (NavLink sozinho acenderia o pai junto com o filho).
+    const isUnder = (base: string) => pathname === base || pathname.startsWith(`${base}/`);
+    const manualActive = !!entry.activeExcept && isUnder(entry.url) && !entry.activeExcept.some(isUnder);
+    return (
     <SidebarMenuItem key={entry.title}>
       <SidebarMenuButton asChild tooltip={entry.title}>
         {/* NavItem do DS: 32px, raio 8, ícone 18, SC/nav (densidade 24/08/2026) */}
@@ -528,8 +558,9 @@ export function AppSidebar() {
             'flex h-8 items-center gap-2.5 rounded-sm text-nav text-nav-on-surface transition-[background,color] duration-[120ms]',
             showLabels ? 'px-3' : collapsedCenterClass,
             navHoverClass,
+            manualActive && navActiveClass,
           )}
-          activeClassName={navActiveClass}
+          activeClassName={entry.activeExcept ? undefined : navActiveClass}
         >
           <entry.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
           {showLabels && <span className="flex-1 truncate">{entry.title}</span>}
@@ -546,7 +577,8 @@ export function AppSidebar() {
         </NavLink>
       </SidebarMenuButton>
     </SidebarMenuItem>
-  );
+    );
+  };
 
   const renderCollapsibleEntry = (entry: CollapsibleModule) => (
     <SidebarMenuItem key={entry.title}>

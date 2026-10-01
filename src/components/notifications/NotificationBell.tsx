@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -7,11 +7,11 @@ import {
   ArrowRightLeft, Calendar, Info, CalendarClock, CalendarX, HandCoins, Mail, Receipt, ShieldCheck, FileCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import type { LucideIcon } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { useNotifications, NotificationRow } from '@/hooks/useNotifications';
-import { PushOptIn } from '@/components/notifications/PushOptIn';
+import { useNotifications, NotificationRow, type NotificationFilter } from '@/hooks/useNotifications';
 
 const TYPE_META: Record<string, { icon: any; color: string }> = {
   task_due: { icon: Clock, color: 'text-warn' },
@@ -90,14 +90,30 @@ function Item({ n, onClick }: { n: NotificationRow; onClick: (n: NotificationRow
   );
 }
 
-export function NotificationBell() {
+interface NotificationBellProps {
+  /** Nome da categoria — título do popover e dica do ícone (ex.: "Notificações Federais"). */
+  title: string;
+  /** Ícone do botão no header. */
+  icon?: LucideIcon;
+  /** Quais tipos de notificação esta categoria enxerga. */
+  filter: NotificationFilter;
+  /** Bloco fixo acima da lista (ex.: o resumo do dia em Tarefas). `close` fecha o popover. */
+  renderTop?: (close: () => void) => ReactNode;
+}
+
+/**
+ * Sino de UMA categoria de notificação (Federais, Financeiras...). O header
+ * monta um por categoria (pedido de Gabriel, 01/10/2026) — antes era um sino
+ * único com tudo misturado.
+ */
+export function NotificationBell({ title, icon: Icon = Bell, filter, renderTop }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll, isLoading } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll, isLoading } = useNotifications(filter);
 
   const handleClear = () => {
     if (notifications.length === 0) return;
-    if (window.confirm('Limpar todas as notificações? Esta ação não pode ser desfeita.')) {
+    if (window.confirm(`Limpar as ${notifications.length} notificações de “${title}”? Esta ação não pode ser desfeita.`)) {
       clearAll();
     }
   };
@@ -113,8 +129,8 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative text-nav-on-surface hover:bg-white/10 hover:text-nav-on-surface">
-          <Bell className="w-5 h-5" />
+        <Button variant="ghost" size="icon" title={title} aria-label={title} className="relative text-nav-on-surface hover:bg-white/10 hover:text-nav-on-surface">
+          <Icon className="w-5 h-5" />
           {unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold rounded-full bg-destructive text-destructive-foreground px-1">
               {unreadCount > 9 ? '9+' : unreadCount}
@@ -124,7 +140,7 @@ export function NotificationBell() {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[380px] p-0">
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/50 gap-1">
-          <h3 className="text-sm font-semibold shrink-0">Notificações</h3>
+          <h3 className="text-sm font-semibold shrink-0">{title}</h3>
           <div className="flex items-center gap-0.5">
             <Button
               variant="ghost"
@@ -146,12 +162,12 @@ export function NotificationBell() {
             </Button>
           </div>
         </div>
-        <PushOptIn />
+        {renderTop?.(() => setOpen(false))}
         <ScrollArea className="max-h-[420px]">
           {isLoading ? (
             <div className="px-3 py-8 text-center text-sm text-muted-foreground">Carregando...</div>
           ) : notifications.length === 0 ? (
-            <div className="px-3 py-8 text-center text-sm text-muted-foreground">Nenhuma notificação</div>
+            <div className="px-3 py-8 text-center text-sm text-muted-foreground">Nenhuma notificação por aqui</div>
           ) : (
             <div className="flex flex-col">
               {notifications.map((n) => (
