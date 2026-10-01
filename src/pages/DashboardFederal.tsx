@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  BadgeCheck, BarChart3, ClipboardList, CreditCard, FileCheck, FileSignature, FileSpreadsheet, FileX,
+  BadgeCheck, BarChart3, ClipboardList, CreditCard, FileCheck, FileSpreadsheet, FileX,
   Calculator, ClipboardCheck, Gavel, Landmark, Mail, Receipt, Scale, ShieldCheck, UserX, ArrowRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -138,12 +138,13 @@ export default function DashboardFederal() {
         linhas: [`${sfSemPend} sem pendências · ${sfComPend} com pendências`, `${sfGerados} de ${sfEstados.length} clientes com relatório${sfConferir ? ` · ${sfConferir} a conferir` : ''}`],
       },
       {
-        titulo: 'DCTFWeb', icone: FileSpreadsheet, to: '/dashboard-federal/dctfweb-mit', tom: dctfNovos > 0 || dctfSem > 0 ? 'warn' : dmConsultados === 0 ? 'neutral' : 'ok',
-        linhas: [`${dctfOk} com recibo · ${dctfSem} sem declaração em ${rotuloCompetencia(competencia)}`, `${dctfNovos} com movimento novo · ${dmConsultados} de ${dmAtivos.length} consultados`],
-      },
-      {
-        titulo: 'MIT', icone: FileSignature, to: '/dashboard-federal/dctfweb-mit', tom: dmConsultados === 0 ? 'neutral' : mitSem > 0 ? 'warn' : 'ok',
-        linhas: [`${mitOk} encerradas · ${mitSem} sem apuração em ${rotuloCompetencia(competencia)}`, `${dmConsultados} de ${dmAtivos.length} clientes consultados`],
+        titulo: 'DCTFWeb e MIT', icone: FileSpreadsheet, to: '/dashboard-federal/dctfweb-mit',
+        tom: dctfNovos > 0 || dctfSem > 0 || mitSem > 0 ? 'warn' : dmConsultados === 0 ? 'neutral' : 'ok',
+        linhas: [
+          `${dctfOk} DCTFWeb com recibo · ${mitOk} MIT encerradas`,
+          `${dctfSem} sem DCTFWeb · ${mitSem} sem MIT em ${rotuloCompetencia(competencia)}`,
+          `${dctfNovos} com movimento novo · ${dmConsultados} de ${dmAtivos.length} consultados`,
+        ],
       },
       {
         titulo: 'Termos de intimação', icone: Gavel, to: '/dashboard-federal/intimacoes', tom: abertas.length > 0 ? 'danger' : 'ok',
