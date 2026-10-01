@@ -117,6 +117,11 @@ export default function TechConsumoSerpro() {
       ligada: 'Leitura bimestral do faturamento ligada.', desligada: 'Leitura bimestral do faturamento desligada.',
     },
     {
+      chave: 'auto_rotina_defis', rotina: rotina('defis-anual'), titulo: 'Conferir a DEFIS duas vezes por ano',
+      texto: (<>A DEFIS vence em <strong className="text-ink">31 de março</strong> do ano seguinte (se cair em fim de semana ou feriado, no próximo dia útil). Em <strong className="text-ink">15 de março</strong>, o sistema consulta o índice das DEFIS de cada cliente do Simples que ainda não tem a do ano na lista, para a equipe cobrar a tempo. No <strong className="text-ink">dia seguinte ao prazo</strong> (1º de abril de 2027), consulta de novo <strong className="text-ink">só quem continua sem a DEFIS</strong>: a consulta depois do prazo é a prova de "não entregue". Empresa aberta depois do ano, filial e quem não tem procuração não entram. Ao fim de cada rodada, avisa no sino.</>),
+      ligada: 'Rotina anual da DEFIS ligada.', desligada: 'Rotina anual da DEFIS desligada.',
+    },
+    {
       chave: 'auto_lote_pagamentos_simples', rotina: rotina('lote-simples'), titulo: 'Detalhes dos pagamentos do Simples no dia 30',
       texto: (<>Durante o mês, quem pagou aparece pela rotina gratuita diária (selo "pagamento novo"). No <strong className="text-ink">dia 30</strong> (em fevereiro, no último dia do mês), às 18:00, o sistema relê esse sensor gratuito e consulta Pagamentos na Receita <strong className="text-ink">só dos clientes do Simples que tiveram pagamento no mês</strong>, para guardar os detalhes: documento, data, valor e composição. Quem não pagou nada não é cobrado. Conclui a tarefa do DAS de quem pagou e, ao terminar, avisa no sino quantos DAS continuam sem pagamento. Quem não tem procuração e quem já foi consultado no dia também não é cobrado. A Receita demora uns dias para registrar: o pagamento dos últimos dias do mês entra na consulta do mês seguinte.</>),
       ligada: 'Lote do dia 30 do Simples ligado.', desligada: 'Lote do dia 30 do Simples desligado.',

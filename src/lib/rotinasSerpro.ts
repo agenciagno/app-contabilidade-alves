@@ -6,7 +6,7 @@
 export type TipoRotina = 'Monitorar' | 'Consultar' | 'Emitir' | 'sem_chamada';
 
 /** Rotinas que cobram e têm interruptor próprio em Tech (colunas de serpro_config). */
-export type InterruptorRotina = 'auto_rotina_pgdas' | 'auto_lote_pagamentos_simples' | 'auto_lote_pagamentos_presumido_real' | 'auto_leitura_faturamento';
+export type InterruptorRotina = 'auto_rotina_pgdas' | 'auto_lote_pagamentos_simples' | 'auto_lote_pagamentos_presumido_real' | 'auto_leitura_faturamento' | 'auto_rotina_defis';
 
 export interface RotinaSerpro {
   id: string;
@@ -52,6 +52,10 @@ export const ROTINAS: RotinaSerpro[] = [
   {
     id: 'leitura-faturamento', nome: 'Faturamento do Simples: leitura do PDF da declaração, a cada dois meses', quando: 'dia 30 de outubro, dezembro, fevereiro (último dia), abril, junho e agosto, de 18:20 a 18:55', tipo: 'Consultar', chamadasPorMes: 72, interruptor: 'auto_leitura_faturamento', padraoLigado: true,
     faz: 'Baixa e lê o PDF da declaração do mês anterior de todos os clientes do Simples e guarda receita, acumulados de 12 meses e do ano, limite, sublimite e fator r, que alimentam o cartão "Faturamento e limites". A primeira leitura é em 30/10/2026. Ao terminar, avisa no sino quantos estão acima do limite, em atenção ou perto do sublimite. Estimativa: 144 clientes por rodada, ou seja, 72 consultas por mês na média (cerca de R$ 34,56 por rodada).',
+  },
+  {
+    id: 'defis-anual', nome: 'DEFIS: quem entregou a declaração anual (duas rodadas por ano)', quando: '15 de março (todos) e dia seguinte ao prazo, 1º de abril de 2027 (só quem continua sem a DEFIS), de 08:20 a 08:30', tipo: 'Consultar', chamadasPorMes: 16, interruptor: 'auto_rotina_defis', padraoLigado: true,
+    faz: 'Em 15 de março, consulta o índice das DEFIS de cada cliente do Simples que ainda não tem a do ano na lista, para a equipe cobrar antes do prazo. No dia seguinte ao prazo (31 de março, ou o próximo dia útil), consulta de novo só quem continua sem a DEFIS: a consulta depois do prazo é a prova de "não entregue". Fora do escopo: empresa aberta depois do ano, filial e quem não tem procuração. Estimativa: cerca de 190 consultas por ano (uns 16 por mês na média).',
   },
   {
     id: 'procuracoes', nome: 'Procurações: aviso de vencimento', quando: 'toda segunda, 08:00', tipo: 'sem_chamada', chamadasPorMes: 0,

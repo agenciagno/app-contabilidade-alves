@@ -4,6 +4,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { invocarSerpro } from '@/lib/invocarSerpro';
 import { fetchAllPages } from '@/lib/fetch-all';
 import { STATUS_MONITORADO } from '@/hooks/useSerproCaixaPostal';
+import { proximoDiaUtil } from '@/lib/prazosFederais';
 
 export interface DefisRow {
   id: string;
@@ -38,8 +39,11 @@ export const TIPO_DEFIS: Record<number, string> = {
 const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
 const digitos = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
 
-/** Prazo da DEFIS do ano-calendário: 31 de março do ano seguinte. */
-export const prazoDefis = (ano: number) => new Date(ano + 1, 2, 31, 23, 59, 59);
+/** Prazo da DEFIS do ano-calendário: 31 de março do ano seguinte; fim de semana ou feriado nacional passa ao próximo dia útil (até 23:59). */
+export const prazoDefis = (ano: number) => {
+  const [a, m, d] = proximoDiaUtil(`${ano + 1}-03-31`).split('-').map(Number);
+  return new Date(a, m - 1, d, 23, 59, 59);
+};
 
 export function defisDoAno(l: LinhaDefis, ano: number): DefisRow | null {
   const doAno = l.declaracoes.filter((d) => d.ano_calendario === ano);
