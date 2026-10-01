@@ -5,6 +5,7 @@ import { criarSerpro, jwtRole, onlyDigits, sleep } from "../_shared/serpro-core.
 import { pega } from "../_shared/pgdasd-indice.ts";
 import { lerIndiceDefis } from "../_shared/defis-indice.ts";
 import { assinar, guardarPdf } from "../_shared/serpro-arquivos.ts";
+import { lerTodas } from "../_shared/paginar.ts";
 
 // ---------------------------------------------------------------------------
 // DEFIS (declaração anual do Simples Nacional, Serpro Integra Contador) — F4 Onda 2, passo 4, 30/09/2026. Só leitura.
@@ -135,8 +136,9 @@ async function avisarRodada(titulo: string, corpo: string, hoje: string) {
 async function carteiraDefis(ano: number) {
   const { data: contatos } = await supabase.from("contacts").select("id,name,display_name,document,data_abertura_receita,data_abertura_rf")
     .eq("company_id", COMPANY_ID).eq("is_active", true).eq("status_cliente", STATUS_MONITORADO).eq("tax_regime", "simples_nacional").order("name");
-  const { data: procs } = await supabase.from("serpro_procuracoes").select("contact_id,status,data_fim")
-    .eq("company_id", COMPANY_ID).eq("fonte", "integra_procuracoes").in("codigo_procuracao", CODIGOS_PROCURACAO).limit(5000);
+  // O mapa de procurações passa de 1.000 linhas (teto do banco por consulta): lê em páginas, senão cliente sem procuração parece "sem mapa" e é tentado (cobrado, 403).
+  const procs = await lerTodas<{ contact_id: string; status: string; data_fim: string | null }>((de, ate) => supabase.from("serpro_procuracoes").select("contact_id,status,data_fim")
+    .eq("company_id", COMPANY_ID).eq("fonte", "integra_procuracoes").in("codigo_procuracao", CODIGOS_PROCURACAO).order("id").range(de, ate));
   const hoje = hojeBR();
   const comMapa = new Map<string, boolean>();
   for (const r of (procs ?? []) as { contact_id: string; status: string; data_fim: string | null }[]) {

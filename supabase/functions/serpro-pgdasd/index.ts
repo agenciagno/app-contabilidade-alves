@@ -5,6 +5,7 @@ import { criarSerpro, jwtRole, onlyDigits, sleep } from "../_shared/serpro-core.
 import { lerIndicePgdasd, pega } from "../_shared/pgdasd-indice.ts";
 import { lerDeclaracaoPgdasd, type DeclaracaoPgdasd } from "../_shared/pgdasd-extrair.ts";
 import { avisarConclusoes, concluirTarefaDas, concluirTarefaFiscal } from "../_shared/tarefas-fiscais.ts";
+import { lerTodas } from "../_shared/paginar.ts";
 
 // ---------------------------------------------------------------------------
 // PGDAS-D e DAS (Serpro Integra Contador, Simples Nacional) — F4 Onda 2, passo 2, 30/09/2026. Só leitura + emissão de DAS.
@@ -205,8 +206,9 @@ async function carteiraDoSimples(ano: number) {
     .eq("company_id", COMPANY_ID).eq("is_active", true).eq("status_cliente", STATUS_MONITORADO).eq("tax_regime", "simples_nacional").order("name");
   const { data: consultas } = await supabase.from("serpro_pgdasd_consultas").select("contact_id,consultado_em").eq("company_id", COMPANY_ID).eq("ano", ano).limit(1000);
   const consultadoEm = new Map<string, string>((consultas ?? []).map((c: any) => [c.contact_id as string, c.consultado_em as string]));
-  const { data: procs } = await supabase.from("serpro_procuracoes").select("contact_id,status,data_fim")
-    .eq("company_id", COMPANY_ID).eq("fonte", "integra_procuracoes").in("codigo_procuracao", CODIGOS_PROCURACAO).limit(5000);
+  // O mapa de procurações passa de 1.000 linhas (teto do banco por consulta): lê em páginas, senão cliente sem procuração parece "sem mapa" e é tentado (cobrado, 403).
+  const procs = await lerTodas<{ contact_id: string; status: string; data_fim: string | null }>((de, ate) => supabase.from("serpro_procuracoes").select("contact_id,status,data_fim")
+    .eq("company_id", COMPANY_ID).eq("fonte", "integra_procuracoes").in("codigo_procuracao", CODIGOS_PROCURACAO).order("id").range(de, ate));
   const hoje = hojeBR();
   const comMapa = new Map<string, boolean>();
   for (const r of (procs ?? []) as { contact_id: string; status: string; data_fim: string | null }[]) {
