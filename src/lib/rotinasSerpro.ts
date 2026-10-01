@@ -6,7 +6,7 @@
 export type TipoRotina = 'Monitorar' | 'Consultar' | 'Emitir' | 'sem_chamada';
 
 /** Rotinas que cobram e têm interruptor próprio em Tech (colunas de serpro_config). */
-export type InterruptorRotina = 'auto_rotina_pgdas' | 'auto_lote_pagamentos_simples' | 'auto_lote_pagamentos_presumido_real';
+export type InterruptorRotina = 'auto_rotina_pgdas' | 'auto_lote_pagamentos_simples' | 'auto_lote_pagamentos_presumido_real' | 'auto_leitura_faturamento';
 
 export interface RotinaSerpro {
   id: string;
@@ -48,6 +48,10 @@ export const ROTINAS: RotinaSerpro[] = [
   {
     id: 'lote-presumido-real', nome: 'Pagamentos do Presumido e do Real: consulta completa no dia 30', quando: 'dia 30 (em fevereiro, o último dia do mês), 18:10', tipo: 'Consultar', chamadasPorMes: 35, interruptor: 'auto_lote_pagamentos_presumido_real', padraoLigado: false,
     faz: 'Consulta Pagamentos na Receita de todos os clientes do Presumido e do Real (matriz): traz os DARF pagos do mês anterior e conclui as tarefas de PIS/COFINS e IRPJ/CSLL quando os dois tributos foram pagos. Estimativa: 35 clientes consultáveis.',
+  },
+  {
+    id: 'leitura-faturamento', nome: 'Faturamento do Simples: leitura do PDF da declaração, a cada dois meses', quando: 'dia 30 de outubro, dezembro, fevereiro (último dia), abril, junho e agosto, de 18:20 a 18:55', tipo: 'Consultar', chamadasPorMes: 72, interruptor: 'auto_leitura_faturamento', padraoLigado: true,
+    faz: 'Baixa e lê o PDF da declaração do mês anterior de todos os clientes do Simples e guarda receita, acumulados de 12 meses e do ano, limite, sublimite e fator r, que alimentam o cartão "Faturamento e limites". A primeira leitura é em 30/10/2026. Ao terminar, avisa no sino quantos estão acima do limite, em atenção ou perto do sublimite. Estimativa: 144 clientes por rodada, ou seja, 72 consultas por mês na média (cerca de R$ 34,56 por rodada).',
   },
   {
     id: 'procuracoes', nome: 'Procurações: aviso de vencimento', quando: 'toda segunda, 08:00', tipo: 'sem_chamada', chamadasPorMes: 0,

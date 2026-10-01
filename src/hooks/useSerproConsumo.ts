@@ -29,6 +29,8 @@ export interface SerproConfig {
   auto_lote_pagamentos_simples: boolean;
   /** Lote do dia 30: consulta Pagamentos de todos os clientes do Presumido e do Real. Cobra 1 consulta por cliente. Padrão: desligado. */
   auto_lote_pagamentos_presumido_real: boolean;
+  /** Leitura bimestral do PDF da declaração (faturamento), no dia 30 dos meses pares. Cobra 1 consulta por declaração baixada. Padrão: ligado. */
+  auto_leitura_faturamento: boolean;
 }
 
 // Tabela de preços do contrato Serpro nº 599032 (Anexo I, 28/09/2026). Cada faixa: quantidade máxima na faixa e valor por requisição.
@@ -102,7 +104,7 @@ export function useSerproConfig() {
     queryKey: ['serpro-config', company?.id],
     enabled: !!company?.id,
     queryFn: async (): Promise<SerproConfig> => {
-      const { data, error } = await supabase.from('serpro_config').select('alerta_gasto_mensal, volume_declarado_mes, auto_concluir_tarefas, auto_criar_tarefas, auto_rotina_pgdas, auto_lote_pagamentos_simples, auto_lote_pagamentos_presumido_real').eq('company_id', company!.id).maybeSingle();
+      const { data, error } = await supabase.from('serpro_config').select('alerta_gasto_mensal, volume_declarado_mes, auto_concluir_tarefas, auto_criar_tarefas, auto_rotina_pgdas, auto_lote_pagamentos_simples, auto_lote_pagamentos_presumido_real, auto_leitura_faturamento').eq('company_id', company!.id).maybeSingle();
       if (error) throw error;
       return {
         alerta_gasto_mensal: Number(data?.alerta_gasto_mensal ?? 100),
@@ -112,6 +114,7 @@ export function useSerproConfig() {
         auto_rotina_pgdas: data?.auto_rotina_pgdas ?? true,
         auto_lote_pagamentos_simples: data?.auto_lote_pagamentos_simples ?? false,
         auto_lote_pagamentos_presumido_real: data?.auto_lote_pagamentos_presumido_real ?? false,
+        auto_leitura_faturamento: data?.auto_leitura_faturamento ?? true,
       };
     },
   });

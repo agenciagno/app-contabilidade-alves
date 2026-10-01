@@ -29,6 +29,12 @@ import { avisarConclusoes, concluirTarefaDas, concluirTarefaFiscal } from "../_s
 //                                                    fim de semana ou feriado nacional): consulta só quem ainda não transmitiu o mês anterior. Outros dias: nada.
 //                                                    Cada disparo faz até 60 clientes (os 4 horários cobrem a carteira); quem já foi feito é pulado. Interruptor:
 //                                                    serpro_config.auto_rotina_pgdas. Custa 1 consulta por cliente. Admin pode testar com { modo, dry_run: true } (não cobra).
+//   rotina_faturamento (cron 18:20 a 18:55 BRT, de 5 em 5 min; decisão de Gabriel, 01/10/2026, "opção C, a cada bimestre, primeira leitura em 30/10"): a cada dois meses
+//                                                    (dia 30 de outubro, dezembro, fevereiro [último dia], abril, junho e agosto) baixa e lê o PDF da declaração do mês anterior de
+//                                                    TODOS os clientes do Simples (CONSULTIMADECREC14, Consultar, R$ 0,24; PDF já guardado não cobra) e grava receita, RBT12, limite,
+//                                                    sublimite e fator r em serpro_faturamento. Quem já foi lido (mesma declaração) é pulado. Até 60 por disparo; os 8 horários cobrem a
+//                                                    carteira. No fim, avisa no sino quantos estão acima do limite, em atenção ou perto do sublimite. Interruptor:
+//                                                    serpro_config.auto_leitura_faturamento (padrão ligado). Admin simula com { dry_run: true, ignorar_data?: true } (não cobra).
 //   link         { tipo, id }                        link assinado (10 min) de um PDF já guardado (sem chamada ao Serpro).
 //   publicar     { tabela: "das" | "declaracao", id, visivel_portal }
 //
@@ -312,7 +318,10 @@ async function rotinaPgdas(payload: any, uid: string | null) {
   return json({ ok: true, modo, hoje, prazo, pa, ano, a_consultar: alvo.length, sem_procuracao_pulados: semProcuracao.length, ...r });
 }
 
-async function documentos(payload: any, uid: string) {
+/** Quem está pedindo: clique da equipe (padrão) ou rotina agendada. A rotina não avisa por cliente (um aviso só no fim). */
+type Via = { origem: "manual" | "cron"; finalidade?: string; semAviso?: boolean };
+
+async function documentos(payload: any, uid: string | null, via?: Via) {
   const c = await carregarCliente(String(payload.contact_id ?? ""));
   if (c.resp) return c.resp;
   const aaaamm = periodoAAAAMM(payload.periodo);
@@ -328,8 +337,8 @@ async function documentos(payload: any, uid: string) {
   const r = await serpro({
     tipo: "Consultar", idSistema: "PGDASD", idServico: "CONSULTIMADECREC14",
     contribuinte: { numero: c.cnpj!, tipo: 2 }, dados: JSON.stringify({ periodoApuracao: aaaamm }),
-    uid, contactId: c.contato!.id, origem: "manual",
-    finalidade: `Consulta da declaração e do recibo do PGDAS-D (PA ${aaaamm.slice(4)}/${aaaamm.slice(0, 4)}) acionada por usuário para o cliente`,
+    uid, contactId: c.contato!.id, origem: via?.origem ?? "manual",
+    finalidade: via?.finalidade ?? `Consulta da declaração e do recibo do PGDAS-D (PA ${aaaamm.slice(4)}/${aaaamm.slice(0, 4)}) acionada por usuário para o cliente`,
   });
   if (r.status === 403) return json({ ok: false, semProcuracao: true, error: "Sem procuração eletrônica para o PGDAS-D deste cliente" });
   if (r.status !== 200) return json({ ok: false, status: r.status, error: msgErro(r) });
@@ -489,7 +498,7 @@ async function lerEGravar(decl: DeclaracaoBase, cnpj: string) {
   return { id: data?.id as string | undefined, confiavel, avisos, tarefasConcluidas };
 }
 
-async function lerFaturamento(payload: any, uid: string) {
+async function lerFaturamento(payload: any, uid: string | null, via?: Via) {
   const c = await carregarCliente(String(payload.contact_id ?? ""));
   if (c.resp) return c.resp;
   const aaaamm = periodoAAAAMM(payload.periodo);
@@ -501,7 +510,7 @@ async function lerFaturamento(payload: any, uid: string) {
   let baixou = false;
   if (!decl.declaracao_path) {
     // PDF ainda não guardado: baixa pela mesma rotina do botão "Declaração (PDF)" (1 consulta ao Serpro, cobrada uma vez).
-    const resp = await documentos({ contact_id: c.contato!.id, periodo: payload.periodo }, uid);
+    const resp = await documentos({ contact_id: c.contato!.id, periodo: payload.periodo }, uid, via);
     const j = await resp.clone().json().catch(() => null);
     if (!j?.ok) return resp;
     baixou = true;
@@ -510,11 +519,132 @@ async function lerFaturamento(payload: any, uid: string) {
   }
   try {
     const f = await lerEGravar(decl, c.cnpj!);
-    await avisarConclusoes(supabase, COMPANY_ID, c.contato!.name ?? "Cliente", f.tarefasConcluidas);
+    if (!via?.semAviso) await avisarConclusoes(supabase, COMPANY_ID, c.contato!.name ?? "Cliente", f.tarefasConcluidas);
     return json({ ok: true, baixou, id: f.id, confiavel: f.confiavel, avisos: f.avisos, tarefas_concluidas: f.tarefasConcluidas });
   } catch (e) {
     return json({ ok: false, baixou, error: `O PDF está guardado, mas não consegui lê-lo: ${(e as Error).message}` });
   }
+}
+
+// ---------- rotina bimestral de faturamento ----------
+const LIMITE_SIMPLES = 4_800_000;
+/** Dia 30 dos meses pares (out, dez, fev, abr, jun, ago); em fevereiro, o último dia do mês. */
+const ehDiaDoBimestre = (hoje: string) => {
+  const ano = Number(hoje.slice(0, 4)), mes = Number(hoje.slice(5, 7));
+  return mes % 2 === 0 && Number(hoje.slice(8, 10)) === Math.min(30, new Date(Date.UTC(ano, mes, 0)).getUTCDate());
+};
+
+/** Mesmos cortes da tela de Faturamento (src/hooks/useSerproFaturamento.ts): base = maior entre RBA e RBT12; 80% atenção, 95% crítico; sublimite perto a partir de 80%. */
+function nivelDaLeitura(f: { rba_total: number | null; rbt12_total: number | null; limite_total: number | null; sublimite: number | null; confiavel: boolean | null }) {
+  if (!f.confiavel) return { limite: null as string | null, sublimite: null as string | null };
+  const a = f.rba_total, b = f.rbt12_total;
+  if (a === null && b === null) return { limite: null, sublimite: null };
+  const base = ((a ?? -1) >= (b ?? -1) ? a : b) as number;
+  const lim = f.limite_total && f.limite_total > 0 ? f.limite_total : LIMITE_SIMPLES;
+  const p = (base / lim) * 100;
+  const limite = p > 100 ? "acima" : p >= 95 ? "critico" : p >= 80 ? "atencao" : "regular";
+  const sublimite = !f.sublimite ? null : base > f.sublimite ? "acima" : base >= 0.8 * f.sublimite ? "perto" : "regular";
+  return { limite, sublimite };
+}
+
+/** Um aviso por rotina e por dia no sino (admins e quem tem o módulo dashboard_federal). */
+async function avisarRotina(titulo: string, corpo: string, hoje: string) {
+  try {
+    const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true })
+      .eq("company_id", COMPANY_ID).eq("type", "serpro_faturamento").eq("title", titulo).gte("created_at", `${hoje}T03:00:00Z`);
+    if ((count ?? 0) > 0) return;
+    const { data: alvos } = await supabase.from("profiles").select("user_id")
+      .eq("company_id", COMPANY_ID).eq("status_active", true).or("role.in.(admin,super_admin),allowed_modules.cs.{dashboard_federal}");
+    if (!alvos?.length) return;
+    await supabase.from("notifications").insert(alvos.map((t: { user_id: string }) => ({
+      user_id: t.user_id, company_id: COMPANY_ID, type: "serpro_faturamento", title: titulo, body: corpo, action_url: "/dashboard-federal/faturamento",
+    })));
+  } catch (e) {
+    console.error("Falha ao avisar a leitura de faturamento:", String((e as Error).message || e));
+  }
+}
+
+/**
+ * Rotina bimestral de faturamento (decisão de Gabriel, 01/10/2026). O cron bate todo dia, em 8 horários; quem decide é o interruptor de Tech
+ * (padrão ligado) e a DATA. Mês de referência = mês anterior. Lê a declaração vigente de cada cliente do Simples que já está no índice e ainda não foi lida.
+ * Guardas: até 60 clientes e 100 s por disparo; para depois de 5 falhas seguidas do Serpro (PDF que não consigo ler não conta como falha do Serpro e não custa nada de novo).
+ */
+async function rotinaFaturamento(payload: any, uid: string | null) {
+  const hoje = hojeBR();
+  const simulando = !!uid && payload.dry_run === true;
+  const { data: cfg } = await supabase.from("serpro_config").select("auto_leitura_faturamento").eq("company_id", COMPANY_ID).maybeSingle();
+  if (!simulando && cfg?.auto_leitura_faturamento === false) return json({ ok: true, desligada: true });
+  if (!(uid && payload.ignorar_data === true) && !ehDiaDoBimestre(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
+
+  const pa = new Date(Date.UTC(Number(hoje.slice(0, 4)), Number(hoje.slice(5, 7)) - 2, 1)).toISOString().slice(0, 7);
+  const periodo = `${pa}-01`;
+  const mes = `${pa.slice(5, 7)}/${pa.slice(0, 4)}`;
+  const { tentaveis, semProcuracao } = await carteiraDoSimples(Number(pa.slice(0, 4)));
+
+  // Declaração vigente de cada cliente no mês (a mais recente transmitida) e o que já foi lido dela.
+  const { data: decls } = await supabase.from("serpro_pgdasd_declaracoes").select("contact_id,numero_declaracao,transmitida_em,declaracao_path")
+    .eq("company_id", COMPANY_ID).eq("periodo_apuracao", periodo).order("transmitida_em", { ascending: false }).limit(5000);
+  const vigente = new Map<string, { numero: string; path: string | null }>();
+  for (const d of (decls ?? []) as { contact_id: string; numero_declaracao: string; declaracao_path: string | null }[]) {
+    if (!vigente.has(d.contact_id)) vigente.set(d.contact_id, { numero: d.numero_declaracao, path: d.declaracao_path });
+  }
+  const { data: lidas } = await supabase.from("serpro_faturamento").select("contact_id,numero_declaracao").eq("company_id", COMPANY_ID).eq("periodo_apuracao", periodo).limit(5000);
+  const jaLido = new Set((lidas ?? []).map((r: { contact_id: string; numero_declaracao: string }) => `${r.contact_id}|${r.numero_declaracao}`));
+  const comDeclaracao = tentaveis.filter((c: any) => vigente.has(c.id));
+  const alvo = comDeclaracao.filter((c: any) => !jaLido.has(`${c.id}|${vigente.get(c.id)!.numero}`));
+  const aBaixar = alvo.filter((c: any) => !vigente.get(c.id)!.path).length;
+
+  if (simulando) {
+    return json({ ok: true, dry_run: true, hoje, mes_de_referencia: pa, com_declaracao: comDeclaracao.length, ja_lidos: comDeclaracao.length - alvo.length, a_ler: alvo.length,
+      a_baixar_cobrado: aBaixar, ja_com_pdf_gratis: alvo.length - aBaixar, sem_procuracao_pulados: semProcuracao.length, custo_estimado_reais: Math.round(aBaixar * 0.24 * 100) / 100 });
+  }
+
+  const inicio = Date.now();
+  const resumo = { lidos: 0, baixados: 0, a_conferir: 0, erros: 0, tarefas_concluidas: 0 };
+  const falhas: string[] = [];
+  let seguidas = 0, processados = 0;
+  for (const c of alvo) {
+    if (processados >= 60 || Date.now() - inicio > 100_000 || seguidas >= 5) break;
+    processados++;
+    const resp = await lerFaturamento({ contact_id: c.id, periodo: pa }, uid, {
+      origem: uid ? "manual" : "cron", semAviso: true,
+      finalidade: `Rotina bimestral de faturamento do Simples: baixar a declaração do PGDAS-D de ${mes} e ler receita e limites, para acompanhamento fiscal da carteira`,
+    });
+    const j = await resp.json().catch(() => null);
+    if (j?.ok === true) {
+      seguidas = 0;
+      resumo.lidos++;
+      if (j.baixou === true) resumo.baixados++;
+      if (j.confiavel === false) resumo.a_conferir++;
+      resumo.tarefas_concluidas += Number(j.tarefas_concluidas ?? 0);
+    } else {
+      // PDF guardado que não consegui ler não é falha do Serpro (e tentar de novo não cobra): não conta para a parada.
+      if (!String(j?.error ?? "").startsWith("O PDF está guardado")) seguidas++;
+      resumo.erros++;
+      if (falhas.length < 10) falhas.push(`${c.display_name || c.name}: ${String(j?.error ?? j?.status ?? "falha")}`);
+    }
+    await sleep(150);
+  }
+  const restantes = alvo.length - processados;
+  if (resumo.tarefas_concluidas > 0) await avisarConclusoes(supabase, COMPANY_ID, `${resumo.lidos} ${resumo.lidos === 1 ? "cliente" : "clientes"} do Simples (leitura bimestral de faturamento)`, resumo.tarefas_concluidas);
+
+  if (seguidas >= 5) {
+    await avisarRotina("Leitura de faturamento do Simples parou por falhas", `A Receita falhou ${resumo.erros} vezes seguidas. Nada mais foi cobrado. Veja o registro de chamadas em Tech.`, hoje);
+  } else if (restantes === 0 && processados > 0) {
+    // Fim da rodada: resumo dos alertas com TODAS as leituras do mês (inclusive as feitas em disparos anteriores).
+    const { data: todas } = await supabase.from("serpro_faturamento").select("rba_total,rbt12_total,limite_total,sublimite,confiavel").eq("company_id", COMPANY_ID).eq("periodo_apuracao", periodo).limit(5000);
+    let acima = 0, atencao = 0, perto = 0, aConferir = 0;
+    for (const f of (todas ?? []) as any[]) {
+      if (!f.confiavel) { aConferir++; continue; }
+      const n = nivelDaLeitura(f);
+      if (n.limite === "acima" || n.sublimite === "acima") acima++;
+      if (n.limite === "atencao" || n.limite === "critico") atencao++;
+      if (n.sublimite === "perto") perto++;
+    }
+    await avisarRotina("Leitura de faturamento do Simples concluída",
+      `${(todas ?? []).length} declarações de ${mes} lidas · ${acima} acima do limite ou sublimite · ${atencao} em atenção (80% do limite ou mais) · ${perto} perto do sublimite · ${aConferir} com leitura a conferir.`, hoje);
+  }
+  return json({ ok: true, hoje, mes_de_referencia: pa, a_ler: alvo.length, a_baixar_cobrado: aBaixar, sem_procuracao_pulados: semProcuracao.length, ...resumo, restantes, parou_por_falhas: seguidas >= 5, falhas, segundos: Math.round((Date.now() - inicio) / 1000) });
 }
 
 const PASTA_TIPO: Record<string, { tabela: "serpro_pgdasd_declaracoes" | "serpro_pgdasd_das"; coluna: string; prefixo: string }> = {
@@ -568,6 +698,11 @@ Deno.serve(async (req) => {
     return await rotinaPgdas({}, null);
   }
 
+  // Rotina bimestral de faturamento: cron com a chave anon; quem decide é o interruptor e a data (fora do dia, não cobra nada).
+  if (payload.action === "rotina_faturamento" && (bearer === Deno.env.get("SUPABASE_ANON_KEY") || jwtRole(bearer) === "anon")) {
+    return await rotinaFaturamento({}, null);
+  }
+
   const { data: userData } = await supabase.auth.getUser(bearer);
   const uid = userData?.user?.id;
   if (!uid) return json({ error: "Não autenticado" }, 401);
@@ -584,12 +719,15 @@ Deno.serve(async (req) => {
     case "rotina_pgdas":
       if (!admin) return json({ error: "Só administradores rodam a rotina manualmente" }, 403);
       return await rotinaPgdas(payload, uid);
+    case "rotina_faturamento":
+      if (!admin) return json({ error: "Só administradores rodam a rotina manualmente" }, 403);
+      return await rotinaFaturamento(payload, uid);
     case "documentos": return await documentos(payload, uid);
     case "extrato": return await extrato(payload, uid);
     case "gerar_das": return await gerarDas(payload, uid);
     case "ler_faturamento": return await lerFaturamento(payload, uid);
     case "link": return await link(payload);
     case "publicar": return await publicar(payload);
-    default: return json({ error: "action inválida (consultar | consultar_carteira | rotina_pgdas | documentos | extrato | gerar_das | ler_faturamento | link | publicar)" }, 400);
+    default: return json({ error: "action inválida (consultar | consultar_carteira | rotina_pgdas | rotina_faturamento | documentos | extrato | gerar_das | ler_faturamento | link | publicar)" }, 400);
   }
 });

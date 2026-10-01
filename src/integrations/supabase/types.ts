@@ -4735,6 +4735,7 @@ export type Database = {
           alerta_gasto_mensal: number
           auto_concluir_tarefas: boolean
           auto_criar_tarefas: boolean
+          auto_leitura_faturamento: boolean
           auto_lote_pagamentos_presumido_real: boolean
           auto_lote_pagamentos_simples: boolean
           auto_rotina_pgdas: boolean
@@ -4746,6 +4747,7 @@ export type Database = {
           alerta_gasto_mensal?: number
           auto_concluir_tarefas?: boolean
           auto_criar_tarefas?: boolean
+          auto_leitura_faturamento?: boolean
           auto_lote_pagamentos_presumido_real?: boolean
           auto_lote_pagamentos_simples?: boolean
           auto_rotina_pgdas?: boolean
@@ -4757,6 +4759,7 @@ export type Database = {
           alerta_gasto_mensal?: number
           auto_concluir_tarefas?: boolean
           auto_criar_tarefas?: boolean
+          auto_leitura_faturamento?: boolean
           auto_lote_pagamentos_presumido_real?: boolean
           auto_lote_pagamentos_simples?: boolean
           auto_rotina_pgdas?: boolean
