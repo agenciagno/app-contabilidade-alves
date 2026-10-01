@@ -1,8 +1,15 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { format } from 'date-fns';
+import { Send } from 'lucide-react';
 
 import { DsBadge, type BadgeTone } from '@/components/ds';
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
+import { EnviarClienteDialog } from '@/components/gestao360/EnviarClienteDialog';
 import { TOM_NIVEL } from '@/components/gestao360/ListaClientesSheet';
+import { Button } from '@/components/ui/button';
+import { ROTULO_CANAL, useDocumentosCliente, useEnviosCliente } from '@/hooks/useEnvioCliente';
+import { modeloDocumentos } from '@/lib/mensagensCliente';
 import { digitos, ROTULO_NIVEL, type LinhaCarteira } from '@/lib/situacaoCarteira';
 
 const sigla = (pa: string) => `${pa.slice(5, 7)}/${pa.slice(0, 4)}`;
@@ -109,20 +116,30 @@ function linhasDaFicha(l: LinhaCarteira): Linha[] {
   return out;
 }
 
-/** Ficha do cliente escolhido no filtro: o mesmo estado que a carteira soma, só que de um cliente. */
+const DOCS_VISIVEIS = 6;
+
+/** Ficha do cliente escolhido no filtro: o mesmo estado que a carteira soma, só que de um cliente, mais os documentos para enviar. */
 export function FichaCliente({ linha: l }: { linha: LinhaCarteira }) {
   const linhas = linhasDaFicha(l);
+  const docs = useDocumentosCliente(l.contact_id);
+  const envios = useEnviosCliente(l.contact_id);
+  const [envio, setEnvio] = useState<{ marcados: string[] } | null>(null);
+  const guardados = docs.data ?? [];
+  const ultimo = envios.data?.[0];
+
   return (
     <section className="space-y-4 rounded-lg border border-line bg-paper p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-h4-card text-ink">{l.nome}</h2>
           <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)} · {l.regimeRotulo}</p>
+          <p className="text-meta text-muted-ink-2">Responsável: {l.responsavel?.nome ?? 'sem responsável no cadastro'}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <DsBadge tone={TOM_NIVEL[l.nivel]}>{ROTULO_NIVEL[l.nivel]}</DsBadge>
           <Link to={`/gestao-360/ausencias?cliente=${l.contact_id}&aba=ausencias`} className="text-ui-strong text-action hover:underline">Ausências do cliente</Link>
           <Link to={`/crm/cliente/${l.contact_id}`} className="text-ui-strong text-action hover:underline">Abrir cadastro</Link>
+          <Button size="sm" onClick={() => setEnvio({ marcados: [] })}><Send className="mr-1.5 h-4 w-4" />Enviar ao cliente</Button>
         </div>
       </div>
 
@@ -142,6 +159,35 @@ export function FichaCliente({ linha: l }: { linha: LinhaCarteira }) {
           </div>
         ))}
       </div>
+
+      <div className="space-y-2 border-t border-line-2 pt-4">
+        <h3 className="text-ui-strong text-ink">Documentos guardados</h3>
+        {docs.isLoading ? (
+          <p className="text-meta text-muted-ink">Procurando documentos…</p>
+        ) : guardados.length === 0 ? (
+          <p className="text-meta text-muted-ink">Nenhum documento deste cliente está guardado ainda. A rodada mensal (dia 30) guarda a Situação fiscal dos clientes.</p>
+        ) : (
+          <div className="divide-y divide-line-2">
+            {guardados.slice(0, DOCS_VISIVEIS).map((d) => (
+              <div key={`${d.tipo}:${d.id}`} className="flex items-center gap-3 py-2">
+                <span className="min-w-0 flex-1 truncate text-ui text-ink">{d.rotulo}</span>
+                <button type="button" onClick={() => setEnvio({ marcados: [`${d.tipo}:${d.id}`] })} className="text-ui-strong text-action hover:underline">Enviar</button>
+              </div>
+            ))}
+            {guardados.length > DOCS_VISIVEIS && <p className="pt-2 text-meta text-muted-ink">+ {guardados.length - DOCS_VISIVEIS} no botão "Enviar ao cliente".</p>}
+          </div>
+        )}
+        <p className="text-meta text-muted-ink-2">
+          {ultimo ? `Último envio: ${ROTULO_CANAL[ultimo.canal] ?? ultimo.canal} em ${format(new Date(ultimo.enviado_em), 'dd/MM/yyyy HH:mm')}.` : 'Nenhum envio registrado para este cliente.'}
+        </p>
+      </div>
+
+      {envio && (
+        <EnviarClienteDialog
+          key={envio.marcados.join(',') || 'novo'} contactId={l.contact_id} nome={l.nome} modelo={modeloDocumentos()}
+          origem="ficha" marcadosInicial={envio.marcados} onClose={() => setEnvio(null)}
+        />
+      )}
     </section>
   );
 }

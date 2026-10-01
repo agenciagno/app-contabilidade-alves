@@ -413,6 +413,74 @@ export type Database = {
           },
         ]
       }
+      ausencia_acompanhamento: {
+        Row: {
+          atualizado_em: string
+          atualizado_por: string | null
+          company_id: string
+          competencia: string
+          contact_id: string
+          id: string
+          nota: string | null
+          obrigacao: string
+          responsavel_id: string | null
+          situacao: string
+        }
+        Insert: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          company_id: string
+          competencia: string
+          contact_id: string
+          id?: string
+          nota?: string | null
+          obrigacao: string
+          responsavel_id?: string | null
+          situacao?: string
+        }
+        Update: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          company_id?: string
+          competencia?: string
+          contact_id?: string
+          id?: string
+          nota?: string | null
+          obrigacao?: string
+          responsavel_id?: string | null
+          situacao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ausencia_acompanhamento_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ausencia_acompanhamento_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ausencia_acompanhamento_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+          {
+            foreignKeyName: "ausencia_acompanhamento_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       boleto_client_notifications: {
         Row: {
           boleto_id: string
@@ -952,6 +1020,73 @@ export type Database = {
           vigente?: boolean
         }
         Relationships: []
+      }
+      client_envios: {
+        Row: {
+          assunto: string | null
+          canal: string
+          company_id: string
+          contact_id: string
+          destino: string | null
+          documentos: Json
+          enviado_em: string
+          enviado_por: string | null
+          id: string
+          mensagem: string
+          origem: string
+          referencia: Json | null
+        }
+        Insert: {
+          assunto?: string | null
+          canal: string
+          company_id: string
+          contact_id: string
+          destino?: string | null
+          documentos?: Json
+          enviado_em?: string
+          enviado_por?: string | null
+          id?: string
+          mensagem: string
+          origem: string
+          referencia?: Json | null
+        }
+        Update: {
+          assunto?: string | null
+          canal?: string
+          company_id?: string
+          contact_id?: string
+          destino?: string | null
+          documentos?: Json
+          enviado_em?: string
+          enviado_por?: string | null
+          id?: string
+          mensagem?: string
+          origem?: string
+          referencia?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_envios_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_envios_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_envios_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
       }
       client_obligations: {
         Row: {

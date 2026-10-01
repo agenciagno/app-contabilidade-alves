@@ -152,20 +152,3 @@ export function GraficosCarteiraView({ g }: { g: GraficosCarteira }) {
     </div>
   );
 }
-
-/** Gráficos da aba Visão geral de CA · Ausências: só o que é declaração em falta. */
-export function GraficosAusencias({ g }: { g: GraficosCarteira }) {
-  return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <Cartao titulo="Em falta por obrigação" subtitulo="Clientes com a obrigação em falta ou a confirmar">
-        <BarrasPorObrigacao dados={g.porObrigacao} />
-      </Cartao>
-      <Cartao titulo="Em falta por regime" subtitulo="Clientes com PGDAS-D ou DEFIS em falta">
-        <BarrasHorizontais dados={g.porRegime} vazio="Nenhum cliente com declaração em falta." />
-      </Cartao>
-      <Cartao className="lg:col-span-2" titulo="Evolução no ano" subtitulo="Clientes sem PGDAS-D em cada competência com prazo vencido. Mostra a situação de hoje, não o retrato da época">
-        <Evolucao dados={g.evolucao} />
-      </Cartao>
-    </div>
-  );
-}

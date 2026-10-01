@@ -65,12 +65,16 @@ export interface AvaliacaoPgdas {
   consultadoEm: string | null;
 }
 
+export interface ResponsavelCliente { id: string; nome: string }
+
 export interface LinhaCarteira {
   contact_id: string;
   nome: string;
   documento: string;
   regime: string | null;
   regimeRotulo: string;
+  /** Responsável do cadastro (contacts.responsible_id); null = cliente sem responsável. */
+  responsavel: ResponsavelCliente | null;
   declaracoes: EstadoDeclaracoes;
   pgdas: AvaliacaoPgdas;
   defis: { estado: StatusDefis; ano: number };
@@ -101,6 +105,8 @@ export interface EntradaCarteira {
   clientes: ClienteCaixa[];
   /** contact_id → data de abertura (AAAA-MM-DD). */
   aberturas: Map<string, string | null>;
+  /** contact_id → responsável do cadastro. Cliente fora do mapa fica sem responsável. */
+  responsaveis?: Map<string, ResponsavelCliente>;
   mensagens: MensagemComCliente[];
   procuracoes: LinhaProcuracao[];
   pagamentos: LinhaPagamentos[];
@@ -256,6 +262,7 @@ export function montarCarteira(e: EntradaCarteira): LinhaCarteira[] {
 
     const linha: LinhaCarteira = {
       contact_id: id, nome: c.nome, documento: c.documento, regime, regimeRotulo: rotuloRegime(regime),
+      responsavel: e.responsaveis?.get(id) ?? null,
       declaracoes, pgdas, defis: { estado: defisEstado, ano: anoDefis }, dctfweb, mit,
       das: dasEstado, dasCompetencia: e.competencia,
       sitfis, sitfisEm: ultimo?.gerado_em ?? null, certidao,
@@ -328,6 +335,28 @@ export const FILTROS = {
 };
 
 export const contar = (linhas: LinhaCarteira[], f: Filtro) => linhas.filter(f).length;
+
+// ---------------------------------------------------------------- responsável
+/** Valor do filtro "sem responsável" na URL (`?resp=sem`); qualquer outro valor é o id do responsável. */
+export const SEM_RESPONSAVEL = 'sem';
+
+export function filtrarPorResponsavel(linhas: LinhaCarteira[], resp: string | null): LinhaCarteira[] {
+  if (!resp) return linhas;
+  return linhas.filter((l) => (resp === SEM_RESPONSAVEL ? !l.responsavel : l.responsavel?.id === resp));
+}
+
+/** Responsáveis que aparecem na carteira, com quantos clientes cada um tem; os sem responsável vêm à parte. */
+export function resumirResponsaveis(linhas: LinhaCarteira[]): { responsaveis: (ResponsavelCliente & { clientes: number })[]; semResponsavel: number } {
+  const m = new Map<string, ResponsavelCliente & { clientes: number }>();
+  let sem = 0;
+  for (const l of linhas) {
+    if (!l.responsavel) { sem++; continue; }
+    const atual = m.get(l.responsavel.id);
+    if (atual) atual.clientes++;
+    else m.set(l.responsavel.id, { ...l.responsavel, clientes: 1 });
+  }
+  return { responsaveis: [...m.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')), semResponsavel: sem };
+}
 
 // ---------------------------------------------------------------- dados dos gráficos
 export interface FatiaGrafico { chave: string; nome: string; valor: number }

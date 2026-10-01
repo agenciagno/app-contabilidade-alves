@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import {
-  ArrowRight, BadgeCheck, Gavel, Landmark, Mail, Receipt, ShieldAlert, ShieldCheck, ShieldX, UserX, Users, FileCheck, FileX,
+  ArrowRight, Gavel, Landmark, Receipt, Scale, ShieldAlert, ShieldX, UserX, FileX,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -11,11 +10,13 @@ import { ClienteFiltro } from '@/components/gestao360/ClienteFiltro';
 import { FichaCliente } from '@/components/gestao360/FichaCliente';
 import { GraficosCarteiraView } from '@/components/gestao360/GraficosCarteira';
 import { ListaClientesSheet, TOM_NIVEL, type ListaAberta } from '@/components/gestao360/ListaClientesSheet';
+import { ResponsavelFiltro } from '@/components/gestao360/ResponsavelFiltro';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useFiltroCarteira } from '@/hooks/useFiltroCarteira';
 import { rotuloCompetencia } from '@/hooks/useSerproPagamentos';
 import { useSituacaoCarteira } from '@/hooks/useSituacaoCarteira';
 import {
-  contar, FILTROS, montarGraficos, ROTULO_NIVEL, topEmRisco,
+  contar, FILTROS, montarGraficos, ROTULO_NIVEL, topEmRisco, totalPendencias,
   type Filtro, type LinhaCarteira, type NivelRisco,
 } from '@/lib/situacaoCarteira';
 
@@ -41,13 +42,8 @@ interface Cartao {
 
 export default function Portal360() {
   const { linhas, carregando, erro, competencia, hoje, fontesAtualizadas } = useSituacaoCarteira();
-  const [params, setParams] = useSearchParams();
   const [lista, setLista] = useState<ListaAberta | null>(null);
-
-  const clienteId = params.get('cliente');
-  const escolhida = clienteId ? linhas.find((l) => l.contact_id === clienteId) ?? null : null;
-  const visiveis = useMemo(() => (escolhida ? [escolhida] : linhas), [escolhida, linhas]);
-  const escolher = (id: string | null) => setParams((p) => { const n = new URLSearchParams(p); if (id) n.set('cliente', id); else n.delete('cliente'); return n; }, { replace: true });
+  const { escolhida, resp, doResponsavel, visiveis, escolherCliente: escolher, escolherResponsavel } = useFiltroCarteira(linhas);
 
   const cartoes = useMemo<Cartao[]>(() => {
     const n = (f: Filtro) => contar(visiveis, f);
@@ -55,13 +51,11 @@ export default function Portal360() {
     const aplicaveis = visiveis.filter((l) => l.declaracoes !== 'nao_se_aplica').length;
     const consultadas = n(FILTROS.declaracoesConsultadas);
     const emFalta = n(FILTROS.declaracoesEmFalta);
-    const emDia = n(FILTROS.declaracoesEmDia);
     const aConfirmarDecl = visiveis.filter((l) => l.declaracoes === 'a_confirmar').length;
     const dctfMitConfirmar = visiveis.filter((l) => l.dctfweb === 'sem_declaracao' || l.mit === 'sem_apuracao').length;
+    const pendencias = totalPendencias(visiveis);
     const comRelatorio = n(FILTROS.sitfisComRelatorio);
     const comPendencia = n(FILTROS.sitfisComPendencia);
-    const semPendencia = n(FILTROS.sitfisSemPendencia);
-    const certLeitura = n(FILTROS.certidaoComLeitura);
     const certIrregular = n(FILTROS.certidaoIrregular);
     const termos = visiveis.filter((l) => l.mensagens.exclusaoSimples > 0).length;
     const tresOuMais = visiveis.filter((l) => l.pgdas.emFalta.length >= 3).length;
@@ -70,33 +64,27 @@ export default function Portal360() {
     const clientesIntim = n(FILTROS.intimacaoAberta);
     const msgsAbertas = visiveis.reduce((s, l) => s + l.mensagens.total, 0);
     const naoLidas = n(FILTROS.mensagemNaoLida);
+    const maed = n(FILTROS.multaMaed);
     const procSem = visiveis.filter((l) => l.procuracao.situacao === 'sem' || l.procuracao.situacao === 'vencida').length;
     const procVencendo = visiveis.filter((l) => l.procuracao.vencendo && l.procuracao.situacao !== 'vencida').length;
-    const comProc = n(FILTROS.semProcuracaoCaixa);
     const rotuloComp = sigla(competencia);
 
+    // Só o que pede ação. O que "está bem" (declarações em dia, situação fiscal sem pendência) fica no chip de nível e na ficha do cliente.
     return [
-      {
-        id: 'monitorados', titulo: 'Clientes monitorados', icone: Users, valor: String(total), tom: 'neutral', filtro: FILTROS.monitorados,
-        hint: `${comProc} com procuração · filiais ficam na conta da matriz`,
-        detalhe: (l) => l.motivos[0] ?? 'Sem pendências',
-      },
       {
         id: 'em-falta', titulo: 'Declarações em falta', icone: FileX, valor: String(emFalta), tom: tomPor(emFalta, consultadas), filtro: FILTROS.declaracoesEmFalta, to: '/dashboard-federal/pgdas',
         cobertura: { n: consultadas, total: aplicaveis },
-        hint: `PGDAS-D e DEFIS${aConfirmarDecl ? ` · ${aConfirmarDecl} a confirmar` : ''}${dctfMitConfirmar ? ` · DCTFWeb/MIT a confirmar: ${dctfMitConfirmar}` : ''}`,
+        hint: `${plural(pendencias, 'pendência', 'pendências')} (PGDAS-D e DEFIS)${aConfirmarDecl ? ` · ${aConfirmarDecl} a confirmar` : ''}${dctfMitConfirmar ? ` · DCTFWeb/MIT a confirmar: ${dctfMitConfirmar}` : ''}`,
         detalhe: (l) => l.ausencias.filter((a) => a.situacao === 'em_falta').map((a) => (a.obrigacao === 'DEFIS' ? `DEFIS ${a.competencia}` : `PGDAS-D ${sigla(a.competencia)}`)).join(', '),
       },
       {
-        id: 'em-dia', titulo: 'Declarações em dia', icone: FileCheck, valor: pct(emDia, consultadas) === null ? '—' : `${pct(emDia, consultadas)}%`, tom: tomPor(emFalta + aConfirmarDecl, consultadas, 'warn'),
-        filtro: FILTROS.declaracoesEmDia, to: '/dashboard-federal/pgdas', cobertura: { n: consultadas, total: aplicaveis },
-        hint: `${emDia} de ${consultadas} consultados · ${aplicaveis - consultadas} sem consulta no ano`,
-        detalhe: () => 'PGDAS-D e DEFIS em dia',
+        id: 'das-vencido', titulo: 'DAS vencidos', icone: Receipt, valor: String(dasVencidos), tom: tomPor(dasVencidos, total), filtro: FILTROS.dasVencido, to: '/dashboard-federal/pagamentos',
+        hint: `Competência ${rotuloComp}`, detalhe: (l) => `DAS ${sigla(l.dasCompetencia)} sem pagamento registrado`,
       },
       {
         id: 'certidao-risco', titulo: 'Pode impedir a certidão federal', icone: ShieldAlert, valor: String(n(FILTROS.podeImpedirCertidao)), tom: tomPor(n(FILTROS.podeImpedirCertidao), total),
         filtro: FILTROS.podeImpedirCertidao, to: '/dashboard-federal/situacao-fiscal',
-        hint: 'Pendência na Situação fiscal, DAS vencido ou declaração em falta',
+        hint: `Pendência na Situação fiscal, DAS vencido ou declaração em falta${certIrregular ? ` · ${certIrregular} com certidão irregular ou vencida (Radar CND)` : ''}`,
         detalhe: (l) => [
           l.sitfis === 'com_pendencias' ? 'Pendência na Situação fiscal' : '',
           l.das === 'vencido' ? `DAS ${sigla(l.dasCompetencia)} vencido` : '',
@@ -113,33 +101,19 @@ export default function Portal360() {
         ].filter(Boolean).join(' · '),
       },
       {
-        id: 'das-vencido', titulo: 'DAS vencidos', icone: Receipt, valor: String(dasVencidos), tom: tomPor(dasVencidos, total), filtro: FILTROS.dasVencido, to: '/dashboard-federal/pagamentos',
-        hint: `Competência ${rotuloComp}`, detalhe: (l) => `DAS ${sigla(l.dasCompetencia)} sem pagamento registrado`,
-      },
-      {
         id: 'intimacoes', titulo: 'Mensagens da Receita em aberto', icone: Gavel, valor: String(clientesIntim), tom: tomPor(clientesIntim, total), filtro: FILTROS.intimacaoAberta, to: '/dashboard-federal/intimacoes',
-        hint: `${plural(msgsAbertas, 'mensagem', 'mensagens')} que exigem ação · só nos clientes com lista baixada`,
+        hint: `${plural(msgsAbertas, 'mensagem', 'mensagens')} ${msgsAbertas === 1 ? 'exige' : 'exigem'} ação${naoLidas ? ` · ${plural(naoLidas, 'cliente', 'clientes')} com mensagem nova ou não lida` : ''} · só nos clientes com lista baixada`,
         detalhe: (l) => `${plural(l.mensagens.total, 'mensagem', 'mensagens')}${l.mensagens.intimacoes ? ` · ${plural(l.mensagens.intimacoes, 'intimação', 'intimações')}` : ''}`,
       },
       {
-        id: 'nao-lidas', titulo: 'Mensagens e-CAC não lidas', icone: Mail, valor: String(naoLidas), tom: tomPor(naoLidas, total, 'warn'), filtro: FILTROS.mensagemNaoLida, to: '/mensagens',
-        hint: 'Clientes com mensagem nova ou não lida na Caixa Postal',
-        detalhe: (l) => (l.caixa === 'nova' ? 'Nova mensagem' : 'Mensagem não lida'),
+        id: 'maed', titulo: 'Multa (MAED) notificada', icone: Scale, valor: String(maed), tom: tomPor(maed, total, 'warn'), filtro: FILTROS.multaMaed, to: '/dashboard-federal/intimacoes',
+        hint: 'Só o que a Receita notificou, sem estimativa de valor',
+        detalhe: (l) => `${plural(l.multa.maed, 'notificação', 'notificações')} da Receita`,
       },
       {
         id: 'sitfis-pend', titulo: 'Situação fiscal com pendência', icone: Landmark, valor: String(comPendencia), tom: tomPor(comPendencia, comRelatorio), filtro: FILTROS.sitfisComPendencia, to: '/dashboard-federal/situacao-fiscal',
         cobertura: { n: comRelatorio, total }, hint: `${comRelatorio} de ${total} com relatório · rodada mensal no dia 30`,
         detalhe: (l) => (l.sitfisEm ? `Relatório de ${dataBR(l.sitfisEm)}` : 'Com pendências'),
-      },
-      {
-        id: 'sitfis-ok', titulo: 'Situação fiscal sem pendência', icone: ShieldCheck, valor: pct(semPendencia, comRelatorio) === null ? '—' : `${pct(semPendencia, comRelatorio)}%`, tom: tomPor(comPendencia, comRelatorio, 'warn'),
-        filtro: FILTROS.sitfisSemPendencia, to: '/dashboard-federal/situacao-fiscal', cobertura: { n: comRelatorio, total },
-        hint: `${semPendencia} de ${comRelatorio} com relatório`, detalhe: (l) => (l.sitfisEm ? `Relatório de ${dataBR(l.sitfisEm)}` : 'Sem pendências'),
-      },
-      {
-        id: 'certidao', titulo: 'Certidão federal irregular', icone: BadgeCheck, valor: String(certIrregular), tom: tomPor(certIrregular, certLeitura), filtro: FILTROS.certidaoIrregular, to: '/dashboard-federal/situacao-fiscal',
-        cobertura: { n: certLeitura, total }, hint: `${certLeitura} de ${total} com certidão lida · só a federal`,
-        detalhe: (l) => `${l.certidao.tipo ?? 'Sem tipo'}${l.certidao.validade ? ` · ${l.certidao.situacao === 'vencida' ? 'venceu em' : 'até'} ${dataBR(l.certidao.validade)}` : ''}`,
       },
       {
         id: 'procuracoes', titulo: 'Procurações sem ou vencendo', icone: ShieldX, valor: String(procSem + procVencendo), tom: tomPor(procSem + procVencendo, total, 'warn'), filtro: FILTROS.procuracaoSemOuVencendo, to: '/dashboard-federal/procuracoes',
@@ -163,15 +137,20 @@ export default function Portal360() {
       <PageHeader
         kicker="~/gestão 360°"
         title="Portal 360°."
-        subtitle="A carteira inteira ou um cliente só, com o que o Serpro já trouxe. Cliente não consultado nunca conta como em dia."
-        actions={<ClienteFiltro linhas={linhas} valor={escolhida?.contact_id ?? null} onChange={escolher} />}
+        subtitle="A carteira inteira, a de um responsável ou um cliente só, com o que o Serpro já trouxe. Cliente não consultado nunca conta como em dia."
+        actions={(
+          <div className="flex flex-wrap items-center gap-2">
+            <ResponsavelFiltro linhas={linhas} valor={resp} onChange={escolherResponsavel} />
+            <ClienteFiltro linhas={doResponsavel} valor={escolhida?.contact_id ?? null} onChange={escolher} />
+          </div>
+        )}
       />
 
       {erro && <DsAlert tone="danger" title="Não foi possível carregar tudo" description="Alguma fonte falhou. Os números abaixo podem estar incompletos; recarregue a página." />}
 
       {carregando ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 12 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)}
+          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)}
         </div>
       ) : linhas.length === 0 ? (
         <DsAlert tone="info" title="Nenhum cliente monitorado" description="Só clientes com status Ativo e CNPJ entram aqui." />
@@ -184,7 +163,7 @@ export default function Portal360() {
               </button>
             ))}
             <span className="ml-1 text-meta text-muted-ink-2">
-              Última leitura: {fontesAtualizadas.map((f) => `${f.rotulo} ${f.em ? dataBR(f.em) : 'sem leitura'}`).join(' · ')} · DAS, DCTFWeb e MIT de {rotuloCompetencia(competencia)}
+              {visiveis.length} {visiveis.length === 1 ? 'cliente monitorado' : 'clientes monitorados'} · {contar(visiveis, FILTROS.semProcuracaoCaixa)} com procuração · filiais ficam na conta da matriz · Última leitura: {fontesAtualizadas.map((f) => `${f.rotulo} ${f.em ? dataBR(f.em) : 'sem leitura'}`).join(' · ')} · DAS, DCTFWeb e MIT de {rotuloCompetencia(competencia)}
             </span>
           </div>
 
@@ -215,6 +194,7 @@ export default function Portal360() {
                     {top.map((l) => (
                       <button key={l.contact_id} type="button" onClick={() => escolher(l.contact_id)} className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 py-3 text-left hover:bg-bg-2/50">
                         <span className="w-[260px] shrink-0 truncate text-ui-strong text-ink">{l.nome}</span>
+                        <span className="w-[120px] shrink-0 truncate text-meta text-muted-ink-2">{l.responsavel?.nome ?? 'Sem responsável'}</span>
                         <DsBadge tone={TOM_NIVEL[l.nivel]}>{ROTULO_NIVEL[l.nivel]}</DsBadge>
                         <span className="min-w-0 flex-1 truncate text-meta text-muted-ink">{l.motivos.slice(0, 3).join(' · ')}{l.motivos.length > 3 ? ` · +${l.motivos.length - 3}` : ''}</span>
                         <ArrowRight className="h-4 w-4 shrink-0 text-muted-ink-2" />
