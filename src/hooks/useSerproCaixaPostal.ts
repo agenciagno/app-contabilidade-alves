@@ -68,7 +68,7 @@ export interface MensagemCaixa {
 
 export type MensagemComCliente = MensagemCaixa & {
   contacts: {
-    name: string; display_name: string | null; document: string | null; status_cliente: string | null;
+    name: string; display_name: string | null; razao_social: string | null; document: string | null; status_cliente: string | null;
     email: string | null; whatsapp: string | null; phone: string | null;
   } | null;
 };
@@ -182,7 +182,7 @@ export function useMensagensCriticas() {
       const criticas = (Object.keys(CATEGORIAS) as CategoriaMsg[]).filter((k) => CATEGORIAS[k].critica);
       const { data, error } = await supabase
         .from('serpro_caixa_postal_mensagens')
-        .select('*, contacts:contact_id (name, display_name, document, status_cliente, email, whatsapp, phone)')
+        .select('*, contacts:contact_id (name, display_name, razao_social, document, status_cliente, email, whatsapp, phone)')
         .in('categoria', criticas)
         .order('data_envio', { ascending: false })
         .limit(1000);
@@ -252,6 +252,31 @@ export function useAcompanharMensagem() {
       return chamarCaixa<{ ok?: boolean; error?: string }>({ action: 'acompanhar', mensagem_id: mensagemId, ...campos });
     },
     onSuccess: (_d, v) => invalidar(v.contactId),
+  });
+}
+
+/** Bloco de notas de cada cliente (tela Termos de Intimação), por contact_id. */
+export function useNotasClientesCaixa() {
+  return useQuery({
+    queryKey: ['serpro-cp-notas-clientes'],
+    queryFn: async (): Promise<Map<string, string>> => {
+      const { data, error } = await supabase
+        .from('serpro_caixa_postal_resumo')
+        .select('contact_id, observacoes')
+        .not('observacoes', 'is', null)
+        .limit(1000);
+      if (error) throw error;
+      return new Map((data ?? []).map((r) => [r.contact_id as string, r.observacoes as string]));
+    },
+  });
+}
+
+export function useAcompanharClienteCaixa() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { contactId: string; observacoes: string | null }) =>
+      chamarCaixa<{ ok?: boolean; error?: string }>({ action: 'acompanhar_cliente', contact_id: v.contactId, observacoes: v.observacoes }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['serpro-cp-notas-clientes'] }),
   });
 }
 

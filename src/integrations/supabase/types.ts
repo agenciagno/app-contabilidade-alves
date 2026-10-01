@@ -4593,6 +4593,9 @@ export type Database = {
           indicador_verificado_em: string | null
           mensagens_salvas: number
           nao_lidas_salvas: number
+          observacoes: string | null
+          observacoes_atualizadas_em: string | null
+          observacoes_atualizadas_por: string | null
           updated_at: string
         }
         Insert: {
@@ -4606,6 +4609,9 @@ export type Database = {
           indicador_verificado_em?: string | null
           mensagens_salvas?: number
           nao_lidas_salvas?: number
+          observacoes?: string | null
+          observacoes_atualizadas_em?: string | null
+          observacoes_atualizadas_por?: string | null
           updated_at?: string
         }
         Update: {
@@ -4619,6 +4625,9 @@ export type Database = {
           indicador_verificado_em?: string | null
           mensagens_salvas?: number
           nao_lidas_salvas?: number
+          observacoes?: string | null
+          observacoes_atualizadas_em?: string | null
+          observacoes_atualizadas_por?: string | null
           updated_at?: string
         }
         Relationships: [

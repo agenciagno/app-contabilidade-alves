@@ -12,6 +12,7 @@ import { criarSerpro, jwtRole, onlyDigits } from "../_shared/serpro-core.ts";
 //   abrir            { mensagem_id, ciencia_confirmada: true }  lê o CORPO de UMA mensagem (MSGDETALHAMENTO62).
 //                    GERA CIÊNCIA da intimação (art. 23 §2º III, Dec. 70.235/72). Só com confirmação explícita.
 //   acompanhar       { mensagem_id, situacao?, responsavel_id?, observacoes?, visivel_portal? }
+//   acompanhar_cliente { contact_id, observacoes }   (bloco de notas do cliente, Termos de Intimação)
 //   avisar           { mensagem_id, canal: email|whatsapp|copiar, mensagem, assunto? }  avisa o CLIENTE (nunca envia o corpo da
 //                    intimação); e-mail sai daqui, WhatsApp/copiar só registram o histórico.
 //   rotina_eventos   rotina diária (07:30 BRT, cron): EVENTOSATUALIZACAO E0601, grátis (/Monitorar), sem ciência.
@@ -178,6 +179,19 @@ async function acompanhar(payload: any, _uid: string) {
   if (!Object.keys(campos).length) return json({ error: "Nada para atualizar" }, 400);
   const { error } = await supabase.from("serpro_caixa_postal_mensagens").update(campos).eq("id", String(payload.mensagem_id ?? "")).eq("company_id", COMPANY_ID);
   if (error) return json({ error: error.message }, 500);
+  return json({ ok: true });
+}
+
+// Bloco de notas do CLIENTE (Termos de Intimação). A nota de cada mensagem continua em `acompanhar`.
+async function acompanharCliente(payload: any, uid: string) {
+  const contactId = String(payload.contact_id ?? "");
+  if (!contactId) return json({ error: "contact_id obrigatório" }, 400);
+  const obs = payload.observacoes ? String(payload.observacoes).trim().slice(0, 4000) : "";
+  const { data, error } = await supabase.from("serpro_caixa_postal_resumo")
+    .update({ observacoes: obs || null, observacoes_atualizadas_em: new Date().toISOString(), observacoes_atualizadas_por: uid })
+    .eq("contact_id", contactId).eq("company_id", COMPANY_ID).select("contact_id");
+  if (error) return json({ error: error.message }, 500);
+  if (!data?.length) return json({ error: "Cliente sem resumo da Caixa Postal" }, 404);
   return json({ ok: true });
 }
 
@@ -363,10 +377,11 @@ Deno.serve(async (req) => {
     case "consultar": return await consultar(payload, uid);
     case "abrir": return await abrir(payload, uid);
     case "acompanhar": return await acompanhar(payload, uid);
+    case "acompanhar_cliente": return await acompanharCliente(payload, uid);
     case "avisar": return await avisar(payload, uid);
     case "rotina_eventos":
       if (!admin) return json({ error: "Só administradores rodam a rotina manualmente" }, 403);
       return await rotinaEventos(payload, uid, "manual");
-    default: return json({ error: "action inválida (consultar | abrir | acompanhar | avisar | rotina_eventos)" }, 400);
+    default: return json({ error: "action inválida (consultar | abrir | acompanhar | acompanhar_cliente | avisar | rotina_eventos)" }, 400);
   }
 });
