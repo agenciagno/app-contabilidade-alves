@@ -16,12 +16,15 @@ import { avisarConclusoes, concluirTarefaDas, concluirTarefasPorPagamentos } fro
 //   publicar         { pagamento_id, visivel_portal }  curadoria para o futuro portal do cliente.
 //   rotina_eventos   rotina diária (cron 07:35 BRT): evento E0701 (grátis, /Monitorar), 1 solicitar + 1 obter. Marca "pagamento novo"
 //                    quando a data do evento avança e avisa a equipe. { forcar?: true } ignora a trava de 12 h.
-//   rotina_lote_simples / rotina_lote_presumido_real   LOTE DO DIA 30 (aprovado por Gabriel, 01/10/2026; crons de 5 em 5 min às 07:10 e 07:20).
+//   rotina_lote_simples / rotina_lote_presumido_real   LOTE DO DIA 30 (aprovado por Gabriel, 01/10/2026; crons de 5 em 5 min às 18:00 e 18:10, horário de Brasília).
 //                    O cron bate todo dia; quem decide é a DATA (dia 30, ou o último dia do mês em fevereiro) e o interruptor de Tech
 //                    (serpro_config.auto_lote_pagamentos_simples / _presumido_real, PADRÃO DESLIGADO: desligado não chama o Serpro).
 //                    Mesma consulta do clique (PAGAMENTOS71 do mês de apuração anterior, que também conclui tarefas), 1 cliente por vez.
-//                    Consulta COMPLETA dos dois grupos (decisão de Gabriel, 01/10/2026): todos os clientes do Simples e todos os do Presumido e Real (matriz).
 //                    Durante o mês, quem pagou aparece pelo sensor gratuito diário (E0701); no dia 30 vêm os detalhes (documento, data, valor e composição).
+//                    Presumido e Real: todos os clientes (matriz). Simples (decisão de Gabriel, 01/10/2026, "não gastar com DAS que não foi pago"): só quem o sensor
+//                    E0701 mostra com pagamento no mês (data do evento a partir do dia 1). Antes de decidir, o lote relê o sensor (grátis, no máximo 1 vez por hora).
+//                    Teste com os DAS de 08/2026: o sensor marcou 82 dos 82 que pagaram (nenhum furo); a Receita demora uns dias para registrar, então pagamento dos
+//                    últimos dias do mês entra na rodada do mês seguinte (a janela da consulta começa no dia 1 do mês de apuração).
 //                    Pula quem já foi consultado hoje, quem não tem procuração (sensor "x") e filial. Até 60 clientes por disparo.
 //                    Admin logado pode simular com { dry_run: true, ignorar_data?: true } (não cobra).
 //
@@ -278,10 +281,11 @@ async function publicar(payload: any) {
 // Rotina diária: evento E0701 (mudança em pagamentos). Só diz que algo mudou; quem consulta o detalhe é a equipe, por clique.
 async function rotinaEventos(payload: any, uid: string | null, origem: "manual" | "cron") {
   if (!payload.forcar) {
-    const desde = new Date(Date.now() - 12 * 3600_000).toISOString();
+    const horas = Number(payload.travaHoras) > 0 ? Number(payload.travaHoras) : 12; // só o lote do dia 30 pede uma trava menor (1 h)
+    const desde = new Date(Date.now() - horas * 3600_000).toISOString();
     const { count } = await supabase.from("serpro_call_log").select("id", { count: "exact", head: true })
       .eq("id_servico", "SOLICEVENTOSPJ132").ilike("finalidade", "%E0701%").gte("created_at", desde).gte("status_http", 200).lt("status_http", 300);
-    if ((count ?? 0) > 0) return json({ ok: true, ignorado: "A rotina de pagamentos já rodou nas últimas 12 h." });
+    if ((count ?? 0) > 0) return json({ ok: true, ignorado: `A rotina de pagamentos já rodou nas últimas ${horas} h.` });
   }
   const { data: contatos } = await supabase.from("contacts").select("id,document")
     .eq("company_id", COMPANY_ID).eq("is_active", true).eq("status_cliente", STATUS_MONITORADO);
@@ -368,13 +372,15 @@ const ehDiaDoLote = (hoje: string) => Number(hoje.slice(8, 10)) === Math.min(30,
 async function clientesDoLote(modo: ModoLote) {
   const { data: contatos } = await supabase.from("contacts").select("id,name,display_name,document")
     .eq("company_id", COMPANY_ID).eq("is_active", true).eq("status_cliente", STATUS_MONITORADO).in("tax_regime", LOTES[modo].regimes).order("name");
-  const { data: sensor } = await supabase.from("serpro_pagamentos_sensor").select("contact_id").eq("company_id", COMPANY_ID).eq("sem_procuracao", true).limit(2000);
-  const semProcuracao = new Set((sensor ?? []).map((r: { contact_id: string }) => r.contact_id));
+  const { data: sensor } = await supabase.from("serpro_pagamentos_sensor").select("contact_id,sem_procuracao,evento_ultima_data").eq("company_id", COMPANY_ID).limit(3000);
+  const semProcuracao = new Set((sensor ?? []).filter((r: { sem_procuracao: boolean | null }) => r.sem_procuracao === true).map((r: { contact_id: string }) => r.contact_id));
+  /** Data do último evento de pagamento (E0701) por cliente: o que o sensor gratuito sabe sobre "quem pagou". */
+  const ultimaData = new Map<string, string | null>((sensor ?? []).map((r: { contact_id: string; evento_ultima_data: string | null }) => [r.contact_id, r.evento_ultima_data]));
   const elegiveis = (contatos ?? []).filter((c: any) => {
     const cnpj = onlyDigits(c.document);
     return cnpj.length === 14 && cnpj.slice(8, 12) === "0001" && !CNPJS_DA_CA.has(cnpj);
   });
-  return { elegiveis, tentaveis: elegiveis.filter((c: any) => !semProcuracao.has(c.id)), semProcuracao: elegiveis.length - elegiveis.filter((c: any) => !semProcuracao.has(c.id)).length };
+  return { elegiveis, tentaveis: elegiveis.filter((c: any) => !semProcuracao.has(c.id)), semProcuracao: elegiveis.length - elegiveis.filter((c: any) => !semProcuracao.has(c.id)).length, ultimaData };
 }
 
 /** Contatos com DAS do mês de apuração (AAAA-MM) e nenhum pagamento registrado: nem a marca "pago" do PGDAS nem documento DAS em Pagamentos. */
@@ -419,14 +425,24 @@ async function rotinaLote(modo: ModoLote, payload: any, uid: string | null) {
   if (!(uid && payload.ignorar_data === true) && !ehDiaDoLote(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
 
   const competencia = new Date(Date.UTC(Number(hoje.slice(0, 4)), Number(hoje.slice(5, 7)) - 2, 1)).toISOString().slice(0, 7);
-  const { elegiveis, tentaveis, semProcuracao } = await clientesDoLote(modo);
+  // Simples: relê o sensor gratuito antes de decidir (no máximo 1 vez por hora; o 2º disparo do dia já o encontra feito). Falha aqui não impede o lote:
+  // segue com a leitura da manhã. A simulação não chama o Serpro.
+  if (modo === "simples" && !simulando) {
+    try { await rotinaEventos({ forcar: false, travaHoras: 1 }, uid, uid ? "manual" : "cron"); }
+    catch (e) { console.error("Falha ao reler o sensor de pagamentos antes do lote:", String((e as Error).message || e)); }
+  }
+  const { elegiveis, tentaveis, semProcuracao, ultimaData } = await clientesDoLote(modo);
   const { data: consultas } = await supabase.from("serpro_pagamentos_consultas").select("contact_id,consultado_em").eq("company_id", COMPANY_ID).eq("competencia", `${competencia}-01`).limit(3000);
   const feitosHoje = new Set((consultas ?? []).filter((c: { consultado_em: string }) => dataBRde(c.consultado_em) === hoje).map((c: { contact_id: string }) => c.contact_id));
-  const alvo = tentaveis.filter((c: any) => !feitosHoje.has(c.id));
+  const aConsultar = tentaveis.filter((c: any) => !feitosHoje.has(c.id));
+  // Simples: só quem o sensor mostra com pagamento no mês (evento a partir do dia 1). Presumido e Real: todos.
+  const inicioDoMes = `${hoje.slice(0, 7)}-01`;
+  const alvo = modo === "simples" ? aConsultar.filter((c: any) => (ultimaData.get(c.id) ?? "") >= inicioDoMes) : aConsultar;
+  const puladosSemPagamento = aConsultar.length - alvo.length;
   const mes = `${competencia.slice(5, 7)}/${competencia.slice(0, 4)}`;
 
   if (simulando) {
-    return json({ ok: true, dry_run: true, modo, hoje, competencia, a_consultar: alvo.length, sem_procuracao_pulados: semProcuracao, custo_estimado_reais: Math.round(alvo.length * 0.24 * 100) / 100,
+    return json({ ok: true, dry_run: true, modo, hoje, competencia, a_consultar: alvo.length, sem_procuracao_pulados: semProcuracao, pulados_sem_pagamento_no_mes: puladosSemPagamento, custo_estimado_reais: Math.round(alvo.length * 0.24 * 100) / 100,
       clientes: alvo.slice(0, 80).map((c: any) => c.display_name || c.name) });
   }
 
@@ -440,7 +456,7 @@ async function rotinaLote(modo: ModoLote, payload: any, uid: string | null) {
     const r = await consultarCliente({
       contactId: c.id, competencia, force: true, uid, origem: uid ? "manual" : "cron",
       finalidade: modo === "simples"
-        ? `Lote do dia 30 (Simples): conferir em Pagamentos se o DAS de ${mes} foi pago, para acompanhamento fiscal do cliente`
+        ? `Lote do dia 30 (Simples): detalhar em Pagamentos os pagamentos do mês de quem pagou (sensor E0701) e conferir o DAS de ${mes}, para acompanhamento fiscal do cliente`
         : `Lote do dia 30 (Presumido e Real): conferir em Pagamentos os DARF pagos de ${mes}, para acompanhamento fiscal do cliente`,
     });
     if (r.corpo.ok === true) {
@@ -465,12 +481,12 @@ async function rotinaLote(modo: ModoLote, payload: any, uid: string | null) {
     const feitos = elegiveis.filter((c: any) => feitosHoje.has(c.id) || alvo.some((a: any) => a.id === c.id)).length;
     if (modo === "simples") {
       const ainda = [...(await dasSemPagamento(competencia))].filter((id) => elegiveis.some((c: any) => c.id === id)).length;
-      await avisarLote("Lote do dia 30 (Simples) concluído", `${feitos} ${feitos === 1 ? "cliente conferido" : "clientes conferidos"} em Pagamentos. ${ainda} DAS de ${mes} ${ainda === 1 ? "continua" : "continuam"} sem pagamento registrado na Receita.`, hoje);
+      await avisarLote("Lote do dia 30 (Simples) concluído", `${feitos} ${feitos === 1 ? "cliente conferido" : "clientes conferidos"} em Pagamentos${puladosSemPagamento ? ` (${puladosSemPagamento} sem pagamento no mês, não consultados)` : ""}. ${ainda} DAS de ${mes} ${ainda === 1 ? "continua" : "continuam"} sem pagamento registrado na Receita.`, hoje);
     } else {
       await avisarLote("Lote do dia 30 (Presumido e Real) concluído", `${feitos} ${feitos === 1 ? "cliente conferido" : "clientes conferidos"} em Pagamentos (competência ${mes})${resumo.tarefas_concluidas ? `, ${resumo.tarefas_concluidas} ${resumo.tarefas_concluidas === 1 ? "tarefa concluída" : "tarefas concluídas"}` : ""}.`, hoje);
     }
   }
-  return json({ ok: true, modo, hoje, competencia, a_consultar: alvo.length, sem_procuracao_pulados: semProcuracao, ...resumo, restantes, parou_por_falhas: seguidas >= 5, falhas, segundos: Math.round((Date.now() - inicio) / 1000) });
+  return json({ ok: true, modo, hoje, competencia, a_consultar: alvo.length, sem_procuracao_pulados: semProcuracao, pulados_sem_pagamento_no_mes: puladosSemPagamento, ...resumo, restantes, parou_por_falhas: seguidas >= 5, falhas, segundos: Math.round((Date.now() - inicio) / 1000) });
 }
 
 // ---------- entrada ----------
@@ -482,7 +498,7 @@ Deno.serve(async (req) => {
 
   // Cron chama com a chave anon (padrão do projeto). Só a rotina de eventos aceita isso, e ela tem trava de 12 h.
   if (action === "rotina_eventos" && (bearer === Deno.env.get("SUPABASE_ANON_KEY") || jwtRole(bearer) === "anon")) {
-    return await rotinaEventos({ ...payload, forcar: false, limite: undefined, semFallback: false }, null, "cron");
+    return await rotinaEventos({ ...payload, forcar: false, limite: undefined, semFallback: false, travaHoras: undefined }, null, "cron");
   }
 
   // Lote do dia 30: o cron chama com a chave anon, mas quem decide é o interruptor (padrão desligado) e a data; fora do dia 30 não cobra nada.

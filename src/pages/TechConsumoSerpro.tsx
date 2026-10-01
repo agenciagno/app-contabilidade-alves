@@ -112,13 +112,13 @@ export default function TechConsumoSerpro() {
       ligada: 'Consulta automática do PGDAS-D ligada.', desligada: 'Consulta automática do PGDAS-D desligada.',
     },
     {
-      chave: 'auto_lote_pagamentos_simples', rotina: rotina('lote-simples'), titulo: 'Consulta completa dos pagamentos do Simples no dia 30',
-      texto: (<>Durante o mês, quem pagou aparece pela rotina gratuita diária (selo "pagamento novo"). No <strong className="text-ink">dia 30</strong> (em fevereiro, no último dia do mês), às 07:10, o sistema consulta Pagamentos na Receita de <strong className="text-ink">todos os clientes do Simples</strong> (só matriz) e guarda os detalhes: documento, data, valor e composição. Conclui a tarefa do DAS de quem pagou e, ao terminar, avisa no sino quantos DAS continuam sem pagamento. Quem não tem procuração e quem já foi consultado no dia não é cobrado.</>),
+      chave: 'auto_lote_pagamentos_simples', rotina: rotina('lote-simples'), titulo: 'Detalhes dos pagamentos do Simples no dia 30',
+      texto: (<>Durante o mês, quem pagou aparece pela rotina gratuita diária (selo "pagamento novo"). No <strong className="text-ink">dia 30</strong> (em fevereiro, no último dia do mês), às 18:00, o sistema relê esse sensor gratuito e consulta Pagamentos na Receita <strong className="text-ink">só dos clientes do Simples que tiveram pagamento no mês</strong>, para guardar os detalhes: documento, data, valor e composição. Quem não pagou nada não é cobrado. Conclui a tarefa do DAS de quem pagou e, ao terminar, avisa no sino quantos DAS continuam sem pagamento. Quem não tem procuração e quem já foi consultado no dia também não é cobrado. A Receita demora uns dias para registrar: o pagamento dos últimos dias do mês entra na consulta do mês seguinte.</>),
       ligada: 'Lote do dia 30 do Simples ligado.', desligada: 'Lote do dia 30 do Simples desligado.',
     },
     {
       chave: 'auto_lote_pagamentos_presumido_real', rotina: rotina('lote-presumido-real'), titulo: 'Consulta completa dos pagamentos do Presumido e do Real no dia 30',
-      texto: (<>Durante o mês, quem pagou aparece pela rotina gratuita diária (selo "pagamento novo"). No <strong className="text-ink">dia 30</strong> (em fevereiro, no último dia do mês), às 07:20, o sistema consulta Pagamentos na Receita de <strong className="text-ink">todos os clientes do Presumido e do Real</strong> (só matriz) e guarda os detalhes dos DARF pagos. Conclui as tarefas de PIS/COFINS e IRPJ/CSLL quando os dois tributos foram pagos e, ao terminar, avisa no sino. Quem não tem procuração e quem já foi consultado no dia não é cobrado.</>),
+      texto: (<>Durante o mês, quem pagou aparece pela rotina gratuita diária (selo "pagamento novo"). No <strong className="text-ink">dia 30</strong> (em fevereiro, no último dia do mês), às 18:10, o sistema consulta Pagamentos na Receita de <strong className="text-ink">todos os clientes do Presumido e do Real</strong> (só matriz) e guarda os detalhes dos DARF pagos. Conclui as tarefas de PIS/COFINS e IRPJ/CSLL quando os dois tributos foram pagos e, ao terminar, avisa no sino. Quem não tem procuração e quem já foi consultado no dia não é cobrado.</>),
       ligada: 'Lote do dia 30 do Presumido e Real ligado.', desligada: 'Lote do dia 30 do Presumido e Real desligado.',
     },
   ];
