@@ -121,7 +121,7 @@ export default function DctfwebMitFederal() {
       <PageHeader
         kicker="~/dashboard federal · dctfweb e mit"
         title="DCTFWeb e MIT."
-        subtitle={`Quem entregou a DCTFWeb e a MIT de cada mês, para os clientes ativos do Lucro Presumido e do Lucro Real. Cada consulta traz o recibo da DCTFWeb do mês e as apurações da MIT do ano. "Sem declaração" na DCTFWeb não quer dizer atraso: ela só existe para quem teve movimento no eSocial ou na EFD-Reinf. Confirme o prazo e o movimento do cliente antes de cobrar. Filiais seguem a matriz. Todo dia às 07:40 a Receita informa, de graça, quais clientes tiveram movimento na DCTFWeb (chegada de eSocial ou Reinf, ou transmissão): eles aparecem marcados como "Movimento novo" até você consultar.`}
+        subtitle={`Quem entregou a DCTFWeb e a MIT de cada mês, para os clientes ativos do Lucro Presumido e do Lucro Real. Cada consulta traz o recibo da DCTFWeb do mês e as apurações da MIT do ano. "Sem declaração" na DCTFWeb não quer dizer atraso: ela só existe para quem teve movimento no eSocial ou na EFD-Reinf. Confirme o prazo e o movimento do cliente antes de cobrar. Filiais seguem a matriz. Todo dia às 07:40 a Receita informa, de graça, quais clientes tiveram movimento na DCTFWeb (chegada de eSocial ou Reinf, ou transmissão): eles aparecem marcados como "Movimento novo" até você consultar. No dia 30 de cada mês, a partir das 20:00, o sistema consulta sozinho só quem estiver marcado como "Movimento novo" (recibo do mês anterior e MIT do ano); a primeira rodada é em 30/10/2026.`}
         actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />}
       />
 

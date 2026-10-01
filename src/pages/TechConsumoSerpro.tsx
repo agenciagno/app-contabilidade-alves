@@ -122,6 +122,11 @@ export default function TechConsumoSerpro() {
       ligada: 'Rotina bimestral da Situação Fiscal ligada.', desligada: 'Rotina bimestral da Situação Fiscal desligada.',
     },
     {
+      chave: 'auto_rotina_dctfweb', rotina: rotina('dctfweb-mensal'), titulo: 'Consultar a DCTFWeb e a MIT de quem teve movimento, todo mês',
+      texto: (<>Todo dia às 07:40 a Receita informa, de graça, quais clientes do Presumido e do Real tiveram movimento na DCTFWeb (marcados como "Movimento novo"). No <strong className="text-ink">dia 30 de cada mês</strong> (em fevereiro, no último dia), a partir das 20:00, o sistema consulta na Receita <strong className="text-ink">só esses clientes</strong>: o recibo da DCTFWeb do mês anterior e as apurações da MIT do ano (2 consultas por cliente), e conclui as tarefas "DCTF" e "MIT" de quem entregou. Quem não teve movimento não é consultado nem cobrado. <strong className="text-ink">A primeira rodada é em 30/10/2026</strong>, sem rodada de atualização antes. Custa no máximo <strong className="text-ink">{reais(custoEstimado('Consultar', 70))} por rodada</strong> (35 clientes, se todos tiverem movimento). Ao terminar, avisa no sino.</>),
+      ligada: 'Rotina mensal da DCTFWeb e MIT ligada.', desligada: 'Rotina mensal da DCTFWeb e MIT desligada.',
+    },
+    {
       chave: 'auto_rotina_defis', rotina: rotina('defis-anual'), titulo: 'Conferir a DEFIS duas vezes por ano',
       texto: (<>A DEFIS vence em <strong className="text-ink">31 de março</strong> do ano seguinte (se cair em fim de semana ou feriado, no próximo dia útil). Em <strong className="text-ink">15 de março</strong>, o sistema consulta o índice das DEFIS de cada cliente do Simples que ainda não tem a do ano na lista, para a equipe cobrar a tempo. No <strong className="text-ink">dia seguinte ao prazo</strong> (1º de abril de 2027), consulta de novo <strong className="text-ink">só quem continua sem a DEFIS</strong>: a consulta depois do prazo é a prova de "não entregue". Empresa aberta depois do ano, filial e quem não tem procuração não entram. Ao fim de cada rodada, avisa no sino.</>),
       ligada: 'Rotina anual da DEFIS ligada.', desligada: 'Rotina anual da DEFIS desligada.',
@@ -237,7 +242,7 @@ export default function TechConsumoSerpro() {
                 <DsBadge tone={ligado ? 'ok' : 'neutral'}>{ligado ? 'Ligada' : 'Desligada'}</DsBadge>
               </h2>
               <p className="text-ui text-muted-ink">
-                {it.texto} Cada cliente gera uma chamada cobrada: cerca de <strong className="text-ink">{reais(custoEstimado(it.rotina.tipo === 'Emitir' ? 'Emitir' : 'Consultar', it.rotina.chamadasPorMes))} por mês</strong> na média ({it.rotina.chamadasPorMes} chamadas por mês, estimativa).
+                {it.texto} Cada chamada é cobrada: cerca de <strong className="text-ink">{reais(custoEstimado(it.rotina.tipo === 'Emitir' ? 'Emitir' : 'Consultar', it.rotina.chamadasPorMes))} por mês</strong> na média ({it.rotina.chamadasPorMes} chamadas por mês, estimativa).
               </p>
             </div>
             <DicaBotao texto={ligado ? 'Ligado: desligue se não quiser que o sistema consulte (e cobre) sozinho.' : 'Desligado: nenhuma consulta automática desta rotina. Ligue quando quiser.'}>

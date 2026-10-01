@@ -6,7 +6,7 @@
 export type TipoRotina = 'Monitorar' | 'Consultar' | 'Emitir' | 'sem_chamada';
 
 /** Rotinas que cobram e têm interruptor próprio em Tech (colunas de serpro_config). */
-export type InterruptorRotina = 'auto_rotina_pgdas' | 'auto_lote_pagamentos_simples' | 'auto_lote_pagamentos_presumido_real' | 'auto_leitura_faturamento' | 'auto_rotina_defis' | 'auto_rotina_sitfis';
+export type InterruptorRotina = 'auto_rotina_pgdas' | 'auto_lote_pagamentos_simples' | 'auto_lote_pagamentos_presumido_real' | 'auto_leitura_faturamento' | 'auto_rotina_defis' | 'auto_rotina_sitfis' | 'auto_rotina_dctfweb';
 
 export interface RotinaSerpro {
   id: string;
@@ -62,12 +62,16 @@ export const ROTINAS: RotinaSerpro[] = [
     faz: 'Gera o relatório de situação fiscal de todos os clientes ativos (matriz) e lê o resultado: sem pendências, com pendências ou a conferir. O pedido do protocolo é grátis; cada relatório emitido custa R$ 0,32. A primeira rodada é em 30/10/2026, sem rodada de atualização antes. Ao terminar, avisa no sino; no dia seguinte às 08:00, a rotina de tarefas cria a tarefa de quem tem pendência. Estimativa: 197 clientes por rodada, ou seja, 99 emissões por mês na média (cerca de R$ 63 por rodada).',
   },
   {
+    id: 'dctfweb-mensal', nome: 'DCTFWeb e MIT: consulta do mês de quem teve movimento novo', quando: 'dia 30 de cada mês (em fevereiro, o último dia), de 20:00 a 20:25', tipo: 'Consultar', chamadasPorMes: 70, interruptor: 'auto_rotina_dctfweb', padraoLigado: true,
+    faz: 'Consulta só os clientes do Lucro Presumido e do Lucro Real que a rotina gratuita das 07:40 marcou como "Movimento novo": traz o recibo da DCTFWeb do mês anterior e as apurações da MIT do ano (2 consultas por cliente) e guarda o recibo. Quem não teve movimento não é consultado nem cobrado. Conclui as tarefas "DCTF" e "MIT" de quem entregou. A primeira rodada é em 30/10/2026, sem rodada de atualização antes. Ao terminar, avisa no sino. Estimativa: no máximo 35 clientes por rodada, ou seja, até 70 consultas por mês (quanto menos clientes com movimento, menos custa).',
+  },
+  {
     id: 'procuracoes', nome: 'Procurações: aviso de vencimento', quando: 'toda segunda, 08:00', tipo: 'sem_chamada', chamadasPorMes: 0,
     faz: 'Avisa no sino as procurações que vencem em até 60 dias. Lê só o que já está salvo.',
   },
   {
     id: 'tarefas', nome: 'Tarefas fiscais criadas pela Receita', quando: 'todo dia, 08:00', tipo: 'sem_chamada', chamadasPorMes: 0,
-    faz: 'Cria tarefa com o responsável do cliente para comunicação crítica, pendência na Situação Fiscal e parcela em atraso. Lê só o que já está salvo.',
+    faz: 'Cria tarefa com o responsável do cliente para comunicação crítica e pendência na Situação Fiscal. Lê só o que já está salvo.',
   },
   {
     id: 'das', nome: 'Aviso do vencimento do DAS', quando: 'dia 20 (segunda se cair no fim de semana), 08:05', tipo: 'sem_chamada', chamadasPorMes: 0,

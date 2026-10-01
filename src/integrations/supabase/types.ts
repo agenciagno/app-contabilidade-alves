@@ -4739,6 +4739,7 @@ export type Database = {
           auto_leitura_faturamento: boolean
           auto_lote_pagamentos_presumido_real: boolean
           auto_lote_pagamentos_simples: boolean
+          auto_rotina_dctfweb: boolean
           auto_rotina_pgdas: boolean
           auto_rotina_sitfis: boolean
           company_id: string
@@ -4753,6 +4754,7 @@ export type Database = {
           auto_leitura_faturamento?: boolean
           auto_lote_pagamentos_presumido_real?: boolean
           auto_lote_pagamentos_simples?: boolean
+          auto_rotina_dctfweb?: boolean
           auto_rotina_pgdas?: boolean
           auto_rotina_sitfis?: boolean
           company_id: string
@@ -4767,6 +4769,7 @@ export type Database = {
           auto_leitura_faturamento?: boolean
           auto_lote_pagamentos_presumido_real?: boolean
           auto_lote_pagamentos_simples?: boolean
+          auto_rotina_dctfweb?: boolean
           auto_rotina_pgdas?: boolean
           auto_rotina_sitfis?: boolean
           company_id?: string

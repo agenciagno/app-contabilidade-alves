@@ -1,10 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { criarSerpro, jwtRole, onlyDigits } from "../_shared/serpro-core.ts";
+import { criarSerpro, jwtRole, onlyDigits, sleep } from "../_shared/serpro-core.ts";
 import { assinar, guardarPdf } from "../_shared/serpro-arquivos.ts";
 import { lerApuracoesMit, pdfDoRecibo, semDeclaracaoDctfweb } from "../_shared/dctfweb-mit.ts";
 import { avisarConclusoes, concluirTarefaFiscal } from "../_shared/tarefas-fiscais.ts";
+import { lerTodas } from "../_shared/paginar.ts";
 
 // ---------------------------------------------------------------------------
 // DCTFWeb e MIT (Serpro Integra Contador) — F4 Onda 4, fase 1 (quem entregou), 30/09/2026. Só leitura.
@@ -17,6 +18,12 @@ import { avisarConclusoes, concluirTarefaFiscal } from "../_shared/tarefas-fisca
 //   rotina_eventos   rotina diária (cron 07:40 BRT): evento E0301 (grátis, /Monitorar), 1 solicitar + 1 obter para todos os clientes do escopo.
 //       O E0301 só diz que a DCTFWeb do CNPJ foi atualizada (eSocial/Reinf/SERO recebido ou declaração transmitida), sem dizer qual.
 //       Marca "movimento novo" quando a data avança e avisa a equipe; quem consulta é a equipe, por clique. { forcar?: true } ignora a trava de 12 h.
+//   rotina_dctfweb   rotina MENSAL (cron 20:00 a 20:25 BRT; decisão de Gabriel, 01/10/2026), só no dia 30 (em fevereiro, o último dia do mês): consulta, como no clique
+//       (recibo da DCTFWeb do MÊS ANTERIOR + apurações da MIT do ano), APENAS os clientes marcados como "movimento novo" pelo sensor gratuito acima.
+//       Quem não teve movimento desde a última consulta não é consultado nem cobrado. Sem rodada de atualização antes: a primeira é em 30/10/2026.
+//       Fora do escopo: filial, CNPJ da CA, sensor com "x" (sem procuração) e quem está mapeado sem nenhuma procuração ativa. Não repete no mesmo dia quem já foi tentado
+//       (cada tentativa é cobrada). Até 20 clientes por disparo e 100 s; para após 5 falhas seguidas. Um aviso no sino ao fim. Interruptor: serpro_config.auto_rotina_dctfweb
+//       (padrão ligado). Admin simula com { dry_run: true, ignorar_data?: true, competencia? } (não cobra).
 //
 // Só clientes com status "Ativo". Filial é recusada (declarações da matriz). Procuração: 00103 (DCTFWeb).
 // Transmitir DCTFWeb/encerrar MIT NÃO existe aqui: escrita na Receita é fase final. A guia (GERARGUIA31) é a fase 2.
@@ -60,28 +67,37 @@ async function semProcuracaoNenhuma(contactId: string): Promise<boolean> {
 }
 
 type Parte = { ok: boolean; erro?: string; semProcuracao?: boolean };
+type Resp = { corpo: Record<string, unknown>; http: number };
+const resp = (corpo: Record<string, unknown>, http = 200): Resp => ({ corpo, http });
 
-async function consultar(payload: any, uid: string) {
-  const c = await carregarCliente(String(payload.contact_id ?? ""));
-  if (c.resp) return c.resp;
+/**
+ * Consulta UM cliente (recibo da DCTFWeb da competência + apurações da MIT do ano: 2 chamadas cobradas) e grava. Serve ao clique e à rodada mensal.
+ * `semAviso`: a rodada soma as tarefas concluídas e avisa uma vez só no fim (em vez de um aviso por cliente).
+ */
+async function consultarCliente(o: {
+  contactId: string; competencia: string; uid: string | null; origem: "manual" | "cron"; force?: boolean; semAviso?: boolean; motivo?: string;
+}): Promise<Resp> {
+  const c = await carregarCliente(o.contactId);
+  if (c.resp) return { corpo: await c.resp.clone().json(), http: c.resp.status };
   const contactId = c.contato!.id;
-  const comp = String(payload.competencia ?? "");
-  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(comp)) return json({ error: "Informe a competência (AAAA-MM)" }, 400);
+  const comp = o.competencia;
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(comp)) return resp({ error: "Informe a competência (AAAA-MM)" }, 400);
   const [ano, mes] = comp.split("-");
   const competencia = `${comp}-01`;
-  if (Number(ano) < 2019 || `${comp}-01` > hojeBR()) return json({ error: "Competência inválida" }, 400);
-  if (await semProcuracaoNenhuma(contactId)) return json({ ok: false, semProcuracao: true, error: "Este cliente não tem procuração eletrônica ativa. Peça para outorgar no e-CAC e mapeie em Procurações." });
+  if (Number(ano) < 2019 || `${comp}-01` > hojeBR()) return resp({ error: "Competência inválida" }, 400);
+  if (await semProcuracaoNenhuma(contactId)) return resp({ ok: false, semProcuracao: true, error: "Este cliente não tem procuração eletrônica ativa. Peça para outorgar no e-CAC e mapeie em Procurações." });
 
-  if (!payload.force) {
+  if (!o.force) {
     const [{ data: d }, { data: m }] = await Promise.all([
       supabase.from("serpro_dctfweb").select("consultado_em").eq("contact_id", contactId).eq("competencia", competencia).maybeSingle(),
       supabase.from("serpro_mit_consultas").select("consultado_em").eq("contact_id", contactId).eq("ano", Number(ano)).maybeSingle(),
     ]);
     const recente = (t?: string | null) => !!t && Date.now() - Date.parse(t) < RECENTE_MIN * 60_000;
-    if (recente(d?.consultado_em) && recente(m?.consultado_em)) return json({ ok: true, recente: true });
+    if (recente(d?.consultado_em) && recente(m?.consultado_em)) return resp({ ok: true, recente: true });
   }
 
   const agora = new Date().toISOString();
+  const porQuem = o.motivo ?? "acionada por usuário para acompanhamento fiscal do cliente";
   let dctf: Parte & { status?: "transmitida" | "sem_declaracao" } = { ok: false };
   let mit: Parte & { apuracoes?: number } = { ok: false };
   let tarefasConcluidas = 0;
@@ -90,18 +106,18 @@ async function consultar(payload: any, uid: string) {
   const r = await serpro({
     tipo: "Consultar", idSistema: "DCTFWEB", idServico: "CONSRECIBO32",
     contribuinte: { numero: c.cnpj!, tipo: 2 }, dados: JSON.stringify({ categoria: 40, anoPA: ano, mesPA: mes }),
-    uid, contactId, origem: "manual",
-    finalidade: `Consulta do recibo da DCTFWeb (PA ${mes}/${ano}) acionada por usuário para acompanhamento fiscal do cliente`,
+    uid: o.uid, contactId, origem: o.origem,
+    finalidade: `Consulta do recibo da DCTFWeb (PA ${mes}/${ano}) ${porQuem}`,
   });
-  if (r.status === 403) return json({ ok: false, semProcuracao: true, status: 403, error: "Sem procuração eletrônica para a DCTFWeb deste cliente" });
+  if (r.status === 403) return resp({ ok: false, semProcuracao: true, status: 403, error: "Sem procuração eletrônica para a DCTFWeb deste cliente" });
   if (semDeclaracaoDctfweb(r.resposta)) {
-    await supabase.from("serpro_dctfweb").upsert({ company_id: COMPANY_ID, contact_id: contactId, competencia, status: "sem_declaracao", recibo_path: null, consultado_em: agora, consultado_por: uid }, { onConflict: "contact_id,competencia" });
+    await supabase.from("serpro_dctfweb").upsert({ company_id: COMPANY_ID, contact_id: contactId, competencia, status: "sem_declaracao", recibo_path: null, consultado_em: agora, consultado_por: o.uid }, { onConflict: "contact_id,competencia" });
     dctf = { ok: true, status: "sem_declaracao" };
   } else if (r.status === 200) {
     const path = await guardarPdf(supabase, BUCKET, `${COMPANY_ID}/${contactId}/dctfweb-${comp}.pdf`, pdfDoRecibo(r.resposta?.dados));
     if (!path) dctf = { ok: false, erro: "O Serpro respondeu, mas o recibo não veio em PDF válido" };
     else {
-      await supabase.from("serpro_dctfweb").upsert({ company_id: COMPANY_ID, contact_id: contactId, competencia, status: "transmitida", recibo_path: path, consultado_em: agora, consultado_por: uid }, { onConflict: "contact_id,competencia" });
+      await supabase.from("serpro_dctfweb").upsert({ company_id: COMPANY_ID, contact_id: contactId, competencia, status: "transmitida", recibo_path: path, consultado_em: agora, consultado_por: o.uid }, { onConflict: "contact_id,competencia" });
       dctf = { ok: true, status: "transmitida" };
     }
   } else {
@@ -125,8 +141,8 @@ async function consultar(payload: any, uid: string) {
   const m = await serpro({
     tipo: "Consultar", idSistema: "MIT", idServico: "LISTAAPURACOES317",
     contribuinte: { numero: c.cnpj!, tipo: 2 }, dados: JSON.stringify({ anoApuracao: Number(ano) }),
-    uid, contactId, origem: "manual",
-    finalidade: `Consulta das apurações da MIT (ano ${ano}) acionada por usuário para acompanhamento fiscal do cliente`,
+    uid: o.uid, contactId, origem: o.origem,
+    finalidade: `Consulta das apurações da MIT (ano ${ano}) ${porQuem}`,
   });
   const textoMit = msgErro(m);
   // Ano sem nenhuma apuração: o formato exato da resposta ainda não foi visto em produção; 404/204 ou "não há/nenhum" valem como lista vazia.
@@ -153,16 +169,21 @@ async function consultar(payload: any, uid: string) {
       }
     }
     if (!mit.erro && !mit.semProcuracao) {
-      await supabase.from("serpro_mit_consultas").upsert({ contact_id: contactId, company_id: COMPANY_ID, ano: Number(ano), consultado_em: agora, consultado_por: uid, apuracoes: lista.length }, { onConflict: "contact_id,ano" });
+      await supabase.from("serpro_mit_consultas").upsert({ contact_id: contactId, company_id: COMPANY_ID, ano: Number(ano), consultado_em: agora, consultado_por: o.uid, apuracoes: lista.length }, { onConflict: "contact_id,ano" });
       mit = { ok: true, apuracoes: lista.length };
     }
   } else {
     mit = { ok: false, erro: textoMit };
   }
 
-  if (!dctf.ok && !mit.ok) return json({ ok: false, error: dctf.erro ?? mit.erro ?? "Falha na consulta ao Serpro", dctfweb: dctf, mit });
-  await avisarConclusoes(supabase, COMPANY_ID, c.contato!.name ?? "Cliente", tarefasConcluidas);
-  return json({ ok: true, dctfweb: dctf, mit, tarefas_concluidas: tarefasConcluidas });
+  if (!dctf.ok && !mit.ok) return resp({ ok: false, error: dctf.erro ?? mit.erro ?? "Falha na consulta ao Serpro", dctfweb: dctf, mit });
+  if (!o.semAviso) await avisarConclusoes(supabase, COMPANY_ID, c.contato!.name ?? "Cliente", tarefasConcluidas);
+  return resp({ ok: true, dctfweb: dctf, mit, tarefas_concluidas: tarefasConcluidas });
+}
+
+async function consultar(payload: any, uid: string) {
+  const r = await consultarCliente({ contactId: String(payload.contact_id ?? ""), competencia: String(payload.competencia ?? ""), uid, origem: "manual", force: !!payload.force });
+  return json(r.corpo, r.http);
 }
 
 async function link(payload: any) {
@@ -229,6 +250,148 @@ async function rotinaEventos(payload: any, uid: string | null, origem: "manual" 
   return json({ ok: true, modo_autor: res.modo, consultados: res.linhas.length, com_evento: comEvento, sem_evento: semEvento, sem_procuracao: semProcuracao, novidades: novidades.length });
 }
 
+// ---------- rotina mensal (dia 30): consulta paga só de quem está com "movimento novo" ----------
+const PRECO_CONSULTAR = 0.24;       // R$ por chamada (faixa até 300 no ciclo; acima disso o Serpro cobra menos)
+const CHAMADAS_POR_CLIENTE = 2;     // recibo da DCTFWeb + apurações da MIT
+const LIMITE_POR_DISPARO = 20;
+const dataBRde = (iso: string) => new Date(Date.parse(iso) - 3 * 3600_000).toISOString().slice(0, 10);
+
+/** Dia 30 de cada mês; em fevereiro, o último dia do mês. */
+const ehDiaDaRodada = (hoje: string) => {
+  const ano = Number(hoje.slice(0, 4)), mes = Number(hoje.slice(5, 7));
+  return Number(hoje.slice(8, 10)) === Math.min(30, new Date(Date.UTC(ano, mes, 0)).getUTCDate());
+};
+/** Competência da rodada: o mês anterior ao da rodada (a DCTFWeb do mês que acabou de fechar). */
+const competenciaDaRodada = (hoje: string) => {
+  const ano = Number(hoje.slice(0, 4)), mes = Number(hoje.slice(5, 7));
+  return mes === 1 ? `${ano - 1}-12` : `${ano}-${String(mes - 1).padStart(2, "0")}`;
+};
+const siglaComp = (comp: string) => `${comp.slice(5, 7)}/${comp.slice(0, 4)}`;
+
+/** Um aviso por título e por dia no sino (admins e quem tem o módulo dashboard_federal). */
+async function avisarRodada(titulo: string, corpo: string, hoje: string) {
+  try {
+    const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true })
+      .eq("company_id", COMPANY_ID).eq("type", "serpro_dctfweb").eq("title", titulo).gte("created_at", `${hoje}T03:00:00Z`);
+    if ((count ?? 0) > 0) return;
+    const { data: alvos } = await supabase.from("profiles").select("user_id")
+      .eq("company_id", COMPANY_ID).eq("status_active", true).or("role.in.(admin,super_admin),allowed_modules.cs.{dashboard_federal}");
+    if (!alvos?.length) return;
+    await supabase.from("notifications").insert(alvos.map((t: { user_id: string }) => ({
+      user_id: t.user_id, company_id: COMPANY_ID, type: "serpro_dctfweb", title: titulo, body: corpo, action_url: "/dashboard-federal/dctfweb-mit",
+    })));
+  } catch (e) {
+    console.error("Falha ao avisar a rodada da DCTFWeb:", String((e as Error).message || e));
+  }
+}
+
+/**
+ * Clientes da rodada: Presumido e Real, Ativo, matriz, CNPJ válido, sem os CNPJs da CA e sem estar mapeado sem nenhuma procuração ativa (a tentativa seria cobrada e voltaria 403).
+ * `novo` = o sensor gratuito viu a Receita mexer na DCTFWeb depois da última consulta (mesma regra da tela). Sensor "x" (sem procuração) fica de fora.
+ */
+async function carteiraDaRodada() {
+  const { data: contatos } = await supabase.from("contacts").select("id,name,display_name,document")
+    .eq("company_id", COMPANY_ID).eq("is_active", true).eq("status_cliente", STATUS_MONITORADO).in("tax_regime", REGIMES_DO_ESCOPO).order("name");
+  // O mapa de procurações passa de 1.000 linhas (teto do banco por consulta): lê em páginas.
+  const procs = await lerTodas<{ contact_id: string; status: string; data_fim: string | null }>((de, ate) => supabase.from("serpro_procuracoes").select("contact_id,status,data_fim")
+    .eq("company_id", COMPANY_ID).eq("fonte", "integra_procuracoes").in("codigo_procuracao", CODIGOS_BASE).order("id").range(de, ate));
+  const hoje = hojeBR();
+  const comMapa = new Map<string, boolean>();
+  for (const r of procs) comMapa.set(r.contact_id, (comMapa.get(r.contact_id) ?? false) || (r.status === "ativa" && (!r.data_fim || r.data_fim >= hoje)));
+  const sensor = await lerTodas<{ contact_id: string; mudou_em: string | null; ultima_consulta_em: string | null; sem_procuracao: boolean }>((de, ate) => supabase.from("serpro_dctfweb_sensor")
+    .select("contact_id,mudou_em,ultima_consulta_em,sem_procuracao").eq("company_id", COMPANY_ID).order("contact_id").range(de, ate));
+  const sPor = new Map(sensor.map((x) => [x.contact_id, x]));
+
+  const elegiveis = ((contatos ?? []) as { id: string; name: string | null; display_name: string | null; document: string | null }[]).filter((c) => {
+    const cnpj = onlyDigits(c.document);
+    return cnpj.length === 14 && cnpj.slice(8, 12) === "0001" && !CNPJS_DA_CA.has(cnpj);
+  });
+  const semProcuracao = elegiveis.filter((c) => comMapa.get(c.id) === false);
+  const fora = new Set(semProcuracao.map((c) => c.id));
+  const tentaveis = elegiveis.filter((c) => !fora.has(c.id));
+  const ehNovo = (id: string) => {
+    const sn = sPor.get(id);
+    return !!sn?.mudou_em && !sn.sem_procuracao && (!sn.ultima_consulta_em || Date.parse(sn.mudou_em) > Date.parse(sn.ultima_consulta_em));
+  };
+  return { elegiveis, tentaveis, novos: tentaveis.filter((c) => ehNovo(c.id)), semProcuracao: semProcuracao.length };
+}
+
+/** Clientes que já tiveram o recibo da DCTFWeb consultado hoje (qualquer origem): a rodada não repete, porque cada tentativa custa, mesmo quando falha. */
+async function tentadosHoje(hoje: string): Promise<Set<string>> {
+  const { data } = await supabase.from("serpro_call_log").select("contact_id,created_at")
+    .eq("company_id", COMPANY_ID).eq("id_servico", "CONSRECIBO32").gte("created_at", `${hoje}T03:00:00Z`).limit(1000);
+  return new Set(((data ?? []) as { contact_id: string | null; created_at: string }[]).filter((r) => r.contact_id && dataBRde(r.created_at) === hoje).map((r) => r.contact_id as string));
+}
+
+/** Rotina mensal: o cron bate todo dia; quem decide é o interruptor (padrão ligado) e a DATA (dia 30). */
+async function rotinaDctfweb(payload: any, uid: string | null) {
+  const hoje = hojeBR();
+  const simulando = !!uid && payload.dry_run === true;
+  const { data: cfg } = await supabase.from("serpro_config").select("auto_rotina_dctfweb").eq("company_id", COMPANY_ID).maybeSingle();
+  if (!simulando && cfg?.auto_rotina_dctfweb === false) return json({ ok: true, desligada: true });
+  if (!(uid && payload.ignorar_data === true) && !ehDiaDaRodada(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
+
+  const comp = uid && /^\d{4}-(0[1-9]|1[0-2])$/.test(String(payload.competencia ?? "")) ? String(payload.competencia) : competenciaDaRodada(hoje);
+  const limite = uid ? Math.max(1, Math.min(Number(payload.limite) || LIMITE_POR_DISPARO, LIMITE_POR_DISPARO)) : LIMITE_POR_DISPARO;
+  const { tentaveis, novos, semProcuracao } = await carteiraDaRodada();
+  const tentados = await tentadosHoje(hoje);
+  const alvo = novos.filter((c) => !tentados.has(c.id));
+  if (simulando) {
+    return json({ ok: true, dry_run: true, hoje, competencia: comp, no_escopo: tentaveis.length, com_movimento_novo: novos.length, a_consultar: alvo.length,
+      sem_procuracao_pulados: semProcuracao, custo_estimado_reais: Math.round(alvo.length * CHAMADAS_POR_CLIENTE * PRECO_CONSULTAR * 100) / 100 });
+  }
+
+  const inicio = Date.now();
+  const resumo = { consultados: 0, com_recibo: 0, sem_declaracao: 0, parciais: 0, erros: 0, tarefas_concluidas: 0 };
+  const falhas: string[] = [];
+  let seguidas = 0, processados = 0;
+  for (const c of alvo) {
+    if (processados >= limite || Date.now() - inicio > 100_000 || seguidas >= 5) break;
+    processados++;
+    const r = await consultarCliente({
+      contactId: c.id, competencia: comp, uid, origem: uid ? "manual" : "cron", force: true, semAviso: true,
+      motivo: `na rodada mensal da DCTFWeb e da MIT (dia 30) de cliente com movimento novo informado pela Receita (evento E0301), para acompanhamento fiscal`,
+    });
+    if (r.corpo.ok === true) {
+      seguidas = 0;
+      resumo.consultados++;
+      const d = r.corpo.dctfweb as { ok: boolean; status?: string }, m = r.corpo.mit as { ok: boolean };
+      if (d.status === "transmitida") resumo.com_recibo++;
+      else if (d.status === "sem_declaracao") resumo.sem_declaracao++;
+      if (!d.ok || !m.ok) resumo.parciais++;
+      resumo.tarefas_concluidas += Number(r.corpo.tarefas_concluidas) || 0;
+    } else {
+      seguidas++;
+      resumo.erros++;
+      if (falhas.length < 10) falhas.push(`${c.display_name || c.name}: ${String(r.corpo.error ?? r.corpo.status ?? "falha")}`);
+    }
+    await sleep(150);
+  }
+  const restantes = alvo.length - processados;
+  if (resumo.tarefas_concluidas > 0) await avisarConclusoes(supabase, COMPANY_ID, `${resumo.consultados} ${resumo.consultados === 1 ? "cliente" : "clientes"} (rodada mensal da DCTFWeb e MIT)`, resumo.tarefas_concluidas);
+
+  if (seguidas >= 5) {
+    await avisarRodada("DCTFWeb e MIT: rodada mensal parou por falhas", `A Receita falhou ${resumo.erros} vezes seguidas. Nada mais foi cobrado hoje. Veja o registro de chamadas em Tech.`, hoje);
+  } else if (restantes === 0) {
+    // Resumo do dia lido do que ficou gravado: vale para os vários disparos da noite, e um aviso só por dia.
+    const tentadosAgora = await tentadosHoje(hoje);
+    const { data: gravados } = await supabase.from("serpro_dctfweb").select("contact_id,status,consultado_em").eq("company_id", COMPANY_ID).eq("competencia", `${comp}-01`).gte("consultado_em", `${hoje}T03:00:00Z`).limit(1000);
+    const doDia = ((gravados ?? []) as { status: string; consultado_em: string }[]).filter((g) => dataBRde(g.consultado_em) === hoje);
+    const recibos = doDia.filter((g) => g.status === "transmitida").length;
+    const sem = doDia.filter((g) => g.status === "sem_declaracao").length;
+    const semResultado = tentadosAgora.size - doDia.length;
+    if (tentadosAgora.size === 0) {
+      await avisarRodada("DCTFWeb e MIT: nenhum cliente com movimento novo", `Nenhum cliente do Presumido ou do Real teve movimento novo na Receita desde a última consulta. Nada foi consultado nem cobrado.`, hoje);
+    } else {
+      await avisarRodada(`DCTFWeb e MIT de ${siglaComp(comp)}: rodada mensal concluída`,
+        `${tentadosAgora.size} ${tentadosAgora.size === 1 ? "cliente com movimento novo consultado" : "clientes com movimento novo consultados"}: ${recibos} com recibo da DCTFWeb, ${sem} sem declaração`
+          + (semResultado > 0 ? `, ${semResultado} sem resultado (consulte pelo botão)` : "") + ". Veja na tela DCTFWeb e MIT.", hoje);
+    }
+  }
+  return json({ ok: true, hoje, competencia: comp, no_escopo: tentaveis.length, com_movimento_novo: novos.length, a_consultar: alvo.length, sem_procuracao_pulados: semProcuracao,
+    ...resumo, restantes, parou_por_falhas: seguidas >= 5, falhas, segundos: Math.round((Date.now() - inicio) / 1000) });
+}
+
 // Um aviso interno por rodada (não um por cliente). Vai para admins e para quem tem o módulo dashboard_federal.
 async function notificarNovidades(ids: string[]) {
   try {
@@ -256,10 +419,12 @@ Deno.serve(async (req) => {
   const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   const payload = await req.json().catch(() => ({}));
 
-  // Cron chama com a chave anon (padrão do projeto). Só a rotina de eventos aceita isso, e ela tem trava de 12 h.
-  if (payload.action === "rotina_eventos" && (bearer === Deno.env.get("SUPABASE_ANON_KEY") || jwtRole(bearer) === "anon")) {
+  // Cron chama com a chave anon (padrão do projeto). Só as duas rotinas aceitam isso: a de eventos (grátis, trava de 12 h) e a mensal (decide pelo interruptor e pela data).
+  const ehCron = bearer === Deno.env.get("SUPABASE_ANON_KEY") || jwtRole(bearer) === "anon";
+  if (payload.action === "rotina_eventos" && ehCron) {
     return await rotinaEventos({ ...payload, forcar: false, limite: undefined, semFallback: false }, null, "cron");
   }
+  if (payload.action === "rotina_dctfweb" && ehCron) return await rotinaDctfweb({}, null);
 
   const { data: userData } = await supabase.auth.getUser(bearer);
   const uid = userData?.user?.id;
@@ -275,6 +440,9 @@ Deno.serve(async (req) => {
     case "rotina_eventos":
       if (!admin) return json({ error: "Só administradores rodam a rotina manualmente" }, 403);
       return await rotinaEventos(payload, uid, "manual");
-    default: return json({ error: "action inválida (consultar | link | rotina_eventos)" }, 400);
+    case "rotina_dctfweb":
+      if (!admin) return json({ error: "Só administradores rodam a rotina manualmente" }, 403);
+      return await rotinaDctfweb(payload, uid);
+    default: return json({ error: "action inválida (consultar | link | rotina_eventos | rotina_dctfweb)" }, 400);
   }
 });
