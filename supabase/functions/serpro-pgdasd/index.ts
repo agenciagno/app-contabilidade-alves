@@ -24,8 +24,6 @@ import { concluirTarefaDas } from "../_shared/tarefas-fiscais.ts";
 //   ler_faturamento { contact_id, periodo }          Passo 3: lê o PDF da declaração do mês (regra fixa de texto, sem IA) e grava em
 //                                                    serpro_faturamento (receita do mês, RBT12, RBA, limite, sublimite, fator r, regime).
 //                                                    Se o PDF já está guardado, não chama o Serpro (custo zero); se não, baixa antes.
-//   aplicar_faturamento { faturamento_id }           Só administrador e só leitura confiável: copia a receita mensal (13 meses) para
-//                                                    client_revenue com fonte "rfb". Nunca sobrescreve lançamento manual.
 //   link         { tipo, id }                        link assinado (10 min) de um PDF já guardado (sem chamada ao Serpro).
 //   publicar     { tabela: "das" | "declaracao", id, visivel_portal }
 //
@@ -349,44 +347,6 @@ async function lerFaturamento(payload: any, uid: string) {
   }
 }
 
-async function aplicarFaturamento(payload: any, uid: string, admin: boolean) {
-  if (!admin) return json({ error: "Só administrador pode aplicar o faturamento ao Fiscal" }, 403);
-  const { data: f } = await supabase.from("serpro_faturamento").select("id,contact_id,numero_declaracao,periodo_apuracao,rpa_total,confiavel,dados")
-    .eq("id", String(payload.faturamento_id ?? "")).eq("company_id", COMPANY_ID).maybeSingle();
-  if (!f) return json({ error: "Leitura não encontrada" }, 404);
-  if (!f.confiavel) return json({ ok: false, error: "A leitura deste PDF não é confiável. Confira o PDF antes de aplicar." });
-  const c = await carregarCliente(f.contact_id);
-  if (c.resp) return c.resp;
-
-  // Receita de cada mês: os 12 meses anteriores do PDF (interno + externo) e a receita do próprio período.
-  const d = f.dados as DeclaracaoPgdasd;
-  const meses = new Map<string, number>();
-  for (const m of [...(d.historico_interno ?? []), ...(d.historico_externo ?? [])]) meses.set(m.mes, Math.round(((meses.get(m.mes) ?? 0) + m.valor) * 100) / 100);
-  if (f.rpa_total !== null) meses.set(String(f.periodo_apuracao).slice(0, 7), Number(f.rpa_total));
-
-  const { data: existentes } = await supabase.from("client_revenue").select("id,competence_year,competence_month,source").eq("contact_id", f.contact_id);
-  const porMes = new Map((existentes ?? []).map((e: { id: string; competence_year: number; competence_month: number; source: string }) => [`${e.competence_year}-${String(e.competence_month).padStart(2, "0")}`, e]));
-  const nota = `PGDAS-D ${f.numero_declaracao}`;
-  const novos: Record<string, unknown>[] = [];
-  let atualizados = 0, ignorados = 0;
-  for (const [mes, valor] of meses) {
-    const ex = porMes.get(mes);
-    if (!ex) {
-      novos.push({ company_id: COMPANY_ID, contact_id: f.contact_id, competence_year: Number(mes.slice(0, 4)), competence_month: Number(mes.slice(5, 7)), gross_revenue: valor, source: "rfb", notes: nota, created_by: uid });
-    } else if (ex.source === "rfb") {
-      const { error } = await supabase.from("client_revenue").update({ gross_revenue: valor, notes: nota }).eq("id", ex.id);
-      if (error) return json({ ok: false, error: `Não foi possível atualizar o faturamento: ${error.message}` }, 500);
-      atualizados++;
-    } else ignorados++; // lançamento manual: nunca sobrescrever
-  }
-  if (novos.length) {
-    const { error } = await supabase.from("client_revenue").insert(novos);
-    if (error) return json({ ok: false, error: `Não foi possível gravar o faturamento: ${error.message}` }, 500);
-  }
-  await supabase.from("serpro_faturamento").update({ aplicado_fiscal_em: new Date().toISOString(), aplicado_por: uid }).eq("id", f.id);
-  return json({ ok: true, inseridos: novos.length, atualizados, ignorados_manuais: ignorados });
-}
-
 const PASTA_TIPO: Record<string, { tabela: "serpro_pgdasd_declaracoes" | "serpro_pgdasd_das"; coluna: string; prefixo: string }> = {
   declaracao: { tabela: "serpro_pgdasd_declaracoes", coluna: "declaracao_path", prefixo: "declaracao" },
   recibo: { tabela: "serpro_pgdasd_declaracoes", coluna: "recibo_path", prefixo: "recibo" },
@@ -435,9 +395,8 @@ Deno.serve(async (req) => {
     case "extrato": return await extrato(payload, uid);
     case "gerar_das": return await gerarDas(payload, uid);
     case "ler_faturamento": return await lerFaturamento(payload, uid);
-    case "aplicar_faturamento": return await aplicarFaturamento(payload, uid, admin);
     case "link": return await link(payload);
     case "publicar": return await publicar(payload);
-    default: return json({ error: "action inválida (consultar | documentos | extrato | gerar_das | ler_faturamento | aplicar_faturamento | link | publicar)" }, 400);
+    default: return json({ error: "action inválida (consultar | documentos | extrato | gerar_das | ler_faturamento | link | publicar)" }, 400);
   }
 });

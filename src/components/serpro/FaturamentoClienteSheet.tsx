@@ -175,7 +175,6 @@ export function FaturamentoClienteSheet({
           </DicaBotao>
           <p className="min-w-[200px] flex-1 text-meta text-muted-ink-2">
             {`Lido em ${format(new Date(f.lido_em), 'dd/MM/yyyy HH:mm')}.`}
-            {f.aplicado_fiscal_em && ` Aplicado ao Fiscal em ${format(new Date(f.aplicado_fiscal_em), 'dd/MM/yyyy HH:mm')}.`}
           </p>
         </div>
 

@@ -1,8 +1,7 @@
 // Núcleo compartilhado das funções Serpro (Integra Contador): autenticação (mTLS + Autentica Procurador),
 // chamada com registro em serpro_call_log e o fluxo de Eventos de Atualização (solicitar + obter).
 // Criado em 01/10/2026 para a Onda 1 (Pagamentos) e reaproveitado pelas ondas seguintes.
-// serpro-gateway e serpro-caixa-postal ainda têm cópia própria deste código (já testado em produção);
-// migrar os dois para cá é uma tarefa à parte, sem pressa.
+// Todas as funções Serpro usam este núcleo (serpro-gateway e serpro-caixa-postal migraram em 01/10/2026; antes tinham cópia própria).
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 export type Tipo = "Apoiar" | "Consultar" | "Declarar" | "Emitir" | "Monitorar";
@@ -20,6 +19,11 @@ export interface Chamada {
   finalidade: string;
   /** versaoSistema do serviço; o padrão "1.0" vale para quase todos (SITFIS usa "2.0"). */
   versao?: string;
+  /** Base legal desta chamada no registro; o padrão é a da CA como procuradora do contribuinte. */
+  baseLegal?: string;
+  /** Só no trial (dados simulados): permite usar os números de contratante e autor do manual. Ignorado em produção. */
+  trialContratante?: string;
+  trialAutor?: string;
 }
 
 export const onlyDigits = (v: unknown) => String(v ?? "").replace(/\D/g, "");
@@ -102,10 +106,11 @@ export function criarSerpro(supabase: SupabaseClient, companyId: string) {
 
   // Uma chamada ao Serpro + registro em serpro_call_log. Nunca reenvia sozinha depois de 504.
   async function serpro(c: Chamada) {
-    const autorNi = c.autor === "contratante" ? CONTRATANTE_NI : AUTOR_NI;
+    const contratanteNi = (MODE === "trial" && c.trialContratante) || CONTRATANTE_NI;
+    const autorNi = c.autor === "contratante" ? contratanteNi : ((MODE === "trial" && c.trialAutor) || AUTOR_NI);
     const body = {
-      contratante: { numero: CONTRATANTE_NI, tipo: 2 },
-      autorPedidoDados: { numero: autorNi, tipo: 2 },
+      contratante: { numero: contratanteNi, tipo: 2 },
+      autorPedidoDados: { numero: autorNi, tipo: autorNi.length === 11 ? 1 : 2 },
       contribuinte: c.contribuinte,
       pedidoDados: { idSistema: c.idSistema, idServico: c.idServico, versaoSistema: c.versao ?? "1.0", dados: c.dados },
     };
@@ -129,7 +134,7 @@ export function criarSerpro(supabase: SupabaseClient, companyId: string) {
       const res = await fetch(`${BASE_URL}/${c.tipo}`, { method: "POST", headers, body: JSON.stringify(body), signal: ctrl.signal });
       clearTimeout(timer);
       status = res.status;
-      responseId = res.headers.get("activityid");
+      responseId = res.headers.get("activityid") ?? res.headers.get("x-request-id");
       const texto = await res.text();
       try { resposta = texto ? JSON.parse(texto) : null; } catch { resposta = { raw: texto.slice(0, 2000) }; }
       if (resposta && typeof resposta.dados === "string") {
@@ -147,7 +152,7 @@ export function criarSerpro(supabase: SupabaseClient, companyId: string) {
       company_id: companyId, ambiente: MODE, tipo_chamada: c.tipo, id_sistema: c.idSistema, id_servico: c.idServico,
       contribuinte_ni: c.contribuinte.tipo === 4 ? `lista(${c.contribuinte.numero.split(",").length})` : c.contribuinte.numero || null,
       contact_id: c.contactId ?? null, status_http: status, cobravel, duracao_ms: Date.now() - t0, response_id: responseId,
-      mensagem_codigo: mensagemCodigo, acionado_por: c.uid, origem: c.origem, finalidade: c.finalidade, base_legal: BASE_LEGAL,
+      mensagem_codigo: mensagemCodigo, acionado_por: c.uid, origem: c.origem, finalidade: c.finalidade, base_legal: c.baseLegal ?? BASE_LEGAL,
     });
     return { status, resposta, cobravel };
   }
@@ -201,5 +206,5 @@ export function criarSerpro(supabase: SupabaseClient, companyId: string) {
     return "linhas" in res ? { linhas: res.linhas, modo } : res;
   }
 
-  return { MODE, CONTRATANTE_NI, AUTOR_NI, serpro, eventosPJ };
+  return { MODE, BASE_URL, CONTRATANTE_NI, AUTOR_NI, serpro, eventosPJ };
 }

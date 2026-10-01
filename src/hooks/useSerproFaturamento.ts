@@ -45,7 +45,6 @@ export interface FaturamentoRow {
   avisos: string[];
   dados: DadosLeitura | null;
   lido_em: string;
-  aplicado_fiscal_em: string | null;
 }
 
 /** Teto anual do Simples Nacional. O limite proporcionalizado do PDF (empresa aberta no ano) tem prioridade. */
