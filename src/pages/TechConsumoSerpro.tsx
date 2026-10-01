@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
-import { DsAlert, PageHeader, StatCardRow } from '@/components/ds';
+import { DsAlert, DsBadge, PageHeader, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Switch } from '@/components/ui/switch';
@@ -17,7 +17,7 @@ import {
   cicloAtual, custoEstimado, useConsumoSerpro, useSalvarSerproConfig, useSerproConfig,
 } from '@/hooks/useSerproConsumo';
 import { STATUS_MONITORADO, useClientesCaixa } from '@/hooks/useSerproCaixaPostal';
-import { ROTINAS_ATIVAS, ROTINAS_NAO_ATIVADAS, cobra, type TipoRotina } from '@/lib/rotinasSerpro';
+import { ROTINAS, cobra, type InterruptorRotina, type RotinaSerpro, type TipoRotina } from '@/lib/rotinasSerpro';
 
 const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const ROTULO_TIPO: Record<TipoRotina, string> = { Monitorar: 'Monitorar (grátis)', Consultar: 'Consultar', Emitir: 'Emitir', sem_chamada: 'Sem chamada ao Serpro' };
@@ -96,10 +96,32 @@ export default function TechConsumoSerpro() {
     if (c.status_cliente !== STATUS_MONITORADO) foraPorStatus.set(c.status_cliente ?? 'Sem status', (foraPorStatus.get(c.status_cliente ?? 'Sem status') ?? 0) + 1);
   }
 
-  // Custo fixo por mês = soma do que as rotinas ATIVAS que cobram gastam (hoje nenhuma cobra).
-  const fixas = ROTINAS_ATIVAS.filter(cobra);
-  const custoFixoMes = fixas.length ? custoEstimado('Consultar', fixas.filter((x) => x.tipo === 'Consultar').reduce((n, x) => n + x.chamadasPorMes, 0)) + custoEstimado('Emitir', fixas.filter((x) => x.tipo === 'Emitir').reduce((n, x) => n + x.chamadasPorMes, 0)) : 0;
-  const custoNaoAtivadas = custoEstimado('Consultar', ROTINAS_NAO_ATIVADAS.reduce((n, x) => n + x.consultasPorMes, 0));
+  // Custo fixo por mês = soma do que as rotinas LIGADAS que cobram gastam. Rotina com interruptor desligado não conta (aparece em "se ligar").
+  const ligada = (x: RotinaSerpro) => !x.interruptor || (config ? config[x.interruptor] : (x.padraoLigado ?? true));
+  const ligadas = ROTINAS.filter(ligada);
+  const fixas = ligadas.filter(cobra);
+  const custoDe = (lista: RotinaSerpro[]) => custoEstimado('Consultar', lista.filter((x) => x.tipo === 'Consultar').reduce((n, x) => n + x.chamadasPorMes, 0)) + custoEstimado('Emitir', lista.filter((x) => x.tipo === 'Emitir').reduce((n, x) => n + x.chamadasPorMes, 0));
+  const custoFixoMes = fixas.length ? custoDe(fixas) : 0;
+  const desligadasQueCobram = ROTINAS.filter((x) => !ligada(x) && cobra(x));
+  const custoSeLigar = desligadasQueCobram.length ? custoDe(desligadasQueCobram) : 0;
+  const rotina = (id: string) => ROTINAS.find((x) => x.id === id)!;
+  const INTERRUPTORES_QUE_COBRAM: { chave: InterruptorRotina; titulo: string; texto: React.ReactNode; rotina: RotinaSerpro; ligada: string; desligada: string }[] = [
+    {
+      chave: 'auto_rotina_pgdas', rotina: rotina('pgdas-consulta'), titulo: 'Consultar o PGDAS-D sozinho',
+      texto: (<>No <strong className="text-ink">dia 16</strong>, o sistema consulta o ano de cada cliente do Simples (07:45 a 08:00) para mostrar quem já transmitiu o mês anterior e como estão os DAS. No <strong className="text-ink">dia seguinte ao prazo</strong> (dia 20, ou o próximo dia útil se cair em fim de semana ou feriado nacional), consulta de novo só quem ainda não transmitiu. Quem não tem procuração não é consultado, e quem já foi consultado no dia não é cobrado de novo.</>),
+      ligada: 'Consulta automática do PGDAS-D ligada.', desligada: 'Consulta automática do PGDAS-D desligada.',
+    },
+    {
+      chave: 'auto_lote_pagamentos_simples', rotina: rotina('lote-simples'), titulo: 'Conferir os pagamentos do Simples no dia 30',
+      texto: (<>No <strong className="text-ink">dia 30</strong> (em fevereiro, no último dia do mês), às 07:10, o sistema consulta Pagamentos na Receita <strong className="text-ink">só dos clientes do Simples que têm DAS do mês anterior ainda sem pagamento registrado</strong>. Mostra quem pagou depois do vencimento, com data e valor, e conclui a tarefa do DAS de quem pagou. Ao terminar, avisa no sino quantos continuam sem pagamento. Quem não tem procuração e quem já foi consultado no dia não é cobrado.</>),
+      ligada: 'Lote do dia 30 do Simples ligado.', desligada: 'Lote do dia 30 do Simples desligado.',
+    },
+    {
+      chave: 'auto_lote_pagamentos_presumido_real', rotina: rotina('lote-presumido-real'), titulo: 'Conferir os pagamentos do Presumido e do Real no dia 30',
+      texto: (<>No <strong className="text-ink">dia 30</strong> (em fevereiro, no último dia do mês), às 07:20, o sistema consulta Pagamentos na Receita de <strong className="text-ink">todos os clientes do Presumido e do Real</strong> (só matriz). Traz os DARF pagos do mês anterior e conclui as tarefas de PIS/COFINS e IRPJ/CSLL quando os dois tributos foram pagos. Ao terminar, avisa no sino. Quem não tem procuração e quem já foi consultado no dia não é cobrado.</>),
+      ligada: 'Lote do dia 30 do Presumido e Real ligado.', desligada: 'Lote do dia 30 do Presumido e Real desligado.',
+    },
+  ];
 
   const alertaValor = config?.alerta_gasto_mensal ?? 100;
   const passouAlerta = r.custo >= alertaValor;
@@ -190,26 +212,32 @@ export default function TechConsumoSerpro() {
         </DicaBotao>
       </section>
 
-      <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-line bg-paper p-5">
-        <div className="min-w-[260px] flex-1 space-y-1">
-          <h2 className="text-h4-card text-ink">Consultar o PGDAS-D sozinho <span className="text-meta text-muted-ink-2">(esta rotina cobra)</span></h2>
-          <p className="text-ui text-muted-ink">
-            No <strong className="text-ink">dia 16</strong>, o sistema consulta o ano de cada cliente do Simples (07:45 a 08:00) para mostrar quem já transmitiu o mês anterior e como estão os DAS.
-            No <strong className="text-ink">dia seguinte ao prazo</strong> (dia 20, ou o próximo dia útil se cair em fim de semana ou feriado nacional), consulta de novo só quem ainda não transmitiu.
-            Custa uma consulta por cliente, cerca de <strong className="text-ink">{reais(custoEstimado('Consultar', 176))} por mês</strong>. Quem não tem procuração não é consultado, e quem já foi consultado no dia não é cobrado de novo.
-          </p>
-        </div>
-        <DicaBotao texto={config?.auto_rotina_pgdas === false ? 'Desligado: nenhuma consulta automática do PGDAS-D. Ligue para voltar a consultar nos dias 16 e seguinte ao prazo.' : 'Ligado: desligue se não quiser que o sistema consulte (e cobre) sozinho.'}>
-          <Switch
-            checked={config?.auto_rotina_pgdas ?? true}
-            disabled={!config || salvar.isPending}
-            onCheckedChange={async (v) => {
-              try { await salvar.mutateAsync({ auto_rotina_pgdas: v }); toast.success(v ? 'Consulta automática do PGDAS-D ligada.' : 'Consulta automática do PGDAS-D desligada.'); }
-              catch { toast.error('Não foi possível salvar.'); }
-            }}
-          />
-        </DicaBotao>
-      </section>
+      {INTERRUPTORES_QUE_COBRAM.map((it) => {
+        const ligado = config ? config[it.chave] : (it.rotina.padraoLigado ?? true);
+        return (
+          <section key={it.chave} className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-line bg-paper p-5">
+            <div className="min-w-[260px] flex-1 space-y-1">
+              <h2 className="flex flex-wrap items-center gap-2 text-h4-card text-ink">
+                {it.titulo} <span className="text-meta text-muted-ink-2">(esta rotina cobra)</span>
+                <DsBadge tone={ligado ? 'ok' : 'neutral'}>{ligado ? 'Ligada' : 'Desligada'}</DsBadge>
+              </h2>
+              <p className="text-ui text-muted-ink">
+                {it.texto} Custa uma consulta por cliente: cerca de <strong className="text-ink">{reais(custoEstimado('Consultar', it.rotina.chamadasPorMes))} por mês</strong> ({it.rotina.chamadasPorMes} consultas por mês, estimativa).
+              </p>
+            </div>
+            <DicaBotao texto={ligado ? 'Ligado: desligue se não quiser que o sistema consulte (e cobre) sozinho.' : 'Desligado: nenhuma consulta automática desta rotina. Ligue quando quiser.'}>
+              <Switch
+                checked={ligado}
+                disabled={!config || salvar.isPending}
+                onCheckedChange={async (v) => {
+                  try { await salvar.mutateAsync({ [it.chave]: v }); toast.success(v ? it.ligada : it.desligada); }
+                  catch { toast.error('Não foi possível salvar.'); }
+                }}
+              />
+            </DicaBotao>
+          </section>
+        );
+      })}
 
       <section className="space-y-4 rounded-lg border border-line bg-paper p-5">
         <div className="space-y-1">
@@ -223,9 +251,9 @@ export default function TechConsumoSerpro() {
         <StatCardRow
           items={[
             { label: 'Custo fixo por mês', value: reais(custoFixoMes), hint: custoFixoMes === 0 ? 'nenhuma rotina automática cobra' : 'rotinas automáticas que cobram' },
-            { label: 'Rotinas ativas', value: ROTINAS_ATIVAS.length, hint: `${ROTINAS_ATIVAS.length - fixas.length} grátis ou sem chamada ao Serpro` },
+            { label: 'Rotinas ligadas', value: ligadas.length, hint: `${ligadas.length - fixas.length} grátis ou sem chamada ao Serpro${desligadasQueCobram.length ? ` · ${desligadasQueCobram.length} desligada${desligadasQueCobram.length === 1 ? '' : 's'}` : ''}` },
             { label: 'Cobrado por rotina neste ciclo', value: r.rotinaCobradas, hint: `${reais(r.rotinaCusto)} medido no registro de chamadas`, emphasis: r.rotinaCobradas > 0 ? 'warm' : 'none' },
-            { label: 'Se ligar as ideias abaixo', value: reais(custoNaoAtivadas), hint: 'por mês (estimativa); hoje nada disso roda' },
+            { label: 'Se ligar as desligadas', value: reais(custoSeLigar), hint: desligadasQueCobram.length ? 'por mês (estimativa), além do custo fixo' : 'nenhuma rotina que cobra está desligada' },
           ]}
         />
 
@@ -241,30 +269,29 @@ export default function TechConsumoSerpro() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {ROTINAS_ATIVAS.map((x) => (
-              <TableRow key={x.id}>
-                <TableCell className="align-top text-ui text-ink">{x.nome}</TableCell>
-                <TableCell className="align-top text-ui text-muted-ink">{x.quando}</TableCell>
-                <TableCell className="max-w-[420px] align-top text-meta text-muted-ink">{x.faz}</TableCell>
-                <TableCell className="align-top text-ui text-muted-ink">{ROTULO_TIPO[x.tipo]}</TableCell>
-                <TableCell className="text-right align-top text-ui text-ink">{x.chamadasPorMes}</TableCell>
-                <TableCell className="text-right align-top text-ui text-ink">{cobra(x) ? reais(custoEstimado(x.tipo as 'Consultar' | 'Emitir', x.chamadasPorMes)) : 'R$ 0,00'}</TableCell>
-              </TableRow>
-            ))}
+            {ROTINAS.map((x) => {
+              const on = ligada(x);
+              const custo = cobra(x) ? reais(custoEstimado(x.tipo as 'Consultar' | 'Emitir', x.chamadasPorMes)) : 'R$ 0,00';
+              return (
+                <TableRow key={x.id} className={on ? undefined : 'opacity-70'}>
+                  <TableCell className="align-top text-ui text-ink">
+                    {x.nome}
+                    {x.interruptor && <div className="mt-1"><DsBadge tone={on ? 'ok' : 'neutral'}>{on ? 'Ligada' : 'Desligada'}</DsBadge></div>}
+                  </TableCell>
+                  <TableCell className="align-top text-ui text-muted-ink">{x.quando}</TableCell>
+                  <TableCell className="max-w-[420px] align-top text-meta text-muted-ink">{x.faz}</TableCell>
+                  <TableCell className="align-top text-ui text-muted-ink">{ROTULO_TIPO[x.tipo]}</TableCell>
+                  <TableCell className="text-right align-top text-ui text-ink">{on ? x.chamadasPorMes : <span className="text-muted-ink-2">{x.chamadasPorMes} se ligar</span>}</TableCell>
+                  <TableCell className="text-right align-top text-ui text-ink">{on ? custo : <span className="text-muted-ink-2">{custo} se ligar</span>}</TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
 
-        <div className="space-y-2 rounded-md border border-dashed border-line p-4">
-          <p className="text-ui text-ink">Ideias estudadas que não estão ligadas</p>
-          {ROTINAS_NAO_ATIVADAS.map((x) => (
-            <p key={x.nome} className="text-meta text-muted-ink">
-              {x.nome}: cerca de {x.consultasPorMes} consultas por mês, ≈ {reais(custoEstimado('Consultar', x.consultasPorMes))}. {x.nota}.
-            </p>
-          ))}
-          <p className="text-meta text-muted-ink-2">
-            Há também o passe único do PGDAS da carteira do Simples, aprovado em 01/10/2026: uma consulta por cliente, feita uma vez, que não se repete sozinha. Ele aparece como gasto manual no ciclo.
-          </p>
-        </div>
+        <p className="text-meta text-muted-ink-2">
+          Há também o passe único do PGDAS da carteira do Simples, aprovado em 01/10/2026: uma consulta por cliente, feita uma vez, que não se repete sozinha. Ele aparece como gasto manual no ciclo.
+        </p>
       </section>
 
       {passouAlerta && (

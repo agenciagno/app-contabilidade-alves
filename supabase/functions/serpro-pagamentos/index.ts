@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { criarSerpro, jwtRole, onlyDigits } from "../_shared/serpro-core.ts";
+import { criarSerpro, jwtRole, onlyDigits, sleep } from "../_shared/serpro-core.ts";
 import { avisarConclusoes, concluirTarefaDas, concluirTarefasPorPagamentos } from "../_shared/tarefas-fiscais.ts";
 
 // ---------------------------------------------------------------------------
@@ -16,6 +16,13 @@ import { avisarConclusoes, concluirTarefaDas, concluirTarefasPorPagamentos } fro
 //   publicar         { pagamento_id, visivel_portal }  curadoria para o futuro portal do cliente.
 //   rotina_eventos   rotina diária (cron 07:35 BRT): evento E0701 (grátis, /Monitorar), 1 solicitar + 1 obter. Marca "pagamento novo"
 //                    quando a data do evento avança e avisa a equipe. { forcar?: true } ignora a trava de 12 h.
+//   rotina_lote_simples / rotina_lote_presumido_real   LOTE DO DIA 30 (aprovado por Gabriel, 01/10/2026; crons de 5 em 5 min às 07:10 e 07:20).
+//                    O cron bate todo dia; quem decide é a DATA (dia 30, ou o último dia do mês em fevereiro) e o interruptor de Tech
+//                    (serpro_config.auto_lote_pagamentos_simples / _presumido_real, PADRÃO DESLIGADO: desligado não chama o Serpro).
+//                    Mesma consulta do clique (PAGAMENTOS71 do mês de apuração anterior, que também conclui tarefas), 1 cliente por vez.
+//                    Simples: só quem tem DAS do mês anterior sem pagamento registrado. Presumido e Real: todos (matriz).
+//                    Pula quem já foi consultado hoje, quem não tem procuração (sensor "x") e filial. Até 60 clientes por disparo.
+//                    Admin logado pode simular com { dry_run: true, ignorar_data?: true } (não cobra).
 //
 // A Receita só devolve pagamento FEITO: "não pago" nunca vem na resposta. Só clientes com status "Ativo" geram chamada.
 // Sem lote na tela: cada consulta é de um cliente por vez. Toda chamada ao Serpro vai para serpro_call_log.
@@ -106,27 +113,34 @@ async function carregarCliente(contactId: string) {
 }
 
 // ---------- ações ----------
-async function consultar(payload: any, uid: string) {
-  const contato = await carregarCliente(String(payload.contact_id ?? ""));
-  if (!contato) return json({ error: "Cliente não encontrado" }, 404);
-  if (contato.status_cliente !== STATUS_MONITORADO) return json({ ok: false, foraDoMonitoramento: true, error: msgForaMonitoramento(contato.status_cliente) });
-  const cnpj = onlyDigits(contato.document);
-  if (cnpj.length !== 14) return json({ error: "Cliente sem CNPJ válido" }, 400);
+type Resp = { corpo: Record<string, unknown>; http: number };
+const resp = (corpo: Record<string, unknown>, http = 200): Resp => ({ corpo, http });
 
-  const avancada = payload.filtros && typeof payload.filtros === "object";
-  const competencia = /^\d{4}-\d{2}$/.test(String(payload.competencia ?? "")) ? `${payload.competencia}-01` : null;
-  if (!avancada && !competencia) return json({ error: "Informe a competência (AAAA-MM)" }, 400);
+/**
+ * Consulta os pagamentos de UM cliente (PAGAMENTOS71, cobrado) e grava. Serve ao clique da equipe (`consultar`) e ao lote do dia 30.
+ * Quem chama decide o aviso: `tarefas_concluidas` vem no resultado (o clique avisa por cliente; o lote avisa uma vez só).
+ */
+async function consultarCliente(o: { contactId: string; competencia?: unknown; filtros?: unknown; force?: boolean; uid: string | null; origem: "manual" | "cron"; finalidade?: string }): Promise<Resp & { nome?: string }> {
+  const contato = await carregarCliente(o.contactId);
+  if (!contato) return resp({ error: "Cliente não encontrado" }, 404);
+  if (contato.status_cliente !== STATUS_MONITORADO) return resp({ ok: false, foraDoMonitoramento: true, error: msgForaMonitoramento(contato.status_cliente) });
+  const cnpj = onlyDigits(contato.document);
+  if (cnpj.length !== 14) return resp({ error: "Cliente sem CNPJ válido" }, 400);
+
+  const avancada = o.filtros && typeof o.filtros === "object";
+  const competencia = /^\d{4}-\d{2}$/.test(String(o.competencia ?? "")) ? `${o.competencia}-01` : null;
+  if (!avancada && !competencia) return resp({ error: "Informe a competência (AAAA-MM)" }, 400);
 
   let pedido: Record<string, unknown>;
   if (avancada) {
-    const f = montarFiltros(payload.filtros);
-    if (typeof f === "string") return json({ error: f }, 400);
+    const f = montarFiltros(o.filtros);
+    if (typeof f === "string") return resp({ error: f }, 400);
     pedido = f;
   } else {
-    if (!payload.force) {
+    if (!o.force) {
       const { data: c } = await supabase.from("serpro_pagamentos_consultas").select("consultado_em").eq("contact_id", contato.id).eq("competencia", competencia).maybeSingle();
       if (c?.consultado_em && Date.now() - Date.parse(c.consultado_em) < RECENTE_MIN * 60_000) {
-        return json({ ok: true, recente: true, consultado_em: c.consultado_em });
+        return resp({ ok: true, recente: true, consultado_em: c.consultado_em });
       }
     }
     const [ano, mes] = competencia!.split("-").map(Number);
@@ -143,15 +157,15 @@ async function consultar(payload: any, uid: string) {
       tipo: "Consultar", idSistema: "PAGTOWEB", idServico: "PAGAMENTOS71",
       contribuinte: { numero: cnpj, tipo: 2 },
       dados: JSON.stringify({ ...pedido, primeiroDaPagina: docs.length, tamanhoDaPagina: 100 }),
-      uid, contactId: contato.id, origem: "manual",
-      finalidade: avancada
+      uid: o.uid, contactId: contato.id, origem: o.origem,
+      finalidade: o.finalidade ?? (avancada
         ? "Busca avançada de pagamentos (PAGTOWEB) acionada por usuário para acompanhamento fiscal do cliente"
-        : "Consulta de pagamentos de DARF/DAS/DAE/DJE (PAGTOWEB) acionada por usuário para acompanhamento fiscal do cliente",
+        : "Consulta de pagamentos de DARF/DAS/DAE/DJE (PAGTOWEB) acionada por usuário para acompanhamento fiscal do cliente"),
     });
     ultimoStatus = r.status;
-    if (r.status === 403) return json({ ok: false, semProcuracao: true, status: 403, error: "Sem procuração eletrônica para consultar pagamentos deste cliente" });
+    if (r.status === 403) return resp({ ok: false, semProcuracao: true, status: 403, error: "Sem procuração eletrônica para consultar pagamentos deste cliente" });
     if (r.status === 204) break;
-    if (r.status !== 200) return json({ ok: false, status: r.status, error: r.resposta?.mensagens?.[0]?.texto ?? r.resposta?.error ?? "Falha na consulta ao Serpro" });
+    if (r.status !== 200) return resp({ ok: false, status: r.status, error: r.resposta?.mensagens?.[0]?.texto ?? r.resposta?.error ?? "Falha na consulta ao Serpro" });
     const lote = Array.isArray(r.resposta?.dados) ? r.resposta.dados : [];
     // Só descarta o que já veio em página ANTERIOR (repetição = a paginação não avançou); iguais na mesma página são pagamentos reais.
     const chaveDe = (d: any) => `${d.numeroDocumento}|${dia(d.dataArrecadacao)}|${num(d.valorTotal)}`;
@@ -169,7 +183,7 @@ async function consultar(payload: any, uid: string) {
     const ja = new Set((existentes ?? []).map((e: { chave: string }) => e.chave));
     novas = linhas.filter((l) => !ja.has(l.chave)).length;
     const { error } = await supabase.from("serpro_pagamentos").upsert(linhas, { onConflict: "contact_id,chave" });
-    if (error) return json({ ok: false, error: `Consulta feita, mas não foi possível gravar: ${error.message}` }, 500);
+    if (error) return resp({ ok: false, error: `Consulta feita, mas não foi possível gravar: ${error.message}` }, 500);
   }
 
   // Apaga o aviso "pagamento novo" do sensor (consulta posterior à mudança). Só toca esta coluna.
@@ -180,7 +194,7 @@ async function consultar(payload: any, uid: string) {
   if (!avancada) {
     doMes = linhas.filter((l) => l.periodo_apuracao && l.periodo_apuracao.slice(0, 7) === competencia!.slice(0, 7)).length;
     await supabase.from("serpro_pagamentos_consultas").upsert(
-      { contact_id: contato.id, company_id: COMPANY_ID, competencia, consultado_em: new Date().toISOString(), consultado_por: uid, documentos: doMes },
+      { contact_id: contato.id, company_id: COMPANY_ID, competencia, consultado_em: new Date().toISOString(), consultado_por: o.uid, documentos: doMes },
       { onConflict: "contact_id,competencia" });
   }
 
@@ -192,8 +206,13 @@ async function consultar(payload: any, uid: string) {
   // DARF pago com PIS e COFINS (ou IRPJ e CSLL) no período → conclui "PIS/ COFINS" (ou "IRPJ/ CSLL") do mesmo mês.
   tarefasConcluidas += await concluirTarefasPorPagamentos(supabase, COMPANY_ID, contato.id,
     linhas.filter((l) => l.tipo_sigla === "DARF" && l.periodo_apuracao).map((l) => l.periodo_apuracao!.slice(0, 7)));
-  await avisarConclusoes(supabase, COMPANY_ID, contato.name ?? "Cliente", tarefasConcluidas);
-  return json({ ok: true, status: ultimoStatus, documentos: linhas.length, do_mes: doMes, novos: novas, tarefas_concluidas: tarefasConcluidas });
+  return { ...resp({ ok: true, status: ultimoStatus, documentos: linhas.length, do_mes: doMes, novos: novas, tarefas_concluidas: tarefasConcluidas }), nome: contato.name ?? "Cliente" };
+}
+
+async function consultar(payload: any, uid: string) {
+  const r = await consultarCliente({ contactId: String(payload.contact_id ?? ""), competencia: payload.competencia, filtros: payload.filtros, force: !!payload.force, uid, origem: "manual" });
+  if (r.nome && Number(r.corpo.tarefas_concluidas) > 0) await avisarConclusoes(supabase, COMPANY_ID, r.nome, Number(r.corpo.tarefas_concluidas));
+  return json(r.corpo, r.http);
 }
 
 function bytesDeBase64(b64: string): Uint8Array {
@@ -333,6 +352,127 @@ async function notificarNovidades(ids: string[]) {
   }
 }
 
+
+// ---------- lote do dia 30 ----------
+type ModoLote = "simples" | "presumido_real";
+const LOTES: Record<ModoLote, { acao: string; coluna: string; regimes: string[]; rotulo: string }> = {
+  simples: { acao: "rotina_lote_simples", coluna: "auto_lote_pagamentos_simples", regimes: ["simples_nacional"], rotulo: "Simples" },
+  presumido_real: { acao: "rotina_lote_presumido_real", coluna: "auto_lote_pagamentos_presumido_real", regimes: ["lucro_presumido", "lucro_real"], rotulo: "Presumido e Real" },
+};
+const dataBRde = (iso: string) => new Date(Date.parse(iso) - 3 * 3600_000).toISOString().slice(0, 10);
+/** Dia 30; em fevereiro, o último dia do mês. */
+const ehDiaDoLote = (hoje: string) => Number(hoje.slice(8, 10)) === Math.min(30, new Date(Date.UTC(Number(hoje.slice(0, 4)), Number(hoje.slice(5, 7)), 0)).getUTCDate());
+
+/** Clientes do regime que o lote pode tentar: Ativo, matriz, CNPJ válido, sem os CNPJs da CA e sem procuração negada (o sensor diário devolveu "x"). */
+async function clientesDoLote(modo: ModoLote) {
+  const { data: contatos } = await supabase.from("contacts").select("id,name,display_name,document")
+    .eq("company_id", COMPANY_ID).eq("is_active", true).eq("status_cliente", STATUS_MONITORADO).in("tax_regime", LOTES[modo].regimes).order("name");
+  const { data: sensor } = await supabase.from("serpro_pagamentos_sensor").select("contact_id").eq("company_id", COMPANY_ID).eq("sem_procuracao", true).limit(2000);
+  const semProcuracao = new Set((sensor ?? []).map((r: { contact_id: string }) => r.contact_id));
+  const elegiveis = (contatos ?? []).filter((c: any) => {
+    const cnpj = onlyDigits(c.document);
+    return cnpj.length === 14 && cnpj.slice(8, 12) === "0001" && !CNPJS_DA_CA.has(cnpj);
+  });
+  return { elegiveis, tentaveis: elegiveis.filter((c: any) => !semProcuracao.has(c.id)), semProcuracao: elegiveis.length - elegiveis.filter((c: any) => !semProcuracao.has(c.id)).length };
+}
+
+/** Contatos com DAS do mês de apuração (AAAA-MM) e nenhum pagamento registrado: nem a marca "pago" do PGDAS nem documento DAS em Pagamentos. */
+async function dasSemPagamento(competencia: string): Promise<Set<string>> {
+  const pa = `${competencia}-01`;
+  const proximo = new Date(Date.UTC(Number(competencia.slice(0, 4)), Number(competencia.slice(5, 7)), 1)).toISOString().slice(0, 10);
+  const { data: das } = await supabase.from("serpro_pgdasd_das").select("contact_id,das_pago").eq("company_id", COMPANY_ID).eq("periodo_apuracao", pa).limit(5000);
+  const { data: docs } = await supabase.from("serpro_pagamentos").select("contact_id").eq("company_id", COMPANY_ID).eq("tipo_sigla", "DAS").gte("periodo_apuracao", pa).lt("periodo_apuracao", proximo).limit(5000);
+  const pagos = new Set((docs ?? []).map((d: { contact_id: string }) => d.contact_id));
+  const comDas = new Map<string, boolean>();
+  for (const d of (das ?? []) as { contact_id: string; das_pago: boolean | null }[]) comDas.set(d.contact_id, (comDas.get(d.contact_id) ?? false) || d.das_pago === true);
+  return new Set([...comDas].filter(([id, pago]) => !pago && !pagos.has(id)).map(([id]) => id));
+}
+
+/** Um aviso por rotina e por dia no sino (admins e quem tem o módulo dashboard_federal). */
+async function avisarLote(titulo: string, corpo: string, hoje: string) {
+  try {
+    const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true })
+      .eq("company_id", COMPANY_ID).eq("type", "serpro_pagamento").eq("title", titulo).gte("created_at", `${hoje}T03:00:00Z`);
+    if ((count ?? 0) > 0) return;
+    const { data: alvos } = await supabase.from("profiles").select("user_id")
+      .eq("company_id", COMPANY_ID).eq("status_active", true).or("role.in.(admin,super_admin),allowed_modules.cs.{dashboard_federal}");
+    if (!alvos?.length) return;
+    await supabase.from("notifications").insert(alvos.map((t: { user_id: string }) => ({
+      user_id: t.user_id, company_id: COMPANY_ID, type: "serpro_pagamento", title: titulo, body: corpo, action_url: "/dashboard-federal/pagamentos",
+    })));
+  } catch (e) {
+    console.error("Falha ao avisar o lote do dia 30:", String((e as Error).message || e));
+  }
+}
+
+/**
+ * Lote do dia 30. O cron bate todo dia; quem decide é o interruptor de Tech (padrão desligado) e a DATA. Competência = mês anterior (AAAA-MM).
+ * Guardas: no máximo 60 clientes por disparo e 100 s de relógio; para depois de 5 falhas seguidas; quem já foi consultado hoje é pulado.
+ */
+async function rotinaLote(modo: ModoLote, payload: any, uid: string | null) {
+  const L = LOTES[modo];
+  const hoje = hojeBR();
+  const simulando = !!uid && payload.dry_run === true;
+  const { data: cfg } = await supabase.from("serpro_config").select(L.coluna).eq("company_id", COMPANY_ID).maybeSingle();
+  if (!simulando && (cfg as Record<string, unknown> | null)?.[L.coluna] !== true) return json({ ok: true, desligada: true });
+  if (!(uid && payload.ignorar_data === true) && !ehDiaDoLote(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
+
+  const competencia = new Date(Date.UTC(Number(hoje.slice(0, 4)), Number(hoje.slice(5, 7)) - 2, 1)).toISOString().slice(0, 7);
+  const { elegiveis, tentaveis, semProcuracao } = await clientesDoLote(modo);
+  const { data: consultas } = await supabase.from("serpro_pagamentos_consultas").select("contact_id,consultado_em").eq("company_id", COMPANY_ID).eq("competencia", `${competencia}-01`).limit(3000);
+  const feitosHoje = new Set((consultas ?? []).filter((c: { consultado_em: string }) => dataBRde(c.consultado_em) === hoje).map((c: { contact_id: string }) => c.contact_id));
+  const semPagamento = modo === "simples" ? await dasSemPagamento(competencia) : null;
+  const alvo = tentaveis.filter((c: any) => !feitosHoje.has(c.id) && (!semPagamento || semPagamento.has(c.id)));
+  const mes = `${competencia.slice(5, 7)}/${competencia.slice(0, 4)}`;
+
+  if (simulando) {
+    return json({ ok: true, dry_run: true, modo, hoje, competencia, a_consultar: alvo.length, sem_procuracao_pulados: semProcuracao, custo_estimado_reais: Math.round(alvo.length * 0.24 * 100) / 100,
+      clientes: alvo.slice(0, 80).map((c: any) => c.display_name || c.name) });
+  }
+
+  const inicio = Date.now();
+  const resumo = { consultados: 0, com_pagamento_no_mes: 0, erros: 0, tarefas_concluidas: 0 };
+  const falhas: string[] = [];
+  let seguidas = 0, processados = 0;
+  for (const c of alvo) {
+    if (processados >= 60 || Date.now() - inicio > 100_000 || seguidas >= 5) break;
+    processados++;
+    const r = await consultarCliente({
+      contactId: c.id, competencia, force: true, uid, origem: uid ? "manual" : "cron",
+      finalidade: modo === "simples"
+        ? `Lote do dia 30 (Simples): conferir em Pagamentos se o DAS de ${mes} foi pago, para acompanhamento fiscal do cliente`
+        : `Lote do dia 30 (Presumido e Real): conferir em Pagamentos os DARF pagos de ${mes}, para acompanhamento fiscal do cliente`,
+    });
+    if (r.corpo.ok === true) {
+      seguidas = 0;
+      resumo.consultados++;
+      resumo.tarefas_concluidas += Number(r.corpo.tarefas_concluidas ?? 0);
+      if (Number(r.corpo.do_mes ?? 0) > 0) resumo.com_pagamento_no_mes++;
+    } else {
+      seguidas++;
+      resumo.erros++;
+      if (falhas.length < 10) falhas.push(`${c.display_name || c.name}: ${String(r.corpo.error ?? r.corpo.status ?? "falha")}`);
+    }
+    await sleep(150);
+  }
+  const restantes = alvo.length - processados;
+  if (resumo.tarefas_concluidas > 0) await avisarConclusoes(supabase, COMPANY_ID, `${resumo.consultados} ${resumo.consultados === 1 ? "cliente" : "clientes"} do ${L.rotulo} (lote do dia 30)`, resumo.tarefas_concluidas);
+
+  // Aviso no sino quando o lote termina (o último disparo do dia): quanto foi conferido e o que ainda está sem pagamento.
+  if (seguidas >= 5) {
+    await avisarLote(`Lote do dia 30 (${L.rotulo}) parou por falhas`, `A Receita falhou ${resumo.erros} vezes seguidas. Nada mais foi cobrado. Veja o registro de chamadas em Tech.`, hoje);
+  } else if (restantes === 0 && alvo.length > 0) {
+    const feitos = elegiveis.filter((c: any) => feitosHoje.has(c.id) || alvo.some((a: any) => a.id === c.id)).length;
+    if (modo === "simples") {
+      const ainda = [...(await dasSemPagamento(competencia))].filter((id) => elegiveis.some((c: any) => c.id === id)).length;
+      await avisarLote("Lote do dia 30 (Simples) concluído", `${feitos} ${feitos === 1 ? "cliente conferido" : "clientes conferidos"} em Pagamentos. ${ainda} DAS de ${mes} ${ainda === 1 ? "continua" : "continuam"} sem pagamento registrado na Receita.`, hoje);
+    } else {
+      await avisarLote("Lote do dia 30 (Presumido e Real) concluído", `${feitos} ${feitos === 1 ? "cliente conferido" : "clientes conferidos"} em Pagamentos (competência ${mes})${resumo.tarefas_concluidas ? `, ${resumo.tarefas_concluidas} ${resumo.tarefas_concluidas === 1 ? "tarefa concluída" : "tarefas concluídas"}` : ""}.`, hoje);
+    }
+  }
+  return json({ ok: true, modo, hoje, competencia, a_consultar: alvo.length, sem_procuracao_pulados: semProcuracao, ...resumo, restantes, parou_por_falhas: seguidas >= 5, falhas, segundos: Math.round((Date.now() - inicio) / 1000) });
+}
+
 // ---------- entrada ----------
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -344,6 +484,10 @@ Deno.serve(async (req) => {
   if (action === "rotina_eventos" && (bearer === Deno.env.get("SUPABASE_ANON_KEY") || jwtRole(bearer) === "anon")) {
     return await rotinaEventos({ ...payload, forcar: false, limite: undefined, semFallback: false }, null, "cron");
   }
+
+  // Lote do dia 30: o cron chama com a chave anon, mas quem decide é o interruptor (padrão desligado) e a data; fora do dia 30 não cobra nada.
+  const modoLote = (Object.keys(LOTES) as ModoLote[]).find((m) => LOTES[m].acao === action);
+  if (modoLote && (bearer === Deno.env.get("SUPABASE_ANON_KEY") || jwtRole(bearer) === "anon")) return await rotinaLote(modoLote, {}, null);
 
   const { data: userData } = await supabase.auth.getUser(bearer);
   const uid = userData?.user?.id;
@@ -360,6 +504,10 @@ Deno.serve(async (req) => {
     case "rotina_eventos":
       if (!admin) return json({ error: "Só administradores rodam a rotina manualmente" }, 403);
       return await rotinaEventos(payload, uid, "manual");
-    default: return json({ error: "action inválida (consultar | comprovante | publicar | rotina_eventos)" }, 400);
+    case "rotina_lote_simples":
+    case "rotina_lote_presumido_real":
+      if (!admin) return json({ error: "Só administradores rodam o lote manualmente" }, 403);
+      return await rotinaLote(modoLote!, payload, uid);
+    default: return json({ error: "action inválida (consultar | comprovante | publicar | rotina_eventos | rotina_lote_simples | rotina_lote_presumido_real)" }, 400);
   }
 });

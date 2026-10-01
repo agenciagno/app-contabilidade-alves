@@ -25,6 +25,10 @@ export interface SerproConfig {
   auto_criar_tarefas: boolean;
   /** Rotina automática do PGDAS-D: dia 16 consulta a carteira do Simples; no dia seguinte ao prazo, só quem não transmitiu. Cobra 1 consulta por cliente. */
   auto_rotina_pgdas: boolean;
+  /** Lote do dia 30: consulta Pagamentos de quem tem DAS do mês anterior sem pagamento. Cobra 1 consulta por cliente. Padrão: desligado. */
+  auto_lote_pagamentos_simples: boolean;
+  /** Lote do dia 30: consulta Pagamentos de todos os clientes do Presumido e do Real. Cobra 1 consulta por cliente. Padrão: desligado. */
+  auto_lote_pagamentos_presumido_real: boolean;
 }
 
 // Tabela de preços do contrato Serpro nº 599032 (Anexo I, 28/09/2026). Cada faixa: quantidade máxima na faixa e valor por requisição.
@@ -98,7 +102,7 @@ export function useSerproConfig() {
     queryKey: ['serpro-config', company?.id],
     enabled: !!company?.id,
     queryFn: async (): Promise<SerproConfig> => {
-      const { data, error } = await supabase.from('serpro_config').select('alerta_gasto_mensal, volume_declarado_mes, auto_concluir_tarefas, auto_criar_tarefas, auto_rotina_pgdas').eq('company_id', company!.id).maybeSingle();
+      const { data, error } = await supabase.from('serpro_config').select('alerta_gasto_mensal, volume_declarado_mes, auto_concluir_tarefas, auto_criar_tarefas, auto_rotina_pgdas, auto_lote_pagamentos_simples, auto_lote_pagamentos_presumido_real').eq('company_id', company!.id).maybeSingle();
       if (error) throw error;
       return {
         alerta_gasto_mensal: Number(data?.alerta_gasto_mensal ?? 100),
@@ -106,6 +110,8 @@ export function useSerproConfig() {
         auto_concluir_tarefas: data?.auto_concluir_tarefas ?? true,
         auto_criar_tarefas: data?.auto_criar_tarefas ?? true,
         auto_rotina_pgdas: data?.auto_rotina_pgdas ?? true,
+        auto_lote_pagamentos_simples: data?.auto_lote_pagamentos_simples ?? false,
+        auto_lote_pagamentos_presumido_real: data?.auto_lote_pagamentos_presumido_real ?? false,
       };
     },
   });
