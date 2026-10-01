@@ -18,10 +18,8 @@ import { faturamentoVigente, nivelLimite, nivelSublimite, useFaturamentoAno } fr
 import { statusDefis, useMatrizDefis } from '@/hooks/useSerproDefis';
 import { useProcuracoes, vencendo as procVencendo } from '@/hooks/useSerproProcuracoes';
 import { estadoSitfis, useMatrizSitfis } from '@/hooks/useSerproSitfis';
-import { useDarfsGerados } from '@/hooks/useSerproDarf';
 import { estadoDctfweb, estadoMit, useMatrizDctfwebMit } from '@/hooks/useSerproDctfweb';
 import { useConferenciaCadastro } from '@/hooks/useSerproConferenciaCadastro';
-import { competenciaAtual, estadoParcelamento, parcelasDoMes, somaValor, useMatrizParcelamentos } from '@/hooks/useSerproParcelamentos';
 
 type Tom = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
 
@@ -36,12 +34,16 @@ interface CartaoAtivo {
 interface CartaoEmBreve {
   titulo: string;
   icone: LucideIcon;
-  onda: string;
+  onda?: string;
   fonte: string;
 }
 
 // Cartões que ainda não têm dado: acendem conforme cada onda do Integra Contador entra (relatório serpro-integra-contador-oportunidades-set2026).
+// Parcelamentos e DARF atualizado já estão desenvolvidos (src/pages/ParcelamentosFederal.tsx e DarfFederal.tsx, hooks useSerproParcelamentos e useSerproDarf),
+// mas ficam guardados, sem cartão nem rota, até Gabriel decidir usar: para ligar, volte o cartão em `ativos` e as duas rotas em App.tsx.
 const EM_BREVE: CartaoEmBreve[] = [
+  { titulo: 'Parcelamentos', icone: CreditCard, fonte: 'Parcelas, situação e guia por cliente' },
+  { titulo: 'DARF atualizado', icone: Calculator, fonte: 'Guia com multa e juros calculados' },
   { titulo: 'e-Processo', icone: Scale, onda: 'Onda 3', fonte: 'Processos por interessado' },
   { titulo: 'Declarações em falta', icone: FileX, onda: 'Onda 2 a 4', fonte: 'PGDAS-D, DCTFWeb e DEFIS' },
   { titulo: 'Exclusão do Simples', icone: UserX, onda: 'Onda 3', fonte: 'Termos e riscos de exclusão' },
@@ -59,8 +61,6 @@ export default function DashboardFederal() {
   const { data: defis = [], isLoading: carregandoDefis } = useMatrizDefis();
   const { data: procuracoes = [], isLoading: carregandoProc } = useProcuracoes();
   const { data: sitfis = [], isLoading: carregandoSitfis } = useMatrizSitfis();
-  const { data: parcelamentos = [], isLoading: carregandoParc } = useMatrizParcelamentos();
-  const { data: darfs = [], isLoading: carregandoDarf } = useDarfsGerados();
   const { data: declMensais = [], isLoading: carregandoDecl } = useMatrizDctfwebMit(competencia);
   const conferencia = useConferenciaCadastro();
 
@@ -93,15 +93,6 @@ export default function DashboardFederal() {
     const dctfNovos = dmAtivos.filter((l) => l.novo).length;
     const mitOk = dmAtivos.filter((l) => estadoMit(l) === 'encerrada').length;
     const mitSem = dmAtivos.filter((l) => estadoMit(l) === 'sem_apuracao').length;
-    const mesDarf = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 7);
-    const darfsMes = darfs.filter((d) => d.created_at.slice(0, 7) === mesDarf);
-    const darfsTotal = darfsMes.reduce((s, d) => s + (d.valor_total ?? 0), 0);
-    const pcAtual = competenciaAtual();
-    const parcEstados = parcelamentos.filter((l) => !l.filial).map((l) => estadoParcelamento(l, pcAtual));
-    const parcAtivos = parcEstados.filter((e) => e === 'em_dia' || e === 'atrasado').length;
-    const parcAtrasados = parcEstados.filter((e) => e === 'atrasado').length;
-    const parcConsultados = parcEstados.filter((e) => e !== 'nao_consultado').length;
-    const parcDoMes = parcelamentos.filter((l) => !l.filial && l.consultas.length).reduce((s, l) => s + somaValor(parcelasDoMes(l, pcAtual)), 0);
     const sfEstados = sitfis.filter((l) => !l.filial).map(estadoSitfis);
     const sfSemPend = sfEstados.filter((e) => e === 'sem_pendencias').length;
     const sfComPend = sfEstados.filter((e) => e === 'com_pendencias').length;
@@ -147,20 +138,12 @@ export default function DashboardFederal() {
         linhas: [`${sfSemPend} sem pendências · ${sfComPend} com pendências`, `${sfGerados} de ${sfEstados.length} clientes com relatório${sfConferir ? ` · ${sfConferir} a conferir` : ''}`],
       },
       {
-        titulo: 'Parcelamentos', icone: CreditCard, to: '/dashboard-federal/parcelamentos', tom: parcConsultados === 0 ? 'neutral' : parcAtrasados > 0 ? 'danger' : 'ok',
-        linhas: [`${parcAtivos} com parcelamento ativo · ${parcAtrasados} com parcela em atraso`, `${parcConsultados} de ${parcEstados.length} consultados · parcelas do mês ${parcDoMes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`],
-      },
-      {
         titulo: 'DCTFWeb', icone: FileSpreadsheet, to: '/dashboard-federal/dctfweb-mit', tom: dctfNovos > 0 || dctfSem > 0 ? 'warn' : dmConsultados === 0 ? 'neutral' : 'ok',
         linhas: [`${dctfOk} com recibo · ${dctfSem} sem declaração em ${rotuloCompetencia(competencia)}`, `${dctfNovos} com movimento novo · ${dmConsultados} de ${dmAtivos.length} consultados`],
       },
       {
         titulo: 'MIT', icone: FileSignature, to: '/dashboard-federal/dctfweb-mit', tom: dmConsultados === 0 ? 'neutral' : mitSem > 0 ? 'warn' : 'ok',
         linhas: [`${mitOk} encerradas · ${mitSem} sem apuração em ${rotuloCompetencia(competencia)}`, `${dmConsultados} de ${dmAtivos.length} clientes consultados`],
-      },
-      {
-        titulo: 'DARF atualizado', icone: Calculator, to: '/dashboard-federal/darf', tom: 'neutral',
-        linhas: [`${darfsMes.length} gerados este mês`, `total de ${darfsTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} com multa e juros`],
       },
       {
         titulo: 'Termos de intimação', icone: Gavel, to: '/dashboard-federal/intimacoes', tom: abertas.length > 0 ? 'danger' : 'ok',
@@ -176,9 +159,9 @@ export default function DashboardFederal() {
         linhas: [`${vencidos} vencidos`, `${aVencer} vencem em 30 dias · ${certificados.length} no total`],
       },
     ];
-  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, sitfis, parcelamentos, darfs, declMensais, conferencia.linhas, conferencia.totalAtivos, competencia]);
+  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, sitfis, declMensais, conferencia.linhas, conferencia.totalAtivos, competencia]);
 
-  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc || carregandoSitfis || carregandoParc || carregandoDarf || carregandoDecl || conferencia.carregando;
+  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc || carregandoSitfis || carregandoDecl || conferencia.carregando;
 
   return (
     <div className="space-y-6">
@@ -217,7 +200,7 @@ export default function DashboardFederal() {
             <div key={c.titulo} className={cn('flex min-h-[150px] flex-col gap-3 rounded-lg border border-dashed border-line bg-bg-2/40 p-5')}>
               <div className="flex items-center justify-between">
                 <IconBox tone="neutral" icon={<Icone className="h-5 w-5" />} />
-                <DsBadge tone="neutral" dot={false}>Em breve · {c.onda}</DsBadge>
+                <DsBadge tone="neutral" dot={false}>{c.onda ? `Em breve · ${c.onda}` : 'Em breve'}</DsBadge>
               </div>
               <h2 className="text-h4-card text-muted-ink">{c.titulo}</h2>
               <p className="text-meta text-muted-ink-2">{c.fonte}</p>

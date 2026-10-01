@@ -211,7 +211,7 @@ export default function TechConsumoSerpro() {
           <p className="text-ui text-muted-ink">
             Todo dia às 08:00, o sistema olha o que já está salvo e cria uma tarefa fiscal, com o responsável do cliente, quando a Receita mandou algo
             que ainda não tem tarefa aberta: <strong className="text-ink">comunicação que exige ação</strong> na Caixa Postal (dos últimos 30 dias),
-            <strong className="text-ink"> pendência na Situação Fiscal</strong> ou <strong className="text-ink">parcela de parcelamento em atraso</strong>.
+            ou <strong className="text-ink">pendência na Situação Fiscal</strong>.
             É uma tarefa aberta por cliente e por tipo. Não chama o Serpro e não custa nada.
           </p>
         </div>

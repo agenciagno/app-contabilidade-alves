@@ -356,6 +356,11 @@ export const EM_BREVE: Record<string, EmBreveInfo> = {
     descricao: 'Parcelamentos federais por cliente, com parcelas e situação.',
     fase: 'F4 · Serpro / Integra Contador',
   },
+  darf_atualizado: {
+    titulo: 'DARF atualizado',
+    descricao: 'Guia de DARF com multa e juros calculados pela Receita, por cliente.',
+    fase: 'F4 · Serpro / Integra Contador',
+  },
   certidoes: {
     titulo: 'Certidões',
     descricao:
