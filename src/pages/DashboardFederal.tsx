@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BadgeCheck, BarChart3, ClipboardList, CreditCard, FileCheck, FileSignature, FileSpreadsheet, FileX,
-  Calculator, ClipboardCheck, Gauge, Gavel, Landmark, Mail, Percent, Receipt, Scale, ShieldCheck, UserX, ArrowRight,
+  Calculator, ClipboardCheck, Gavel, Landmark, Mail, Receipt, Scale, ShieldCheck, UserX, ArrowRight,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -135,16 +135,8 @@ export default function DashboardFederal() {
         linhas: [`${snTransmitidas} de ${snConsultados.length} transmitidas em ${rotuloCompetencia(competencia)}`, `${snConsultados.length} de ${snTotal} clientes do Simples consultados`],
       },
       {
-        titulo: 'Faturamento', icone: BarChart3, to: '/dashboard-federal/faturamento', tom: fatConfiaveis.length === 0 ? 'neutral' : fatAcima > 0 ? 'danger' : fatAtencao > 0 ? 'warn' : 'ok',
-        linhas: [`${fatLidos.length} declarações lidas em ${rotuloCompetencia(competencia)}`, `${fatAtencao} em atenção ou crítico (80% do limite)`],
-      },
-      {
-        titulo: 'Sublimite do Simples', icone: Gauge, to: '/dashboard-federal/faturamento?filtro=sublimite', tom: fatConfiaveis.length === 0 ? 'neutral' : fatAcima > 0 ? 'danger' : fatPertoSub > 0 ? 'warn' : 'ok',
-        linhas: [`${fatAcima} acima do limite ou sublimite`, `${fatPertoSub} perto do sublimite`],
-      },
-      {
-        titulo: 'Fator R', icone: Percent, to: '/dashboard-federal/faturamento?filtro=fator_r', tom: fatFatorR > 0 ? 'info' : 'neutral',
-        linhas: [`${fatFatorR} com fator r na declaração`, 'valor como a Receita escreve no PDF'],
+        titulo: 'Faturamento e limites', icone: BarChart3, to: '/dashboard-federal/faturamento', tom: fatConfiaveis.length === 0 ? 'neutral' : fatAcima > 0 ? 'danger' : fatAtencao > 0 || fatPertoSub > 0 ? 'warn' : 'ok',
+        linhas: [`${fatLidos.length} de ${snTransmitidas} declarações lidas em ${rotuloCompetencia(competencia)} · ${fatFatorR} com fator r`, `${fatAcima} acima do limite ou sublimite · ${fatAtencao} em atenção (80% do limite) · ${fatPertoSub} perto do sublimite`],
       },
       {
         titulo: 'DEFIS', icone: ClipboardList, to: '/dashboard-federal/defis', tom: dfConsultados === 0 ? 'neutral' : dfAtraso > 0 ? 'warn' : 'ok',
