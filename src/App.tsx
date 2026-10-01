@@ -56,6 +56,7 @@ const Faturas = lazy(() => import("@/pages/Faturas"));
 const Equipe = lazy(() => import("@/pages/Equipe"));
 const CadastroCertificados = lazy(() => import("@/pages/CadastroCertificados"));
 const DashboardFederal = lazy(() => import("@/pages/DashboardFederal"));
+const Portal360 = lazy(() => import("@/pages/Portal360"));
 const MensagensEcac = lazy(() => import("@/pages/MensagensEcac"));
 const TermosIntimacao = lazy(() => import("@/pages/TermosIntimacao"));
 const PagamentosFederal = lazy(() => import("@/pages/PagamentosFederal"));
@@ -162,7 +163,7 @@ const App = () => (
               <Route path="/reforma-tributaria" element={<AppLayout><ModuleGuard moduleName="reforma_tributaria" subModule="reforma_tributaria_painel"><EmBreve moduleKey="reforma_tributaria" /></ModuleGuard></AppLayout>} />
 
               {/* Gestão 360° */}
-              <Route path="/gestao-360/portal" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_portal"><EmBreve moduleKey="gestao360_portal" /></ModuleGuard></AppLayout>} />
+              <Route path="/gestao-360/portal" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_portal"><Portal360 /></ModuleGuard></AppLayout>} />
               <Route path="/gestao-360/ausencias" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_ausencias"><EmBreve moduleKey="gestao360_ausencias" /></ModuleGuard></AppLayout>} />
               <Route path="/gestao-360/diagnosticos" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_diagnosticos"><EmBreve moduleKey="gestao360_diagnosticos" /></ModuleGuard></AppLayout>} />
               <Route path="/gestao-360/indicadores" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_indicadores"><EmBreve moduleKey="gestao360_indicadores" /></ModuleGuard></AppLayout>} />
