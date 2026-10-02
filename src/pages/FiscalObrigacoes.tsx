@@ -100,6 +100,10 @@ function extractBusinessDay(due_rule: string): number | null {
   return m ? parseInt(m[1], 10) : null;
 }
 
+function isLastBusinessDay(due_rule: string): boolean {
+  return due_rule === 'last_business_day' || due_rule === 'last_day_of_month';
+}
+
 function ordinal(n: number): string {
   return `${n}º`;
 }
@@ -110,6 +114,7 @@ function humanizeDueRule(due_rule: string, frequency: string): string {
   if (day) return `Dia ${day} · ${freq}`;
   const bday = extractBusinessDay(due_rule);
   if (bday) return `${ordinal(bday)} dia útil · ${freq}`;
+  if (isLastBusinessDay(due_rule)) return `Último dia útil · ${freq}`;
   return `${due_rule} · ${freq}`;
 }
 
@@ -177,7 +182,8 @@ interface Occurrence {
 function buildOccurrences(due_rule: string, count = 6): Occurrence[] {
   const day = extractDay(due_rule);
   const bday = extractBusinessDay(due_rule);
-  if (!day && !bday) return [];
+  const last = isLastBusinessDay(due_rule);
+  if (!day && !bday && !last) return [];
   const occ: Occurrence[] = [];
   const now = new Date();
   for (let i = 0; i < count; i++) {
@@ -191,6 +197,9 @@ function buildOccurrences(due_rule: string, count = 6): Occurrence[] {
     if (bday) {
       raw = nthBusinessDayOfMonth(normYear, normMonth, bday);
       adjusted = raw;
+    } else if (last) {
+      raw = new Date(normYear, normMonth + 1, 0);
+      adjusted = adjustToLastBusinessDay(raw);
     } else {
       raw = new Date(year, month, day!);
       if (raw.getMonth() !== normMonth) {

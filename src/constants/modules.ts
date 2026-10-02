@@ -49,7 +49,6 @@ export const MODULE_TREE: ModuleNode[] = [
       { key: 'fiscal_colaboradores', label: 'Colaboradores' },
       { key: 'fiscal_obrigacoes_declaracoes', label: 'Obrigações e Declarações' },
       { key: 'fiscal_calendario', label: 'Calendário Fiscal' },
-      { key: 'fiscal_obrigacoes', label: 'Obrigações Fiscais' },
       { key: 'fiscal_agenda', label: 'Agenda' },
     ],
   },
@@ -324,10 +323,6 @@ export const EM_BREVE: Record<string, EmBreveInfo> = {
     descricao:
       'Prontidão CBS/IBS da carteira, apoio à decisão de setembro do Simples e radar de CNAE.',
     fase: 'F5 · Gestor RT IBS/CBS',
-  },
-  fiscal_obrigacoes: {
-    titulo: 'Obrigações Fiscais',
-    descricao: 'Controle de obrigações por cliente, separado do gestor de tarefas.',
   },
   fiscal_agenda: {
     titulo: 'Agenda',

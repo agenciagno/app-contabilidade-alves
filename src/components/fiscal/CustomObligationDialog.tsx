@@ -52,6 +52,8 @@ export function CustomObligationDialog({ open, onOpenChange, initial }: Props) {
   const { profile } = useProfile();
   const qc = useQueryClient();
   const isEdit = !!initial?.id;
+  // Regra que não é "dia fixo" (último dia útil, Nº dia útil): este diálogo não sabe editar, então preserva a regra e deixa o dia travado.
+  const regraPreservada = isEdit && !!initial?.due_rule && !/^day_\d+$/.test(initial.due_rule) ? initial.due_rule : null;
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -84,7 +86,7 @@ export function CustomObligationDialog({ open, onOpenChange, initial }: Props) {
       toast.error('Selecione ao menos um regime tributário.');
       return;
     }
-    if (!dueDay || dueDay < 1 || dueDay > 31) {
+    if (!regraPreservada && (!dueDay || dueDay < 1 || dueDay > 31)) {
       toast.error('Dia do vencimento deve estar entre 1 e 31.');
       return;
     }
@@ -99,7 +101,7 @@ export function CustomObligationDialog({ open, onOpenChange, initial }: Props) {
       applies_to: appliesTo,
       code: null,
       frequency: 'monthly',
-      due_rule: `day_${dueDay}`,
+      due_rule: regraPreservada ?? `day_${dueDay}`,
       holiday_adjustment: businessDaysOnly ? 'prev_business_day' : 'none',
       internal_delivery_offset: internalOffset,
       requires_employees: false,
@@ -200,9 +202,14 @@ export function CustomObligationDialog({ open, onOpenChange, initial }: Props) {
                 type="number"
                 min={1}
                 max={31}
-                value={dueDay}
+                value={regraPreservada ? '' : dueDay}
+                disabled={!!regraPreservada}
+                placeholder={regraPreservada ? 'Regra especial' : undefined}
                 onChange={(e) => setDueDay(Number(e.target.value))}
               />
+              {regraPreservada && (
+                <p className="text-xs text-muted-foreground">Vencimento por regra especial; altere em Obrigações e declarações.</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="custom-obl-offset">Antecedência interna (dias) <span className="text-destructive">*</span></Label>

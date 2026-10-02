@@ -46,13 +46,14 @@ const REGIME_OPTIONS: { value: string; label: string }[] = [
 const ALL_REGIMES = REGIME_OPTIONS.map((r) => r.value);
 
 type Category = 'fiscal' | 'recorrente';
-type DueRuleType = 'day' | 'bday';
+type DueRuleType = 'day' | 'bday' | 'last';
 
 function extractDueRule(due_rule: string | undefined | null): {
   type: DueRuleType;
   value: string;
 } {
   if (!due_rule) return { type: 'day', value: '' };
+  if (due_rule === 'last_business_day' || due_rule === 'last_day_of_month') return { type: 'last', value: '' };
   const bday = due_rule.match(/^bday_(\d+)$/);
   if (bday) return { type: 'bday', value: bday[1] };
   const day = due_rule.match(/^day_(\d+)$/);
@@ -119,7 +120,7 @@ export function ObrigacaoDialog({
     }
     const dayNum = parseInt(dueDay, 10);
     const maxDay = dueRuleType === 'bday' ? 23 : 31;
-    if (!Number.isFinite(dayNum) || dayNum < 1 || dayNum > maxDay) {
+    if (dueRuleType !== 'last' && (!Number.isFinite(dayNum) || dayNum < 1 || dayNum > maxDay)) {
       toast.error(
         dueRuleType === 'bday'
           ? 'Nº do dia útil deve ser entre 1 e 23.'
@@ -135,7 +136,7 @@ export function ObrigacaoDialog({
       department,
       applies_to: category === 'recorrente' ? ALL_REGIMES : selectedRegimes,
       frequency: 'monthly',
-      due_rule: dueRuleType === 'bday' ? `bday_${dayNum}` : `day_${dayNum}`,
+      due_rule: dueRuleType === 'last' ? 'last_business_day' : dueRuleType === 'bday' ? `bday_${dayNum}` : `day_${dayNum}`,
       holiday_adjustment: 'advance',
       requires_employees: requiresEmployees,
       active: true,
@@ -254,8 +255,10 @@ export function ObrigacaoDialog({
                 <SelectContent>
                   <SelectItem value="day">Dia fixo do mês</SelectItem>
                   <SelectItem value="bday">Nº dia útil do mês</SelectItem>
+                  <SelectItem value="last">Último dia útil do mês</SelectItem>
                 </SelectContent>
               </Select>
+              {dueRuleType !== 'last' && (
               <Input
                 id="ob-day"
                 type="number"
@@ -266,9 +269,12 @@ export function ObrigacaoDialog({
                 className="w-24"
                 placeholder={dueRuleType === 'bday' ? 'Ex: 5' : 'Ex: 20'}
               />
+              )}
             </div>
             <p className="text-xs text-muted-foreground">
-              {dueRuleType === 'bday'
+              {dueRuleType === 'last'
+                ? 'Vence no último dia útil de cada mês (ex.: MIT, DCTFWeb, IRPJ/CSLL).'
+                : dueRuleType === 'bday'
                 ? 'Ex: "5" = 5º dia útil de cada mês, já calculado automaticamente.'
                 : 'Ajuste automático para último dia útil anterior se cair em fim de semana.'}
             </p>

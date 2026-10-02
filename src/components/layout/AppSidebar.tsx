@@ -234,7 +234,6 @@ export const menuEntries: MenuEntry[] = [
       { title: 'Colaboradores', url: '/fiscal/colaboradores', icon: UsersRound, iconName: 'users-round', subKey: 'fiscal_colaboradores', requireAdmin: true },
       { title: 'Obrigações e Declarações', url: '/fiscal/obrigacoes', icon: BookOpen, iconName: 'book-open', subKey: 'fiscal_obrigacoes_declaracoes', requireAdmin: true },
       { title: 'Calendário Fiscal', url: '/fiscal/calendario', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'fiscal_calendario', requireAdmin: true },
-      { title: 'Obrigações Fiscais', url: '/fiscal/obrigacoes-fiscais', icon: FileCheck, iconName: 'file-check', subKey: 'fiscal_obrigacoes', requireAdmin: true },
     ],
   },
 

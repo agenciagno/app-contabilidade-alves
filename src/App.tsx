@@ -172,7 +172,6 @@ const App = () => (
               <Route path="/gestao-360/indicadores" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_indicadores"><CaIndicadores /></ModuleGuard></AppLayout>} />
 
               {/* Tarefas — subrotas novas */}
-              <Route path="/fiscal/obrigacoes-fiscais" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_obrigacoes" requireAdmin><EmBreve moduleKey="fiscal_obrigacoes" /></ModuleGuard></AppLayout>} />
               <Route path="/fiscal/agenda" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_agenda" requireAdmin><EmBreve moduleKey="fiscal_agenda" /></ModuleGuard></AppLayout>} />
 
               {/* Monitoramento */}
