@@ -9,6 +9,18 @@ export interface Triplo { interno: number; externo: number; total: number }
 export interface MesValor { mes: string; valor: number } // mes = AAAA-MM
 export interface Tributos { irpj: number; csll: number; cofins: number; pis: number; cpp: number; icms: number; ipi: number; iss: number; total: number }
 
+/** Uma atividade da seção 2.7 ("Valor do Débito por Tributo para a Atividade"): o que foi vendido/prestado, a receita e o tributo de cada uma. */
+export interface Atividade {
+  descricao: string; // texto da Receita, normalizado
+  tipo: "revenda" | "industrializacao" | "servico" | "outro";
+  receita: number;
+  tributos: Tributos;
+  /** Só para revenda/industrialização: true = com substituição tributária/monofásico/antecipação (ICMS não sai no DAS); false = sem; null = não deu para dizer. */
+  st_ou_monofasico: boolean | null;
+  /** Só para serviço: true = ISS retido/substituído (ISS não sai no DAS); false = sem retenção; null = não deu para dizer. */
+  iss_retido: boolean | null;
+}
+
 export interface DeclaracaoPgdasd {
   tipo: "original" | "retificadora" | null;
   periodo_apuracao: string | null; // AAAA-MM
@@ -27,6 +39,7 @@ export interface DeclaracaoPgdasd {
   fator_r_aplica: boolean | null;
   fator_r_texto: string | null; // texto como veio ("Não se aplica" ou o valor); converter só depois de ver uma declaração real
   debito_declarado: Tributos | null; // Total Geral da Empresa, exigível + suspenso
+  atividades: Atividade[]; // seção 2.7, todas as atividades de todos os estabelecimentos ([] = não li)
   municipio: string | null;
   uf: string | null;
   sublimite: number | null;
@@ -60,6 +73,32 @@ function entre(texto: string, ini: RegExp, fim: RegExp): string {
   const resto = texto.slice(i);
   const j = resto.slice(1).search(fim);
   return j < 0 ? resto : resto.slice(0, j + 1);
+}
+
+/** Seção 2.7: um bloco por atividade (descrição, "Receita Bruta Informada" e a linha de 9 valores IRPJ…Total). */
+function lerAtividades(t: string): Atividade[] {
+  const re = new RegExp(
+    String.raw`Valor do Débito por Tributo para a Atividade \(R\$\):\s*([\s\S]*?)Receita Bruta Informada:\s*R\$\s*${NUM}[\s\S]*?IRPJ[^\n]*\n\s*((?:${NUM}\s+){8}${NUM})`,
+    "g",
+  );
+  const out: Atividade[] = [];
+  for (const m of t.matchAll(re)) {
+    const descricao = m[1]
+      .split("\n").filter((l) => !/^\s*(Número da Declaração:|Autenticação:)/.test(l)).join(" ")
+      .replace(/\s+/g, " ").trim();
+    const v = [...m[3].matchAll(new RegExp(NUM, "g"))].map((x) => brl(x[1]));
+    const tipo: Atividade["tipo"] = /^revenda de mercadorias/i.test(descricao) ? "revenda"
+      : /^venda de mercadorias industrializadas/i.test(descricao) ? "industrializacao"
+      : /^presta[cç][aã]o de servi[cç]os/i.test(descricao) ? "servico" : "outro";
+    const mercadoria = tipo === "revenda" || tipo === "industrializacao";
+    out.push({
+      descricao, tipo, receita: brl(m[2]),
+      tributos: { irpj: v[0], csll: v[1], cofins: v[2], pis: v[3], cpp: v[4], icms: v[5], ipi: v[6], iss: v[7], total: v[8] },
+      st_ou_monofasico: mercadoria ? (/\bcom\s+substitui[cç][aã]o\s+tribut[aá]ria/i.test(descricao) ? true : /\bsem\s+substitui[cç][aã]o\s+tribut[aá]ria/i.test(descricao) ? false : null) : null,
+      iss_retido: tipo === "servico" ? (/\bcom\s+reten[cç][aã]o/i.test(descricao) ? true : /\bsem\s+reten[cç][aã]o/i.test(descricao) ? false : null) : null,
+    });
+  }
+  return out;
 }
 
 export function lerDeclaracaoPgdasd(texto: string): DeclaracaoPgdasd {
@@ -123,6 +162,7 @@ export function lerDeclaracaoPgdasd(texto: string): DeclaracaoPgdasd {
     fator_r_aplica: fatorM ? !/n[aã]o se aplica/i.test(fatorM[1]) : null,
     fator_r_texto: fatorM ? fatorM[1].trim() : null,
     debito_declarado: pega("débito declarado", debito),
+    atividades: lerAtividades(t),
     municipio: munM ? munM[1].trim() : null,
     uf: munM ? munM[2] : null,
     sublimite: subM ? brl(subM[1]) : null,
@@ -172,6 +212,11 @@ export function lerDeclaracaoPgdasd(texto: string): DeclaracaoPgdasd {
     const b = d.debito_declarado;
     const soma = b.irpj + b.csll + b.cofins + b.pis + b.cpp + b.icms + b.ipi + b.iss;
     if (Math.abs(soma - b.total) > 0.05) avisos.push("tributos não fecham com o total do débito declarado");
+  }
+  if (!d.atividades.length) avisos.push("não li: atividades (seção 2.7)");
+  else if (d.debito_declarado) {
+    const soma = d.atividades.reduce((x, a) => x + a.tributos.total, 0);
+    if (Math.abs(soma - d.debito_declarado.total) > 0.05) avisos.push(`atividades divergem do total do débito declarado (${soma.toFixed(2)} x ${d.debito_declarado.total.toFixed(2)})`);
   }
   // Campos essenciais para faturamento/sublimite: sem eles, não é confiável.
   d.confiavel = !!(d.periodo_apuracao && d.rpa && d.rbt12 && d.numero_declaracao) && !avisos.some((a) => /não fecha|não bate/.test(a));
