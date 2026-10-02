@@ -1,11 +1,12 @@
-import { Moon, Sun, LifeBuoy, Landmark, Wallet } from 'lucide-react';
+import { Moon, Sun, LifeBuoy, Landmark, Mail, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { UserMenu } from './UserMenu';
-import { HeaderMensagensEcac } from './HeaderMensagensEcac';
 import { HeaderResumoTarefas } from './HeaderResumoTarefas';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
+import { Button } from '@/components/ui/button';
+import { NOTIFICACOES_ROTINAS_DIARIAS } from '@/lib/rotinasSerpro';
 import { AccountSwitcher } from './AccountSwitcher';
 import { Logo } from '@/components/brand/Logo';
 import { isDevEnvironment } from '@/lib/environment';
@@ -68,9 +69,25 @@ export function AppHeader() {
           {/* Um ícone por categoria (pedido de Gabriel, 01/10/2026), cada um só
               aparece para quem tem o módulo. Notificações Certidões entra quando
               existir notificação de certidão (tela ainda "em breve"). */}
-          {isModuleVisible('mensagens') && <HeaderMensagensEcac />}
+          {/* Mensagens e-CAC (01/10/2026): deixou de ser só atalho. É o sino das rotinas diárias da Receita: avisa quando algum status muda
+              (mensagem nova, pagamento novo, movimento na DCTFWeb, procuração perdida). Os avisos das rodadas ficam nas Notificações Federais. */}
+          {isModuleVisible('mensagens') && (
+            <NotificationBell
+              title="Mensagens e-CAC"
+              icon={Mail}
+              filter={{ types: NOTIFICACOES_ROTINAS_DIARIAS }}
+              renderTop={(fechar) => (
+                <div className="flex items-center justify-between gap-3 border-b border-border/50 bg-muted/30 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">Mudanças que as rotinas diárias da Receita viram hoje de manhã.</p>
+                  <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs" onClick={() => { fechar(); navigate('/mensagens'); }}>
+                    Abrir Mensagens
+                  </Button>
+                </div>
+              )}
+            />
+          )}
           {isModuleVisible('dashboard_federal') && (
-            <NotificationBell title="Notificações Federais" icon={Landmark} filter={{ typePrefix: 'serpro_' }} />
+            <NotificationBell title="Notificações Federais" icon={Landmark} filter={{ typePrefix: 'serpro_', excludeTypes: NOTIFICACOES_ROTINAS_DIARIAS }} />
           )}
           {isModuleVisible('fiscal') && <HeaderResumoTarefas />}
           {isModuleVisible('financeiro') && isSubItemVisible('financeiro', 'financeiro_boletos') && (

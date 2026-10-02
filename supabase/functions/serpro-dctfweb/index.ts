@@ -269,17 +269,20 @@ const competenciaDaRodada = (hoje: string) => {
 };
 const siglaComp = (comp: string) => `${comp.slice(5, 7)}/${comp.slice(0, 4)}`;
 
-/** Um aviso por título e por dia no sino (admins e quem tem o módulo dashboard_federal). */
+/**
+ * Um aviso por título e por dia no sino (admins e quem tem o módulo dashboard_federal). Tipo próprio (serpro_dctfweb_rodada): o serpro_dctfweb é o aviso DIÁRIO
+ * de movimento, que aparece no sino de Mensagens e-CAC; o das rodadas fica nas Notificações Federais.
+ */
 async function avisarRodada(titulo: string, corpo: string, hoje: string) {
   try {
     const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true })
-      .eq("company_id", COMPANY_ID).eq("type", "serpro_dctfweb").eq("title", titulo).gte("created_at", `${hoje}T03:00:00Z`);
+      .eq("company_id", COMPANY_ID).eq("type", "serpro_dctfweb_rodada").eq("title", titulo).gte("created_at", `${hoje}T03:00:00Z`);
     if ((count ?? 0) > 0) return;
     const { data: alvos } = await supabase.from("profiles").select("user_id")
       .eq("company_id", COMPANY_ID).eq("status_active", true).or("role.in.(admin,super_admin),allowed_modules.cs.{dashboard_federal}");
     if (!alvos?.length) return;
     await supabase.from("notifications").insert(alvos.map((t: { user_id: string }) => ({
-      user_id: t.user_id, company_id: COMPANY_ID, type: "serpro_dctfweb", title: titulo, body: corpo, action_url: "/dashboard-federal/dctfweb-mit",
+      user_id: t.user_id, company_id: COMPANY_ID, type: "serpro_dctfweb_rodada", title: titulo, body: corpo, action_url: "/dashboard-federal/dctfweb-mit",
     })));
   } catch (e) {
     console.error("Falha ao avisar a rodada da DCTFWeb:", String((e as Error).message || e));

@@ -24,6 +24,13 @@ export interface RotinaSerpro {
 /** Só `Consultar` e `Emitir` são cobrados. Monitorar (eventos e indicador) e Apoiar são gratuitos. */
 export const cobra = (r: Pick<RotinaSerpro, 'tipo'>) => r.tipo === 'Consultar' || r.tipo === 'Emitir';
 
+/**
+ * Tipos de aviso que as rotinas DIÁRIAS gratuitas do Serpro criam quando um status muda (07:30 Caixa Postal, 07:35 Pagamentos, 07:40 DCTFWeb; procurações
+ * perdidas e a conferência semanal). Aparecem só no sino de Mensagens e-CAC do topo; os avisos das rodadas (DAS, PGDAS-D, faturamento, DEFIS, Situação
+ * Fiscal, DCTFWeb/MIT) ficam no sino de Notificações Federais.
+ */
+export const NOTIFICACOES_ROTINAS_DIARIAS = ['serpro_mensagem', 'serpro_pagamento', 'serpro_dctfweb', 'serpro_procuracao'];
+
 export const ROTINAS: RotinaSerpro[] = [
   {
     id: 'caixa-postal', nome: 'Caixa Postal: mensagem nova (evento E0601)', quando: 'todo dia, 07:30', tipo: 'Monitorar', chamadasPorMes: 60,

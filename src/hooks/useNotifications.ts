@@ -26,6 +26,16 @@ export interface NotificationFilter {
   types?: string[];
   /** Prefixo de tipo (ex.: 'serpro_' pega serpro_mensagem, serpro_defis...). */
   typePrefix?: string;
+  /** Tipos que ficam de fora (ex.: os avisos das rotinas diárias, que têm sino próprio). */
+  excludeTypes?: string[];
+}
+
+/** Aplica o recorte da categoria a uma consulta de `notifications` (a lista e o "marcar lidas" usam o mesmo). */
+function aplicarFiltro(q: any, filter: NotificationFilter) {
+  if (filter.typePrefix) q = q.like('type', `${filter.typePrefix}%`);
+  else if (filter.types) q = q.in('type', filter.types);
+  if (filter.excludeTypes?.length) q = q.not('type', 'in', `(${filter.excludeTypes.join(',')})`);
+  return q;
 }
 
 export function useNotifications(filter: NotificationFilter = {}) {
@@ -33,7 +43,8 @@ export function useNotifications(filter: NotificationFilter = {}) {
   const queryClient = useQueryClient();
   const userId = user?.id;
   // Chave por categoria; o prefixo ['notifications', userId] continua invalidando todas.
-  const scope = filter.typePrefix ? `prefix:${filter.typePrefix}` : filter.types ? `types:${filter.types.join(',')}` : 'all';
+  const scope = (filter.typePrefix ? `prefix:${filter.typePrefix}` : filter.types ? `types:${filter.types.join(',')}` : 'all')
+    + (filter.excludeTypes?.length ? `|not:${filter.excludeTypes.join(',')}` : '');
   const queryKey = ['notifications', userId, scope];
 
   const query = useQuery<NotificationRow[]>({
@@ -46,8 +57,7 @@ export function useNotifications(filter: NotificationFilter = {}) {
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(20);
-      if (filter.typePrefix) q = q.like('type', `${filter.typePrefix}%`);
-      else if (filter.types) q = q.in('type', filter.types);
+      q = aplicarFiltro(q, filter);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as NotificationRow[];
@@ -79,8 +89,7 @@ export function useNotifications(filter: NotificationFilter = {}) {
         .update({ read_at: new Date().toISOString() })
         .eq('user_id', userId)
         .is('read_at', null);
-      if (filter.typePrefix) q = q.like('type', `${filter.typePrefix}%`);
-      else if (filter.types) q = q.in('type', filter.types);
+      q = aplicarFiltro(q, filter);
       const { error } = await q;
       if (error) throw error;
     },

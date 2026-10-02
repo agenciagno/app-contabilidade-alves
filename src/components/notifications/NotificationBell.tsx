@@ -35,6 +35,7 @@ const TYPE_META: Record<string, { icon: any; color: string }> = {
   serpro_pagamento: { icon: Receipt, color: 'text-ok' },
   serpro_procuracao: { icon: ShieldCheck, color: 'text-warn' },
   serpro_dctfweb: { icon: FileCheck, color: 'text-warn' },
+  serpro_dctfweb_rodada: { icon: FileCheck, color: 'text-ok' },
 };
 
 const DEADLINE_BADGES: Record<string, { label: string; className: string }> = {
