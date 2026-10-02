@@ -62,6 +62,8 @@ import { FiscalObligationOverrideDialog } from '@/components/fiscal/FiscalObliga
 import { BulkEditCalendarDialog } from '@/components/fiscal/BulkEditCalendarDialog';
 import { CustomObligationDialog, CustomObligationInitial } from '@/components/fiscal/CustomObligationDialog';
 import { CalendarLaunchPreview } from '@/components/fiscal/CalendarLaunchPreview';
+import { AgendaReceitaPanel } from '@/components/fiscal/AgendaReceitaPanel';
+import { useAgendaReceita, useAprovarAgenda, useAtualizarAgenda } from '@/hooks/useAgendaReceita';
 import { CalendarConflictMap } from '@/components/fiscal/CalendarConflictMap';
 import { LaunchTasksDialog, LaunchFilters } from '@/components/fiscal/LaunchTasksDialog';
 import { FiscalPeriodStatusControl } from '@/components/fiscal/FiscalPeriodStatusControl';
@@ -96,6 +98,9 @@ export default function FiscalCalendar() {
   const calculate = useCalculateCalendar();
   const confirm = useConfirmMonthlyTasks();
   const rollback = useRollbackMonthlyTasks();
+  const agenda = useAgendaReceita(year, month);
+  const aprovarAgenda = useAprovarAgenda();
+  const atualizarAgenda = useAtualizarAgenda();
 
   // Preview gate
   const [previewReviewed, setPreviewReviewed] = useState(false);
@@ -142,6 +147,14 @@ export default function FiscalCalendar() {
       setLocked(false);
     }
   };
+
+  // Agenda oficial da Receita: se o mês já tem rascunho (rotina do dia 1), a tela abre direto na revisão, sem "Calcular Calendário".
+  useEffect(() => {
+    if (!agenda.importacao || phase !== 'idle') return;
+    const jaLancado = !!agenda.aprovacao && !!companyId && !!loadLaunchMeta(companyId, year, month);
+    setPhasePersist(jaLancado ? 'launched' : 'calculated');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agenda.importacao?.id, agenda.aprovacao?.importacao_id, phase, companyId]);
 
   const handleMonthChange = (v: string) => {
     setPhasePersist('idle');
@@ -195,9 +208,13 @@ export default function FiscalCalendar() {
     confirm.mutate(
       { year, month, companyId, launchedBy: userName, ...filters },
       {
-        onSuccess: () => {
+        onSuccess: (res) => {
           setPhasePersist('launched');
           setLaunchDialogOpen(false);
+          // Lançou: se há agenda oficial do mês ainda sem aprovação, registra a aprovação (quem e quando).
+          if (agenda.importacao && !agenda.aprovacao) {
+            aprovarAgenda.mutate({ importacaoId: agenda.importacao.id, tarefas: res.tasksCreated });
+          }
         },
       },
     );
@@ -399,7 +416,19 @@ export default function FiscalCalendar() {
       </div>
 
 
-      {phase === 'calculated' && (
+      {agenda.importacao && (
+        <AgendaReceitaPanel
+          importacao={agenda.importacao}
+          aprovacao={agenda.aprovacao}
+          podeAprovar={isAdmin || isSuperAdmin}
+          lancando={confirm.isPending}
+          atualizando={atualizarAgenda.isPending}
+          onAprovar={() => { setPreviewReviewed(true); setLaunchDialogOpen(true); }}
+          onAtualizar={() => atualizarAgenda.mutate({ year, month })}
+        />
+      )}
+
+      {phase === 'calculated' && !agenda.importacao && (
         <DsAlert
           tone="info"
           icon={<Info />}
@@ -524,7 +553,16 @@ export default function FiscalCalendar() {
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell>{fmt(r.adjusted_due_date)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span>{fmt(r.adjusted_due_date)}</span>
+                        {r.fonte === 'receita' && (
+                          <Badge className="border-brand/30 bg-brand-tint px-1.5 py-0 text-[10px] text-brand" title="Data da planilha oficial da Receita">
+                            Receita
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>{fmt(r.internal_delivery_date)}</TableCell>
                     <TableCell>
                       {isOverridden ? (

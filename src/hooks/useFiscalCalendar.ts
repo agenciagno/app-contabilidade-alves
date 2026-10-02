@@ -29,6 +29,7 @@ export interface FiscalCalendarEffectiveRow {
   override_reason: string | null;
   overridden_at: string | null;
   overridden_by: string | null;
+  fonte?: 'regra' | 'receita';
   fiscal_obligations_catalog: FiscalObligationCatalog | null;
 }
 

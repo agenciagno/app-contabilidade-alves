@@ -1,0 +1,15 @@
+-- Agendador da agenda oficial da Receita, 02/10/2026. Aplicado em duas etapas no banco (agenda_receita_cron e agenda_receita_cron_corpo).
+-- Roda de hora em hora (minuto 10): a função decide pela data e é idempotente. Mês que já tem a planilha oficial não faz nada;
+-- sem planilha, só olha a página do gov.br. Dia 1 depois das 20h sem planilha: rascunho pelas regras (agenda disponível até 23h59).
+-- A partir do dia 25 antecipa o mês seguinte.
+--
+-- O comando foi copiado do job `calcular-fiscal-calendar-mensal` (chave anon, não se retipa), trocando a função por agenda-receita e o corpo
+-- por { action: 'rotina' } com 120 s de timeout no pg_net. Esse job antigo (cálculo só pelas regras, dia 1 às 07h) foi removido:
+--   select cron.unschedule('calcular-fiscal-calendar-mensal');
+-- Para recriar do zero, tome o comando de qualquer job que chame uma edge function com a chave anon (ex.: serpro-pagamentos-eventos-0735):
+--   select cron.schedule('agenda-receita-rotina', '10 * * * *',
+--     regexp_replace(replace(command, '/functions/v1/serpro-pagamentos', '/functions/v1/agenda-receita'),
+--       'body := jsonb_build_object\([^;]*;',
+--       E'timeout_milliseconds := 120000, body := jsonb_build_object(''action'', ''rotina'')\n  );', 'g'))
+--   from cron.job where jobname = 'serpro-pagamentos-eventos-0735';
+select 1;
