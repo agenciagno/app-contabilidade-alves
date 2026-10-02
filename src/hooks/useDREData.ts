@@ -26,7 +26,8 @@ export const DRE_STRUCTURE: DREStructureItem[] = [
   { type: 'section', name: 'Empréstimos Recebidos' },
   { type: 'section', name: 'Despesas Empréstimos' },
   { type: 'calculated', key: 'despesas_receitas_nao_op', label: 'Despesas/Receitas não Operacionais' },
-  { type: 'section', name: 'Movimento Financeiro' },
+  { type: 'section', name: 'Movimento Financeiro (R)' },
+  { type: 'section', name: 'Movimento Financeiro (D)' },
   { type: 'calculated', key: 'lucro_liquido', label: 'Lucro/Prejuízo Líquido' },
   { type: 'calculated', key: 'fluxo_caixa', label: 'Saldo em Conta Corrente' },
 ];
@@ -330,17 +331,13 @@ export function useDREData(startDate: string, endDate: string) {
       realizado: empRecebidos.realizado - Math.abs(despEmprestimos.realizado),
     };
 
-    // Movimento Financeiro = Movimento Entrada - ABS(Movimento Saída) (net, not sum)
-    const movFinSection = buildSection('Movimento Financeiro');
-    const movEntrada = movFinSection.children.find(c => c.name.toLowerCase().includes('entrada'));
-    const movSaida = movFinSection.children.find(c => c.name.toLowerCase().includes('saída') || c.name.toLowerCase().includes('saida'));
+    // Movimento Financeiro = total de (R) - ABS(total de (D)); cada seção soma suas sublinhas
+    const movR = sec('Movimento Financeiro (R)');
+    const movD = sec('Movimento Financeiro (D)');
     const movimentoFinanceiro = {
-      previsto: (movEntrada?.previsto ?? 0) - Math.abs(movSaida?.previsto ?? 0),
-      realizado: (movEntrada?.realizado ?? 0) - Math.abs(movSaida?.realizado ?? 0),
+      previsto: movR.previsto - Math.abs(movD.previsto),
+      realizado: movR.realizado - Math.abs(movD.realizado),
     };
-    calculatedTotals['movimento_financeiro'] = movimentoFinanceiro;
-    // Override section total so second pass renders the net
-    sectionTotals['movimento financeiro'] = movimentoFinanceiro;
 
     calculatedTotals['lucro_liquido'] = {
       previsto: calculatedTotals['lucro_operacional_2'].previsto + calculatedTotals['despesas_receitas_nao_op'].previsto + movimentoFinanceiro.previsto,
@@ -369,10 +366,8 @@ export function useDREData(startDate: string, endDate: string) {
     for (const item of DRE_STRUCTURE) {
       if (item.type === 'section') {
         const data = buildSection(item.name);
-        // Use possibly-overridden section total (e.g. Movimento Financeiro is a net)
-        const overridden = sec(item.name);
-        const sectionPrevisto = overridden.previsto;
-        const sectionRealizado = overridden.realizado;
+        const sectionPrevisto = data.previsto;
+        const sectionRealizado = data.realizado;
         const rxp = sectionRealizado - sectionPrevisto;
 
         // Add % to children
