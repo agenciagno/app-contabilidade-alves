@@ -23,7 +23,7 @@ export const DRE_STRUCTURE: DREStructureItem[] = [
   { type: 'calculated', key: 'lucro_operacional', label: 'Lucro/Prejuízo Operacional' },
   { type: 'section', name: 'Despesas c/ Sócios' },
   { type: 'calculated', key: 'lucro_operacional_2', label: 'Lucro/Prejuízo Operacional (2)' },
-  { type: 'section', name: 'Empréstimos Recebidos PF/PJ' },
+  { type: 'section', name: 'Empréstimos Recebidos' },
   { type: 'section', name: 'Despesas Empréstimos' },
   { type: 'calculated', key: 'despesas_receitas_nao_op', label: 'Despesas/Receitas não Operacionais' },
   { type: 'section', name: 'Movimento Financeiro' },
@@ -323,7 +323,7 @@ export function useDREData(startDate: string, endDate: string) {
     };
 
     // Despesas/Receitas não Operacionais = Empréstimos Recebidos - Despesas Empréstimos
-    const empRecebidos = sec('Empréstimos Recebidos PF/PJ');
+    const empRecebidos = sec('Empréstimos Recebidos');
     const despEmprestimos = sec('Despesas Empréstimos');
     calculatedTotals['despesas_receitas_nao_op'] = {
       previsto: empRecebidos.previsto - Math.abs(despEmprestimos.previsto),
