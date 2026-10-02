@@ -6,6 +6,7 @@ import { assinar, guardarPdf } from "../_shared/serpro-arquivos.ts";
 import { lerApuracoesMit, pdfDoRecibo, semDeclaracaoDctfweb } from "../_shared/dctfweb-mit.ts";
 import { avisarConclusoes, concluirTarefaFiscal } from "../_shared/tarefas-fiscais.ts";
 import { lerTodas } from "../_shared/paginar.ts";
+import { loteTokenValido } from "../_shared/lote-token.ts";
 
 // ---------------------------------------------------------------------------
 // DCTFWeb e MIT (Serpro Integra Contador) — F4 Onda 4, fase 1 (quem entregou), 30/09/2026. Só leitura.
@@ -316,26 +317,32 @@ async function carteiraDaRodada() {
   return { elegiveis, tentaveis, novos: tentaveis.filter((c) => ehNovo(c.id)), semProcuracao: semProcuracao.length };
 }
 
-/** Clientes que já tiveram o recibo da DCTFWeb consultado hoje (qualquer origem): a rodada não repete, porque cada tentativa custa, mesmo quando falha. */
-async function tentadosHoje(hoje: string): Promise<Set<string>> {
+/** Clientes que já tiveram o recibo da DCTFWeb consultado desde o dia informado, inclusive (qualquer origem). Padrão: hoje. A rodada não repete, porque cada tentativa custa, mesmo quando falha. */
+async function tentadosDesde(desde: string, ateOQueFor = false): Promise<Set<string>> {
   const { data } = await supabase.from("serpro_call_log").select("contact_id,created_at")
-    .eq("company_id", COMPANY_ID).eq("id_servico", "CONSRECIBO32").gte("created_at", `${hoje}T03:00:00Z`).limit(1000);
-  return new Set(((data ?? []) as { contact_id: string | null; created_at: string }[]).filter((r) => r.contact_id && dataBRde(r.created_at) === hoje).map((r) => r.contact_id as string));
+    .eq("company_id", COMPANY_ID).eq("id_servico", "CONSRECIBO32").gte("created_at", `${desde}T03:00:00Z`).limit(1000);
+  return new Set(((data ?? []) as { contact_id: string | null; created_at: string }[]).filter((r) => r.contact_id && (ateOQueFor || dataBRde(r.created_at) === desde)).map((r) => r.contact_id as string));
 }
+const tentadosHoje = (hoje: string) => tentadosDesde(hoje);
 
 /** Rotina mensal: o cron bate todo dia; quem decide é o interruptor (padrão ligado) e a DATA (dia 30). */
-async function rotinaDctfweb(payload: any, uid: string | null) {
+async function rotinaDctfweb(payload: any, uid: string | null, unica = false) {
   const hoje = hojeBR();
-  const simulando = !!uid && payload.dry_run === true;
+  // `adm`: administrador logado OU chave de uso curto (rodada única de atualização). Só `adm` simula, ignora a data e escolhe parâmetros.
+  const adm = !!uid || unica;
+  const simulando = adm && payload.dry_run === true;
   const { data: cfg } = await supabase.from("serpro_config").select("auto_rotina_dctfweb").eq("company_id", COMPANY_ID).maybeSingle();
-  if (!simulando && cfg?.auto_rotina_dctfweb === false) return json({ ok: true, desligada: true });
-  if (!(uid && payload.ignorar_data === true) && !ehDiaDaRodada(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
+  if (!simulando && !unica && cfg?.auto_rotina_dctfweb === false) return json({ ok: true, desligada: true });
+  if (!(adm && payload.ignorar_data === true) && !ehDiaDaRodada(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
 
-  const comp = uid && /^\d{4}-(0[1-9]|1[0-2])$/.test(String(payload.competencia ?? "")) ? String(payload.competencia) : competenciaDaRodada(hoje);
-  const limite = uid ? Math.max(1, Math.min(Number(payload.limite) || LIMITE_POR_DISPARO, LIMITE_POR_DISPARO)) : LIMITE_POR_DISPARO;
+  const comp = adm && /^\d{4}-(0[1-9]|1[0-2])$/.test(String(payload.competencia ?? "")) ? String(payload.competencia) : competenciaDaRodada(hoje);
+  const limite = adm ? Math.max(1, Math.min(Number(payload.limite) || LIMITE_POR_DISPARO, LIMITE_POR_DISPARO)) : LIMITE_POR_DISPARO;
   const { tentaveis, novos, semProcuracao } = await carteiraDaRodada();
   const tentados = await tentadosHoje(hoje);
-  const alvo = novos.filter((c) => !tentados.has(c.id));
+  // Rodada de atualização (`todos`): consulta a carteira inteira do escopo, não só o "movimento novo"; quem já foi consultado desde a data informada fica de fora.
+  const todos = adm && payload.todos === true;
+  const jaConsultados = todos && /^\d{4}-\d{2}-\d{2}$/.test(String(payload.pular_consultados_desde ?? "")) ? await tentadosDesde(String(payload.pular_consultados_desde), true) : new Set<string>();
+  const alvo = (todos ? tentaveis : novos).filter((c) => !tentados.has(c.id) && !jaConsultados.has(c.id));
   if (simulando) {
     return json({ ok: true, dry_run: true, hoje, competencia: comp, no_escopo: tentaveis.length, com_movimento_novo: novos.length, a_consultar: alvo.length,
       sem_procuracao_pulados: semProcuracao, custo_estimado_reais: Math.round(alvo.length * CHAMADAS_POR_CLIENTE * PRECO_CONSULTAR * 100) / 100 });
@@ -349,8 +356,10 @@ async function rotinaDctfweb(payload: any, uid: string | null) {
     if (processados >= limite || Date.now() - inicio > 100_000 || seguidas >= 5) break;
     processados++;
     const r = await consultarCliente({
-      contactId: c.id, competencia: comp, uid, origem: uid ? "manual" : "cron", force: true, semAviso: true,
-      motivo: `na rodada mensal da DCTFWeb e da MIT (dia 30) de cliente com movimento novo informado pela Receita (evento E0301), para acompanhamento fiscal`,
+      contactId: c.id, competencia: comp, uid, origem: adm ? "manual" : "cron", force: true, semAviso: true,
+      motivo: unica
+        ? `na rodada de atualização da DCTFWeb e da MIT (aprovada por Gabriel em 01/10/2026, antes da primeira rodada mensal), de todos os clientes do Presumido e do Real, para acompanhamento fiscal`
+        : `na rodada mensal da DCTFWeb e da MIT (dia 30) de cliente com movimento novo informado pela Receita (evento E0301), para acompanhamento fiscal`,
     });
     if (r.corpo.ok === true) {
       seguidas = 0;
@@ -383,8 +392,8 @@ async function rotinaDctfweb(payload: any, uid: string | null) {
     if (tentadosAgora.size === 0) {
       await avisarRodada("DCTFWeb e MIT: nenhum cliente com movimento novo", `Nenhum cliente do Presumido ou do Real teve movimento novo na Receita desde a última consulta. Nada foi consultado nem cobrado.`, hoje);
     } else {
-      await avisarRodada(`DCTFWeb e MIT de ${siglaComp(comp)}: rodada mensal concluída`,
-        `${tentadosAgora.size} ${tentadosAgora.size === 1 ? "cliente com movimento novo consultado" : "clientes com movimento novo consultados"}: ${recibos} com recibo da DCTFWeb, ${sem} sem declaração`
+      await avisarRodada(`DCTFWeb e MIT de ${siglaComp(comp)}: ${unica ? "atualização concluída" : "rodada mensal concluída"}`,
+        `${tentadosAgora.size} ${unica ? (tentadosAgora.size === 1 ? "cliente consultado" : "clientes consultados") : (tentadosAgora.size === 1 ? "cliente com movimento novo consultado" : "clientes com movimento novo consultados")}: ${recibos} com recibo da DCTFWeb, ${sem} sem declaração`
           + (semResultado > 0 ? `, ${semResultado} sem resultado (consulte pelo botão)` : "") + ". Veja na tela DCTFWeb e MIT.", hoje);
     }
   }
@@ -423,6 +432,11 @@ Deno.serve(async (req) => {
   const ehCron = bearer === Deno.env.get("SUPABASE_ANON_KEY") || jwtRole(bearer) === "anon";
   if (payload.action === "rotina_eventos" && ehCron) {
     return await rotinaEventos({ ...payload, forcar: false, limite: undefined, semFallback: false }, null, "cron");
+  }
+  // Rodada única de atualização por chave de uso curto (ver _shared/lote-token.ts): mesma rotina, a qualquer data, sem depender do interruptor.
+  if (payload.action === "rotina_dctfweb" && req.headers.get("x-lote-token")) {
+    if (!(await loteTokenValido(supabase, COMPANY_ID, req))) return json({ error: "Chave da rodada inválida ou vencida" }, 403);
+    return await rotinaDctfweb(payload, null, true);
   }
   if (payload.action === "rotina_dctfweb" && ehCron) return await rotinaDctfweb({}, null);
 

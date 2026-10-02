@@ -6,6 +6,7 @@ import { pega } from "../_shared/pgdasd-indice.ts";
 import { assinar, guardarPdf } from "../_shared/serpro-arquivos.ts";
 import { lerRelatorioSitfis } from "../_shared/sitfis-extrair.ts";
 import { lerTodas } from "../_shared/paginar.ts";
+import { loteTokenValido } from "../_shared/lote-token.ts";
 
 // ---------------------------------------------------------------------------
 // Situação Fiscal (SITFIS, Serpro Integra Contador) — F4 Onda 3, 30/09/2026. Só leitura.
@@ -226,12 +227,14 @@ async function clientesDaRodada() {
  * Rotina mensal (decisão de Gabriel, 01/10/2026; de bimestral para mensal em 02/10/2026). O cron bate de 5 em 5 minutos; quem decide é o interruptor (padrão ligado) e a DATA. Cada disparo faz um lote:
  * pede os protocolos (grátis), espera uma vez e emite. Guardas: 100 s de relógio, 5 falhas seguidas, limite de solicitações do Serpro interrompe os pedidos sem custo.
  */
-async function rotinaSitfis(payload: any, uid: string | null) {
+async function rotinaSitfis(payload: any, uid: string | null, unica = false) {
   const hoje = hojeBR();
-  const simulando = !!uid && payload.dry_run === true;
+  // `adm`: administrador logado OU chave de uso curto (rodada única de atualização). Só `adm` simula, ignora a data e escolhe parâmetros.
+  const adm = !!uid || unica;
+  const simulando = adm && payload.dry_run === true;
   const { data: cfg } = await supabase.from("serpro_config").select("auto_rotina_sitfis").eq("company_id", COMPANY_ID).maybeSingle();
-  if (!simulando && cfg?.auto_rotina_sitfis === false) return json({ ok: true, desligada: true });
-  if (!(uid && payload.ignorar_data === true) && !ehDiaDaRodada(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
+  if (!simulando && !unica && cfg?.auto_rotina_sitfis === false) return json({ ok: true, desligada: true });
+  if (!(adm && payload.ignorar_data === true) && !ehDiaDaRodada(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
 
   const { elegiveis, tentaveis, semProcuracao } = await clientesDaRodada();
   // Hoje: quem já tem relatório pronto, quem falhou na emissão (não repete no mesmo dia: cada emissão custa) e quem já gastou 3 solicitações (relatório que não fecha).
@@ -243,18 +246,24 @@ async function rotinaSitfis(payload: any, uid: string | null) {
     if (r.status === "erro") falhouHoje.add(r.contact_id);
     tentativas.set(r.contact_id, (tentativas.get(r.contact_id) ?? 0) + 1);
   }
+  // Rodada de atualização: quem já tem relatório pronto desde a data informada não é cobrado de novo.
+  if (adm && /^\d{4}-\d{2}-\d{2}$/.test(String(payload.pular_prontos_desde ?? ""))) {
+    const { data: recentes } = await supabase.from("serpro_sitfis").select("contact_id").eq("company_id", COMPANY_ID).eq("status", "pronto").gte("gerado_em", `${payload.pular_prontos_desde}T03:00:00Z`).limit(5000);
+    for (const r of (recentes ?? []) as { contact_id: string }[]) jaFeitos.add(r.contact_id);
+  }
   const alvo = tentaveis.filter((c: any) => !jaFeitos.has(c.id) && !falhouHoje.has(c.id) && (tentativas.get(c.id) ?? 0) < 3);
   if (simulando) {
     return json({ ok: true, dry_run: true, hoje, no_escopo: tentaveis.length, ja_feitos_hoje: tentaveis.length - alvo.length, a_gerar: alvo.length, sem_procuracao_pulados: semProcuracao,
       custo_estimado_reais: Math.round(alvo.length * PRECO_EMITIR * 100) / 100, disparos_necessarios: Math.ceil(alvo.length / LOTE) });
   }
 
+  const rotulo = unica ? "Rodada de atualização da Situação Fiscal (aprovada por Gabriel em 01/10/2026, antes da primeira rodada mensal)" : "Rotina mensal da Situação Fiscal";
   const inicio = Date.now();
   const lote = alvo.slice(0, LOTE);
   const via: Via = {
-    origem: uid ? "manual" : "cron", marcarErro: true,
-    finalidadeProtocolo: "Rotina mensal da Situação Fiscal: solicitar o protocolo do relatório de situação fiscal, para acompanhamento fiscal da carteira",
-    finalidadeEmissao: "Rotina mensal da Situação Fiscal: emitir o relatório de situação fiscal da carteira, para acompanhamento fiscal do cliente",
+    origem: adm ? "manual" : "cron", marcarErro: true,
+    finalidadeProtocolo: `${rotulo}: solicitar o protocolo do relatório de situação fiscal, para acompanhamento fiscal da carteira`,
+    finalidadeEmissao: `${rotulo}: emitir o relatório de situação fiscal da carteira, para acompanhamento fiscal do cliente`,
   };
   // Protocolos em aberto (menos de 10 min, de um disparo que não terminou): só falta emitir.
   const { data: abertas } = await supabase.from("serpro_sitfis").select("id,contact_id,protocolo,solicitado_em").eq("company_id", COMPANY_ID).eq("status", "aguardando").not("protocolo", "is", null).limit(5000);
@@ -318,7 +327,7 @@ async function rotinaSitfis(payload: any, uid: string | null) {
     const sem = lista.filter((x) => x.confiavel && x.resultado === "sem_pendencias").length;
     const conferir = lista.length - com - sem;
     const falharam = falhouHoje.size + resumo.erros;
-    await avisarRodada("Situação fiscal: rodada mensal concluída",
+    await avisarRodada(unica ? "Situação fiscal: atualização concluída" : "Situação fiscal: rodada mensal concluída",
       `${lista.length} relatórios gerados de ${tentaveis.length} clientes · ${com} com pendências · ${sem} sem pendências · ${conferir} a conferir${falharam ? ` · ${falharam} falharam (sem nova tentativa hoje)` : ""}. ${semProcuracao} sem procuração não entram. A tarefa de quem tem pendência é criada amanhã às 08:00.`, hoje);
   }
   return json({ ok: true, hoje, no_escopo: tentaveis.length, sem_procuracao_pulados: semProcuracao, a_gerar: alvo.length, lote: lote.length, protocolos_pedidos: prontos.length, ...resumo, restantes: Math.max(restantes, 0),
@@ -349,6 +358,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   const payload = await req.json().catch(() => ({}));
+  // Rodada única de atualização por chave de uso curto (ver _shared/lote-token.ts): mesma rotina, a qualquer data, sem depender do interruptor.
+  if (payload.action === "rotina_sitfis" && req.headers.get("x-lote-token")) {
+    if (!(await loteTokenValido(supabase, COMPANY_ID, req))) return json({ error: "Chave da rodada inválida ou vencida" }, 403);
+    return await rotinaSitfis(payload, null, true);
+  }
   // Rotina mensal: cron com a chave anon; quem decide é o interruptor e a data (fora do dia 30, não cobra nada).
   if (payload.action === "rotina_sitfis" && (bearer === Deno.env.get("SUPABASE_ANON_KEY") || jwtRole(bearer) === "anon")) {
     return await rotinaSitfis({}, null);

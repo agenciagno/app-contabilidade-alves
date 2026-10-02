@@ -6,6 +6,7 @@ import { lerIndicePgdasd, pega } from "../_shared/pgdasd-indice.ts";
 import { lerDeclaracaoPgdasd, type DeclaracaoPgdasd } from "../_shared/pgdasd-extrair.ts";
 import { avisarConclusoes, concluirTarefaDas, concluirTarefaFiscal } from "../_shared/tarefas-fiscais.ts";
 import { lerTodas } from "../_shared/paginar.ts";
+import { loteTokenValido } from "../_shared/lote-token.ts";
 
 // ---------------------------------------------------------------------------
 // PGDAS-D e DAS (Serpro Integra Contador, Simples Nacional) — F4 Onda 2, passo 2, 30/09/2026. Só leitura + emissão de DAS.
@@ -571,14 +572,19 @@ async function avisarRotina(titulo: string, corpo: string, hoje: string) {
  * (padrão ligado) e a DATA. Mês de referência = mês anterior. Lê a declaração vigente de cada cliente do Simples que já está no índice e ainda não foi lida.
  * Guardas: até 60 clientes e 100 s por disparo; para depois de 5 falhas seguidas do Serpro (PDF que não consigo ler não conta como falha do Serpro e não custa nada de novo).
  */
-async function rotinaFaturamento(payload: any, uid: string | null) {
+async function rotinaFaturamento(payload: any, uid: string | null, unica = false) {
   const hoje = hojeBR();
-  const simulando = !!uid && payload.dry_run === true;
+  // `adm`: administrador logado OU chave de uso curto (rodada única de atualização). Só `adm` simula, ignora a data e escolhe o mês.
+  const adm = !!uid || unica;
+  const simulando = adm && payload.dry_run === true;
   const { data: cfg } = await supabase.from("serpro_config").select("auto_leitura_faturamento").eq("company_id", COMPANY_ID).maybeSingle();
-  if (!simulando && cfg?.auto_leitura_faturamento === false) return json({ ok: true, desligada: true });
-  if (!(uid && payload.ignorar_data === true) && !ehDiaDaRodada(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
+  if (!simulando && !unica && cfg?.auto_leitura_faturamento === false) return json({ ok: true, desligada: true });
+  if (!(adm && payload.ignorar_data === true) && !ehDiaDaRodada(hoje)) return json({ ok: true, nada_a_fazer: true, hoje });
 
-  const pa = new Date(Date.UTC(Number(hoje.slice(0, 4)), Number(hoje.slice(5, 7)) - 2, 1)).toISOString().slice(0, 7);
+  // Mês de referência: o anterior ao de hoje. Na rodada de atualização (adm) pode ser outro mês ("AAAA-MM"), ex.: o último com o prazo do PGDAS-D já vencido.
+  const pa = adm && /^\d{4}-(0[1-9]|1[0-2])$/.test(String(payload.mes_de_referencia ?? ""))
+    ? String(payload.mes_de_referencia)
+    : new Date(Date.UTC(Number(hoje.slice(0, 4)), Number(hoje.slice(5, 7)) - 2, 1)).toISOString().slice(0, 7);
   const periodo = `${pa}-01`;
   const mes = `${pa.slice(5, 7)}/${pa.slice(0, 4)}`;
   const { tentaveis, semProcuracao } = await carteiraDoSimples(Number(pa.slice(0, 4)));
@@ -593,7 +599,12 @@ async function rotinaFaturamento(payload: any, uid: string | null) {
   const { data: lidas } = await supabase.from("serpro_faturamento").select("contact_id,numero_declaracao").eq("company_id", COMPANY_ID).eq("periodo_apuracao", periodo).limit(5000);
   const jaLido = new Set((lidas ?? []).map((r: { contact_id: string; numero_declaracao: string }) => `${r.contact_id}|${r.numero_declaracao}`));
   const comDeclaracao = tentaveis.filter((c: any) => vigente.has(c.id));
-  const alvo = comDeclaracao.filter((c: any) => !jaLido.has(`${c.id}|${vigente.get(c.id)!.numero}`));
+  // Quem já teve o PDF pedido HOJE e continua sem ele guardado (ex.: a Receita devolveu uma declaração que ainda não está na lista) não é cobrado de novo no mesmo dia:
+  // sem isso, cada disparo da rodada repetiria a chamada paga do mesmo cliente.
+  const { data: pedidos } = await supabase.from("serpro_call_log").select("contact_id,created_at")
+    .eq("company_id", COMPANY_ID).eq("id_servico", "CONSULTIMADECREC14").gte("created_at", `${hoje}T03:00:00Z`).limit(1000);
+  const pedidoHoje = new Set(((pedidos ?? []) as { contact_id: string | null; created_at: string }[]).filter((r) => r.contact_id && dataBRde(r.created_at) === hoje).map((r) => r.contact_id as string));
+  const alvo = comDeclaracao.filter((c: any) => !jaLido.has(`${c.id}|${vigente.get(c.id)!.numero}`) && !(pedidoHoje.has(c.id) && !vigente.get(c.id)!.path));
   const aBaixar = alvo.filter((c: any) => !vigente.get(c.id)!.path).length;
 
   if (simulando) {
@@ -609,8 +620,8 @@ async function rotinaFaturamento(payload: any, uid: string | null) {
     if (processados >= 60 || Date.now() - inicio > 100_000 || seguidas >= 5) break;
     processados++;
     const resp = await lerFaturamento({ contact_id: c.id, periodo: pa }, uid, {
-      origem: uid ? "manual" : "cron", semAviso: true,
-      finalidade: `Rotina mensal de faturamento do Simples: baixar a declaração do PGDAS-D de ${mes} e ler receita e limites, para acompanhamento fiscal da carteira`,
+      origem: adm ? "manual" : "cron", semAviso: true,
+      finalidade: `${unica ? "Rodada de atualização do faturamento do Simples (aprovada por Gabriel em 01/10/2026, antes da primeira rodada mensal)" : "Rotina mensal de faturamento do Simples"}: baixar a declaração do PGDAS-D de ${mes} e ler receita e limites, para acompanhamento fiscal da carteira`,
     });
     const j = await resp.json().catch(() => null);
     if (j?.ok === true) {
@@ -643,7 +654,7 @@ async function rotinaFaturamento(payload: any, uid: string | null) {
       if (n.limite === "atencao" || n.limite === "critico") atencao++;
       if (n.sublimite === "perto") perto++;
     }
-    await avisarRotina("Leitura de faturamento do Simples concluída",
+    await avisarRotina(unica ? "Atualização do faturamento do Simples concluída" : "Leitura de faturamento do Simples concluída",
       `${(todas ?? []).length} declarações de ${mes} lidas · ${acima} acima do limite ou sublimite · ${atencao} em atenção (80% do limite ou mais) · ${perto} perto do sublimite · ${aConferir} com leitura a conferir.`, hoje);
   }
   return json({ ok: true, hoje, mes_de_referencia: pa, a_ler: alvo.length, a_baixar_cobrado: aBaixar, sem_procuracao_pulados: semProcuracao.length, ...resumo, restantes, parou_por_falhas: seguidas >= 5, falhas, segundos: Math.round((Date.now() - inicio) / 1000) });
@@ -693,6 +704,12 @@ Deno.serve(async (req) => {
       return await consultarCarteira(payload, null);
     }
     return json({ error: "Chave do passe inválida ou vencida" }, 403);
+  }
+
+  // Rodada única de atualização do faturamento por chave de uso curto (ver _shared/lote-token.ts): mesma rotina, a qualquer data, sem depender do interruptor.
+  if (payload.action === "rotina_faturamento" && req.headers.get("x-lote-token")) {
+    if (!(await loteTokenValido(supabase, COMPANY_ID, req))) return json({ error: "Chave da rodada inválida ou vencida" }, 403);
+    return await rotinaFaturamento(payload, null, true);
   }
 
   // Cron chama com a chave anon (padrão do projeto). A rotina decide pela DATA e tem teto por disparo: pedido repetido ou fora de hora não cobra nada.
