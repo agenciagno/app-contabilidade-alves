@@ -220,7 +220,6 @@ export const menuEntries: MenuEntry[] = [
       { title: 'Portal 360°', url: '/gestao-360/portal', icon: Compass, iconName: 'compass', subKey: 'gestao360_portal' },
       { title: 'CA · Ausências', url: '/gestao-360/ausencias', icon: CalendarClock, iconName: 'calendar-clock', subKey: 'gestao360_ausencias' },
       { title: 'CA · Diagnósticos', url: '/gestao-360/diagnosticos', icon: Stethoscope, iconName: 'stethoscope', subKey: 'gestao360_diagnosticos' },
-      { title: 'CA · Indicadores', url: '/gestao-360/indicadores', icon: TrendingUp, iconName: 'trending-up', subKey: 'gestao360_indicadores' },
     ],
   },
   {

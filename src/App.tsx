@@ -59,7 +59,6 @@ const DashboardFederal = lazy(() => import("@/pages/DashboardFederal"));
 const Portal360 = lazy(() => import("@/pages/Portal360"));
 const CaAusencias = lazy(() => import("@/pages/CaAusencias"));
 const CaDiagnosticos = lazy(() => import("@/pages/CaDiagnosticos"));
-const CaIndicadores = lazy(() => import("@/pages/CaIndicadores"));
 const MensagensEcac = lazy(() => import("@/pages/MensagensEcac"));
 const TermosIntimacao = lazy(() => import("@/pages/TermosIntimacao"));
 const PagamentosFederal = lazy(() => import("@/pages/PagamentosFederal"));
@@ -169,7 +168,7 @@ const App = () => (
               <Route path="/gestao-360/portal" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_portal"><Portal360 /></ModuleGuard></AppLayout>} />
               <Route path="/gestao-360/ausencias" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_ausencias"><CaAusencias /></ModuleGuard></AppLayout>} />
               <Route path="/gestao-360/diagnosticos" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_diagnosticos"><CaDiagnosticos /></ModuleGuard></AppLayout>} />
-              <Route path="/gestao-360/indicadores" element={<AppLayout><ModuleGuard moduleName="gestao360" subModule="gestao360_indicadores"><CaIndicadores /></ModuleGuard></AppLayout>} />
+              <Route path="/gestao-360/indicadores" element={<Navigate to="/gestao-360/diagnosticos?aba=indicadores" replace />} />
 
               {/* Tarefas — subrotas novas */}
               <Route path="/fiscal/agenda" element={<AppLayout><ModuleGuard moduleName="fiscal" subModule="fiscal_agenda" requireAdmin><EmBreve moduleKey="fiscal_agenda" /></ModuleGuard></AppLayout>} />

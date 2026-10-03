@@ -1,4 +1,5 @@
 import { DsAlert, PageHeader, tabsListClass, tabsTriggerClass } from '@/components/ds';
+import { DiagnosticosIndicadores } from '@/components/gestao360/DiagnosticosIndicadores';
 import { DiagnosticosOportunidades } from '@/components/gestao360/DiagnosticosOportunidades';
 import { DiagnosticosPerfil } from '@/components/gestao360/DiagnosticosPerfil';
 import { DiagnosticosSaude } from '@/components/gestao360/DiagnosticosSaude';
@@ -9,7 +10,7 @@ import { usePerfilCarteira } from '@/hooks/useDiagnosticos';
 import { useFiltroCarteira } from '@/hooks/useFiltroCarteira';
 import { useSituacaoCarteira } from '@/hooks/useSituacaoCarteira';
 
-const ABAS = ['perfil', 'saude', 'oportunidades'] as const;
+const ABAS = ['perfil', 'saude', 'oportunidades', 'indicadores'] as const;
 type Aba = (typeof ABAS)[number];
 
 /** Quem é a carteira e como ela está. O que pede ação hoje fica no Portal 360°; aqui é a visão do conjunto. */
@@ -44,10 +45,12 @@ export default function CaDiagnosticos() {
             <TabsTrigger value="perfil" className={tabsTriggerClass}>Perfil</TabsTrigger>
             <TabsTrigger value="saude" className={tabsTriggerClass}>Saúde</TabsTrigger>
             <TabsTrigger value="oportunidades" className={tabsTriggerClass}>Oportunidades</TabsTrigger>
+            <TabsTrigger value="indicadores" className={tabsTriggerClass}>Indicadores</TabsTrigger>
           </TabsList>
           <TabsContent value="perfil" className="mt-0"><DiagnosticosPerfil linhas={doResponsavel} perfis={perfil.data ?? new Map()} hoje={hoje} /></TabsContent>
           <TabsContent value="saude" className="mt-0"><DiagnosticosSaude linhas={doResponsavel} competencia={competencia} hoje={hoje} /></TabsContent>
           <TabsContent value="oportunidades" className="mt-0"><DiagnosticosOportunidades linhas={doResponsavel} faturamento={faturamento} /></TabsContent>
+          <TabsContent value="indicadores" className="mt-0"><DiagnosticosIndicadores linhas={doResponsavel} competencia={competencia} hoje={hoje} faturamento={faturamento} perfis={perfil.data ?? new Map()} /></TabsContent>
         </Tabs>
       )}
     </div>

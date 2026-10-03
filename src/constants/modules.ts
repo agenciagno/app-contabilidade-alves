@@ -37,7 +37,6 @@ export const MODULE_TREE: ModuleNode[] = [
       { key: 'gestao360_portal', label: 'Portal 360°' },
       { key: 'gestao360_ausencias', label: 'CA · Ausências' },
       { key: 'gestao360_diagnosticos', label: 'CA · Diagnósticos' },
-      { key: 'gestao360_indicadores', label: 'CA · Indicadores' },
     ],
   },
   {
