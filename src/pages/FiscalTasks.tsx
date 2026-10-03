@@ -172,6 +172,8 @@ export default function FiscalTasks() {
     const r = searchParams.get('responsible');
     const c = searchParams.get('contact_id') ?? searchParams.get('contact');
     const v = searchParams.get('view') as ViewMode | null;
+    // `mes=todos` (vindo do Dashboard): vencido de qualquer mês, não só o corrente.
+    const todosMeses = searchParams.get('mes') === 'todos';
     let mutated = false;
     const next = new URLSearchParams(searchParams);
     if (r) {
@@ -184,6 +186,11 @@ export default function FiscalTasks() {
       setFilterContact(c);
       next.delete('contact_id');
       next.delete('contact');
+      mutated = true;
+    }
+    if (todosMeses) {
+      setVencimentoMonth('all');
+      next.delete('mes');
       mutated = true;
     }
     if (v && ['myday', 'kanban', 'list', 'calendar'].includes(v)) {

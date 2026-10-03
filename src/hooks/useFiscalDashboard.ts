@@ -140,6 +140,34 @@ export function useFiscalOverdueTasks() {
   });
 }
 
+/** Não concluídas que vencem de hoje até daqui a `days` dias (qualquer mês). */
+export function useFiscalDueSoon(days = 7) {
+  const { company } = useCompany();
+  const companyId = (company as any)?.id;
+  const { isColaborador } = useUserRole();
+  const { data: profileId } = useCurrentProfileId();
+  const de = today();
+  const ate = inDays(days);
+
+  return useQuery<FiscalTaskRow[]>({
+    queryKey: ['fiscal-dashboard', 'due-soon', companyId, de, days, isColaborador, profileId],
+    enabled: !!companyId && (!isColaborador || !!profileId),
+    queryFn: async () =>
+      fetchAllPages<FiscalTaskRow>(() => {
+        let q = (supabase as any)
+          .from('fiscal_tasks')
+          .select(TASK_COLUMNS)
+          .eq('company_id', companyId)
+          .neq('status', 'concluido')
+          .gte('due_date', de)
+          .lte('due_date', ate)
+          .order('id', { ascending: true });
+        if (isColaborador && profileId) q = q.eq('responsible_id', profileId);
+        return q;
+      }),
+  });
+}
+
 export function useFiscalTasksPrevMonth(year: number, month: number) {
   const prev = month === 1
     ? { y: year - 1, m: 12 }

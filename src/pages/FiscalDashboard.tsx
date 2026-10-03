@@ -43,12 +43,15 @@ import { useUserRole } from '@/hooks/useUserRole';
 import {
   useFiscalTasksOfMonth,
   useFiscalOverdueTasks,
+  useFiscalDueSoon,
   useFiscalCollaborators,
   useCompleteFiscalTasks,
   FiscalTaskRow,
 } from '@/hooks/useFiscalDashboard';
 import { StatCardRow, DsBadge, SearchField, tabsListClass, tabsTriggerClass } from '@/components/ds';
 import { TAX_REGIMES } from '@/constants/taxRegimes';
+import { useTeamProfiles } from '@/hooks/useTeamProfiles';
+import { DashboardAtencao, ATRASO_RECENTE_DIAS, isAtrasoAntigo } from '@/components/fiscal/DashboardAtencao';
 import { OBLIGATION_DEPARTMENTS } from '@/constants/obligationDepartments';
 
 
@@ -120,6 +123,8 @@ export default function FiscalDashboard() {
 
   const tasksQ = useFiscalTasksOfMonth(year, month);
   const overdueQ = useFiscalOverdueTasks();
+  const dueSoonQ = useFiscalDueSoon(7);
+  const profilesQ = useTeamProfiles();
   const collabsQ = useFiscalCollaborators();
   const completeTasks = useCompleteFiscalTasks();
 
@@ -145,9 +150,14 @@ export default function FiscalDashboard() {
     [overdueQ.data, regime, department],
   );
 
+  const dueSoon = useMemo(
+    () => filterByDepartment(filterByRegime(dueSoonQ.data ?? [])),
+    [dueSoonQ.data, regime, department],
+  );
+
   const kpis = useMemo(() => {
     const concluidas = tasks.filter((t) => t.status === 'concluido').length;
-    const atrasadas = overdue.length;
+    const atrasadas = overdue.filter((t) => !isAtrasoAntigo(t, today)).length;
     const pendentes = tasks.filter((t) => t.status === 'a_fazer' && (!t.due_date || t.due_date >= today)).length;
     const emAndamento = tasks.filter((t) => t.status === 'em_progresso').length;
     return { concluidas, pendentes, atrasadas, emAndamento };
@@ -163,8 +173,11 @@ export default function FiscalDashboard() {
 
   const handleRefresh = () => qc.invalidateQueries({ queryKey: ['fiscal-dashboard'] });
 
+  // `mes=todos`: o vencido pode ser de qualquer mês, e a lista de Tarefas abre por padrão só no mês corrente.
   const goToKanbanByContact = (contactId: string) =>
-    navigate(`/fiscal/tarefas?view=kanban&contact_id=${contactId}`);
+    navigate(`/fiscal/tarefas?view=kanban&contact_id=${contactId}&mes=todos`);
+  const goToTasksByCollaborator = (profileId: string) =>
+    navigate(`/fiscal/tarefas?responsible=${profileId}&mes=todos`);
 
   return (
     <div className="p-6 space-y-6">
@@ -236,25 +249,36 @@ export default function FiscalDashboard() {
         </Alert>
       )}
 
-      {/* Indicadores numerados (decisão 06): atraso primeiro, e só ele destacado */}
+      {/* Indicadores numerados (decisão 06): vencido recente primeiro, e só ele destacado. O atraso antigo fica à parte, logo abaixo. */}
       <StatCardRow
         items={[
           {
-            label: 'Atrasadas',
+            label: 'Vencidas',
             value: kpis.atrasadas,
-            hint: 'vencidas e não concluídas, de todos os meses',
+            hint: `vencidas nos últimos ${ATRASO_RECENTE_DIAS} dias, não concluídas`,
             emphasis: kpis.atrasadas > 0 ? 'warm' : 'none',
           },
-          { label: 'Pendentes', value: kpis.pendentes, hint: 'dentro do prazo' },
-          { label: 'Em andamento', value: kpis.emAndamento, hint: 'com responsável ativo' },
+          { label: 'Vencem em 7 dias', value: dueSoon.length, hint: 'a partir de hoje, não concluídas' },
+          { label: 'Pendentes do mês', value: kpis.pendentes, hint: 'a fazer, dentro do prazo' },
           {
-            label: 'Concluídas',
+            label: 'Concluídas do mês',
             value: kpis.concluidas,
             hint: tasks.length > 0
               ? `${Math.round((kpis.concluidas / tasks.length) * 100)}% do mês entregue`
               : 'nada vence neste mês',
           },
         ]}
+      />
+
+      {/* O que está vencido, o que vem aí, quais clientes e qual colaborador */}
+      <DashboardAtencao
+        overdue={overdue}
+        dueSoon={dueSoon}
+        monthTasks={tasks}
+        profiles={profilesQ.data ?? []}
+        today={today}
+        onClient={goToKanbanByContact}
+        onCollaborator={goToTasksByCollaborator}
       />
 
       {/* Calendário Fiscal */}
@@ -269,7 +293,7 @@ export default function FiscalDashboard() {
         onMonthChange={(y, m) => { setYear(y); setMonth(m); }}
       />
 
-      {/* Pendências por Cliente */}
+      {/* Todos os clientes do mês */}
       <ClientPendenciesSection tasks={tasks} today={today} onClientClick={goToKanbanByContact} />
     </div>
   );
@@ -886,7 +910,7 @@ function ClientPendenciesSection({
               <TableHead className="text-right"><SortBtn k="pendentes" label="Pendentes" align="right" /></TableHead>
               <TableHead className="text-right"><SortBtn k="emAndamento" label="Em Andamento" align="right" /></TableHead>
               <TableHead className="text-right"><SortBtn k="aguardando" label="Aguardando" align="right" /></TableHead>
-              <TableHead className="text-right"><SortBtn k="atrasadas" label="Atrasadas" align="right" /></TableHead>
+              <TableHead className="text-right"><SortBtn k="atrasadas" label="Atrasadas no mês" align="right" /></TableHead>
               <TableHead className="text-right"><SortBtn k="concluidas" label="Concluídas" align="right" /></TableHead>
             </TableRow>
           </TableHeader>
