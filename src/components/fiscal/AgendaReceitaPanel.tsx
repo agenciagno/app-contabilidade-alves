@@ -1,8 +1,6 @@
-import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { CheckCircle2, ChevronDown, ChevronUp, FileSpreadsheet, Loader2, RefreshCw, Rocket, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, FileSpreadsheet, Loader2, RefreshCw, Rocket, TriangleAlert, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { AgendaAprovacao, AgendaImportacao } from '@/hooks/useAgendaReceita';
@@ -11,22 +9,36 @@ interface Props {
   importacao: AgendaImportacao;
   aprovacao: AgendaAprovacao | null;
   podeAprovar: boolean;
+  /** Tarefas e clientes que o lançamento vai criar (já descontado o que existe). */
+  tarefasALancar: number | null;
+  clientesALancar: number | null;
   lancando: boolean;
+  desfazendo: boolean;
   atualizando: boolean;
   onAprovar: () => void;
+  onDesfazer: () => void;
   onAtualizar: () => void;
 }
 
-const fmt = (s: string | null) => (s ? format(parseISO(s), 'dd/MM') : '—');
-
-/** Faixa "Agenda oficial da Receita" do Calendário Fiscal: de onde vêm as datas, o que diverge das regras e o botão de aprovar (lança as tarefas). */
-export function AgendaReceitaPanel({ importacao, aprovacao, podeAprovar, lancando, atualizando, onAprovar, onAtualizar }: Props) {
-  const [aberto, setAberto] = useState(false);
-  const oficiais = importacao.resumo.filter((r) => r.fonte === 'receita');
-  const pelasRegras = importacao.resumo.length - oficiais.length;
-  const divergentes = importacao.resumo.filter((r) => r.divergente);
+/** Faixa única do Calendário Fiscal: de onde vêm as datas e o botão que aprova e lança as tarefas (um clique). */
+export function AgendaReceitaPanel({
+  importacao, aprovacao, podeAprovar, tarefasALancar, clientesALancar, lancando, desfazendo, atualizando, onAprovar, onDesfazer, onAtualizar,
+}: Props) {
+  const oficiais = importacao.resumo.filter((r) => r.fonte === 'receita').length;
+  const diferem = importacao.resumo.filter((r) => r.divergente).length;
   const semPlanilha = importacao.fonte === 'regras';
   const aprovada = !!aprovacao;
+
+  const titulo = aprovada
+    ? 'Tarefas lançadas'
+    : semPlanilha
+      ? 'Rascunho pelas regras do sistema (a Receita ainda não publicou a planilha)'
+      : 'Agenda da Receita pronta';
+  const detalhe = aprovada
+    ? `Aprovado em ${format(parseISO(aprovacao!.aprovado_em), "dd/MM/yyyy 'às' HH:mm")} · ${aprovacao!.tarefas_criadas} tarefas lançadas`
+    : semPlanilha
+      ? 'Quando a planilha sair, as datas oficiais entram sozinhas se você ainda não tiver aprovado.'
+      : `${importacao.ade_titulo ?? 'ADE Corat'} · ${oficiais} datas da Receita, o resto pela regra do sistema${diferem ? ` · ${diferem} diferem da regra` : ''}`;
 
   return (
     <Card className={cn('border-l-[3px] p-5', aprovada ? 'border-l-ok' : semPlanilha ? 'border-l-warn' : 'border-l-brand')}>
@@ -40,23 +52,12 @@ export function AgendaReceitaPanel({ importacao, aprovacao, podeAprovar, lancand
             <FileSpreadsheet className="mt-0.5 h-[22px] w-[22px] shrink-0 text-brand" />
           )}
           <div className="min-w-0">
-            <p className="text-ui-strong text-ink">
-              {aprovada
-                ? 'Agenda aprovada'
-                : semPlanilha
-                  ? 'Rascunho pelas regras do sistema (a Receita ainda não publicou a planilha)'
-                  : 'Agenda oficial da Receita pronta para revisar'}
-            </p>
-            <p className="text-meta text-muted-ink">
-              {aprovada
-                ? `Aprovada em ${format(parseISO(aprovacao!.aprovado_em), "dd/MM/yyyy 'às' HH:mm")}${aprovacao!.tarefas_criadas ? ` · ${aprovacao!.tarefas_criadas} tarefas lançadas` : ''}`
-                : semPlanilha
-                  ? 'Quando a planilha sair, as datas oficiais entram sozinhas (se você ainda não tiver aprovado).'
-                  : `${importacao.ade_titulo ?? 'ADE Corat'} · ${oficiais.length} obrigações com data da Receita${pelasRegras ? ` · ${pelasRegras} pela regra do sistema (estadual, municipal e pessoal)` : ''}`}
-            </p>
-            {!aprovada && !semPlanilha && (
+            <p className="text-ui-strong text-ink">{titulo}</p>
+            <p className="text-meta text-muted-ink">{detalhe}</p>
+            {!aprovada && tarefasALancar !== null && (
               <p className="mt-1 text-meta text-muted-ink">
-                Para ajustar uma data, use o lápis na linha da tabela (fica registrado como ajuste). Aprovar lança as tarefas.
+                Ao aprovar: <strong className="text-ink">{tarefasALancar}</strong> tarefa{tarefasALancar === 1 ? '' : 's'} para{' '}
+                <strong className="text-ink">{clientesALancar ?? 0}</strong> cliente{clientesALancar === 1 ? '' : 's'}. Para mudar uma data, use o lápis na linha antes de aprovar.
               </p>
             )}
           </div>
@@ -70,7 +71,7 @@ export function AgendaReceitaPanel({ importacao, aprovacao, podeAprovar, lancand
               </a>
             </Button>
           )}
-          {!aprovada && podeAprovar && (
+          {podeAprovar && !aprovada && (
             <>
               <Button variant="outline" size="sm" onClick={onAtualizar} disabled={atualizando || lancando}>
                 {atualizando ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -82,53 +83,14 @@ export function AgendaReceitaPanel({ importacao, aprovacao, podeAprovar, lancand
               </Button>
             </>
           )}
+          {podeAprovar && aprovada && (
+            <Button variant="outline" size="sm" onClick={onDesfazer} disabled={desfazendo} className="text-destructive hover:text-destructive">
+              {desfazendo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}
+              Desfazer lançamento
+            </Button>
+          )}
         </div>
       </div>
-
-      <button
-        type="button"
-        onClick={() => setAberto((v) => !v)}
-        className="mt-3 inline-flex items-center gap-1 text-meta text-muted-ink hover:text-ink"
-      >
-        {aberto ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        {aberto ? 'Ocultar' : 'Ver'} de onde vem cada data
-        {divergentes.length > 0 && (
-          <Badge className="ml-1 border-warn/30 bg-warn/15 text-warn">{divergentes.length} diferem da regra</Badge>
-        )}
-      </button>
-
-      {aberto && (
-        <div className="mt-3 overflow-hidden rounded-md border border-line">
-          <table className="w-full text-meta">
-            <thead className="bg-paper text-muted-ink">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium">Obrigação</th>
-                <th className="px-3 py-2 text-left font-medium">Origem</th>
-                <th className="px-3 py-2 text-left font-medium">Receita</th>
-                <th className="px-3 py-2 text-left font-medium">Regra do sistema</th>
-                <th className="px-3 py-2 text-left font-medium">Na agenda</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...importacao.resumo].sort((a, b) => a.final.localeCompare(b.final)).map((r) => (
-                <tr key={r.obligation_id} className="border-t border-line">
-                  <td className="px-3 py-2 text-ink">{r.nome}</td>
-                  <td className="px-3 py-2">
-                    {r.fonte === 'receita' ? (
-                      <Badge className="border-brand/30 bg-brand-tint text-brand">Receita</Badge>
-                    ) : (
-                      <Badge variant="outline">{r.sem_linha_oficial ? 'Regra (sem linha na planilha)' : 'Regra'}</Badge>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-muted-ink" title={r.linhas.join('\n')}>{fmt(r.oficial)}</td>
-                  <td className={cn('px-3 py-2', r.divergente ? 'text-warn' : 'text-muted-ink')}>{fmt(r.regra)}</td>
-                  <td className="px-3 py-2 text-ui-strong text-ink">{fmt(r.final)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </Card>
   );
 }

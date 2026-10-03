@@ -31,6 +31,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTeamProfiles } from '@/hooks/useTeamProfiles';
 import { ContactObligationsSelector } from '@/components/fiscal/ContactObligationsSelector';
+import { ClienteTarefasStatus } from './ClienteTarefasStatus';
 import { useCompany } from '@/hooks/useCompany';
 import { maskPhone, maskCPF, maskCPFCNPJ, getDocumentType } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -581,9 +582,8 @@ function useContactObligations(contactId: string, enabled: boolean) {
   }, [contactObligations, initialized, obligationsLoaded]);
 
   // Trocar as obrigações aqui não pode deixar o Kanban desatualizado: obrigação
-  // removida some (só cards intocados — mesma trava do "Desfazer lançamento" do
-  // Calendário Fiscal, nunca mexe em tarefa em andamento ou concluída) e obrigação
-  // nova já lança o card do mês atual, se o calendário desse mês já foi calculado.
+  // removida some (só cards intocados, nunca tarefa em andamento ou concluída) e obrigação
+  // nova já lança o card do mês, se o mês já foi aprovado no Calendário Fiscal.
   const sync = async () => {
     if (!company?.id || !initialized) return { removed: 0, preserved: 0, created: 0 };
     const original = new Set(contactObligations.map(o => o.obligation_id));
@@ -592,34 +592,8 @@ function useContactObligations(contactId: string, enabled: boolean) {
     original.forEach(id => { if (!selected.has(id)) toDelete.push(id); });
     selected.forEach(id => { if (!original.has(id)) toInsert.push(id); });
 
-    let removed = 0;
-    let preserved = 0;
-    let created = 0;
-
+    // 1) Grava a mudança de obrigações do cliente.
     if (toDelete.length) {
-      const { data: staleTasks, error: staleErr } = await supabase
-        .from('fiscal_tasks')
-        .select('id, status, created_at, updated_at')
-        .eq('contact_id', contactId)
-        .in('obligation_id', toDelete)
-        .neq('status', 'concluido');
-      if (staleErr) throw staleErr;
-
-      const deletableTaskIds: string[] = [];
-      (staleTasks ?? []).forEach((t: any) => {
-        const untouched =
-          t.status === 'a_fazer' &&
-          new Date(t.updated_at).getTime() - new Date(t.created_at).getTime() < 2000;
-        if (untouched) deletableTaskIds.push(t.id);
-        else preserved += 1;
-      });
-
-      if (deletableTaskIds.length) {
-        const { error: delTasksErr } = await supabase.from('fiscal_tasks').delete().in('id', deletableTaskIds);
-        if (delTasksErr) throw delTasksErr;
-        removed = deletableTaskIds.length;
-      }
-
       const { error } = await (supabase as any)
         .from('client_obligations').delete()
         .eq('contact_id', contactId).in('obligation_id', toDelete);
@@ -631,20 +605,23 @@ function useContactObligations(contactId: string, enabled: boolean) {
           toInsert.map(obligation_id => ({ contact_id: contactId, obligation_id, company_id: company.id }))
         );
       if (error) throw error;
+    }
 
-      const now = new Date();
-      const { data: genData, error: genErr } = await (supabase as any).rpc('generate_monthly_fiscal_tasks', {
-        p_year: now.getFullYear(),
-        p_month: now.getMonth() + 1,
-        p_tax_regimes: null,
-        p_responsible_ids: null,
-        p_contact_ids: [contactId],
-      });
-      if (genErr) throw genErr;
-      created = (genData && typeof genData === 'object' && 'tasks_created' in genData) ? (genData as any).tasks_created ?? 0 : 0;
+    // 2) Atualiza o card pelas regras do banco (fiscal_cliente_tarefas): só mês já aprovado no Calendário Fiscal; cria o que falta,
+    //    remove só card intocado de obrigação tirada e acerta datas. Nunca mexe em tarefa em andamento ou concluída.
+    let removed = 0;
+    let preserved = 0;
+    let created = 0;
+    if (toDelete.length || toInsert.length) {
+      const { data, error } = await (supabase as any).rpc('fiscal_cliente_tarefas', { p_contact_id: contactId, p_aplicar: true });
+      if (error) throw error;
+      removed = data?.removidas ?? 0;
+      created = data?.criadas ?? 0;
+      preserved = data?.preservadas ?? 0;
     }
 
     await queryClient.invalidateQueries({ queryKey: ['client-obligations', contactId] });
+    await queryClient.invalidateQueries({ queryKey: ['fiscal-cliente-tarefas', contactId] });
     if (removed > 0 || created > 0) {
       await queryClient.invalidateQueries({ queryKey: ['fiscal-tasks'] });
     }
@@ -757,6 +734,7 @@ function OperacionalSection({
               selectedIds={selectedObligations}
               onChange={setSelectedObligations}
             />
+            <ClienteTarefasStatus contactId={contactId} />
           </CardContent>
         </Card>
       )}

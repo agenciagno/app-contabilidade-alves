@@ -76,21 +76,66 @@ export function useAgendaReceita(year: number, month: number) {
   };
 }
 
-/** Registra a aprovação (quem e quando). As tarefas são lançadas pelo fluxo existente, antes desta chamada. */
-export function useAprovarAgenda() {
+export interface ResumoObrigacao {
+  obligation_id: string;
+  lancadas: number;
+  a_lancar: number;
+  sem_responsavel: number;
+}
+export interface ResumoCalendario {
+  obrigacoes: ResumoObrigacao[];
+  clientes_a_lancar: number;
+}
+
+/** Por obrigação: tarefas já lançadas e a lançar no mês (a conta é feita no banco). */
+export function useResumoCalendario(year: number, month: number) {
+  return useQuery<ResumoCalendario>({
+    queryKey: ['calendario-resumo', year, month],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc('fiscal_calendario_resumo', { p_ano: year, p_mes: month });
+      if (error) throw error;
+      return data as ResumoCalendario;
+    },
+  });
+}
+
+const invalidarLancamento = (qc: ReturnType<typeof useQueryClient>) => {
+  for (const k of ['agenda-receita-aprovacao', 'calendario-resumo', 'fiscal-clientes-sem-tarefas', 'fiscal-tasks', 'fiscal-cliente-tarefas']) {
+    qc.invalidateQueries({ queryKey: [k] });
+  }
+};
+
+/** Um clique: aprova a agenda do mês e lança as tarefas (tudo numa transação no banco). */
+export function useAprovarELancar() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ importacaoId, tarefas }: { importacaoId: string; tarefas: number }) => {
-      const { error } = await (supabase as any).rpc('agenda_receita_aprovar', {
-        p_importacao_id: importacaoId,
-        p_tarefas: tarefas,
-      });
+    mutationFn: async (importacaoId: string) => {
+      const { data, error } = await (supabase as any).rpc('agenda_receita_aprovar_e_lancar', { p_importacao_id: importacaoId });
       if (error) throw error;
+      return data as { tarefas: number; ano: number; mes: number };
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['agenda-receita-aprovacao'] });
+    onSuccess: (r) => {
+      toast.success(`✅ ${r.tarefas} tarefa${r.tarefas === 1 ? '' : 's'} lançada${r.tarefas === 1 ? '' : 's'} para ${String(r.mes).padStart(2, '0')}/${r.ano}`);
+      invalidarLancamento(qc);
     },
-    onError: (err: any) => toast.error(err?.message ?? 'Erro ao registrar a aprovação da agenda'),
+    onError: (err: any) => toast.error(err?.message ?? 'Erro ao aprovar e lançar'),
+  });
+}
+
+/** Desfaz o lançamento: apaga só cards intocados (a fazer, sem edição) e o mês volta a rascunho. */
+export function useDesfazerAgenda() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (importacaoId: string) => {
+      const { data, error } = await (supabase as any).rpc('agenda_receita_desfazer', { p_importacao_id: importacaoId });
+      if (error) throw error;
+      return data as { removidas: number; preservadas: number };
+    },
+    onSuccess: (r) => {
+      toast.success(`Lançamento desfeito: ${r.removidas} removidas${r.preservadas ? `, ${r.preservadas} preservadas (já mexidas)` : ''}.`);
+      invalidarLancamento(qc);
+    },
+    onError: (err: any) => toast.error(err?.message ?? 'Erro ao desfazer o lançamento'),
   });
 }
 
