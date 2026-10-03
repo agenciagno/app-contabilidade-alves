@@ -6,7 +6,6 @@ import { UserMenu } from './UserMenu';
 import { HeaderNotificacoesGerais } from './HeaderNotificacoesGerais';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { Button } from '@/components/ui/button';
-import { useAudience } from '@/hooks/useAudience';
 import { AccountSwitcher } from './AccountSwitcher';
 import { Logo } from '@/components/brand/Logo';
 import { isDevEnvironment } from '@/lib/environment';
@@ -33,7 +32,6 @@ export function AppHeader() {
   const isDev = isDevEnvironment();
   const isLight = resolvedTheme !== 'dark';
   const { isModuleVisible, isSubItemVisible } = useModuleAccess();
-  const isInternal = useAudience() === 'internal';
 
   return (
     <header className="sticky top-0 z-50 h-16 shrink-0 bg-nav-surface pt-[env(safe-area-inset-top)]">
@@ -68,15 +66,14 @@ export function AppHeader() {
           </button>
 
           {/* Um ícone por categoria (pedido de Gabriel, 01/10 e 03/10/2026).
-              Quem recebe: todos recebem tudo, exceto Financeiras (admin/super
-              admin e quem tem o módulo Financeiro). e-CAC e Federais só existem
-              no lado interno (os módulos são internos), mas sem exigir o módulo
-              Dashboard Federal do usuário.
+              Quem vê: e-CAC e Federais por módulo (Mensagens e Dashboard Federal,
+              que Gabriel vai liberar aos internos); Gerais, todos; Financeiras,
+              admin/super admin e quem tem o módulo Financeiro (regra antiga).
               - Mensagens e-CAC: só a Caixa Postal da Receita (serpro_mensagem).
               - Federais: o resto que vem da Receita/Serpro (serpro_*, gestao360_*).
               - Gerais: o que não tem sino próprio (cliente novo, cadastro,
                 certificado, tarefas). */}
-          {isInternal && (
+          {isModuleVisible('mensagens') && (
             <NotificationBell
               title="Mensagens e-CAC"
               icon={Mail}
@@ -91,7 +88,7 @@ export function AppHeader() {
               )}
             />
           )}
-          {isInternal && (
+          {isModuleVisible('dashboard_federal') && (
             <NotificationBell
               title="Notificações Federais"
               icon={Landmark}
