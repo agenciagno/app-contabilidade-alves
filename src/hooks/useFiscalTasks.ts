@@ -6,6 +6,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useToast } from '@/hooks/use-toast';
 import { fetchValidFiscalContactIds } from '@/lib/fiscal-filters';
 import { notifyTaskCompleted, notifyTaskAssigned } from '@/lib/fiscal-notifications';
+import { fetchAllPages } from '@/lib/fetch-all';
 
 
 export interface FiscalTask {
@@ -69,10 +70,14 @@ export function useFiscalTasks(filters: FiscalTaskFilters = {}) {
       // Restrict to contacts with a tax regime defined
       const validContactIds = companyId ? await fetchValidFiscalContactIds(companyId) : [];
 
+      // fetchAllPages: o PostgREST corta em 1.000 linhas em silêncio e o mês já passa disso (outubro/26: 1.138 tarefas);
+      // sem paginar, o Kanban esconde as últimas. A query é montada de novo a cada página, com `id` de desempate.
+      const buildQuery = () => {
       let query = supabase
         .from('fiscal_tasks')
         .select('*')
-        .order('due_date', { ascending: filters.sortOrder !== 'desc' });
+        .order('due_date', { ascending: filters.sortOrder !== 'desc' })
+        .order('id', { ascending: true });
 
       if (companyId) {
         query = query.eq('company_id', companyId);
@@ -116,9 +121,9 @@ export function useFiscalTasks(filters: FiscalTaskFilters = {}) {
         query = query.gte('due_date', `${filters.dueYear}-01-01`).lte('due_date', `${filters.dueYear}-12-31`);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as FiscalTask[];
+      return query;
+      };
+      return fetchAllPages<FiscalTask>(buildQuery);
     },
     enabled: !!companyId && (!isColaborador || !!currentProfile?.id),
   });

@@ -42,6 +42,7 @@ import { cn, maskCPFCNPJ } from '@/lib/utils';
 import { useUserRole } from '@/hooks/useUserRole';
 import {
   useFiscalTasksOfMonth,
+  useFiscalOverdueTasks,
   useFiscalCollaborators,
   useCompleteFiscalTasks,
   FiscalTaskRow,
@@ -118,6 +119,7 @@ export default function FiscalDashboard() {
   const [department, setDepartment] = useState<string>('todos');
 
   const tasksQ = useFiscalTasksOfMonth(year, month);
+  const overdueQ = useFiscalOverdueTasks();
   const collabsQ = useFiscalCollaborators();
   const completeTasks = useCompleteFiscalTasks();
 
@@ -137,13 +139,19 @@ export default function FiscalDashboard() {
     [tasksQ.data, regime, department],
   );
 
+  // "Atrasadas" é o vencido de TODOS os meses (com os mesmos filtros de regime e setor); o resto é do mês aberto.
+  const overdue = useMemo(
+    () => filterByDepartment(filterByRegime(overdueQ.data ?? [])),
+    [overdueQ.data, regime, department],
+  );
+
   const kpis = useMemo(() => {
     const concluidas = tasks.filter((t) => t.status === 'concluido').length;
-    const atrasadas = tasks.filter((t) => isLateTask(t, today)).length;
+    const atrasadas = overdue.length;
     const pendentes = tasks.filter((t) => t.status === 'a_fazer' && (!t.due_date || t.due_date >= today)).length;
     const emAndamento = tasks.filter((t) => t.status === 'em_progresso').length;
     return { concluidas, pendentes, atrasadas, emAndamento };
-  }, [tasks, today]);
+  }, [tasks, overdue, today]);
 
   const semResponsavel = useMemo(
     () => tasks.filter((t) => !t.responsible_id && t.status !== 'concluido').length,
@@ -165,7 +173,7 @@ export default function FiscalDashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="min-w-0 space-y-1">
             <p className="text-kicker uppercase text-muted-ink-2">
-              ~/tarefas · {MONTHS[month - 1]?.toLowerCase()} {year}
+              ~/tarefas · vencimentos de {MONTHS[month - 1]?.toLowerCase()} {year}
             </p>
             <h1 className="text-display text-ink">Dashboard fiscal.</h1>
           </div>
@@ -234,7 +242,7 @@ export default function FiscalDashboard() {
           {
             label: 'Atrasadas',
             value: kpis.atrasadas,
-            hint: 'acumulado de meses anteriores',
+            hint: 'vencidas e não concluídas, de todos os meses',
             emphasis: kpis.atrasadas > 0 ? 'warm' : 'none',
           },
           { label: 'Pendentes', value: kpis.pendentes, hint: 'dentro do prazo' },
@@ -244,7 +252,7 @@ export default function FiscalDashboard() {
             value: kpis.concluidas,
             hint: tasks.length > 0
               ? `${Math.round((kpis.concluidas / tasks.length) * 100)}% do mês entregue`
-              : 'nada lançado no mês',
+              : 'nada vence neste mês',
           },
         ]}
       />
