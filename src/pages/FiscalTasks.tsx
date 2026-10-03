@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format, isValid, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Plus, CalendarDays, CalendarIcon, X, ArrowRightLeft, Trash2, Bookmark, BookmarkPlus, Building2, Users, FileText, ChevronDown, SlidersHorizontal, Gauge, LayoutDashboard, ListChecks } from 'lucide-react';
+import { Plus, CalendarDays, CalendarIcon, X, Bookmark, BookmarkPlus, Building2, Users, FileText, ChevronDown, SlidersHorizontal, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
@@ -23,14 +23,11 @@ import { useCompany } from '@/hooks/useCompany';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useFiscalTasks, FiscalTask } from '@/hooks/useFiscalTasks';
 import { KanbanBoard } from '@/components/fiscal/KanbanBoard';
-import { TaskListView } from '@/components/fiscal/TaskListView';
 import { TaskCalendarView } from '@/components/fiscal/TaskCalendarView';
 import { TaskDetailModal } from '@/components/fiscal/TaskDetailModal';
 import { TaskCreateModal } from '@/components/fiscal/TaskCreateModal';
 import { BulkCompleteDialog } from '@/components/fiscal/BulkCompleteDialog';
 import { CheckCheck } from 'lucide-react';
-import { BulkReassignModal } from '@/components/fiscal/BulkReassignModal';
-import { MyDayView } from '@/components/fiscal/MyDayView';
 import { SearchableSelect } from '@/components/fiscal/SearchableSelect';
 import { useClosedPeriodsMap, periodKey } from '@/hooks/useFiscalPeriodStatus';
 import {
@@ -46,8 +43,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { isContactFiscalEligible, competenceFromMonthYear } from '@/lib/fiscal-filters';
 import { toast } from 'sonner';
+import { getContactDisplayName } from '@/lib/contact-display';
 
-type ViewMode = 'myday' | 'kanban' | 'list' | 'calendar';
+type ViewMode = 'kanban' | 'calendar';
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] as const;
 
@@ -147,24 +145,7 @@ export default function FiscalTasks() {
   const now = new Date();
   const [vencimentoMonth, setVencimentoMonth] = useState<string>(String(now.getMonth() + 1));
   const [vencimentoYear, setVencimentoYear] = useState<string>(String(now.getFullYear()));
-  const isAdminUser = isAdmin || isSuperAdmin;
-  const [viewMode, setViewMode] = useState<ViewMode>(isAdminUser ? 'kanban' : 'myday');
-
-  // Current user's profile id (responsible_id reference)
-  const { data: currentProfile } = useQuery({
-    queryKey: ['current-profile-fiscal', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .eq('user_id', user!.id)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id,
-  });
-  const myProfileId = currentProfile?.id ?? null;
+  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
 
   // Pre-populate from URL (?responsible=… | ?contact_id=… | ?view=kanban)
   const [searchParams, setSearchParams] = useSearchParams();
@@ -181,7 +162,7 @@ export default function FiscalTasks() {
     const next = new URLSearchParams(searchParams);
     if (r) {
       setFilterResponsible(r);
-      setViewMode('list');
+      setViewMode('kanban');
       next.delete('responsible');
       mutated = true;
     }
@@ -202,7 +183,7 @@ export default function FiscalTasks() {
       next.delete('ano');
       mutated = true;
     }
-    if (v && ['myday', 'kanban', 'list', 'calendar'].includes(v)) {
+    if (v && ['kanban', 'calendar'].includes(v)) {
       setViewMode(v);
       next.delete('view');
       mutated = true;
@@ -218,8 +199,6 @@ export default function FiscalTasks() {
   const [selectedTask, setSelectedTask] = useState<FiscalTask | null>(null);
   const [selectedGroupTasks, setSelectedGroupTasks] = useState<FiscalTask[] | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
   // Profiles for responsible dropdown — todos os colaboradores ativos da equipe
@@ -348,6 +327,13 @@ export default function FiscalTasks() {
     return map;
   }, [fiscalContacts]);
 
+  // O calendário mostra o Nome de Exibição do cliente.
+  const contactsDisplayMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    fiscalContacts.forEach((c: any) => { map[c.id] = getContactDisplayName(c) || c.name; });
+    return map;
+  }, [fiscalContacts]);
+
   const profilesMap = useMemo(() => {
     const map: Record<string, { name: string; initials: string }> = {};
     companyProfiles.forEach(p => {
@@ -436,48 +422,6 @@ export default function FiscalTasks() {
     [companyProfiles],
   );
 
-  const toggleSelected = (id: string) => {
-    setSelectedTaskIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-  const toggleAll = (ids: string[], allSelected: boolean) => {
-    setSelectedTaskIds((prev) => {
-      const next = new Set(prev);
-      if (allSelected) ids.forEach((id) => next.delete(id));
-      else ids.forEach((id) => next.add(id));
-      return next;
-    });
-  };
-  const rangeSelect = (ids: string[]) => {
-    setSelectedTaskIds((prev) => {
-      const next = new Set(prev);
-      ids.forEach((id) => next.add(id));
-      return next;
-    });
-  };
-  const clearSelection = () => setSelectedTaskIds(new Set());
-
-  const handleBulkDelete = async () => {
-    const ids = Array.from(selectedTaskIds);
-    if (ids.length === 0) return;
-    const lockedIds = ids.filter((id) => isTaskLocked(id));
-    if (lockedIds.length > 0) {
-      toast.error(`${lockedIds.length} tarefa(s) pertencem a competência encerrada e não podem ser excluídas.`);
-      return;
-    }
-    const { error } = await supabase.from('fiscal_tasks').delete().in('id', ids);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success(`✅ ${ids.length} tarefa${ids.length === 1 ? '' : 's'} excluída${ids.length === 1 ? '' : 's'} com sucesso`);
-    clearSelection();
-    queryClient.invalidateQueries({ queryKey: ['fiscal-tasks'] });
-  };
-
   const handleInlineReassign = async (taskId: string, newId: string) => {
     if (guardLocked(taskId)) return;
     try {
@@ -489,44 +433,6 @@ export default function FiscalTasks() {
       toast.error(e?.message ?? 'Erro ao alterar responsável');
     }
   };
-
-  const handleBulkReassign = async (newId: string, expandToMonth: boolean) => {
-    if (!companyId) return;
-    let ids = Array.from(selectedTaskIds);
-    if (expandToMonth) {
-      const selectedTasks = tasks.filter((t) => selectedTaskIds.has(t.id));
-      const contactIds = Array.from(new Set(selectedTasks.map((t) => t.contact_id).filter(Boolean)));
-      const now = new Date();
-      if (contactIds.length > 0) {
-        const { data } = await (supabase as any)
-          .from('fiscal_tasks')
-          .select('id')
-          .eq('company_id', companyId)
-          .eq('competence_year', now.getFullYear())
-          .eq('competence_month', now.getMonth() + 1)
-          .in('contact_id', contactIds)
-          .in('status', ['pendente', 'em_andamento', 'a_fazer', 'em_progresso', 'aguardando_cliente']);
-        ids = Array.from(new Set([...(ids), ...((data ?? []) as any[]).map((r) => r.id)]));
-      }
-    }
-    if (ids.length === 0) {
-      toast.error('Nenhuma tarefa para transferir.');
-      return;
-    }
-    try {
-      await Promise.all(
-        ids.map((id) => updateTask.mutateAsync({ id, responsible_id: newId })),
-      );
-    } catch (e: any) {
-      toast.error(e?.message ?? 'Erro ao transferir tarefas');
-      return;
-    }
-    const name = profileOptions.find((p) => p.id === newId)?.name ?? 'colaborador';
-    toast.success(`✅ ${ids.length} tarefa${ids.length === 1 ? '' : 's'} transferida${ids.length === 1 ? '' : 's'} para ${name}`);
-    queryClient.invalidateQueries({ queryKey: ['fiscal-tasks'] });
-    clearSelection();
-  };
-
 
   return (
     <div className="space-y-6">
@@ -835,14 +741,8 @@ export default function FiscalTasks() {
             onValueChange={v => v && setViewMode(v as ViewMode)}
             className="gap-0.5 rounded-md border border-line bg-bg-2 p-1"
           >
-            <ToggleGroupItem value="myday" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Meu Dia">
-              <Gauge className="h-[15px] w-[15px]" strokeWidth={1.75} />
-            </ToggleGroupItem>
             <ToggleGroupItem value="kanban" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Kanban">
               <LayoutDashboard className="h-[15px] w-[15px]" strokeWidth={1.75} />
-            </ToggleGroupItem>
-            <ToggleGroupItem value="list" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Lista">
-              <ListChecks className="h-[15px] w-[15px]" strokeWidth={1.75} />
             </ToggleGroupItem>
             <ToggleGroupItem value="calendar" className="h-7 w-8 rounded-sm p-0 data-[state=on]:bg-paper data-[state=on]:shadow-sc-sm" title="Calendário">
               <CalendarDays className="h-[15px] w-[15px]" strokeWidth={1.75} />
@@ -852,18 +752,6 @@ export default function FiscalTasks() {
       </div>
 
       {/* Views */}
-      {viewMode === 'myday' && (
-        <MyDayView
-          tasks={displayedTasks}
-          contactsMap={contactsMap}
-          profilesMap={profilesMap}
-          myProfileId={myProfileId}
-          isAdminUser={isAdminUser}
-          onStatusChange={handleStatusChange}
-          onTaskClick={handleTaskClick}
-        />
-      )}
-
       {viewMode === 'kanban' && (
         <KanbanBoard
           tasks={displayedTasks}
@@ -882,70 +770,10 @@ export default function FiscalTasks() {
       )}
 
 
-      {viewMode === 'list' && (
-        <>
-          {selectedTaskIds.size > 0 && (
-            <div className="sticky top-14 z-30 flex items-center gap-3 px-4 py-2.5 rounded-lg border border-primary/30 bg-primary/5 backdrop-blur">
-              <span className="text-sm font-medium text-foreground">
-                {selectedTaskIds.size} tarefa{selectedTaskIds.size === 1 ? '' : 's'} selecionada{selectedTaskIds.size === 1 ? '' : 's'}
-              </span>
-              <div className="ml-auto flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={clearSelection} className="gap-1.5">
-                  <X className="w-3.5 h-3.5" /> Desmarcar tudo
-                </Button>
-                <Button size="sm" onClick={() => setBulkOpen(true)} className="gap-1.5">
-                  <ArrowRightLeft className="w-3.5 h-3.5" /> Transferir Responsabilidade
-                </Button>
-                {canDelete && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="destructive" className="gap-1.5">
-                        <Trash2 className="w-3.5 h-3.5" /> Excluir selecionados
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Excluir tarefas selecionadas</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Tem certeza que deseja excluir {selectedTaskIds.size} tarefa{selectedTaskIds.size === 1 ? '' : 's'} selecionada{selectedTaskIds.size === 1 ? '' : 's'}? Esta ação não pode ser desfeita.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          onClick={handleBulkDelete}
-                        >
-                          Excluir
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-              </div>
-            </div>
-          )}
-          <TaskListView
-            tasks={displayedTasks}
-            contactsMap={contactsMap}
-            profilesMap={profilesMap}
-            onTaskClick={handleTaskClick}
-            onDelete={id => { if (!guardLocked(id)) deleteTask.mutate(id); }}
-            canDelete={canDelete}
-            selectedIds={selectedTaskIds}
-            onToggleSelected={toggleSelected}
-            onToggleAll={toggleAll}
-            onRangeSelect={rangeSelect}
-            profileOptions={!isColaborador ? profileOptions : undefined}
-            onReassign={!isColaborador ? handleInlineReassign : undefined}
-          />
-        </>
-      )}
-
       {viewMode === 'calendar' && (
         <TaskCalendarView
           tasks={displayedTasks}
-          contactsMap={contactsMap}
+          contactsMap={contactsDisplayMap}
           onTaskClick={handleTaskClick}
         />
       )}
@@ -987,13 +815,6 @@ export default function FiscalTasks() {
         groupTasks={selectedGroupTasks}
       />
 
-      <BulkReassignModal
-        open={bulkOpen}
-        onOpenChange={setBulkOpen}
-        count={selectedTaskIds.size}
-        profiles={profileOptions}
-        onConfirm={handleBulkReassign}
-      />
     </div>
   );
 }
