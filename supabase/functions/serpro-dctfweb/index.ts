@@ -125,11 +125,16 @@ async function consultarCliente(o: {
     dctf = { ok: false, erro: msgErro(r) };
   }
 
-  // DCTFWeb com recibo → conclui a tarefa fiscal "DCTF" da competência (ver _shared/tarefas-fiscais.ts). "Sem declaração" não conclui.
+  // DCTFWeb com recibo → conclui as tarefas fiscais "DCTFWeb" e "EFD-Reinf (DCTF)" da competência (ver _shared/tarefas-fiscais.ts). "Sem declaração" não conclui.
+  // A DCTFWeb só é transmitida com a EFD-Reinf do período fechada: decisão de Gabriel (03/10/2026) de tratar o recibo como prova das duas.
+  // (O nome "DCTF" que estava aqui não existe no catálogo do Fiscal: a tarefa "DCTFWeb" nunca era concluída.)
   if (dctf.ok && dctf.status === "transmitida") {
-    tarefasConcluidas += await concluirTarefaFiscal(supabase, COMPANY_ID, contactId, {
-      obrigacao: "DCTF", periodo: comp, tipo: "transmitted", protocolo: null, detalhe: `DCTFWeb de ${mes}/${ano} com recibo na Receita`,
-    });
+    for (const [obrigacao, detalhe] of [
+      ["DCTFWeb", `DCTFWeb de ${mes}/${ano} com recibo na Receita`],
+      ["EFD-Reinf (DCTF)", `DCTFWeb de ${mes}/${ano} transmitida (recibo na Receita), que só segue com a EFD-Reinf do período fechada`],
+    ]) {
+      tarefasConcluidas += await concluirTarefaFiscal(supabase, COMPANY_ID, contactId, { obrigacao, periodo: comp, tipo: "transmitted", protocolo: null, detalhe });
+    }
   }
 
   // Apaga o aviso "movimento novo" do sensor (consulta posterior à mudança). Só toca esta coluna.

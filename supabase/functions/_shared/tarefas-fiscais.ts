@@ -1,7 +1,7 @@
 // Conclusão automática de tarefas fiscais (30/09/2026 e 01/10/2026).
 // Só conclui quando a Receita (via Serpro) prova que não há mais o que fazer:
 //   · "DAS - Simples Nacional": declaração do período TRANSMITIDA (índice do PGDAS-D; decisão de Gabriel, 01/10/2026). DAS pago em PAGTOWEB também conclui (pagar exige transmitir);
-//   · "DCTF": DCTFWeb do período com recibo (transmitida);
+//   · "DCTFWeb" e "EFD-Reinf (DCTF)": DCTFWeb do período com recibo (transmitida); o recibo prova as duas (decisão de Gabriel, 03/10/2026);
 //   · "MIT": apuração do período com situação encerrada e data de encerramento;
 //   · "PIS/ COFINS": DARF pago com PIS e COFINS no período de apuração (juntos ou em documentos separados);
 //   · "IRPJ/ CSLL": DARF pago com IRPJ e CSLL no período de apuração (mensal ou trimestral: o período do DARF tem de ser o mesmo da tarefa).

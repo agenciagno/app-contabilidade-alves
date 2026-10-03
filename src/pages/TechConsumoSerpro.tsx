@@ -311,7 +311,7 @@ export default function TechConsumoSerpro() {
               <p className="text-ui text-muted-ink">
                 Quando você consulta um cliente e a Receita prova que está feito, a tarefa daquele mês é concluída na hora, com a origem registrada:
                 DAS <strong className="text-ink">pago</strong> ou declaração <strong className="text-ink">sem receita e sem débito</strong> ("DAS - Simples Nacional"),
-                DCTFWeb com recibo ("DCTF"), MIT encerrada ("MIT") e DARF pago de PIS e COFINS ou de IRPJ e CSLL do mesmo período.
+                DCTFWeb com recibo ("DCTFWeb" e "EFD-Reinf (DCTF)"), MIT encerrada ("MIT") e DARF pago de PIS e COFINS ou de IRPJ e CSLL do mesmo período.
                 "Sem declaração" ou "sem apuração" não conclui (a Receita não prova "sem movimento"), e DAS transmitido sozinho também não:
                 a tarefa inclui enviar o DAS ao cliente.
               </p>

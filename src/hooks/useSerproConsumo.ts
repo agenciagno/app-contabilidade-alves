@@ -19,7 +19,7 @@ export interface ChamadaSerpro {
 export interface SerproConfig {
   alerta_gasto_mensal: number;
   volume_declarado_mes: number | null;
-  /** Conclui sozinha tarefas fiscais quando a Receita prova (DAS pago ou zerado, DCTFWeb com recibo, MIT encerrada, DARF de PIS/COFINS ou IRPJ/CSLL pago). */
+  /** Conclui sozinha tarefas fiscais quando a Receita prova (DAS pago ou zerado, DCTFWeb com recibo (conclui também a EFD-Reinf), MIT encerrada, DARF de PIS/COFINS ou IRPJ/CSLL pago). */
   auto_concluir_tarefas: boolean;
   /** Cria tarefa fiscal sozinha quando a Receita manda algo (comunicação crítica, pendência na Situação Fiscal, parcela em atraso). */
   auto_criar_tarefas: boolean;
