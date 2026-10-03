@@ -20,21 +20,32 @@ export interface NotificationRow {
   message?: string | null;
 }
 
-/** Recorte por categoria — cada sino do header enxerga só os seus tipos. */
+/**
+ * Recorte por categoria — cada sino do header enxerga só os seus tipos.
+ * Quem inclui (`types`/`typePrefixes`) soma as duas listas (OU); quem exclui
+ * (`excludeTypes`/`excludePrefixes`) tira do resultado. Sem nada = tudo.
+ */
 export interface NotificationFilter {
   /** Tipos exatos (ex.: 'boleto_pago'). */
   types?: string[];
-  /** Prefixo de tipo (ex.: 'serpro_' pega serpro_mensagem, serpro_defis...). */
-  typePrefix?: string;
-  /** Tipos que ficam de fora (ex.: os avisos das rotinas diárias, que têm sino próprio). */
+  /** Prefixos de tipo (ex.: 'serpro_' pega serpro_mensagem, serpro_defis...). */
+  typePrefixes?: string[];
+  /** Tipos que ficam de fora (ex.: a Caixa Postal, que tem sino próprio). */
   excludeTypes?: string[];
+  /** Prefixos que ficam de fora (ex.: o sino Gerais não leva 'serpro_'). */
+  excludePrefixes?: string[];
 }
 
 /** Aplica o recorte da categoria a uma consulta de `notifications` (a lista e o "marcar lidas" usam o mesmo). */
 function aplicarFiltro(q: any, filter: NotificationFilter) {
-  if (filter.typePrefix) q = q.like('type', `${filter.typePrefix}%`);
-  else if (filter.types) q = q.in('type', filter.types);
+  const incluir = [
+    ...(filter.types?.length ? [`type.in.(${filter.types.join(',')})`] : []),
+    // Dentro de .or() o curinga do PostgREST é '*' (o '%' soltaria na URL sem codificar).
+    ...(filter.typePrefixes ?? []).map((p) => `type.like.${p}*`),
+  ];
+  if (incluir.length) q = q.or(incluir.join(','));
   if (filter.excludeTypes?.length) q = q.not('type', 'in', `(${filter.excludeTypes.join(',')})`);
+  for (const p of filter.excludePrefixes ?? []) q = q.not('type', 'like', `${p}%`);
   return q;
 }
 
@@ -43,8 +54,12 @@ export function useNotifications(filter: NotificationFilter = {}) {
   const queryClient = useQueryClient();
   const userId = user?.id;
   // Chave por categoria; o prefixo ['notifications', userId] continua invalidando todas.
-  const scope = (filter.typePrefix ? `prefix:${filter.typePrefix}` : filter.types ? `types:${filter.types.join(',')}` : 'all')
-    + (filter.excludeTypes?.length ? `|not:${filter.excludeTypes.join(',')}` : '');
+  const scope = [
+    filter.types?.length ? `types:${filter.types.join(',')}` : '',
+    filter.typePrefixes?.length ? `prefix:${filter.typePrefixes.join(',')}` : '',
+    filter.excludeTypes?.length ? `not:${filter.excludeTypes.join(',')}` : '',
+    filter.excludePrefixes?.length ? `notprefix:${filter.excludePrefixes.join(',')}` : '',
+  ].filter(Boolean).join('|') || 'all';
   const queryKey = ['notifications', userId, scope];
 
   const query = useQuery<NotificationRow[]>({

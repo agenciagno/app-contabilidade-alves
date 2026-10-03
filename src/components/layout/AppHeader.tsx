@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { UserMenu } from './UserMenu';
-import { HeaderResumoTarefas } from './HeaderResumoTarefas';
+import { HeaderNotificacoesGerais } from './HeaderNotificacoesGerais';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { Button } from '@/components/ui/button';
-import { NOTIFICACOES_ROTINAS_DIARIAS } from '@/lib/rotinasSerpro';
+import { useAudience } from '@/hooks/useAudience';
 import { AccountSwitcher } from './AccountSwitcher';
 import { Logo } from '@/components/brand/Logo';
 import { isDevEnvironment } from '@/lib/environment';
@@ -19,7 +19,7 @@ import { isDevEnvironment } from '@/lib/environment';
  * Fundo --nav-surface, sem canto arredondado próprio (o único raio do shell
  * agora vive no conteúdo, ver AppLayout.tsx). Logo + AccountSwitcher (o
  * cartão de conta, que morava na sidebar) ficam à esquerda; à direita:
- * tema, Mensagens e-CAC, notificações por categoria (Federais, Tarefas, Financeiras), Suporte e Perfil (avatar só, mais perto da borda) —
+ * tema, Mensagens e-CAC, notificações por categoria (e-CAC, Federais, Gerais, Financeiras), Suporte e Perfil (avatar só, mais perto da borda) —
  * Agente IA saiu daqui e voltou a existir só como sub-item de Tech no menu
  * (decisão Gabriel: não precisa de atalho dedicado no header).
  *
@@ -33,6 +33,7 @@ export function AppHeader() {
   const isDev = isDevEnvironment();
   const isLight = resolvedTheme !== 'dark';
   const { isModuleVisible, isSubItemVisible } = useModuleAccess();
+  const isInternal = useAudience() === 'internal';
 
   return (
     <header className="sticky top-0 z-50 h-16 shrink-0 bg-nav-surface pt-[env(safe-area-inset-top)]">
@@ -66,19 +67,23 @@ export function AppHeader() {
             <span>{isLight ? 'claro' : 'escuro'}</span>
           </button>
 
-          {/* Um ícone por categoria (pedido de Gabriel, 01/10/2026), cada um só
-              aparece para quem tem o módulo. Notificações Certidões entra quando
-              existir notificação de certidão (tela ainda "em breve"). */}
-          {/* Mensagens e-CAC (01/10/2026): deixou de ser só atalho. É o sino das rotinas diárias da Receita: avisa quando algum status muda
-              (mensagem nova, pagamento novo, movimento na DCTFWeb, procuração perdida). Os avisos das rodadas ficam nas Notificações Federais. */}
-          {isModuleVisible('mensagens') && (
+          {/* Um ícone por categoria (pedido de Gabriel, 01/10 e 03/10/2026).
+              Quem recebe: todos recebem tudo, exceto Financeiras (admin/super
+              admin e quem tem o módulo Financeiro). e-CAC e Federais só existem
+              no lado interno (os módulos são internos), mas sem exigir o módulo
+              Dashboard Federal do usuário.
+              - Mensagens e-CAC: só a Caixa Postal da Receita (serpro_mensagem).
+              - Federais: o resto que vem da Receita/Serpro (serpro_*, gestao360_*).
+              - Gerais: o que não tem sino próprio (cliente novo, cadastro,
+                certificado, tarefas). */}
+          {isInternal && (
             <NotificationBell
               title="Mensagens e-CAC"
               icon={Mail}
-              filter={{ types: NOTIFICACOES_ROTINAS_DIARIAS }}
+              filter={{ types: ['serpro_mensagem'] }}
               renderTop={(fechar) => (
                 <div className="flex items-center justify-between gap-3 border-b border-border/50 bg-muted/30 px-3 py-2">
-                  <p className="text-xs text-muted-foreground">Mudanças que as rotinas diárias da Receita viram hoje de manhã.</p>
+                  <p className="text-xs text-muted-foreground">Mensagens novas na Caixa Postal da Receita (e-CAC).</p>
                   <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs" onClick={() => { fechar(); navigate('/mensagens'); }}>
                     Abrir Mensagens
                   </Button>
@@ -86,10 +91,14 @@ export function AppHeader() {
               )}
             />
           )}
-          {isModuleVisible('dashboard_federal') && (
-            <NotificationBell title="Notificações Federais" icon={Landmark} filter={{ typePrefix: 'serpro_', excludeTypes: NOTIFICACOES_ROTINAS_DIARIAS }} />
+          {isInternal && (
+            <NotificationBell
+              title="Notificações Federais"
+              icon={Landmark}
+              filter={{ typePrefixes: ['serpro_', 'gestao360_'], excludeTypes: ['serpro_mensagem'] }}
+            />
           )}
-          {isModuleVisible('fiscal') && <HeaderResumoTarefas />}
+          <HeaderNotificacoesGerais />
           {isModuleVisible('financeiro') && isSubItemVisible('financeiro', 'financeiro_boletos') && (
             <NotificationBell title="Notificações Financeiras" icon={Wallet} filter={{ types: ['boleto_pago'] }} />
           )}

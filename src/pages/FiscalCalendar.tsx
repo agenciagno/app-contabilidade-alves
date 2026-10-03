@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
-import { CalendarRange, Loader2, MoreHorizontal, Pencil, RefreshCw, Trash2 } from 'lucide-react';
+import { CalendarRange, Loader2, MoreHorizontal, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +38,7 @@ import {
 import { FiscalObligationOverrideDialog } from '@/components/fiscal/FiscalObligationOverrideDialog';
 import { AgendaReceitaPanel } from '@/components/fiscal/AgendaReceitaPanel';
 import { ClientesSemTarefasPanel } from '@/components/fiscal/ClientesSemTarefasPanel';
+import { LancarTarefasDialog } from '@/components/fiscal/LancarTarefasDialog';
 import { CalendarConflictMap } from '@/components/fiscal/CalendarConflictMap';
 import { FiscalPeriodStatusControl } from '@/components/fiscal/FiscalPeriodStatusControl';
 import { supabase } from '@/integrations/supabase/client';
@@ -72,6 +73,7 @@ export default function FiscalCalendar() {
 
   const [editing, setEditing] = useState<FiscalCalendarEffectiveRow | null>(null);
   const [desfazerOpen, setDesfazerOpen] = useState(false);
+  const [lancarOpen, setLancarOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState<FiscalCalendarEffectiveRow | null>(null);
 
   const importacao = agenda.importacao;
@@ -131,7 +133,12 @@ export default function FiscalCalendar() {
             </div>
             <p className="mt-1 text-body text-muted-ink">Datas da agenda oficial da Receita. Aprove e as tarefas do mês são lançadas.</p>
           </div>
-          <FiscalPeriodStatusControl year={year} month={month} />
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setLancarOpen(true)} disabled={sorted.length === 0}>
+              <Plus className="h-4 w-4" /> Lançar tarefa
+            </Button>
+            <FiscalPeriodStatusControl year={year} month={month} />
+          </div>
         </div>
 
         {importacao && (
@@ -273,6 +280,8 @@ export default function FiscalCalendar() {
             </Table>
           </Card>
         )}
+
+        <LancarTarefasDialog open={lancarOpen} onOpenChange={setLancarOpen} year={year} month={month} mesLabel={mesLabel} />
 
         <FiscalObligationOverrideDialog
           row={editing}

@@ -1,26 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { ListChecks } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { PushOptIn } from '@/components/notifications/PushOptIn';
 import { useResumoTarefasHoje } from '@/hooks/useResumoTarefasHoje';
+import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { cn } from '@/lib/utils';
-
-/** Tipos de notificação que pertencem ao ícone Tarefas (atribuição, conclusão, prazos). */
-const TIPOS_TAREFA = [
-  'task_assigned',
-  'task_completed',
-  'task_due',
-  'task_overdue',
-  'due_alert',
-  'overdue',
-  'prazo_5d',
-  'prazo_3d',
-  'prazo_hoje',
-  'prazo_atraso',
-  'calendar_generated',
-  'transfer_start',
-  'transfer_end',
-];
 
 function ResumoDoDia({ fechar }: { fechar: () => void }) {
   const navigate = useNavigate();
@@ -59,17 +43,23 @@ function ResumoDoDia({ fechar }: { fechar: () => void }) {
 }
 
 /**
- * Header › Tarefas. Topo: o resumo do dia (vencem hoje / entregues hoje /
- * vencidas, cada linha abre a lista de Tarefas). Abaixo: as notificações de
- * tarefa — atribuída a você, concluída, prazos. O selo vermelho conta as não lidas.
+ * Header › Notificações Gerais (03/10/2026, substitui o sino "Tarefas").
+ * Leva tudo que não tem sino próprio: cliente novo, cadastro alterado,
+ * certificado vencendo, tarefas (atribuída, concluída, prazos), agenda fiscal.
+ * Ficam de fora o que pertence a Mensagens e-CAC / Federais (serpro_*,
+ * gestao360_*), às Financeiras (boleto_pago) e os pop-ups (aparecem na tela,
+ * não no sino). Quem tem o módulo Fiscal ainda vê o resumo do dia no topo.
  */
-export function HeaderResumoTarefas() {
+export function HeaderNotificacoesGerais() {
+  const { isModuleVisible } = useModuleAccess();
   return (
     <NotificationBell
-      title="Tarefas"
-      icon={ListChecks}
-      filter={{ types: TIPOS_TAREFA }}
-      renderTop={(fechar) => <ResumoDoDia fechar={fechar} />}
+      title="Notificações Gerais"
+      icon={Bell}
+      filter={{ excludePrefixes: ['serpro_', 'gestao360_'], excludeTypes: ['boleto_pago', 'popup'] }}
+      renderTop={(fechar) =>
+        isModuleVisible('fiscal') ? <ResumoDoDia fechar={fechar} /> : <PushOptIn />
+      }
     />
   );
 }
