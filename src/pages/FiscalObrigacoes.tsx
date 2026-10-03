@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { fetchAllPages } from '@/lib/fetch-all';
 import { useCompany } from '@/hooks/useCompany';
 import {
   BookOpen,
@@ -32,12 +31,6 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -58,6 +51,8 @@ import {
   type FiscalObligationCatalog,
 } from '@/components/fiscal/ObrigacaoDialog';
 import { PageHeader, StatCardRow } from '@/components/ds';
+import { ObrigacaoSheet, type AbaObrigacao } from '@/components/fiscal/ObrigacaoSheet';
+import { useObrigacoesResumo } from '@/hooks/useObrigacoesResumo';
 import { obligationDepartmentLabel } from '@/constants/obligationDepartments';
 
 const REGIME_BADGE: Record<
@@ -118,108 +113,6 @@ function humanizeDueRule(due_rule: string, frequency: string): string {
   return `${due_rule} · ${freq}`;
 }
 
-function adjustToLastBusinessDay(date: Date): Date {
-  const result = new Date(date);
-  const dow = result.getDay();
-  if (dow === 6) result.setDate(result.getDate() - 1);
-  if (dow === 0) result.setDate(result.getDate() - 2);
-  return result;
-}
-
-function isWeekend(date: Date): boolean {
-  const dow = date.getDay();
-  return dow === 0 || dow === 6;
-}
-
-function nthBusinessDayOfMonth(year: number, month: number, n: number): Date {
-  const result = new Date(year, month, 1);
-  let count = 0;
-  while (count < n) {
-    if (!isWeekend(result)) count++;
-    if (count < n) result.setDate(result.getDate() + 1);
-  }
-  return result;
-}
-
-function subtractBusinessDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  let count = 0;
-  while (count < days) {
-    result.setDate(result.getDate() - 1);
-    const dow = result.getDay();
-    if (dow !== 0 && dow !== 6) count++;
-  }
-  return result;
-}
-
-function formatBR(date: Date): string {
-  return date.toLocaleDateString('pt-BR');
-}
-
-const MONTH_NAMES = [
-  'Janeiro',
-  'Fevereiro',
-  'Março',
-  'Abril',
-  'Maio',
-  'Junho',
-  'Julho',
-  'Agosto',
-  'Setembro',
-  'Outubro',
-  'Novembro',
-  'Dezembro',
-];
-
-interface Occurrence {
-  monthLabel: string;
-  rawDate: Date;
-  adjusted: Date;
-  internal: Date;
-  wasAdjusted: boolean;
-}
-
-function buildOccurrences(due_rule: string, count = 6): Occurrence[] {
-  const day = extractDay(due_rule);
-  const bday = extractBusinessDay(due_rule);
-  const last = isLastBusinessDay(due_rule);
-  if (!day && !bday && !last) return [];
-  const occ: Occurrence[] = [];
-  const now = new Date();
-  for (let i = 0; i < count; i++) {
-    const year = now.getFullYear();
-    const month = now.getMonth() + i;
-    const normMonth = ((month % 12) + 12) % 12;
-    const normYear = year + Math.floor(month / 12);
-
-    let raw: Date;
-    let adjusted: Date;
-    if (bday) {
-      raw = nthBusinessDayOfMonth(normYear, normMonth, bday);
-      adjusted = raw;
-    } else if (last) {
-      raw = new Date(normYear, normMonth + 1, 0);
-      adjusted = adjustToLastBusinessDay(raw);
-    } else {
-      raw = new Date(year, month, day!);
-      if (raw.getMonth() !== normMonth) {
-        // dia inválido para o mês (ex: 31 em fev) — pular
-        continue;
-      }
-      adjusted = adjustToLastBusinessDay(raw);
-    }
-    const internal = subtractBusinessDays(adjusted, 2);
-    occ.push({
-      monthLabel: `${MONTH_NAMES[adjusted.getMonth()]} ${adjusted.getFullYear()}`,
-      rawDate: raw,
-      adjusted,
-      internal,
-      wasAdjusted: raw.getTime() !== adjusted.getTime(),
-    });
-  }
-  return occ;
-}
-
 function RegimeBadges({
   regimes,
   category,
@@ -264,7 +157,7 @@ export default function FiscalObrigacoes() {
   const queryClient = useQueryClient();
 
   const [regimeFilter, setRegimeFilter] = useState<string>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [esferaFilter, setEsferaFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('active');
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -272,6 +165,16 @@ export default function FiscalObrigacoes() {
   const [sheetItem, setSheetItem] = useState<FiscalObligationCatalog | null>(
     null,
   );
+  const [sheetAba, setSheetAba] = useState<AbaObrigacao>('datas');
+  const resumoQuery = useObrigacoesResumo();
+  const resumoPorId = useMemo(
+    () => new Map((resumoQuery.data?.obrigacoes ?? []).map((r) => [r.obligation_id, r])),
+    [resumoQuery.data],
+  );
+  const abrirSheet = (ob: FiscalObligationCatalog, aba: AbaObrigacao) => {
+    setSheetAba(aba);
+    setSheetItem(ob);
+  };
   const [deleteTarget, setDeleteTarget] =
     useState<FiscalObligationCatalog | null>(null);
 
@@ -289,40 +192,10 @@ export default function FiscalObrigacoes() {
     },
   });
 
-  // Conta clientes por obrigação a partir do vínculo real (client_obligations), não por
-  // regime — applies_to só diz quais regimes PODEM ter a obrigação, não quem de fato tem
-  // ela marcada no Super Perfil. Contar por regime infla o número (ex: uma obrigação
-  // recorrente que aplica a todos os regimes apareceria vinculada a quase todo mundo).
-  const obligationCompanyCountsQuery = useQuery({
-    queryKey: ['client-obligations-count', companyId],
-    enabled: !!companyId,
-    queryFn: async () => {
-      // fetchAllPages: a tabela já passa de 1000 linhas — sem isso o PostgREST
-      // corta e a contagem de empresas por obrigação fica menor que a real.
-      const data = await fetchAllPages<{ obligation_id: string }>(() =>
-        supabase
-          .from('client_obligations')
-          .select('obligation_id')
-          .eq('company_id', companyId!)
-          .order('id', { ascending: true })
-      );
-      const counts: Record<string, number> = {};
-      data.forEach((row) => {
-        const id = row.obligation_id;
-        counts[id] = (counts[id] ?? 0) + 1;
-      });
-      return counts;
-    },
-  });
-
-  const obligationCompanyCounts = obligationCompanyCountsQuery.data ?? {};
-  const getCompanyCount = (obligationId: string) =>
-    obligationCompanyCounts[obligationId] ?? 0;
-
   const filtered = useMemo(() => {
     const all = obligationsQuery.data ?? [];
     return all.filter((o) => {
-      if (categoryFilter !== 'all' && (o.category ?? 'fiscal') !== categoryFilter)
+      if (esferaFilter !== 'all' && ((o as any).jurisdiction ?? 'federal') !== esferaFilter)
         return false;
       if (regimeFilter !== 'all' && !o.applies_to?.includes(regimeFilter))
         return false;
@@ -335,7 +208,7 @@ export default function FiscalObrigacoes() {
         return false;
       return true;
     });
-  }, [obligationsQuery.data, categoryFilter, regimeFilter, statusFilter, search]);
+  }, [obligationsQuery.data, esferaFilter, regimeFilter, statusFilter, search]);
 
   const handleToggleActive = async (
     ob: FiscalObligationCatalog,
@@ -372,14 +245,7 @@ export default function FiscalObrigacoes() {
     setDeleteTarget(null);
   };
 
-  const occurrences = useMemo(
-    () => (sheetItem ? buildOccurrences(sheetItem.due_rule) : []),
-    [sheetItem],
-  );
-
   const catalog = obligationsQuery.data ?? [];
-  const countByRegime = (regime: string) =>
-    catalog.filter((o) => o.applies_to?.includes(regime)).length;
 
   return (
     <TooltipProvider>
@@ -402,10 +268,19 @@ export default function FiscalObrigacoes() {
 
         <StatCardRow
           items={[
-            { label: 'Obrigações ativas', value: catalog.filter((o) => o.active).length, hint: 'no catálogo' },
-            { label: 'Simples Nacional', value: countByRegime('simples_nacional'), hint: 'regimes vinculados' },
-            { label: 'Lucro Presumido', value: countByRegime('lucro_presumido'), hint: 'regimes vinculados' },
-            { label: 'Lucro Real', value: countByRegime('lucro_real'), hint: 'regimes vinculados' },
+            { label: 'Obrigações ativas', value: catalog.filter((o) => o.active).length, hint: 'alimentam as tarefas' },
+            {
+              label: 'Com data da Receita',
+              value: resumoQuery.data ? `${resumoQuery.data.com_data_receita} de ${catalog.filter((o) => o.active).length}` : '—',
+              hint: 'o resto segue a regra do sistema',
+            },
+            {
+              label: 'Clientes a conferir',
+              value: resumoQuery.data?.clientes_com_divergencia ?? '—',
+              hint: 'obrigação marcada diferente da Receita',
+              emphasis: (resumoQuery.data?.clientes_com_divergencia ?? 0) > 0 ? 'warm' : 'none',
+            },
+            { label: 'Sem clientes', value: resumoQuery.data?.sem_clientes ?? '—', hint: 'obrigações que não geram tarefa' },
           ]}
         />
 
@@ -420,14 +295,15 @@ export default function FiscalObrigacoes() {
             />
           </div>
 
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <Select value={esferaFilter} onValueChange={setEsferaFilter}>
             <SelectTrigger className="h-9 w-[150px] border-line bg-paper text-ui">
-              <SelectValue placeholder="Tipo" />
+              <SelectValue placeholder="Esfera" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os tipos</SelectItem>
-              <SelectItem value="fiscal">Departamento Fiscal</SelectItem>
-              <SelectItem value="recorrente">Tarefa recorrente</SelectItem>
+              <SelectItem value="all">Todas as esferas</SelectItem>
+              <SelectItem value="federal">Federal</SelectItem>
+              <SelectItem value="estadual">Estadual</SelectItem>
+              <SelectItem value="municipal">Municipal</SelectItem>
             </SelectContent>
           </Select>
 
@@ -461,11 +337,12 @@ export default function FiscalObrigacoes() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
-                <TableHead>Setor</TableHead>
-                <TableHead>Regime(s)</TableHead>
+                <TableHead>Quem cumpre</TableHead>
+                <TableHead>Esfera</TableHead>
                 <TableHead>Vencimento</TableHead>
-                <TableHead>Empresas</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Clientes</TableHead>
+                <TableHead className="text-right">Abertas</TableHead>
+                <TableHead>Ativa</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -473,7 +350,7 @@ export default function FiscalObrigacoes() {
               {obligationsQuery.isLoading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((__, j) => (
+                    {Array.from({ length: 8 }).map((__, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-5 w-full" />
                       </TableCell>
@@ -482,7 +359,7 @@ export default function FiscalObrigacoes() {
                 ))
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-12 text-center">
+                  <TableCell colSpan={8} className="py-12 text-center">
                     <div className="flex flex-col items-center gap-3 text-muted-foreground">
                       <BookOpen className="h-10 w-10" />
                       <span>
@@ -494,35 +371,55 @@ export default function FiscalObrigacoes() {
                 </TableRow>
               ) : (
                 filtered.map((ob) => {
-                  const count = getCompanyCount(ob.id);
-                  const tooltipText =
-                    count > 0
-                      ? `${count} empresa${count === 1 ? '' : 's'} com esta obrigação vinculada`
-                      : 'Nenhuma empresa vinculada ainda';
+                  const r = resumoPorId.get(ob.id);
+                  const count = r?.clientes ?? 0;
+                  const esfera = ((ob as any).jurisdiction ?? 'federal') as string;
                   return (
                     <TableRow
                       key={ob.id}
                       className="cursor-pointer"
-                      onClick={() => setSheetItem(ob)}
+                      onClick={() => abrirSheet(ob, 'datas')}
                     >
-                      <TableCell className="font-medium">{ob.name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-[10px]">
+                        <div className="font-medium">{ob.name}</div>
+                        <div className="text-[11px] text-muted-ink">
                           {obligationDepartmentLabel((ob as any).department, 'short')}
-                        </Badge>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <RegimeBadges regimes={ob.applies_to ?? []} category={ob.category} />
                       </TableCell>
                       <TableCell>
-                        {humanizeDueRule(ob.due_rule, ob.frequency)}
+                        <Badge variant="outline" className="text-[10px] capitalize">{esfera}</Badge>
                       </TableCell>
                       <TableCell>
+                        <div>{humanizeDueRule(ob.due_rule, ob.frequency)}</div>
+                        {r?.proximo_data && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-muted-ink">
+                            Próximo: {new Date(`${r.proximo_data}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                            {r.proximo_fonte === 'receita'
+                              ? <Badge className="border-brand/30 bg-brand-tint px-1 py-0 text-[9px] text-brand">Receita</Badge>
+                              : <Badge variant="outline" className="px-1 py-0 text-[9px]">Regra</Badge>}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <button type="button" onClick={() => abrirSheet(ob, 'clientes')} className="inline-flex items-center gap-1.5">
+                          <Badge variant="secondary" className="cursor-pointer hover:bg-muted">{count} clientes</Badge>
+                          {!!r?.divergencias && (
+                            <Badge className="border-warn/30 bg-warn/15 px-1.5 py-0 text-[10px] text-warn">{r.divergencias} a conferir</Badge>
+                          )}
+                          {!r?.divergencias && !!r?.revisar && (
+                            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">{r.revisar} a revisar</Badge>
+                          )}
+                        </button>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Badge variant="secondary">{count} empresas</Badge>
+                            <span>{r?.abertas ?? '—'}</span>
                           </TooltipTrigger>
-                          <TooltipContent>{tooltipText || '—'}</TooltipContent>
+                          <TooltipContent>Tarefas ainda não concluídas, de todos os meses</TooltipContent>
                         </Tooltip>
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
@@ -563,73 +460,13 @@ export default function FiscalObrigacoes() {
           </Table>
         </div>
 
-        <Sheet
-          open={!!sheetItem}
-          onOpenChange={(o) => !o && setSheetItem(null)}
-        >
-          <SheetContent className="w-full sm:max-w-[520px] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>{sheetItem?.name}</SheetTitle>
-            </SheetHeader>
-            {sheetItem && (
-              <div className="mt-4 space-y-6">
-                <div className="space-y-2">
-                  <RegimeBadges regimes={sheetItem.applies_to ?? []} category={sheetItem.category} />
-                  <p className="text-sm text-muted-foreground">
-                    {humanizeDueRule(sheetItem.due_rule, sheetItem.frequency)}
-                  </p>
-                  {sheetItem.description && (
-                    <p className="text-sm">{sheetItem.description}</p>
-                  )}
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">
-                    Próximas ocorrências
-                  </h3>
-                  {occurrences.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Não foi possível calcular as ocorrências para esta
-                      obrigação.
-                    </p>
-                  ) : (
-                    <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Mês</TableHead>
-                            <TableHead>Vencimento Fiscal</TableHead>
-                            <TableHead>Entrega Interna</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {occurrences.map((o) => (
-                            <TableRow key={o.monthLabel}>
-                              <TableCell>{o.monthLabel}</TableCell>
-                              <TableCell>
-                                {o.wasAdjusted ? (
-                                  <span>
-                                    <span className="line-through text-muted-foreground mr-1">
-                                      {formatBR(o.rawDate)}
-                                    </span>
-                                    {formatBR(o.adjusted)}
-                                  </span>
-                                ) : (
-                                  formatBR(o.adjusted)
-                                )}
-                              </TableCell>
-                              <TableCell>{formatBR(o.internal)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </SheetContent>
-        </Sheet>
+        <ObrigacaoSheet
+          obligation={sheetItem}
+          regraTexto={sheetItem ? humanizeDueRule(sheetItem.due_rule, sheetItem.frequency) : ''}
+          aba={sheetAba}
+          onAbaChange={setSheetAba}
+          onClose={() => setSheetItem(null)}
+        />
 
         {companyId && (
           <ObrigacaoDialog
@@ -637,11 +474,12 @@ export default function FiscalObrigacoes() {
             onOpenChange={setDialogOpen}
             obligation={editing}
             companyId={companyId}
-            onSuccess={() =>
+            onSuccess={() => {
               queryClient.invalidateQueries({
                 queryKey: ['fiscal-obligations-catalog', companyId],
-              })
-            }
+              });
+              queryClient.invalidateQueries({ queryKey: ['obrigacoes-resumo'] });
+            }}
           />
         )}
 

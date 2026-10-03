@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import type { Database } from '@/integrations/supabase/types';
 import { OBLIGATION_DEPARTMENTS, type ObligationDepartment } from '@/constants/obligationDepartments';
+import { salvarMapeamento, useMapeamentoObrigacao, type OrigemData } from '@/hooks/useObrigacoesResumo';
 
 export type FiscalObligationCatalog =
   Database['public']['Tables']['fiscal_obligations_catalog']['Row'];
@@ -79,7 +80,12 @@ export function ObrigacaoDialog({
   const [dueRuleType, setDueRuleType] = useState<DueRuleType>('day');
   const [dueDay, setDueDay] = useState('');
   const [requiresEmployees, setRequiresEmployees] = useState(false);
+  const [jurisdiction, setJurisdiction] = useState<'federal' | 'estadual' | 'municipal'>('federal');
+  // De onde vem a data: regra do sistema (padrão) ou uma linha da planilha oficial da Receita.
+  const [origemTipo, setOrigemTipo] = useState<OrigemData>('regra');
+  const [origemValor, setOrigemValor] = useState('');
   const [saving, setSaving] = useState(false);
+  const mapeamento = useMapeamentoObrigacao(open ? obligation?.id : null);
 
   useEffect(() => {
     if (!open) return;
@@ -92,6 +98,7 @@ export function ObrigacaoDialog({
       setDueRuleType(dueRule.type);
       setDueDay(dueRule.value);
       setRequiresEmployees(!!obligation.requires_employees);
+      setJurisdiction((((obligation as any).jurisdiction as string) || 'federal') as 'federal' | 'estadual' | 'municipal');
     } else {
       setName('');
       setDescription('');
@@ -100,8 +107,18 @@ export function ObrigacaoDialog({
       setDueRuleType('day');
       setDueDay('');
       setRequiresEmployees(false);
+      setJurisdiction('federal');
+      setOrigemTipo('regra');
+      setOrigemValor('');
     }
   }, [open, obligation]);
+
+  useEffect(() => {
+    if (open && obligation && mapeamento.data) {
+      setOrigemTipo(mapeamento.data.tipo);
+      setOrigemValor(mapeamento.data.valor);
+    }
+  }, [open, obligation, mapeamento.data]);
 
   const toggleRegime = (value: string) => {
     setSelectedRegimes((prev) =>
@@ -143,21 +160,36 @@ export function ObrigacaoDialog({
       is_custom: true,
       company_id: companyId,
       source: 'manual',
+      jurisdiction,
     };
+
+    if (origemTipo !== 'regra' && !origemValor.trim()) {
+      toast.error(origemTipo === 'declaracao' ? 'Informe como o nome da declaração começa na planilha da Receita.' : 'Informe ao menos um código de receita.');
+      return;
+    }
 
     setSaving(true);
     try {
-      if (obligation?.id) {
+      let obligationId = obligation?.id;
+      if (obligationId) {
         const { error } = await supabase
           .from('fiscal_obligations_catalog')
           .update(payload)
-          .eq('id', obligation.id);
+          .eq('id', obligationId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('fiscal_obligations_catalog')
-          .insert(payload);
+          .insert(payload)
+          .select('id')
+          .single();
         if (error) throw error;
+        obligationId = data.id;
+      }
+      // Origem da data: grava só quando muda (ou na obrigação nova que escolheu a Receita).
+      const origemAtual = obligation ? (mapeamento.data ?? { tipo: 'regra' as OrigemData, valor: '' }) : { tipo: 'regra' as OrigemData, valor: '' };
+      if (obligationId && (origemTipo !== origemAtual.tipo || origemValor.trim() !== origemAtual.valor.trim())) {
+        await salvarMapeamento(obligationId, origemTipo, origemValor.trim());
       }
       toast.success('Obrigação salva com sucesso.');
       onSuccess();
@@ -172,7 +204,7 @@ export function ObrigacaoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {obligation ? 'Editar obrigação' : 'Nova obrigação'}
@@ -277,6 +309,42 @@ export function ObrigacaoDialog({
                 : dueRuleType === 'bday'
                 ? 'Ex: "5" = 5º dia útil de cada mês, já calculado automaticamente.'
                 : 'Ajuste automático para último dia útil anterior se cair em fim de semana.'}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Esfera</Label>
+            <Select value={jurisdiction} onValueChange={(v) => setJurisdiction(v as 'federal' | 'estadual' | 'municipal')}>
+              <SelectTrigger id="ob-esfera"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="federal">Federal</SelectItem>
+                <SelectItem value="estadual">Estadual</SelectItem>
+                <SelectItem value="municipal">Municipal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>De onde vem a data</Label>
+            <Select value={origemTipo} onValueChange={(v) => setOrigemTipo(v as OrigemData)}>
+              <SelectTrigger id="ob-origem"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="regra">Regra do vencimento acima</SelectItem>
+                <SelectItem value="declaracao">Planilha da Receita · declaração</SelectItem>
+                <SelectItem value="codigos">Planilha da Receita · código(s) de receita</SelectItem>
+              </SelectContent>
+            </Select>
+            {origemTipo !== 'regra' && (
+              <Input
+                value={origemValor}
+                onChange={(e) => setOrigemValor(e.target.value)}
+                placeholder={origemTipo === 'declaracao' ? 'Como o nome começa na planilha. Ex.: EFD-Reinf' : 'Códigos separados por vírgula. Ex.: 8109, 2172'}
+              />
+            )}
+            <p className="text-xs text-muted-foreground">
+              {origemTipo === 'regra'
+                ? 'Estadual e municipal seguem a regra. Federal pode vir da agenda oficial da Receita, que tem prioridade quando há linha para o mês.'
+                : 'Quando a Receita publicar a agenda do mês, esta data vem da linha correspondente; sem linha, vale a regra acima.'}
             </p>
           </div>
 
