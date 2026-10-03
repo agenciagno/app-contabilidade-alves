@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { DateRange } from 'react-day-picker';
 import {
   ArrowUpDown,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Plus,
-  RefreshCw,
-  X,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,7 +72,6 @@ const monthLabel = (y: number, m: number) => `${MONTHS[m - 1]} de ${y}`;
 
 export default function FiscalDashboard() {
   const { isAdmin, isSuperAdmin, isLoading: roleLoading } = useUserRole();
-  const qc = useQueryClient();
   const navigate = useNavigate();
 
   // Padrão: mês corrente. Mês/Ano e o período livre são alternativos: escolher um limpa o outro.
@@ -82,7 +79,7 @@ export default function FiscalDashboard() {
   const [year, setYear] = useState<number>(now.getFullYear());
   const [month, setMonth] = useState<number>(now.getMonth() + 1);
   const [range, setRange] = useState<DateRange | undefined>(undefined);
-  const [rangeOpen, setRangeOpen] = useState(false);
+  const [filtroOpen, setFiltroOpen] = useState(false);
   const [collaborator, setCollaborator] = useState<string>('todos');
 
   const rangeAtivo = !!(range?.from && range?.to);
@@ -152,13 +149,11 @@ export default function FiscalDashboard() {
     const vencimento = rangeAtivo
       ? `de ${format(parseISO(periodo.from), 'dd/MM/yyyy')} a ${format(parseISO(periodo.to), 'dd/MM/yyyy')}`
       : `em ${monthLabel(year, month)}`;
-    return `Tarefas com vencimento ${vencimento} - Referente ${competencia}`;
+    return { vencimento: `Tarefas com vencimento ${vencimento}`, competencia: `Referente ${competencia}` };
   }, [periodo, rangeAtivo, year, month]);
 
   if (roleLoading) return null;
   if (!isAdmin && !isSuperAdmin) return <Navigate to="/fiscal/tarefas" replace />;
-
-  const handleRefresh = () => qc.invalidateQueries({ queryKey: ['fiscal-dashboard'] });
 
   // Abre a lista de Tarefas no mesmo período; num intervalo livre abre todos os meses.
   const mesQuery = rangeAtivo ? 'mes=todos' : `mes=${month}&ano=${year}`;
@@ -176,63 +171,70 @@ export default function FiscalDashboard() {
         <div className="min-w-0 space-y-1">
           <p className="text-kicker uppercase text-muted-ink-2">~/tarefas</p>
           <h1 className="text-display text-ink">Dashboard fiscal.</h1>
-          <p className="text-sm text-muted-ink">{subtitulo}</p>
+          <p className="text-sm text-muted-ink">
+            {subtitulo.vencimento}
+            <br />
+            {subtitulo.competencia}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 no-print sm:justify-end">
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4" /> Atualizar
-          </Button>
-          <Select
-            value={String(month)}
-            onValueChange={(v) => { setMonth(Number(v)); setRange(undefined); }}
-          >
-            <SelectTrigger className={cn('h-8 w-[130px] text-xs shrink-0', rangeAtivo && 'text-muted-ink')}><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((m, i) => <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select
-            value={String(year)}
-            onValueChange={(v) => { setYear(Number(v)); setRange(undefined); }}
-          >
-            <SelectTrigger className={cn('h-8 w-[85px] text-xs shrink-0', rangeAtivo && 'text-muted-ink')}><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Popover open={rangeOpen} onOpenChange={setRangeOpen}>
+          {/* Um filtro só: mês/ano em cima (padrão) e período livre embaixo; escolher datas sobrepõe o mês. */}
+          <Popover open={filtroOpen} onOpenChange={setFiltroOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className={cn('h-8 shrink-0 text-xs', rangeAtivo && 'border-ink/40 text-ink')}>
+              <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs">
                 <CalendarDays className="h-4 w-4" />
                 {rangeAtivo
                   ? `${format(range!.from!, 'dd/MM/yy')} – ${format(range!.to!, 'dd/MM/yy')}`
-                  : 'Período livre'}
+                  : `${MONTHS[month - 1]} ${year}`}
+                <ChevronDown className="h-3.5 w-3.5 text-muted-ink" />
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-auto p-0">
-              <Calendar
-                mode="range"
-                numberOfMonths={2}
-                defaultMonth={range?.from ?? new Date(year, month - 1, 1)}
-                selected={range}
-                onSelect={(r) => {
-                  setRange(r);
-                  if (r?.from && r?.to) setRangeOpen(false);
-                }}
-              />
+              <div className="space-y-2 p-3">
+                <p className="text-[11px] uppercase tracking-[0.05em] text-muted-ink-2">Mês e ano</p>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={String(month)}
+                    onValueChange={(v) => { setMonth(Number(v)); setRange(undefined); }}
+                  >
+                    <SelectTrigger className={cn('h-8 w-[140px] text-xs', rangeAtivo && 'text-muted-ink')}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.map((m, i) => <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={String(year)}
+                    onValueChange={(v) => { setYear(Number(v)); setRange(undefined); }}
+                  >
+                    <SelectTrigger className={cn('h-8 w-[90px] text-xs', rangeAtivo && 'text-muted-ink')}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="border-t border-line">
+                <p className="px-3 pt-3 text-[11px] uppercase tracking-[0.05em] text-muted-ink-2">Ou escolha as datas</p>
+                <Calendar
+                  mode="range"
+                  numberOfMonths={2}
+                  defaultMonth={range?.from ?? new Date(year, month - 1, 1)}
+                  selected={range}
+                  onSelect={(r) => {
+                    setRange(r);
+                    if (r?.from && r?.to) setFiltroOpen(false);
+                  }}
+                />
+              </div>
+              {rangeAtivo && (
+                <div className="border-t border-line p-2">
+                  <Button variant="ghost" size="sm" className="h-8 w-full text-xs" onClick={() => { setRange(undefined); setFiltroOpen(false); }}>
+                    Voltar para {MONTHS[month - 1]} {year}
+                  </Button>
+                </div>
+              )}
             </PopoverContent>
           </Popover>
-          {rangeAtivo && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              aria-label="Voltar para o filtro de mês"
-              onClick={() => setRange(undefined)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
           <Select value={collaborator} onValueChange={setCollaborator}>
             <SelectTrigger className="h-8 w-[170px] text-xs shrink-0"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -247,21 +249,10 @@ export default function FiscalDashboard() {
       {/* Indicadores: todos do período filtrado (mês corrente por padrão) */}
       <StatCardRow
         items={[
-          {
-            label: 'Vencidas',
-            value: kpis.vencidas,
-            hint: `prazo já passou, não concluídas`,
-            emphasis: kpis.vencidas > 0 ? 'warm' : 'none',
-          },
-          { label: 'Vencem em 7 dias', value: kpis.vencem7, hint: 'a partir de hoje, não concluídas' },
-          { label: `Pendentes do ${escopo}`, value: kpis.pendentes, hint: 'não concluídas, dentro do prazo' },
-          {
-            label: `Concluídas do ${escopo}`,
-            value: kpis.concluidas,
-            hint: tasks.length > 0
-              ? `${Math.round((kpis.concluidas / tasks.length) * 100)}% do ${escopo} entregue`
-              : `nada vence neste ${escopo}`,
-          },
+          { label: 'Vencidas', value: kpis.vencidas, emphasis: kpis.vencidas > 0 ? 'warm' : 'none' },
+          { label: 'Vencem em 7 dias', value: kpis.vencem7 },
+          { label: `Pendentes do ${escopo}`, value: kpis.pendentes },
+          { label: `Concluídas do ${escopo}`, value: kpis.concluidas },
         ]}
       />
 
@@ -352,8 +343,6 @@ function FiscalCalendarCard({
   onCompleteTasks: (ids: string[]) => void;
 }) {
   const [selection, setSelection] = useState<CalendarSelection | null>(null);
-  // Deslocamento em semanas a partir da semana de partida — só a fileira de dias em destaque usa isso.
-  const [weekOffset, setWeekOffset] = useState(0);
   const periodKey = `${months[0]?.y}-${months[0]?.m}-${months.length}`;
   // Mês em exibição: o de hoje, se o período o contém; senão o primeiro do período.
   const [viewIdx, setViewIdx] = useState(0);
@@ -361,7 +350,6 @@ function FiscalCalendarCard({
     const [ty, tm] = today.split('-').map(Number);
     const i = months.findIndex((x) => x.y === ty && x.m === tm);
     setViewIdx(i >= 0 ? i : 0);
-    setWeekOffset(0);
   }, [periodKey, today]); // eslint-disable-line react-hooks/exhaustive-deps
   const { y: year, m: month } = months[Math.min(viewIdx, months.length - 1)] ?? { y: new Date().getFullYear(), m: new Date().getMonth() + 1 };
 
@@ -401,9 +389,9 @@ function FiscalCalendarCard({
     const t = parseISO(weekAnchor);
     const mondayOffset = (t.getDay() + 6) % 7; // Dom=6, Seg=0, ..., Sáb=5
     const monday = new Date(t);
-    monday.setDate(t.getDate() - mondayOffset + weekOffset * 7);
+    monday.setDate(t.getDate() - mondayOffset);
     return monday;
-  }, [weekAnchor, weekOffset]);
+  }, [weekAnchor]);
 
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
@@ -413,10 +401,6 @@ function FiscalCalendarCard({
       return { date: d, iso, tasks: byDay.get(iso) ?? [] };
     });
   }, [weekStartDate, byDay]);
-
-  const weekRangeLabel = `${format(weekStartDate, 'dd/MM')} – ${format(weekDays[6].date, 'dd/MM')}`;
-
-  const shiftWeek = (delta: number) => setWeekOffset((o) => o + delta);
 
   const gridDays = useMemo(() => {
     const startWeekday = new Date(year, month - 1, 1).getDay();
@@ -444,9 +428,9 @@ function FiscalCalendarCard({
   const openDay = (iso: string) => {
     const list = byDay.get(iso);
     if (!list || list.length === 0) return;
-    const names = new Set(list.map((t) => t.fiscal_obligations_catalog?.name ?? t.title ?? 'Obrigação'));
-    const title = names.size === 1 ? [...names][0] : format(parseISO(iso), "dd 'de' MMMM", { locale: ptBR });
-    setSelection({ title, dueDate: iso, tasks: list });
+    // Título sempre pela data; as obrigações do dia aparecem no detalhe (antes só aparecia o nome quando havia uma).
+    const title = format(parseISO(iso), "EEEE, d 'de' MMMM", { locale: ptBR });
+    setSelection({ title: title.charAt(0).toUpperCase() + title.slice(1), dueDate: iso, tasks: list });
   };
 
   const shiftMonth = (delta: number) => setViewIdx((i) => Math.max(0, Math.min(months.length - 1, i + delta)));
@@ -497,16 +481,7 @@ function FiscalCalendarCard({
               <span className="text-xs text-muted-ink">Hoje: {format(parseISO(today), 'dd/MM')}</span>
             </div>
 
-            {/* Fileira de dias em destaque — semana completa, com setas próprias */}
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => shiftWeek(-1)} aria-label="Semana anterior">
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </Button>
-              <span className="text-xs font-medium text-muted-ink">{weekRangeLabel}</span>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => shiftWeek(1)} aria-label="Próxima semana">
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+            {/* Semana em destaque (sem navegação) */}
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
               {weekDays.map((wd) => {
                 const hasTasks = wd.tasks.length > 0;
@@ -640,6 +615,7 @@ function CalendarSelectionSheet({
 }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'todos' | DayTaskStatus>('todos');
+  const [obligationFilter, setObligationFilter] = useState('todas');
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const tasks = selection?.tasks ?? [];
@@ -647,8 +623,11 @@ function CalendarSelectionSheet({
   useEffect(() => {
     setSearch('');
     setStatusFilter('todos');
+    setObligationFilter('todas');
     setSelected(new Set());
   }, [selection?.title, selection?.dueDate]);
+
+  const obrigacaoDe = (t: FiscalTaskRow) => t.fiscal_obligations_catalog?.name ?? t.title ?? 'Obrigação';
 
   const rows = useMemo(
     () =>
@@ -661,17 +640,28 @@ function CalendarSelectionSheet({
     [tasks, today],
   );
 
+  // Obrigações do dia, com a contagem de empresas de cada uma.
+  const obrigacoes = useMemo(() => {
+    const map = new Map<string, Set<string | null>>();
+    tasks.forEach((t) => {
+      const n = obrigacaoDe(t);
+      map.set(n, (map.get(n) ?? new Set()).add(t.contact_id));
+    });
+    return [...map.entries()].map(([nome, set]) => ({ nome, empresas: set.size })).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [tasks]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const qDigits = q.replace(/\D/g, '');
     return rows.filter(({ task, statusKey }) => {
       if (statusFilter !== 'todos' && statusKey !== statusFilter) return false;
+      if (obligationFilter !== 'todas' && obrigacaoDe(task) !== obligationFilter) return false;
       if (!q) return true;
       const name = (task.contacts?.name ?? '').toLowerCase();
       const doc = (task.contacts?.document ?? '').replace(/\D/g, '');
       return name.includes(q) || (qDigits && doc.includes(qDigits));
     });
-  }, [rows, search, statusFilter]);
+  }, [rows, search, statusFilter, obligationFilter]);
 
   const toggleSelected = (id: string, checked: boolean) => {
     setSelected((prev) => {
@@ -691,7 +681,7 @@ function CalendarSelectionSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto px-6 py-6">
+      <SheetContent side="right" className="w-full sm:max-w-4xl overflow-y-auto px-6 py-6">
         <SheetHeader className="space-y-1 pb-4">
           <SheetTitle className="text-2xl">{selection?.title}</SheetTitle>
           <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -699,6 +689,9 @@ function CalendarSelectionSheet({
             {groupStatus === 'ok' ? 'Concluído' : 'Aberto'}
             {selection?.dueDate && ` · Vencimento: ${format(parseISO(selection.dueDate), 'dd/MM/yyyy')}`}
             {` · ${empresasCount} ${empresasCount === 1 ? 'empresa' : 'empresas'}`}
+          </p>
+          <p className="text-sm font-medium text-ink">
+            {obrigacoes.map((o) => `${o.nome} (${o.empresas})`).join(' · ')}
           </p>
         </SheetHeader>
 
@@ -719,6 +712,15 @@ function CalendarSelectionSheet({
                 <SelectItem value="pendente">Pendente</SelectItem>
               </SelectContent>
             </Select>
+            {obrigacoes.length > 1 && (
+              <Select value={obligationFilter} onValueChange={setObligationFilter}>
+                <SelectTrigger className="h-9 w-full sm:w-[200px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas as obrigações</SelectItem>
+                  {obrigacoes.map((o) => <SelectItem key={o.nome} value={o.nome}>{o.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {selected.size > 0 && (
@@ -738,13 +740,14 @@ function CalendarSelectionSheet({
                 <TableHead className="w-10" />
                 <TableHead>Razão Social</TableHead>
                 <TableHead>CNPJ</TableHead>
+                <TableHead>Obrigação</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
                     Nenhuma empresa encontrada
                   </TableCell>
                 </TableRow>
@@ -762,6 +765,7 @@ function CalendarSelectionSheet({
                     <TableCell className="text-muted-ink">
                       {task.contacts?.document ? maskCPFCNPJ(task.contacts.document) : '—'}
                     </TableCell>
+                    <TableCell className="text-ink">{obrigacaoDe(task)}</TableCell>
                     <TableCell>
                       <DsBadge tone={dayTaskStatusTone[statusKey]}>{dayTaskStatusLabel[statusKey]}</DsBadge>
                     </TableCell>
