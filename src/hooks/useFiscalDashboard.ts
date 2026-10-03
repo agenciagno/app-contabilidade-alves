@@ -83,47 +83,17 @@ const TASK_COLUMNS =
   'id, status, title, due_date, fiscal_due_date, completed_at, created_at, responsible_id, contact_id, department, contacts(tax_regime, name, document), fiscal_obligations_catalog(name)';
 
 /**
- * Tarefas que VENCEM no mês (fiscal_due_date), a mesma base do Calendário Fiscal e do calendário deste dashboard.
- * Antes filtrava por competência (o mês anterior ao vencimento): "Outubro" mostrava um mês vazio, "Setembro" mostrava as tarefas de
- * outubro e o calendário não marcava nenhuma. Pagina (fetchAllPages): o PostgREST corta em 1.000 linhas e o mês já passa disso.
+ * Tarefas que VENCEM no período (fiscal_due_date), a mesma base do Calendário Fiscal: o mês corrente por padrão (competência = mês anterior)
+ * ou um intervalo livre. Todos os indicadores do Dashboard saem desta lista. Pagina (fetchAllPages): o PostgREST corta em 1.000 linhas e o mês já passa disso.
  */
-export function useFiscalTasksOfMonth(year: number, month: number) {
+export function useFiscalTasksInRange(from: string, to: string) {
   const { company } = useCompany();
   const companyId = (company as any)?.id;
   const { isColaborador } = useUserRole();
   const { data: profileId } = useCurrentProfileId();
 
   return useQuery<FiscalTaskRow[]>({
-    queryKey: ['fiscal-dashboard', 'tasks', companyId, year, month, isColaborador, profileId],
-    enabled: !!companyId && (!isColaborador || !!profileId),
-    queryFn: async () => {
-      const mm = String(month).padStart(2, '0');
-      const last = String(new Date(year, month, 0).getDate()).padStart(2, '0');
-      return fetchAllPages<FiscalTaskRow>(() => {
-        let q = (supabase as any)
-          .from('fiscal_tasks')
-          .select(TASK_COLUMNS)
-          .eq('company_id', companyId)
-          .gte('fiscal_due_date', `${year}-${mm}-01`)
-          .lte('fiscal_due_date', `${year}-${mm}-${last}`)
-          .order('id', { ascending: true });
-        if (isColaborador && profileId) q = q.eq('responsible_id', profileId);
-        return q;
-      });
-    },
-  });
-}
-
-/** Tudo que já venceu e não foi concluído, de qualquer mês (o "vencido" de verdade, não só o do mês aberto). */
-export function useFiscalOverdueTasks() {
-  const { company } = useCompany();
-  const companyId = (company as any)?.id;
-  const { isColaborador } = useUserRole();
-  const { data: profileId } = useCurrentProfileId();
-  const hoje = today();
-
-  return useQuery<FiscalTaskRow[]>({
-    queryKey: ['fiscal-dashboard', 'overdue', companyId, hoje, isColaborador, profileId],
+    queryKey: ['fiscal-dashboard', 'tasks', companyId, from, to, isColaborador, profileId],
     enabled: !!companyId && (!isColaborador || !!profileId),
     queryFn: async () =>
       fetchAllPages<FiscalTaskRow>(() => {
@@ -131,48 +101,13 @@ export function useFiscalOverdueTasks() {
           .from('fiscal_tasks')
           .select(TASK_COLUMNS)
           .eq('company_id', companyId)
-          .neq('status', 'concluido')
-          .lt('due_date', hoje)
+          .gte('fiscal_due_date', from)
+          .lte('fiscal_due_date', to)
           .order('id', { ascending: true });
         if (isColaborador && profileId) q = q.eq('responsible_id', profileId);
         return q;
       }),
   });
-}
-
-/** Não concluídas que vencem de hoje até daqui a `days` dias (qualquer mês). */
-export function useFiscalDueSoon(days = 7) {
-  const { company } = useCompany();
-  const companyId = (company as any)?.id;
-  const { isColaborador } = useUserRole();
-  const { data: profileId } = useCurrentProfileId();
-  const de = today();
-  const ate = inDays(days);
-
-  return useQuery<FiscalTaskRow[]>({
-    queryKey: ['fiscal-dashboard', 'due-soon', companyId, de, days, isColaborador, profileId],
-    enabled: !!companyId && (!isColaborador || !!profileId),
-    queryFn: async () =>
-      fetchAllPages<FiscalTaskRow>(() => {
-        let q = (supabase as any)
-          .from('fiscal_tasks')
-          .select(TASK_COLUMNS)
-          .eq('company_id', companyId)
-          .neq('status', 'concluido')
-          .gte('due_date', de)
-          .lte('due_date', ate)
-          .order('id', { ascending: true });
-        if (isColaborador && profileId) q = q.eq('responsible_id', profileId);
-        return q;
-      }),
-  });
-}
-
-export function useFiscalTasksPrevMonth(year: number, month: number) {
-  const prev = month === 1
-    ? { y: year - 1, m: 12 }
-    : { y: year, m: month - 1 };
-  return useFiscalTasksOfMonth(prev.y, prev.m);
 }
 
 export function useFiscalUpcomingTasksRange(startDate: string, endDate: string) {

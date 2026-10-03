@@ -172,8 +172,11 @@ export default function FiscalTasks() {
     const r = searchParams.get('responsible');
     const c = searchParams.get('contact_id') ?? searchParams.get('contact');
     const v = searchParams.get('view') as ViewMode | null;
-    // `mes=todos` (vindo do Dashboard): vencido de qualquer mês, não só o corrente.
-    const todosMeses = searchParams.get('mes') === 'todos';
+    // Vindo do Dashboard: `mes=todos` (período livre, qualquer mês) ou `mes=10&ano=2026` (o mês que o Dashboard mostra).
+    const mesParam = searchParams.get('mes');
+    const anoParam = searchParams.get('ano');
+    const todosMeses = mesParam === 'todos';
+    const mesNumero = mesParam && /^(1[0-2]|[1-9])$/.test(mesParam) ? mesParam : null;
     let mutated = false;
     const next = new URLSearchParams(searchParams);
     if (r) {
@@ -191,6 +194,12 @@ export default function FiscalTasks() {
     if (todosMeses) {
       setVencimentoMonth('all');
       next.delete('mes');
+      mutated = true;
+    } else if (mesNumero) {
+      setVencimentoMonth(mesNumero);
+      if (anoParam && /^\d{4}$/.test(anoParam)) setVencimentoYear(anoParam);
+      next.delete('mes');
+      next.delete('ano');
       mutated = true;
     }
     if (v && ['myday', 'kanban', 'list', 'calendar'].includes(v)) {

@@ -3,21 +3,22 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import type { DateRange } from 'react-day-picker';
 import {
-  AlertTriangle,
   ArrowUpDown,
-  CheckCircle2,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Plus,
   RefreshCw,
+  X,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -41,19 +42,12 @@ import { cn, maskCPFCNPJ } from '@/lib/utils';
 
 import { useUserRole } from '@/hooks/useUserRole';
 import {
-  useFiscalTasksOfMonth,
-  useFiscalOverdueTasks,
-  useFiscalDueSoon,
-  useFiscalCollaborators,
+  useFiscalTasksInRange,
   useCompleteFiscalTasks,
   FiscalTaskRow,
 } from '@/hooks/useFiscalDashboard';
-import { StatCardRow, DsBadge, SearchField, tabsListClass, tabsTriggerClass } from '@/components/ds';
-import { TAX_REGIMES } from '@/constants/taxRegimes';
+import { StatCardRow, DsBadge, SearchField } from '@/components/ds';
 import { useTeamProfiles } from '@/hooks/useTeamProfiles';
-import { DashboardAtencao, ATRASO_RECENTE_DIAS, isAtrasoAntigo } from '@/components/fiscal/DashboardAtencao';
-import { OBLIGATION_DEPARTMENTS } from '@/constants/obligationDepartments';
-
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -61,240 +55,238 @@ const MONTHS = [
 ];
 const YEARS = [2025, 2026, 2027];
 
-// Bug antigo: comparava contra 'Simples Nacional' (Title Case) enquanto
-// contacts.tax_regime guarda 'simples_nacional' (snake_case) — nunca batia,
-// zerava a lista toda vez que uma aba de regime era clicada.
-const REGIMES = [
-  { value: 'todos', label: 'Todos' },
-  ...TAX_REGIMES.filter((r) => ['simples_nacional', 'lucro_presumido', 'lucro_real'].includes(r.value)),
-];
-
-const DEPARTMENTS = [
-  { value: 'todos', label: 'Todos' },
-  ...OBLIGATION_DEPARTMENTS.map((d) => ({ value: d.value, label: d.short })),
-];
-
-const todayIso = () => {
+const isoOfDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const todayIso = () => isoOfDate(new Date());
+const inDaysIso = (n: number) => {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  d.setDate(d.getDate() + n);
+  return isoOfDate(d);
 };
 
+/** Vencida = não concluída com o prazo interno (data de entrega) antes de hoje. */
 const isLateTask = (t: { status: string; due_date: string | null }, today: string) =>
   t.status !== 'concluido' && !!t.due_date && t.due_date < today;
 
-function KpiCard({
-  label,
-  value,
-  icon: Icon,
-  borderClass,
-  iconClass,
-}: {
-  label: string;
-  value: number;
-  icon: typeof ArrowUpDown;
-  borderClass: string;
-  iconClass: string;
-}) {
-  return (
-    <Card className={cn('border-l-4', borderClass)}>
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-[0.05em] font-medium truncate">{label}</p>
-            <p className="text-[1.75rem] font-bold tracking-tight mt-1 leading-none">{value}</p>
-          </div>
-          <Icon className={cn('h-4 w-4 shrink-0', iconClass)} />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+/** Competência é o mês anterior ao vencimento. */
+const prevMonth = (y: number, m: number) => (m === 1 ? { y: y - 1, m: 12 } : { y, m: m - 1 });
+const monthLabel = (y: number, m: number) => `${MONTHS[m - 1]} de ${y}`;
 
 export default function FiscalDashboard() {
   const { isAdmin, isSuperAdmin, isLoading: roleLoading } = useUserRole();
   const qc = useQueryClient();
   const navigate = useNavigate();
 
+  // Padrão: mês corrente. Mês/Ano e o período livre são alternativos: escolher um limpa o outro.
   const now = new Date();
   const [year, setYear] = useState<number>(now.getFullYear());
   const [month, setMonth] = useState<number>(now.getMonth() + 1);
-  const [regime, setRegime] = useState<string>('todos');
-  const [department, setDepartment] = useState<string>('todos');
+  const [range, setRange] = useState<DateRange | undefined>(undefined);
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const [collaborator, setCollaborator] = useState<string>('todos');
 
-  const tasksQ = useFiscalTasksOfMonth(year, month);
-  const overdueQ = useFiscalOverdueTasks();
-  const dueSoonQ = useFiscalDueSoon(7);
+  const rangeAtivo = !!(range?.from && range?.to);
+  const periodo = useMemo(() => {
+    if (range?.from && range?.to) return { from: isoOfDate(range.from), to: isoOfDate(range.to) };
+    const last = new Date(year, month, 0).getDate();
+    const mm = String(month).padStart(2, '0');
+    return { from: `${year}-${mm}-01`, to: `${year}-${mm}-${String(last).padStart(2, '0')}` };
+  }, [range, year, month]);
+
+  const tasksQ = useFiscalTasksInRange(periodo.from, periodo.to);
   const profilesQ = useTeamProfiles();
-  const collabsQ = useFiscalCollaborators();
   const completeTasks = useCompleteFiscalTasks();
 
   const today = todayIso();
+  const em7dias = inDaysIso(7);
 
-  const filterByRegime = <T extends { contacts?: { tax_regime?: string | null } | null }>(arr: T[]): T[] => {
-    if (regime === 'todos') return arr;
-    return arr.filter((t) => (t.contacts?.tax_regime ?? '') === regime);
-  };
-  const filterByDepartment = <T extends { department?: string | null }>(arr: T[]): T[] => {
-    if (department === 'todos') return arr;
-    return arr.filter((t) => t.department === department);
-  };
+  // Colaboradores do filtro: quem tem tarefa no período (mais a seleção atual, para não sumir da lista).
+  const collaboratorOptions = useMemo(() => {
+    const ids = new Set<string>();
+    (tasksQ.data ?? []).forEach((t) => { if (t.responsible_id) ids.add(t.responsible_id); });
+    if (collaborator !== 'todos' && collaborator !== 'none') ids.add(collaborator);
+    return [...ids]
+      .map((id) => ({ id, name: profilesQ.data?.find((p) => p.id === id)?.full_name ?? 'Colaborador' }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [tasksQ.data, profilesQ.data, collaborator]);
 
-  const tasks = useMemo(
-    () => filterByDepartment(filterByRegime(tasksQ.data ?? [])),
-    [tasksQ.data, regime, department],
-  );
+  const tasks = useMemo(() => {
+    const all = tasksQ.data ?? [];
+    if (collaborator === 'todos') return all;
+    if (collaborator === 'none') return all.filter((t) => !t.responsible_id);
+    return all.filter((t) => t.responsible_id === collaborator);
+  }, [tasksQ.data, collaborator]);
 
-  // "Atrasadas" é o vencido de TODOS os meses (com os mesmos filtros de regime e setor); o resto é do mês aberto.
-  const overdue = useMemo(
-    () => filterByDepartment(filterByRegime(overdueQ.data ?? [])),
-    [overdueQ.data, regime, department],
-  );
-
-  const dueSoon = useMemo(
-    () => filterByDepartment(filterByRegime(dueSoonQ.data ?? [])),
-    [dueSoonQ.data, regime, department],
-  );
-
+  // As quatro partes (vencidas, pendentes, concluídas) somam o total do período; "vencem em 7 dias" é parte das pendentes.
   const kpis = useMemo(() => {
-    const concluidas = tasks.filter((t) => t.status === 'concluido').length;
-    const atrasadas = overdue.filter((t) => !isAtrasoAntigo(t, today)).length;
-    const pendentes = tasks.filter((t) => t.status === 'a_fazer' && (!t.due_date || t.due_date >= today)).length;
-    const emAndamento = tasks.filter((t) => t.status === 'em_progresso').length;
-    return { concluidas, pendentes, atrasadas, emAndamento };
-  }, [tasks, overdue, today]);
+    let vencidas = 0, pendentes = 0, concluidas = 0, vencem7 = 0;
+    for (const t of tasks) {
+      if (t.status === 'concluido') concluidas += 1;
+      else if (isLateTask(t, today)) vencidas += 1;
+      else {
+        pendentes += 1;
+        if (t.due_date && t.due_date <= em7dias) vencem7 += 1;
+      }
+    }
+    return { vencidas, pendentes, concluidas, vencem7 };
+  }, [tasks, today, em7dias]);
 
-  const semResponsavel = useMemo(
-    () => tasks.filter((t) => !t.responsible_id && t.status !== 'concluido').length,
-    [tasks]
-  );
+  // Meses que o período cobre: o calendário só navega entre eles.
+  const periodMonths = useMemo(() => {
+    const [fy, fm] = periodo.from.split('-').map(Number);
+    const [ty, tm] = periodo.to.split('-').map(Number);
+    const out: Array<{ y: number; m: number }> = [];
+    for (let y = fy, m = fm; y < ty || (y === ty && m <= tm); m === 12 ? (y += 1, m = 1) : (m += 1)) out.push({ y, m });
+    return out;
+  }, [periodo]);
+
+  const subtitulo = useMemo(() => {
+    const [fy, fm] = periodo.from.split('-').map(Number);
+    const [ty, tm] = periodo.to.split('-').map(Number);
+    const c1 = prevMonth(fy, fm);
+    const c2 = prevMonth(ty, tm);
+    const mesmaCompetencia = c1.y === c2.y && c1.m === c2.m;
+    const competencia = mesmaCompetencia
+      ? `à competência de ${monthLabel(c1.y, c1.m)}`
+      : `às competências de ${monthLabel(c1.y, c1.m)} a ${monthLabel(c2.y, c2.m)}`;
+    const vencimento = rangeAtivo
+      ? `de ${format(parseISO(periodo.from), 'dd/MM/yyyy')} a ${format(parseISO(periodo.to), 'dd/MM/yyyy')}`
+      : `em ${monthLabel(year, month)}`;
+    return `Tarefas com vencimento ${vencimento} - Referente ${competencia}`;
+  }, [periodo, rangeAtivo, year, month]);
 
   if (roleLoading) return null;
   if (!isAdmin && !isSuperAdmin) return <Navigate to="/fiscal/tarefas" replace />;
 
   const handleRefresh = () => qc.invalidateQueries({ queryKey: ['fiscal-dashboard'] });
 
-  // `mes=todos`: o vencido pode ser de qualquer mês, e a lista de Tarefas abre por padrão só no mês corrente.
+  // Abre a lista de Tarefas no mesmo período; num intervalo livre abre todos os meses.
+  const mesQuery = rangeAtivo ? 'mes=todos' : `mes=${month}&ano=${year}`;
   const goToKanbanByContact = (contactId: string) =>
-    navigate(`/fiscal/tarefas?view=kanban&contact_id=${contactId}&mes=todos`);
+    navigate(`/fiscal/tarefas?view=kanban&contact_id=${contactId}&${mesQuery}`);
   const goToTasksByCollaborator = (profileId: string) =>
-    navigate(`/fiscal/tarefas?responsible=${profileId}&mes=todos`);
+    navigate(`/fiscal/tarefas?responsible=${profileId}&${mesQuery}`);
+
+  const escopo = rangeAtivo ? 'período' : 'mês';
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <p className="text-kicker uppercase text-muted-ink-2">
-              ~/tarefas · vencimentos de {MONTHS[month - 1]?.toLowerCase()} {year}
-            </p>
-            <h1 className="text-display text-ink">Dashboard fiscal.</h1>
-          </div>
-          <div className="flex items-center gap-2 overflow-x-auto flex-nowrap no-print">
-            <Button variant="outline" size="sm" onClick={handleRefresh}>
-              <RefreshCw className="h-4 w-4" /> Atualizar
-            </Button>
-            <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-              <SelectTrigger className="h-8 w-[130px] text-xs shrink-0"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {MONTHS.map((m, i) => <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-              <SelectTrigger className="h-8 w-[85px] text-xs shrink-0"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={department} onValueChange={setDepartment}>
-              <SelectTrigger className="h-8 w-[120px] text-xs shrink-0"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {DEPARTMENTS.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <p className="text-kicker uppercase text-muted-ink-2">~/tarefas</p>
+          <h1 className="text-display text-ink">Dashboard fiscal.</h1>
+          <p className="text-sm text-muted-ink">{subtitulo}</p>
         </div>
-
-        {/* Regime */}
-        <div className="no-print">
-          <Tabs value={regime} onValueChange={setRegime}>
-            <TabsList className={cn(tabsListClass, 'overflow-x-auto flex-nowrap')}>
-              {REGIMES.map((r) => (
-                <TabsTrigger key={r.value} value={r.value} className={tabsTriggerClass}>
-                  {r.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+        <div className="flex flex-wrap items-center gap-2 no-print sm:justify-end">
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4" /> Atualizar
+          </Button>
+          <Select
+            value={String(month)}
+            onValueChange={(v) => { setMonth(Number(v)); setRange(undefined); }}
+          >
+            <SelectTrigger className={cn('h-8 w-[130px] text-xs shrink-0', rangeAtivo && 'text-muted-ink')}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {MONTHS.map((m, i) => <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select
+            value={String(year)}
+            onValueChange={(v) => { setYear(Number(v)); setRange(undefined); }}
+          >
+            <SelectTrigger className={cn('h-8 w-[85px] text-xs shrink-0', rangeAtivo && 'text-muted-ink')}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Popover open={rangeOpen} onOpenChange={setRangeOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn('h-8 shrink-0 text-xs', rangeAtivo && 'border-ink/40 text-ink')}>
+                <CalendarDays className="h-4 w-4" />
+                {rangeAtivo
+                  ? `${format(range!.from!, 'dd/MM/yy')} – ${format(range!.to!, 'dd/MM/yy')}`
+                  : 'Período livre'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-auto p-0">
+              <Calendar
+                mode="range"
+                numberOfMonths={2}
+                defaultMonth={range?.from ?? new Date(year, month - 1, 1)}
+                selected={range}
+                onSelect={(r) => {
+                  setRange(r);
+                  if (r?.from && r?.to) setRangeOpen(false);
+                }}
+              />
+            </PopoverContent>
+          </Popover>
+          {rangeAtivo && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              aria-label="Voltar para o filtro de mês"
+              onClick={() => setRange(undefined)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+          <Select value={collaborator} onValueChange={setCollaborator}>
+            <SelectTrigger className="h-8 w-[170px] text-xs shrink-0"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os colaboradores</SelectItem>
+              <SelectItem value="none">Sem responsável</SelectItem>
+              {collaboratorOptions.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      {/* Sem responsável banner */}
-      {semResponsavel > 0 && (
-        <Alert className="bg-warn/10 border-warn/40">
-          <AlertTriangle className="h-4 w-4 text-warn" />
-          <AlertDescription className="flex items-center justify-between gap-3 w-full">
-            <span className="font-medium">
-              {semResponsavel} {semResponsavel === 1 ? 'tarefa' : 'tarefas'} sem responsável atribuído
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              className="no-print"
-              onClick={() => navigate('/fiscal/tarefas?responsavel=none')}
-            >
-              Ver tarefas
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Indicadores numerados (decisão 06): vencido recente primeiro, e só ele destacado. O atraso antigo fica à parte, logo abaixo. */}
+      {/* Indicadores: todos do período filtrado (mês corrente por padrão) */}
       <StatCardRow
         items={[
           {
             label: 'Vencidas',
-            value: kpis.atrasadas,
-            hint: `vencidas nos últimos ${ATRASO_RECENTE_DIAS} dias, não concluídas`,
-            emphasis: kpis.atrasadas > 0 ? 'warm' : 'none',
+            value: kpis.vencidas,
+            hint: `prazo já passou, não concluídas`,
+            emphasis: kpis.vencidas > 0 ? 'warm' : 'none',
           },
-          { label: 'Vencem em 7 dias', value: dueSoon.length, hint: 'a partir de hoje, não concluídas' },
-          { label: 'Pendentes do mês', value: kpis.pendentes, hint: 'a fazer, dentro do prazo' },
+          { label: 'Vencem em 7 dias', value: kpis.vencem7, hint: 'a partir de hoje, não concluídas' },
+          { label: `Pendentes do ${escopo}`, value: kpis.pendentes, hint: 'não concluídas, dentro do prazo' },
           {
-            label: 'Concluídas do mês',
+            label: `Concluídas do ${escopo}`,
             value: kpis.concluidas,
             hint: tasks.length > 0
-              ? `${Math.round((kpis.concluidas / tasks.length) * 100)}% do mês entregue`
-              : 'nada vence neste mês',
+              ? `${Math.round((kpis.concluidas / tasks.length) * 100)}% do ${escopo} entregue`
+              : `nada vence neste ${escopo}`,
           },
         ]}
-      />
-
-      {/* O que está vencido, o que vem aí, quais clientes e qual colaborador */}
-      <DashboardAtencao
-        overdue={overdue}
-        dueSoon={dueSoon}
-        monthTasks={tasks}
-        profiles={profilesQ.data ?? []}
-        today={today}
-        onClient={goToKanbanByContact}
-        onCollaborator={goToTasksByCollaborator}
       />
 
       {/* Calendário Fiscal */}
       <FiscalCalendarCard
         tasks={tasks}
         today={today}
-        year={year}
-        month={month}
+        months={periodMonths}
+        rangeFrom={periodo.from}
+        rangeTo={periodo.to}
         isLoading={tasksQ.isLoading}
         isCompleting={completeTasks.isPending}
         onCompleteTasks={(ids) => completeTasks.mutate(ids)}
-        onMonthChange={(y, m) => { setYear(y); setMonth(m); }}
       />
 
-      {/* Todos os clientes do mês */}
+      {/* Pendências por Cliente */}
       <ClientPendenciesSection tasks={tasks} today={today} onClientClick={goToKanbanByContact} />
+
+      {/* Colaboradores */}
+      <CollaboratorsSection
+        tasks={tasks}
+        today={today}
+        profiles={profilesQ.data ?? []}
+        onCollaboratorClick={goToTasksByCollaborator}
+      />
     </div>
   );
 }
@@ -339,29 +331,39 @@ type ObligationGroup = {
 
 type CalendarSelection = { title: string; dueDate: string; tasks: FiscalTaskRow[] };
 
+/** O calendário acompanha o filtro do Dashboard: mostra só os meses do período (um, no filtro de mês) e navega entre eles. */
 function FiscalCalendarCard({
   tasks,
   today,
-  year,
-  month,
+  months,
+  rangeFrom,
+  rangeTo,
   isLoading,
   isCompleting,
   onCompleteTasks,
-  onMonthChange,
 }: {
   tasks: FiscalTaskRow[];
   today: string;
-  year: number;
-  month: number;
+  months: Array<{ y: number; m: number }>;
+  rangeFrom: string;
+  rangeTo: string;
   isLoading: boolean;
   isCompleting: boolean;
   onCompleteTasks: (ids: string[]) => void;
-  onMonthChange: (year: number, month: number) => void;
 }) {
   const [selection, setSelection] = useState<CalendarSelection | null>(null);
-  // Deslocamento em semanas a partir da semana corrente — só a fileira de dias em
-  // destaque usa isso; a grade do mês continua navegando por mês (decisão de Gabriel).
+  // Deslocamento em semanas a partir da semana de partida — só a fileira de dias em destaque usa isso.
   const [weekOffset, setWeekOffset] = useState(0);
+  const periodKey = `${months[0]?.y}-${months[0]?.m}-${months.length}`;
+  // Mês em exibição: o de hoje, se o período o contém; senão o primeiro do período.
+  const [viewIdx, setViewIdx] = useState(0);
+  useEffect(() => {
+    const [ty, tm] = today.split('-').map(Number);
+    const i = months.findIndex((x) => x.y === ty && x.m === tm);
+    setViewIdx(i >= 0 ? i : 0);
+    setWeekOffset(0);
+  }, [periodKey, today]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { y: year, m: month } = months[Math.min(viewIdx, months.length - 1)] ?? { y: new Date().getFullYear(), m: new Date().getMonth() + 1 };
 
   const byDay = useMemo(() => {
     const map = new Map<string, FiscalTaskRow[]>();
@@ -392,13 +394,16 @@ function FiscalCalendarCard({
   // independente do mês navegado pela grade abaixo.
   const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+  // Semana de partida: a de hoje se hoje cai no período; senão a do primeiro dia do período.
+  const weekAnchor = today >= rangeFrom && today <= rangeTo ? today : rangeFrom;
+
   const weekStartDate = useMemo(() => {
-    const t = parseISO(today);
+    const t = parseISO(weekAnchor);
     const mondayOffset = (t.getDay() + 6) % 7; // Dom=6, Seg=0, ..., Sáb=5
     const monday = new Date(t);
     monday.setDate(t.getDate() - mondayOffset + weekOffset * 7);
     return monday;
-  }, [today, weekOffset]);
+  }, [weekAnchor, weekOffset]);
 
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
@@ -444,26 +449,14 @@ function FiscalCalendarCard({
     setSelection({ title, dueDate: iso, tasks: list });
   };
 
-  const shiftMonth = (delta: number) => {
-    let m = month + delta;
-    let y = year;
-    if (m < 1) { m = 12; y -= 1; }
-    if (m > 12) { m = 1; y += 1; }
-    onMonthChange(y, m);
-  };
-
-  const goToToday = () => {
-    const now = new Date();
-    onMonthChange(now.getFullYear(), now.getMonth() + 1);
-    setWeekOffset(0);
-  };
+  const shiftMonth = (delta: number) => setViewIdx((i) => Math.max(0, Math.min(months.length - 1, i + delta)));
 
   return (
     <Card>
       <CardHeader className="flex flex-col gap-1 space-y-0 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-base">Calendário Fiscal</CardTitle>
         <span className="text-xs text-muted-ink">
-          {MONTHS[month - 1]?.toLowerCase()} {year} · {obligationGroups.length} {obligationGroups.length === 1 ? 'obrigação mapeada' : 'obrigações mapeadas'}
+          {obligationGroups.length} {obligationGroups.length === 1 ? 'obrigação mapeada' : 'obrigações mapeadas'}
         </span>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -487,22 +480,21 @@ function FiscalCalendarCard({
             {/* Navegador de mês + resumo */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => shiftMonth(-1)} aria-label="Mês anterior">
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="w-[120px] text-center text-sm font-medium text-ink">{MONTHS[month - 1]} {year}</span>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => shiftMonth(1)} aria-label="Próximo mês">
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                {months.length > 1 && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" disabled={viewIdx <= 0} onClick={() => shiftMonth(-1)} aria-label="Mês anterior">
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                )}
+                <span className={cn('text-center text-sm font-medium text-ink', months.length > 1 && 'w-[120px]')}>{MONTHS[month - 1]} {year}</span>
+                {months.length > 1 && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" disabled={viewIdx >= months.length - 1} onClick={() => shiftMonth(1)} aria-label="Próximo mês">
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                )}
                 {vencidos > 0 && <DsBadge tone="danger">{vencidos} vencido{vencidos !== 1 ? 's' : ''}</DsBadge>}
                 {pendentesCount > 0 && <DsBadge tone="warn">{pendentesCount} pendente{pendentesCount !== 1 ? 's' : ''}</DsBadge>}
               </div>
-              <div className="flex items-center gap-2 text-xs text-muted-ink">
-                <span>Hoje: {format(parseISO(today), 'dd/MM')}</span>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={goToToday}>
-                  Voltar para hoje
-                </Button>
-              </div>
+              <span className="text-xs text-muted-ink">Hoje: {format(parseISO(today), 'dd/MM')}</span>
             </div>
 
             {/* Fileira de dias em destaque — semana completa, com setas próprias */}
@@ -910,7 +902,7 @@ function ClientPendenciesSection({
               <TableHead className="text-right"><SortBtn k="pendentes" label="Pendentes" align="right" /></TableHead>
               <TableHead className="text-right"><SortBtn k="emAndamento" label="Em Andamento" align="right" /></TableHead>
               <TableHead className="text-right"><SortBtn k="aguardando" label="Aguardando" align="right" /></TableHead>
-              <TableHead className="text-right"><SortBtn k="atrasadas" label="Atrasadas no mês" align="right" /></TableHead>
+              <TableHead className="text-right"><SortBtn k="atrasadas" label="Vencidas" align="right" /></TableHead>
               <TableHead className="text-right"><SortBtn k="concluidas" label="Concluídas" align="right" /></TableHead>
             </TableRow>
           </TableHeader>
@@ -966,6 +958,109 @@ function ClientPendenciesSection({
             </div>
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
+// ---- Colaboradores ----
+type CollaboratorRowData = {
+  id: string | null;
+  name: string;
+  total: number;
+  vencidas: number;
+  pendentes: number;
+  concluidas: number;
+};
+
+function CollaboratorsSection({
+  tasks,
+  today,
+  profiles,
+  onCollaboratorClick,
+}: {
+  tasks: FiscalTaskRow[];
+  today: string;
+  profiles: { id: string; full_name: string | null }[];
+  onCollaboratorClick: (profileId: string) => void;
+}) {
+  const rows = useMemo<CollaboratorRowData[]>(() => {
+    const map = new Map<string, CollaboratorRowData>();
+    for (const t of tasks) {
+      const key = t.responsible_id ?? '__sem__';
+      let r = map.get(key);
+      if (!r) {
+        r = {
+          id: t.responsible_id,
+          name: t.responsible_id ? (profiles.find((p) => p.id === t.responsible_id)?.full_name ?? 'Colaborador') : 'Sem responsável',
+          total: 0, vencidas: 0, pendentes: 0, concluidas: 0,
+        };
+        map.set(key, r);
+      }
+      r.total += 1;
+      if (t.status === 'concluido') r.concluidas += 1;
+      else if (isLateTask(t, today)) r.vencidas += 1;
+      else r.pendentes += 1;
+    }
+    return [...map.values()].sort((a, b) => b.vencidas - a.vencidas || b.pendentes - a.pendentes || a.name.localeCompare(b.name));
+  }, [tasks, today, profiles]);
+
+  return (
+    <Card>
+      <CardHeader className="space-y-0 pb-3">
+        <CardTitle className="text-base">Colaboradores</CardTitle>
+        <p className="text-meta text-muted-ink">Tarefas do período por responsável · clique no nome para abrir as tarefas</p>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Colaborador</TableHead>
+              <TableHead className="text-right">Tarefas</TableHead>
+              <TableHead className="text-right">Vencidas</TableHead>
+              <TableHead className="text-right">Pendentes</TableHead>
+              <TableHead className="text-right">Concluídas</TableHead>
+              <TableHead className="w-[180px]">Entregue</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">Sem tarefas neste período</TableCell>
+              </TableRow>
+            ) : (
+              rows.map((r) => {
+                const pct = r.total > 0 ? Math.round((r.concluidas / r.total) * 100) : 0;
+                return (
+                  <TableRow key={r.id ?? '__sem__'}>
+                    <TableCell className="font-medium">
+                      {r.id
+                        ? <button type="button" onClick={() => onCollaboratorClick(r.id!)} className="text-left hover:underline">{r.name}</button>
+                        : <span className="text-warn">{r.name}</span>}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{r.total}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {r.vencidas > 0
+                        ? <Badge className="border-danger/30 bg-danger/15 text-danger">{r.vencidas}</Badge>
+                        : <span className="text-muted-foreground">0</span>}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{r.pendentes}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.concluidas}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 flex-1 rounded-full bg-muted">
+                          <div className="h-full rounded-full bg-ok" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="w-9 text-right text-xs tabular-nums text-muted-ink">{pct}%</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );
