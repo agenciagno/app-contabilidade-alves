@@ -18,7 +18,7 @@ export interface FiscalTaskRow {
   responsible_id: string | null;
   contact_id: string | null;
   department: string | null;
-  contacts?: { tax_regime: string | null; name?: string | null; document?: string | null } | null;
+  contacts?: { tax_regime: string | null; name?: string | null; display_name?: string | null; nome_fantasia?: string | null; razao_social?: string | null; document?: string | null } | null;
   fiscal_obligations_catalog?: { name: string | null } | null;
 }
 
@@ -80,7 +80,7 @@ function useCurrentProfileId() {
 }
 
 const TASK_COLUMNS =
-  'id, status, title, due_date, fiscal_due_date, completed_at, created_at, responsible_id, contact_id, department, contacts(tax_regime, name, document), fiscal_obligations_catalog(name)';
+  'id, status, title, due_date, fiscal_due_date, completed_at, created_at, responsible_id, contact_id, department, contacts(tax_regime, name, display_name, nome_fantasia, razao_social, document), fiscal_obligations_catalog(name)';
 
 /**
  * Tarefas que VENCEM no período (fiscal_due_date), a mesma base do Calendário Fiscal: o mês corrente por padrão (competência = mês anterior)

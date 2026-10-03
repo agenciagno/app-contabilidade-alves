@@ -46,6 +46,7 @@ import {
 } from '@/hooks/useFiscalDashboard';
 import { StatCardRow, DsBadge, SearchField } from '@/components/ds';
 import { useTeamProfiles } from '@/hooks/useTeamProfiles';
+import { getContactDisplayName } from '@/lib/contact-display';
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -657,7 +658,7 @@ function CalendarSelectionSheet({
       if (statusFilter !== 'todos' && statusKey !== statusFilter) return false;
       if (obligationFilter !== 'todas' && obrigacaoDe(task) !== obligationFilter) return false;
       if (!q) return true;
-      const name = (task.contacts?.name ?? '').toLowerCase();
+      const name = (getContactDisplayName(task.contacts) || '').toLowerCase();
       const doc = (task.contacts?.document ?? '').replace(/\D/g, '');
       return name.includes(q) || (qDigits && doc.includes(qDigits));
     });
@@ -698,7 +699,7 @@ function CalendarSelectionSheet({
         <div className="space-y-4 pb-8">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <SearchField
-              placeholder="Buscar por razão social ou CNPJ"
+              placeholder="Buscar por nome ou CNPJ"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               wrapperClassName="w-full sm:max-w-xs"
@@ -738,7 +739,7 @@ function CalendarSelectionSheet({
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10" />
-                <TableHead>Razão Social</TableHead>
+                <TableHead>Cliente</TableHead>
                 <TableHead>CNPJ</TableHead>
                 <TableHead>Obrigação</TableHead>
                 <TableHead>Status</TableHead>
@@ -758,10 +759,10 @@ function CalendarSelectionSheet({
                       <Checkbox
                         checked={selected.has(task.id)}
                         onCheckedChange={(v) => toggleSelected(task.id, !!v)}
-                        aria-label={`Selecionar ${task.contacts?.name ?? ''}`}
+                        aria-label={`Selecionar ${getContactDisplayName(task.contacts)}`}
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{task.contacts?.name ?? '—'}</TableCell>
+                    <TableCell className="font-medium">{getContactDisplayName(task.contacts) || '—'}</TableCell>
                     <TableCell className="text-muted-ink">
                       {task.contacts?.document ? maskCPFCNPJ(task.contacts.document) : '—'}
                     </TableCell>
@@ -785,15 +786,12 @@ function CalendarSelectionSheet({
 type ClientRow = {
   contactId: string;
   name: string;
+  document: string;
+  vencidas: number;
   pendentes: number;
-  emAndamento: number;
-  aguardando: number;
-  atrasadas: number;
-  concluidas: number;
-  total: number;
 };
 
-type SortKey = 'name' | 'pendentes' | 'emAndamento' | 'aguardando' | 'atrasadas' | 'concluidas';
+type SortKey = 'name' | 'vencidas' | 'pendentes';
 
 function ClientPendenciesSection({
   tasks,
@@ -806,50 +804,46 @@ function ClientPendenciesSection({
 }) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [sortKey, setSortKey] = useState<SortKey>('atrasadas');
+  const [sortKey, setSortKey] = useState<SortKey>('vencidas');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
+  // Mesma conta dos cartões: concluída não conta; vencida é a de prazo passado; pendente é o resto das abertas.
   const rows = useMemo<ClientRow[]>(() => {
     const map = new Map<string, ClientRow>();
-    for (const t of tasks as any[]) {
-      const cid: string | null = t.contact_id ?? null;
-      if (!cid) continue;
-      let row = map.get(cid);
+    for (const t of tasks) {
+      if (!t.contact_id) continue;
+      let row = map.get(t.contact_id);
       if (!row) {
         row = {
-          contactId: cid,
-          name: t.contacts?.name ?? '—',
+          contactId: t.contact_id,
+          name: getContactDisplayName(t.contacts) || '—',
+          document: t.contacts?.document ?? '',
+          vencidas: 0,
           pendentes: 0,
-          emAndamento: 0,
-          aguardando: 0,
-          atrasadas: 0,
-          concluidas: 0,
-          total: 0,
         };
-        map.set(cid, row);
+        map.set(t.contact_id, row);
       }
-      row.total += 1;
-      if (t.status === 'a_fazer') row.pendentes += 1;
-      else if (t.status === 'em_progresso') row.emAndamento += 1;
-      else if (t.status === 'aguardando_cliente') row.aguardando += 1;
-      else if (t.status === 'concluido') row.concluidas += 1;
-      if (t.status !== 'concluido' && t.due_date && t.due_date < today) row.atrasadas += 1;
+      if (t.status === 'concluido') continue;
+      if (isLateTask(t, today)) row.vencidas += 1;
+      else row.pendentes += 1;
     }
     return Array.from(map.values());
   }, [tasks, today]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const list = q ? rows.filter((r) => r.name.toLowerCase().includes(q)) : rows;
-    const sorted = [...list].sort((a, b) => {
+    const qDigits = q.replace(/\D/g, '');
+    const list = q
+      ? rows.filter((r) => r.name.toLowerCase().includes(q) || (qDigits && r.document.replace(/\D/g, '').includes(qDigits)))
+      : rows;
+    return [...list].sort((a, b) => {
       const dir = sortDir === 'asc' ? 1 : -1;
       if (sortKey === 'name') return a.name.localeCompare(b.name) * dir;
-      const av = (a as any)[sortKey] as number;
-      const bv = (b as any)[sortKey] as number;
+      const av = a[sortKey];
+      const bv = b[sortKey];
       if (av === bv) return a.name.localeCompare(b.name);
       return (av - bv) * dir;
     });
-    return sorted;
   }, [rows, search, sortKey, sortDir]);
 
   const PER_PAGE = 20;
@@ -881,9 +875,9 @@ function ClientPendenciesSection({
     </button>
   );
 
-  const trafficLight = (atrasadas: number) => {
-    if (atrasadas >= 3) return 'bg-danger';
-    if (atrasadas >= 1) return 'bg-warn';
+  const trafficLight = (vencidas: number) => {
+    if (vencidas >= 3) return 'bg-danger';
+    if (vencidas >= 1) return 'bg-warn';
     return 'bg-ok';
   };
 
@@ -894,7 +888,7 @@ function ClientPendenciesSection({
         <Input
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          placeholder="Buscar cliente..."
+          placeholder="Buscar por nome ou CNPJ..."
           className="h-9 w-full sm:w-[260px]"
         />
       </CardHeader>
@@ -903,17 +897,15 @@ function ClientPendenciesSection({
           <TableHeader>
             <TableRow>
               <TableHead><SortBtn k="name" label="Cliente" /></TableHead>
+              <TableHead>CNPJ</TableHead>
+              <TableHead className="text-right"><SortBtn k="vencidas" label="Vencidas" align="right" /></TableHead>
               <TableHead className="text-right"><SortBtn k="pendentes" label="Pendentes" align="right" /></TableHead>
-              <TableHead className="text-right"><SortBtn k="emAndamento" label="Em Andamento" align="right" /></TableHead>
-              <TableHead className="text-right"><SortBtn k="aguardando" label="Aguardando" align="right" /></TableHead>
-              <TableHead className="text-right"><SortBtn k="atrasadas" label="Vencidas" align="right" /></TableHead>
-              <TableHead className="text-right"><SortBtn k="concluidas" label="Concluídas" align="right" /></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {pageRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
                   Nenhum cliente encontrado
                 </TableCell>
               </TableRow>
@@ -926,21 +918,21 @@ function ClientPendenciesSection({
                       onClick={() => onClientClick(r.contactId)}
                       className="inline-flex items-center gap-2 text-left hover:underline"
                     >
-                      <span className={cn('inline-block h-2.5 w-2.5 rounded-full', trafficLight(r.atrasadas))} />
+                      <span className={cn('inline-block h-2.5 w-2.5 rounded-full', trafficLight(r.vencidas))} />
                       <span className="truncate">{r.name}</span>
                     </button>
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{r.pendentes}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.emAndamento}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.aguardando}</TableCell>
+                  <TableCell className="text-muted-ink tabular-nums">
+                    {r.document ? maskCPFCNPJ(r.document) : '—'}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {r.atrasadas > 0 ? (
-                      <Badge className="bg-danger/15 text-danger dark:text-danger border-danger/30">{r.atrasadas}</Badge>
+                    {r.vencidas > 0 ? (
+                      <Badge className="bg-danger/15 text-danger dark:text-danger border-danger/30">{r.vencidas}</Badge>
                     ) : (
                       <span className="text-muted-foreground">0</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{r.concluidas}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.pendentes}</TableCell>
                 </TableRow>
               ))
             )}
