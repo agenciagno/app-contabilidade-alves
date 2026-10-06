@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DateField, segmentedListClass, segmentedTriggerClass } from '@/components/ds';
 import { Transaction, TransactionInsert } from '@/hooks/useTransactions';
-import { Category, useCategories, CategoryInsert, CLIENT_CATEGORY_LABELS, getSelectableCategories } from '@/hooks/useCategories';
+import { Category, useCategories, CategoryInsert, CLIENT_CATEGORY_LABELS, getSelectableCategories, getCategoryParentName } from '@/hooks/useCategories';
 import { Bank, useBanks, BankInsert } from '@/hooks/useBanks';
 import { Contact, useContacts, ContactInsert } from '@/hooks/useContacts';
 import { useParties, PartyInput } from '@/hooks/useParties';
@@ -653,7 +653,7 @@ export function TransactionFormDialog({
                       <div className="flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Novo</div>
                     </SelectItem>
                     {filteredCategories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                      <SelectItem key={cat.id} value={cat.id} detail={isInternalCompany ? undefined : getCategoryParentName(cat, categories)}>{cat.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

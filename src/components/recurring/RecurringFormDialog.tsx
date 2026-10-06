@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { useCategories, CategoryInsert, CLIENT_CATEGORY_LABELS, getSelectableCategories } from '@/hooks/useCategories';
+import { useCategories, CategoryInsert, CLIENT_CATEGORY_LABELS, getSelectableCategories, getCategoryParentName } from '@/hooks/useCategories';
 import { useBanks, BankInsert } from '@/hooks/useBanks';
 import { useContacts, ContactInsert } from '@/hooks/useContacts';
 import { useActiveCompany } from '@/contexts/CompanyContext';
@@ -283,7 +283,7 @@ export function RecurringFormDialog({
                     </SelectTrigger>
                     <SelectContent>
                       {filteredCategories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
+                        <SelectItem key={category.id} value={category.id} detail={isInternalCompany ? undefined : getCategoryParentName(category, categories)}>
                           {category.name}
                         </SelectItem>
                       ))}

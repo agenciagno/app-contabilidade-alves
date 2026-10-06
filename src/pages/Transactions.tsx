@@ -15,7 +15,8 @@ import { useServerTransactions, useTransactionKPIs, useDistinctTransactionValues
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
 import { getContactLegalName, getTransactionCounterpartyName } from '@/lib/contact-display';
-import { useCategories, getSelectableCategories } from '@/hooks/useCategories';
+import { useCategories, getSelectableCategories, getCategoryParentName } from '@/hooks/useCategories';
+import { CategoryNameWithParent } from '@/components/categories/CategoryNameWithParent';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { useBanks } from '@/hooks/useBanks';
 import { useContacts } from '@/hooks/useContacts';
@@ -262,7 +263,7 @@ function CategoryMultiFilter({
 }: {
   selected: string[];
   onChange: (v: string[]) => void;
-  categories: { id: string; name: string; color: string }[];
+  categories: { id: string; name: string; color: string; parentName?: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -323,7 +324,7 @@ function CategoryMultiFilter({
             <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-xs">
               <Checkbox checked={displaySelected.includes(c.id)} onCheckedChange={() => toggle(c.id)} className="h-3.5 w-3.5" />
               <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color || '#3B82F6' }} />
-              <span className="truncate">{c.name}</span>
+              <CategoryNameWithParent name={c.name} parentName={c.parentName} />
             </label>
           )) : (
             <p className="text-xs text-muted-foreground text-center py-4">Nenhum resultado</p>
@@ -466,7 +467,7 @@ function EventoContabilColumnFilter({
 }: {
   selected: string[];
   onChange: (v: string[]) => void;
-  categories: { id: string; name: string; color: string }[];
+  categories: { id: string; name: string; color: string; parentName?: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -526,7 +527,7 @@ function EventoContabilColumnFilter({
               <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-xs">
                 <Checkbox checked={displaySelected.includes(c.id)} onCheckedChange={() => toggle(c.id)} className="h-3.5 w-3.5" />
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color || '#3B82F6' }} />
-                <span className="truncate">{c.name}</span>
+                <CategoryNameWithParent name={c.name} parentName={c.parentName} />
               </label>
             )) : (
               <p className="text-xs text-muted-foreground text-center py-4">Nenhum resultado</p>
@@ -758,7 +759,11 @@ export default function Transactions() {
   // subevento não entra (só o subevento); macro sozinho entra.
   const categoryOptions = useMemo(() => {
     return getSelectableCategories(categories, isInternalCompany)
-      .map(c => ({ id: c.id, name: c.name, color: c.color || '#3B82F6' }));
+      .map(c => ({
+        id: c.id, name: c.name, color: c.color || '#3B82F6',
+        // Cliente externo: subevento mostra o macro abaixo do nome.
+        parentName: isInternalCompany ? undefined : getCategoryParentName(c, categories),
+      }));
   }, [categories, isInternalCompany]);
 
   // Distinct values for NumericMultiFilter (full dataset, fetched only when popover opens)

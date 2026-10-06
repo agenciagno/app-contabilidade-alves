@@ -38,6 +38,14 @@ export function getSelectableCategories<T extends { id: string; parent_id?: stri
   return categories.filter(c => !parentIds.has(c.id) || c.id === keepId);
 }
 
+/** Nome do macro de um subevento (para a linha de apoio nas listas); undefined se for macro. */
+export function getCategoryParentName(
+  category: { parent_id?: string | null },
+  categories: { id: string; name: string }[],
+): string | undefined {
+  return category.parent_id ? categories.find(c => c.id === category.parent_id)?.name : undefined;
+}
+
 export type CategoryInsert = Omit<Category, 'id' | 'created_at' | 'updated_at' | 'parent_id' | 'show_in_dre' | 'scope'> & { parent_id?: string | null; show_in_dre?: boolean };
 export type CategoryUpdate = Partial<Omit<Category, 'id' | 'company_id' | 'created_at' | 'updated_at'>>;
 

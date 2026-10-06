@@ -15,7 +15,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { getContactLegalName } from '@/lib/contact-display';
-import { getSelectableCategories } from '@/hooks/useCategories';
+import { getSelectableCategories, getCategoryParentName } from '@/hooks/useCategories';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { Loader2, CalendarIcon } from 'lucide-react';
 
@@ -141,7 +141,7 @@ export function BulkEditDialog({
                 <SelectContent>
                   <SelectItem value="placeholder" disabled>Selecione o evento</SelectItem>
                   {subCategories.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    <SelectItem key={c.id} value={c.id} detail={isInternalCompany ? undefined : getCategoryParentName(c, categories)}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

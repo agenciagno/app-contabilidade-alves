@@ -35,7 +35,8 @@ import { IconBox } from '@/components/ds';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useTransactionAttachments } from '@/hooks/useTransactionAttachments';
 import type { Transaction, TransactionInsert } from '@/hooks/useTransactions';
-import { getSelectableCategories, type Category } from '@/hooks/useCategories';
+import { getSelectableCategories, getCategoryParentName, type Category } from '@/hooks/useCategories';
+import { CategoryNameWithParent } from '@/components/categories/CategoryNameWithParent';
 import type { Bank } from '@/hooks/useBanks';
 import type { Contact } from '@/hooks/useContacts';
 
@@ -372,7 +373,7 @@ function StatusMultiFilter({ selected, onChange }: { selected: string[]; onChang
 }
 
 function EventoMultiFilter({ selected, onChange, categories }: {
-  selected: string[]; onChange: (v: string[]) => void; categories: Category[];
+  selected: string[]; onChange: (v: string[]) => void; categories: (Category & { parentName?: string })[];
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -416,7 +417,7 @@ function EventoMultiFilter({ selected, onChange, categories }: {
               <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-xs">
                 <Checkbox checked={displaySelected.includes(c.id)} onCheckedChange={() => toggle(c.id)} className="h-3.5 w-3.5" />
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color || '#3B82F6' }} />
-                <span className="truncate">{c.name}</span>
+                <CategoryNameWithParent name={c.name} parentName={c.parentName} />
               </label>
             )) : (
               <p className="text-xs text-muted-foreground text-center py-4">Nenhum resultado</p>
@@ -541,7 +542,12 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
 
   // Filtro de evento. CA: só subeventos. Cliente externo: macro com subevento não entra
   // (só o subevento); macro sozinho entra.
-  const subCategories = useMemo(() => getSelectableCategories(categories, isInternalCompany), [categories, isInternalCompany]);
+  // Cliente externo: subevento mostra o macro abaixo do nome.
+  const subCategories = useMemo(
+    () => getSelectableCategories(categories, isInternalCompany)
+      .map(c => ({ ...c, parentName: isInternalCompany ? undefined : getCategoryParentName(c, categories) })),
+    [categories, isInternalCompany],
+  );
 
   const uniqueEventOptions = useMemo(() => {
     const set = new Set<string>();

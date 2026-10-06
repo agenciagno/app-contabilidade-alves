@@ -100,8 +100,11 @@ SelectLabel.displayName = SelectPrimitive.Label.displayName;
 
 const SelectItem = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & {
+    /** Linha de apoio abaixo do nome, só na lista aberta — fica fora do ItemText, então o campo fechado mostra só o nome. */
+    detail?: React.ReactNode;
+  }
+>(({ className, children, detail, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
@@ -116,7 +119,14 @@ const SelectItem = React.forwardRef<
       </SelectPrimitive.ItemIndicator>
     </span>
 
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    {detail ? (
+      <div className="flex min-w-0 flex-col">
+        <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+        <span className="truncate text-xs text-muted-ink">{detail}</span>
+      </div>
+    ) : (
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    )}
   </SelectPrimitive.Item>
 ));
 SelectItem.displayName = SelectPrimitive.Item.displayName;

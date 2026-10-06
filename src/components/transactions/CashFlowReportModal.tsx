@@ -13,7 +13,8 @@ import { cn } from '@/lib/utils';
 import { FileText, X, ChevronDown, Search } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
 import { useParties } from '@/hooks/useParties';
-import { getSelectableCategories } from '@/hooks/useCategories';
+import { getSelectableCategories, getCategoryParentName } from '@/hooks/useCategories';
+import { CategoryNameWithParent } from '@/components/categories/CategoryNameWithParent';
 import { format, parseISO, isWithinInterval } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -1233,7 +1234,7 @@ export function CashFlowReportModal({
                             >
                               <Checkbox checked={checked} />
                               <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat.color || '#3B82F6' }} />
-                              <span className="truncate">{cat.name}</span>
+                              <CategoryNameWithParent name={cat.name} parentName={isInternalCompany ? undefined : getCategoryParentName(cat, categories)} />
                             </button>
                           );
                         });
@@ -1541,7 +1542,7 @@ export function CashFlowReportModal({
                               >
                                 <Checkbox checked={checked} />
                                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat.color || '#3B82F6' }} />
-                                <span className="truncate">{cat.name}</span>
+                                <CategoryNameWithParent name={cat.name} parentName={isInternalCompany ? undefined : getCategoryParentName(cat, categories)} />
                               </button>
                             );
                           });
