@@ -38,16 +38,13 @@ import { toast } from 'sonner';
 import { TAX_REGIMES } from '@/constants/taxRegimes';
 import { PORTE_OPTIONS } from '@/constants/porte';
 import { RESPONSIBLE_FIELDS } from '@/constants/responsibleFields';
+import { STATUS_CLIENTE, STATUS_AJUDA } from '@/constants/statusCliente';
 import { SETORES_ATUACAO, getSegmentos, inferRamoFromCnaeDescricao } from '@/constants/ramoAtuacao';
 
 interface Props {
   contactId: string;
 }
 
-const STATUS_CLIENTE = [
-  'Ativo', 'Suspensa - Contabilidade', 'Suspensa - Receita Federal', 'Inapta - Receita Federal',
-  'Cancelada - Receita Federal', 'Baixada', 'Ex-cliente', 'Ex-Colaborador',
-];
 const BR_STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
 const AutofillBadge = () => (
@@ -681,6 +678,7 @@ function OperacionalSection({
                 {STATUS_CLIENTE.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            <p className="mt-1.5 text-xs text-muted-foreground">{STATUS_AJUDA}</p>
           </Field>
           {RESPONSIBLE_FIELDS.map(rf => (
             <Field key={rf.key} label={rf.label}>

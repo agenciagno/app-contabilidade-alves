@@ -9,6 +9,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { SearchField } from '@/components/ds';
+import { supabase } from '@/integrations/supabase/client';
+import { statusPedeAviso } from '@/constants/statusCliente';
 import type { PreviewItem, PreviewResponse, GenerateResult } from '@/hooks/useBoletoControls';
 
 const fmtBRL = (n: number | null) =>
@@ -45,6 +47,8 @@ export function BoletoGenerationDialog({
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [results, setResults] = useState<GenerateResult[]>([]);
   const [search, setSearch] = useState('');
+  // Situação do cliente (Status do Cliente) para avisar na confirmação: Suspensa/Inapta ainda recebem boleto.
+  const [situacao, setSituacao] = useState<Map<string, string>>(new Map());
 
   // Carrega o preview ao abrir
   useEffect(() => {
@@ -55,11 +59,18 @@ export function BoletoGenerationDialog({
     setResults([]);
     setProgress({ done: 0, total: 0 });
     setSearch('');
+    setSituacao(new Map());
     fetchPreview()
       .then((data) => {
         setPreview(data);
         setSelected(new Set(data.items.filter(isEligible).map((i) => i.contact_id)));
         setStep('list');
+        const ids = data.items.map((i) => i.contact_id);
+        if (ids.length) {
+          supabase.from('contacts').select('id,status_cliente').in('id', ids).then(({ data: rows }) => {
+            setSituacao(new Map((rows ?? []).filter((r) => statusPedeAviso(r.status_cliente)).map((r) => [r.id, r.status_cliente as string])));
+          });
+        }
       })
       .catch((e) => {
         setError(e?.message || 'Erro ao carregar o preview');
@@ -185,6 +196,9 @@ export function BoletoGenerationDialog({
                             {fmtBRL(i.valor)} · vence {fmtDate(i.data_vencimento)} · {i.canal_entrega ?? 'sem canal'}
                           </div>
                         </div>
+                        {situacao.has(i.contact_id) && (
+                          <Badge variant="outline" className="shrink-0 border-warn/40 bg-warn/10 text-warn">{situacao.get(i.contact_id)}</Badge>
+                        )}
                         {i.already_generated && (
                           <Badge variant="outline" className="shrink-0">Já gerado</Badge>
                         )}
@@ -198,6 +212,20 @@ export function BoletoGenerationDialog({
                   })}
                 </div>
               </div>
+
+              {(() => {
+                const comAviso = (preview?.items ?? []).filter((i) => selected.has(i.contact_id) && situacao.has(i.contact_id));
+                if (!comAviso.length) return null;
+                return (
+                  <div className="flex items-start gap-2 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div>
+                      <strong>{comAviso.length} {comAviso.length === 1 ? 'cliente selecionado está' : 'clientes selecionados estão'} com situação especial.</strong>{' '}
+                      {comAviso.map((i) => `${i.name} (${situacao.get(i.contact_id)})`).join(' · ')}. Confirme se o boleto deve sair, ou desmarque.
+                    </div>
+                  </div>
+                );
+              })()}
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

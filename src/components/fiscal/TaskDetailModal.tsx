@@ -40,6 +40,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
+import { statusEhInativo } from '@/constants/statusCliente';
 import { notifyTaskMention } from '@/lib/fiscal-notifications';
 
 // ---- SLA helper ----
@@ -443,6 +444,16 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     toast({ title: 'Tarefa desmarcada.' });
   };
 
+  // Situação do cliente (Status do Cliente): avisa quando não é "Ativo" (Suspensa, Inapta ou, em tarefa antiga, Baixada/Ex-cliente).
+  const { data: situacaoCliente } = useQuery({
+    queryKey: ['task-situacao-cliente', task.contact_id],
+    enabled: open && !!task.contact_id,
+    queryFn: async () => {
+      const { data } = await supabase.from('contacts').select('status_cliente').eq('id', task.contact_id as string).maybeSingle();
+      return (data?.status_cliente as string | null) ?? null;
+    },
+  });
+
   const contactName = task.contact_id ? (contacts.find(c => c.id === task.contact_id)?.name || '—') : task.title;
   const responsibleName = profiles.find(p => p.id === responsibleId)?.full_name || '—';
   // Competência é o mês de apuração — sempre o mês anterior ao vencimento — e já vem
@@ -495,6 +506,17 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
               Vencimento: {dueDate ? format(parseISO(dueDate), 'dd/MM/yyyy') : '—'}
             </span>
           </div>
+          {situacaoCliente && situacaoCliente !== 'Ativo' && (
+            <div className="flex items-start gap-2 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                <strong>Situação do cliente: {situacaoCliente}.</strong>{' '}
+                {statusEhInativo(situacaoCliente)
+                  ? 'Cliente inativo: não deveria receber novas tarefas. Confira se esta ainda vale.'
+                  : 'O cliente segue na carteira e a obrigação continua valendo; confira a situação antes de entregar.'}
+              </p>
+            </div>
+          )}
           {groupSummary ? (
             <div className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium ${slaToneClass['done']}`}>
               <CheckCircle2 className="w-4 h-4 shrink-0" />

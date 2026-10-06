@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Loader2 } from 'lucide-react';
+import { Loader2, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { SearchField } from '@/components/ds';
 import { maskCPFCNPJ } from '@/lib/utils';
 import { useCandidatosLancamento, useLancarTarefasClientes } from '@/hooks/useLancarTarefas';
+import { statusPedeAviso } from '@/constants/statusCliente';
 
 interface Props {
   open: boolean;
@@ -147,6 +148,9 @@ export function LancarTarefasDialog({ open, onOpenChange, year, month, mesLabel 
                           {semResp > 0 && <span className="text-warn"> · {plural(semResp, 'obrigação sem responsável', 'obrigações sem responsável')}</span>}
                         </p>
                       </div>
+                      {statusPedeAviso(c.status_cliente) && (
+                        <Badge variant="outline" className="shrink-0 border-warn/40 bg-warn/10 text-warn">{c.status_cliente}</Badge>
+                      )}
                       {faltam > 0
                         ? <Badge className="shrink-0 border-warn/30 bg-warn/15 text-warn">{faltam} a lançar</Badge>
                         : <span className="shrink-0 text-meta text-muted-ink">em dia</span>}
@@ -181,6 +185,17 @@ export function LancarTarefasDialog({ open, onOpenChange, year, month, mesLabel 
             </div>
           </div>
         </div>
+
+        {escolhidos.some((c) => statusPedeAviso(c.status_cliente)) && (
+          <div className="flex items-start gap-2 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              <strong>Situação especial na seleção:</strong>{' '}
+              {escolhidos.filter((c) => statusPedeAviso(c.status_cliente)).map((c) => `${c.nome} (${c.status_cliente})`).join(' · ')}.
+              Eles ainda recebem tarefa; confirme antes de lançar.
+            </p>
+          </div>
+        )}
 
         <DialogFooter className="items-center gap-2 sm:justify-between sm:gap-2">
           <p className="text-meta text-muted-ink">

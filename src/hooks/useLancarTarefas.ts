@@ -18,6 +18,8 @@ export interface CandidatoLancamento {
   nome: string;
   documento: string | null;
   regime: string | null;
+  /** Status do Cliente: Suspensa/Inapta ainda recebem tarefa e pedem aviso na confirmação. */
+  status_cliente: string | null;
   obrigacoes: ObrigacaoDoCliente[];
 }
 
@@ -50,5 +52,25 @@ export function useLancarTarefasClientes(year: number, month: number) {
       }
     },
     onError: (err: any) => toast.error(err?.message ?? 'Erro ao lançar as tarefas'),
+  });
+}
+
+export interface AvisoLancamento {
+  contact_id: string;
+  nome: string;
+  status_cliente: string;
+  tarefas: number;
+}
+
+/** Clientes com situação especial (Suspensa, Inapta) que vão receber tarefa no "Aprovar e lançar" do mês. */
+export function useAvisosLancamento(year: number, month: number, enabled: boolean) {
+  return useQuery<AvisoLancamento[]>({
+    queryKey: ['fiscal-lancamento-avisos', year, month],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc('fiscal_lancamento_avisos', { p_ano: year, p_mes: month });
+      if (error) throw error;
+      return (data ?? []) as AvisoLancamento[];
+    },
   });
 }

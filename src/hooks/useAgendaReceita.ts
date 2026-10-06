@@ -100,7 +100,7 @@ export function useResumoCalendario(year: number, month: number) {
 }
 
 const invalidarLancamento = (qc: ReturnType<typeof useQueryClient>) => {
-  for (const k of ['agenda-receita-aprovacao', 'calendario-resumo', 'fiscal-clientes-sem-tarefas', 'fiscal-tasks', 'fiscal-cliente-tarefas']) {
+  for (const k of ['agenda-receita-aprovacao', 'calendario-resumo', 'fiscal-clientes-sem-tarefas', 'fiscal-tasks', 'fiscal-cliente-tarefas', 'fiscal-lancamento-avisos']) {
     qc.invalidateQueries({ queryKey: [k] });
   }
 };

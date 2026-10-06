@@ -35,6 +35,7 @@ import {
   useDesfazerAgenda,
   useResumoCalendario,
 } from '@/hooks/useAgendaReceita';
+import { useAvisosLancamento } from '@/hooks/useLancarTarefas';
 import { FiscalObligationOverrideDialog } from '@/components/fiscal/FiscalObligationOverrideDialog';
 import { AgendaReceitaPanel } from '@/components/fiscal/AgendaReceitaPanel';
 import { ClientesSemTarefasPanel } from '@/components/fiscal/ClientesSemTarefasPanel';
@@ -73,6 +74,8 @@ export default function FiscalCalendar() {
 
   const [editing, setEditing] = useState<FiscalCalendarEffectiveRow | null>(null);
   const [desfazerOpen, setDesfazerOpen] = useState(false);
+  const [aprovarOpen, setAprovarOpen] = useState(false);
+  const avisos = useAvisosLancamento(year, month, aprovarOpen);
   const [lancarOpen, setLancarOpen] = useState(false);
   const [rowToDelete, setRowToDelete] = useState<FiscalCalendarEffectiveRow | null>(null);
 
@@ -151,7 +154,7 @@ export default function FiscalCalendar() {
             lancando={aprovarELancar.isPending}
             desfazendo={desfazer.isPending}
             atualizando={buscar.isPending}
-            onAprovar={() => aprovarELancar.mutate(importacao.id)}
+            onAprovar={() => setAprovarOpen(true)}
             onDesfazer={() => setDesfazerOpen(true)}
             onAtualizar={() => buscar.mutate({ year, month })}
           />
@@ -288,6 +291,41 @@ export default function FiscalCalendar() {
           open={!!editing}
           onOpenChange={(o) => { if (!o) setEditing(null); }}
         />
+
+        <AlertDialog open={aprovarOpen} onOpenChange={setAprovarOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Aprovar e lançar as tarefas de {mesLabel}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {tarefasALancar !== null
+                  ? <>Serão criadas <strong className="text-ink">{tarefasALancar}</strong> tarefa{tarefasALancar === 1 ? '' : 's'} para <strong className="text-ink">{resumo.data?.clientes_a_lancar ?? 0}</strong> cliente{(resumo.data?.clientes_a_lancar ?? 0) === 1 ? '' : 's'}, com as datas da agenda.</>
+                  : 'As tarefas do mês serão criadas com as datas da agenda.'}{' '}
+                Clientes Baixada, Cancelada, Ex-cliente e Ex-Colaborador não recebem tarefa.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {avisos.data && avisos.data.length > 0 && (
+              <div className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">
+                <p className="font-medium">
+                  {avisos.data.length} cliente{avisos.data.length === 1 ? '' : 's'} com situação especial {avisos.data.length === 1 ? 'vai' : 'vão'} receber tarefa:
+                </p>
+                <ul className="mt-1 max-h-40 list-disc space-y-0.5 overflow-y-auto pl-5">
+                  {avisos.data.map((a) => (
+                    <li key={a.contact_id}>{a.nome} · {a.status_cliente} · {a.tarefas} tarefa{a.tarefas === 1 ? '' : 's'}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-ok text-white hover:bg-ok"
+                onClick={() => { if (importacao) aprovarELancar.mutate(importacao.id); setAprovarOpen(false); }}
+              >
+                Aprovar e lançar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={desfazerOpen} onOpenChange={setDesfazerOpen}>
           <AlertDialogContent>

@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
@@ -28,6 +27,7 @@ import { ContactObligationsSelector } from '@/components/fiscal/ContactObligatio
 import { lookupCnpj, pickEmptyFields } from '@/lib/cnpj-lookup';
 import { maskCPFCNPJ, maskPhone } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
+import { STATUS_CLIENTE, STATUS_AJUDA } from '@/constants/statusCliente';
 import { toast } from 'sonner';
 
 type Section = 'contato' | 'endereco' | 'fiscal' | 'empresariais' | 'datas-esfera' | 'departamento-pessoal' | 'observacoes' | 'cobranca';
@@ -77,7 +77,7 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
 
   // Fiscal fields
   const [taxRegime, setTaxRegime] = useState<TaxRegime | ''>(contact.tax_regime || '');
-  const [isActive, setIsActive] = useState(contact.is_active);
+  const [statusCliente, setStatusCliente] = useState<string>(contact.status_cliente || 'Ativo');
   const [responsibleId, setResponsibleId] = useState<string>(contact.responsible_id || 'none');
   const [dpResponsibleId, setDpResponsibleId] = useState<string>(contact.dp_responsible_id || 'none');
   const [financeiroResponsibleId, setFinanceiroResponsibleId] = useState<string>(contact.financeiro_responsible_id || 'none');
@@ -171,7 +171,7 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
     setCity(contact.city || '');
     setState(contact.state || '');
     setTaxRegime(contact.tax_regime || '');
-    setIsActive(contact.is_active);
+    setStatusCliente(contact.status_cliente || 'Ativo');
     setResponsibleId(contact.responsible_id || 'none');
     setDpResponsibleId(contact.dp_responsible_id || 'none');
     setFinanceiroResponsibleId(contact.financeiro_responsible_id || 'none');
@@ -321,7 +321,7 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
     } else if (section === 'fiscal') {
       updates = {
         tax_regime: (taxRegime as TaxRegime) || null,
-        is_active: isActive,
+        status_cliente: statusCliente,
         responsible_id: responsibleId === 'none' ? null : responsibleId,
         dp_responsible_id: dpResponsibleId === 'none' ? null : dpResponsibleId,
         financeiro_responsible_id: financeiroResponsibleId === 'none' ? null : financeiroResponsibleId,
@@ -495,12 +495,15 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center justify-between rounded-lg border border-border/50 p-4">
-                <div>
-                  <Label>Status</Label>
-                  <p className="text-sm text-muted-foreground">{isActive ? 'Cliente ativo' : 'Cliente inativo'}</p>
-                </div>
-                <Switch checked={isActive} onCheckedChange={setIsActive} />
+              <div className="space-y-1.5">
+                <Label>Status do Cliente</Label>
+                <Select value={statusCliente} onValueChange={setStatusCliente}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {STATUS_CLIENTE.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">{STATUS_AJUDA}</p>
               </div>
               <div className="space-y-1.5">
                 <Label>Responsável — Fiscal</Label>
