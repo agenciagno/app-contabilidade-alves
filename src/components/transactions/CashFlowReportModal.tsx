@@ -12,11 +12,12 @@ import { DateField, segmentedListClass, segmentedTriggerClass } from '@/componen
 import { cn } from '@/lib/utils';
 import { FileText, X, ChevronDown, Search } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
+import { useParties } from '@/hooks/useParties';
 import { format, parseISO, isWithinInterval } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { zebraPorData } from '@/lib/pdf-zebra';
-import { getContactLegalName } from '@/lib/contact-display';
+import { getContactLegalName, getTransactionCounterpartyName } from '@/lib/contact-display';
 import type { Transaction } from '@/hooks/useTransactions';
 import type { Bank } from '@/hooks/useBanks';
 import type { Contact } from '@/hooks/useContacts';
@@ -83,6 +84,16 @@ export function CashFlowReportModal({
   const isReceivables = variant === 'receivables';
   const { company } = useCompany();
   const isInternalCompany = (company as any)?.is_internal === true;
+  const { data: parties = [] } = useParties();
+  // Seletores de cliente/fornecedor: contatos na CA, Clientes & Fornecedores (parties)
+  // no cliente do Financeiro — o lançamento dele não tem contact_id.
+  const counterparties = useMemo(
+    () => (isInternalCompany
+      ? contacts.map(c => ({ id: c.id, name: getContactLegalName(c) || c.name }))
+      : parties.map(p => ({ id: p.id, name: p.nome || p.display_name || '' }))
+    ).sort((a, b) => a.name.localeCompare(b.name)),
+    [isInternalCompany, contacts, parties],
+  );
   const summaryRef = useRef<HTMLDivElement>(null);
 
   const [mode, setMode] = useState<'report' | 'monthly'>('report');
@@ -176,7 +187,7 @@ export function CashFlowReportModal({
   const contactLabel = contactIds.size === 0
     ? 'Todos'
     : contactIds.size === 1
-      ? getContactLegalName(contacts.find(c => contactIds.has(c.id))) || '1 selecionado'
+      ? counterparties.find(c => contactIds.has(c.id))?.name || '1 selecionado'
       : `${contactIds.size} selecionados`;
   const typeLabel = typeFilter === 'receita' ? 'A Receber' : typeFilter === 'despesa' ? 'A Pagar' : 'Todos';
 
@@ -210,14 +221,14 @@ export function CashFlowReportModal({
   const activeBanks = useMemo(() => banks.filter(b => b.is_active), [banks]);
   const totalBankBalance = useMemo(() => activeBanks.reduce((s, b) => s + Number(b.current_balance), 0), [activeBanks]);
 
-  // Pre-filter: in receivables mode, only "A Receber" entries (receita > 0)
-  // with Evento Contábil: Honorários Contábeis — mirrors CashFlowTab
+  // Pre-filter: in receivables mode, only "A Receber" entries (receita > 0);
+  // na CA só Honorários Contábeis, para cliente do Financeiro toda receita — mirrors CashFlowTab
   const txns = useMemo(() => {
     if (!isReceivables) return transactions;
     return transactions.filter(
-      t => t.type === 'receita' && Number(t.amount) > 0 && t.category?.name === 'Honorários Contábeis'
+      t => t.type === 'receita' && Number(t.amount) > 0 && (!isInternalCompany || t.category?.name === 'Honorários Contábeis')
     );
-  }, [transactions, isReceivables]);
+  }, [transactions, isReceivables, isInternalCompany]);
 
   // Date key: receivables ranks by due_date (Vencimento); all ranks by expected_date (Data Prevista)
   const dateKeyOf = (t: Transaction): string | null =>
@@ -240,7 +251,7 @@ export function CashFlowReportModal({
     }
 
     if (categoryIds.size > 0) result = result.filter(t => !!t.category_id && categoryIds.has(t.category_id));
-    if (contactIds.size > 0) result = result.filter(t => !!t.contact_id && contactIds.has(t.contact_id));
+    if (contactIds.size > 0) result = result.filter(t => { const cp = t.contact_id ?? t.party_id; return !!cp && contactIds.has(cp); });
     if (typeFilter !== 'all') result = result.filter(t => t.type === typeFilter);
 
     result.sort((a, b) => (dateKeyOf(a) || '').localeCompare(dateKeyOf(b) || ''));
@@ -354,8 +365,8 @@ export function CashFlowReportModal({
     return { id: catId, name: cat?.name || 'Sem evento', color: cat?.color ?? null };
   };
   const getContactKey = (t: Transaction) => ({
-    id: t.contact?.id || '__no_contact__',
-    name: getContactLegalName(t.contact) || 'Sem cliente/fornecedor',
+    id: t.contact?.id || t.party?.id || '__no_contact__',
+    name: getTransactionCounterpartyName(t) || 'Sem cliente/fornecedor',
     color: null as string | null,
   });
 
@@ -372,7 +383,7 @@ export function CashFlowReportModal({
       // (Evento Contábil ou Cliente/Fornecedor) — a seleção de cada um fica
       // guardada à parte, então trocar de aba não perde o filtro anterior.
       if (monthlyGroupBy === 'cliente') {
-        if (monthlySelectedContacts.size > 0 && !monthlySelectedContacts.has(t.contact_id || '__no_contact__')) return false;
+        if (monthlySelectedContacts.size > 0 && !monthlySelectedContacts.has(t.contact_id || t.party_id || '__no_contact__')) return false;
       } else {
         if (expandedSelectedCategories.size > 0 && !expandedSelectedCategories.has(t.category_id)) return false;
       }
@@ -452,10 +463,10 @@ export function CashFlowReportModal({
   }, [monthlySelectedCategories, categories]);
   const monthlyContactLabel = useMemo(() => {
     if (monthlySelectedContacts.size === 0) return 'Todos';
-    const names = contacts.filter(c => monthlySelectedContacts.has(c.id)).map(c => getContactLegalName(c));
+    const names = counterparties.filter(c => monthlySelectedContacts.has(c.id)).map(c => c.name);
     if (names.length === 1) return names[0];
     return `${names.length} selecionados: ${names.join(', ')}`;
-  }, [monthlySelectedContacts, contacts]);
+  }, [monthlySelectedContacts, counterparties]);
   const monthlyFilterDimensionLabel = monthlyGroupBy === 'cliente' ? 'Cliente/Fornecedor' : 'Evento Contábil';
   const monthlyFilterValueLabel = monthlyGroupBy === 'cliente' ? monthlyContactLabel : monthlyCategoryLabel;
   const monthlyStatusLabel = monthlyStatus === 'paid' ? 'Pago/Recebido' : 'Pagar/Receber';
@@ -544,7 +555,7 @@ export function CashFlowReportModal({
       ? [['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia']]
       : [['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia']];
     const body = rowsWithBalance.map(r => isReceivables ? [
-      getContactLegalName(r.contact) || r.description,
+      getTransactionCounterpartyName(r) || r.description,
       formatCurrency(Number(r.amount)),
       r.due_date ? formatDateBR(r.due_date) : '',
       r.category?.name || '',
@@ -554,7 +565,7 @@ export function CashFlowReportModal({
       weekdayOf(r.due_date || r.expected_date),
     ] : [
       formatDateBR(r.expected_date || ''),
-      getContactLegalName(r.contact) || r.description,
+      getTransactionCounterpartyName(r) || r.description,
       r.type === 'receita' ? formatCurrency(Number(r.amount)) : '',
       r.type === 'despesa' ? formatCurrency(Number(r.amount)) : '',
       r.due_date ? formatDateBR(r.due_date) : '',
@@ -698,7 +709,7 @@ export function CashFlowReportModal({
       : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia'];
     const colSpan = headers.length;
     const tableRows = rowsWithBalance.map(r => isReceivables ? [
-      getContactLegalName(r.contact) || r.description || '',
+      getTransactionCounterpartyName(r) || r.description || '',
       Number(r.amount).toFixed(2).replace('.', ','),
       r.due_date ? formatDateBR(r.due_date) : '',
       r.category?.name || '',
@@ -708,7 +719,7 @@ export function CashFlowReportModal({
       weekdayOf(r.due_date || r.expected_date),
     ] : [
       formatDateBR(r.expected_date || ''),
-      getContactLegalName(r.contact) || r.description || '',
+      getTransactionCounterpartyName(r) || r.description || '',
       r.type === 'receita' ? Number(r.amount).toFixed(2).replace('.', ',') : '',
       r.type === 'despesa' ? Number(r.amount).toFixed(2).replace('.', ',') : '',
       r.due_date ? formatDateBR(r.due_date) : '',
@@ -773,7 +784,7 @@ export function CashFlowReportModal({
       ? ['Cliente', 'Receber', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia']
       : ['Prevista', 'Cliente', 'Receber', 'Pagar', 'Vencimento', 'Evento', 'Histórico', 'Saldo Atual', 'Status', 'Dia'];
     const dataLines = rowsWithBalance.map(r => (isReceivables ? [
-      `"${(getContactLegalName(r.contact) || r.description || '').replace(/"/g, '""')}"`,
+      `"${(getTransactionCounterpartyName(r) || r.description || '').replace(/"/g, '""')}"`,
       Number(r.amount).toFixed(2).replace('.', ','),
       r.due_date ? formatDateBR(r.due_date) : '',
       r.category?.name || '',
@@ -783,7 +794,7 @@ export function CashFlowReportModal({
       weekdayOf(r.due_date || r.expected_date),
     ] : [
       formatDateBR(r.expected_date || ''),
-      `"${(getContactLegalName(r.contact) || r.description || '').replace(/"/g, '""')}"`,
+      `"${(getTransactionCounterpartyName(r) || r.description || '').replace(/"/g, '""')}"`,
       r.type === 'receita' ? Number(r.amount).toFixed(2).replace('.', ',') : '',
       r.type === 'despesa' ? Number(r.amount).toFixed(2).replace('.', ',') : '',
       r.due_date ? formatDateBR(r.due_date) : '',
@@ -1269,7 +1280,7 @@ export function CashFlowReportModal({
                       {(() => {
                         const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
                         const q = norm(contactSearch.trim());
-                        const filtered = q ? contacts.filter(c => norm(c.name).includes(q)) : contacts;
+                        const filtered = q ? counterparties.filter(c => norm(c.name).includes(q)) : counterparties;
                         if (filtered.length === 0) {
                           return <div className="px-2 py-4 text-sm text-muted-ink text-center">Nenhum cliente/fornecedor encontrado</div>;
                         }
@@ -1289,7 +1300,7 @@ export function CashFlowReportModal({
                               className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-bg-2 text-left"
                             >
                               <Checkbox checked={checked} />
-                              <span className="truncate">{getContactLegalName(ct)}</span>
+                              <span className="truncate">{ct.name}</span>
                             </button>
                           );
                         });
@@ -1553,7 +1564,7 @@ export function CashFlowReportModal({
                         {monthlySelectedContacts.size === 0
                           ? 'Todos os clientes/fornecedores'
                           : monthlySelectedContacts.size === 1
-                          ? getContactLegalName(contacts.find(c => monthlySelectedContacts.has(c.id))) || '1 selecionado'
+                          ? counterparties.find(c => monthlySelectedContacts.has(c.id))?.name || '1 selecionado'
                           : `${monthlySelectedContacts.size} selecionados`}
                       </span>
                       <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
@@ -1584,7 +1595,7 @@ export function CashFlowReportModal({
                         {(() => {
                           const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
                           const q = norm(monthlyContactSearch.trim());
-                          const filtered = q ? contacts.filter(c => norm(c.name).includes(q)) : contacts;
+                          const filtered = q ? counterparties.filter(c => norm(c.name).includes(q)) : counterparties;
                           if (filtered.length === 0) {
                             return <div className="px-2 py-4 text-sm text-muted-ink text-center">Nenhum cliente/fornecedor encontrado</div>;
                           }
@@ -1604,7 +1615,7 @@ export function CashFlowReportModal({
                                 className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-bg-2 text-left"
                               >
                                 <Checkbox checked={checked} />
-                                <span className="truncate">{getContactLegalName(ct)}</span>
+                                <span className="truncate">{ct.name}</span>
                               </button>
                             );
                           });

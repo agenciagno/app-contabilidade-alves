@@ -24,7 +24,7 @@ import {
 import { format, parseISO, isWithinInterval, startOfYear, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { calcularEncargosAtraso } from '@/lib/financial-utils';
-import { getContactLegalName } from '@/lib/contact-display';
+import { getContactLegalName, getTransactionCounterpartyName } from '@/lib/contact-display';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { CashFlowReportModal } from './CashFlowReportModal';
 import { TransactionCalendarView } from './TransactionCalendarView';
@@ -439,15 +439,18 @@ function EventoMultiFilter({ selected, onChange, categories }: {
 
 export function CashFlowTab({ transactions: transactionsRaw, banks, categories, contacts, togglePaid, mode = 'all' }: CashFlowTabProps) {
   const isReceivables = mode === 'receivables';
+  const { isInternalCompany } = useActiveCompany();
 
-  // Pre-filter: in receivables mode, only "A Receber" entries (receita > 0)
-  // with Evento Contábil: Honorários Contábeis
+  // Pre-filter: in receivables mode, only "A Receber" entries (receita > 0).
+  // Na CA (interna), só o Evento Contábil Honorários Contábeis — a aba existe para
+  // a carteira de honorários. Cliente do Financeiro não tem esse evento: cada um
+  // cria as próprias categorias, então ali vale toda receita em aberto.
   const transactions = useMemo(() => {
     if (!isReceivables) return transactionsRaw;
     return transactionsRaw.filter(
-      t => t.type === 'receita' && Number(t.amount) > 0 && t.category?.name === 'Honorários Contábeis'
+      t => t.type === 'receita' && Number(t.amount) > 0 && (!isInternalCompany || t.category?.name === 'Honorários Contábeis')
     );
-  }, [transactionsRaw, isReceivables]);
+  }, [transactionsRaw, isReceivables, isInternalCompany]);
 
   const [reportOpen, setReportOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; row: any | null }>({ open: false, row: null });
@@ -529,8 +532,9 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
   const uniqueContactOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const t of transactions) {
-      const displayName = getContactLegalName(t.contact);
-      if (displayName && t.contact_id) map.set(t.contact_id, displayName);
+      const displayName = getTransactionCounterpartyName(t);
+      const cpId = t.contact_id ?? t.party_id;
+      if (displayName && cpId) map.set(cpId, displayName);
     }
     return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
   }, [transactions]);
@@ -538,7 +542,6 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
   // Interno (Eventos Contábeis): filtro mostra só sub-eventos (macro é cabeçalho
   // de agrupamento, some aqui mas segue visível na tela de cadastro). Cliente
   // (Categorias) não força hierarquia — toda categoria entra.
-  const { isInternalCompany } = useActiveCompany();
   const subCategories = useMemo(
     () => categories.filter(c => !isInternalCompany || c.parent_id !== null),
     [categories, isInternalCompany],
@@ -547,7 +550,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
   const uniqueEventOptions = useMemo(() => {
     const set = new Set<string>();
     for (const t of transactions) {
-      if (!t.contact_id && t.description) set.add(t.description);
+      if (!t.contact_id && !t.party_id && t.description) set.add(t.description);
     }
     return Array.from(set).sort();
   }, [transactions]);
@@ -613,9 +616,10 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
         let matchContact = false;
         let matchEvent = false;
 
-        if (includeEmptyContact && !t.contact_id) matchContact = true;
-        if (realContactIds.length && t.contact_id && realContactIds.includes(t.contact_id)) matchContact = true;
-        if (eventNames.length && !t.contact_id && eventNames.includes(t.description)) matchEvent = true;
+        const cpId = t.contact_id ?? t.party_id;
+        if (includeEmptyContact && !cpId) matchContact = true;
+        if (realContactIds.length && cpId && realContactIds.includes(cpId)) matchContact = true;
+        if (eventNames.length && !cpId && eventNames.includes(t.description)) matchEvent = true;
 
         if (hasContactFilter && hasEventFilter) return matchContact || matchEvent;
         if (hasContactFilter) return matchContact;
@@ -759,7 +763,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
   const calendarItems = useMemo(() => rows.map(row => ({
     id: row.id,
     dateKey: isReceivables ? row.due_date : (row.expected_date || row.due_date),
-    label: getContactLegalName(row.contact) || row.description,
+    label: getTransactionCounterpartyName(row) || row.description,
     type: row.type as 'receita' | 'despesa',
   })), [rows, isReceivables]);
 
@@ -1035,7 +1039,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
                       )}
 
                       {/* Cliente/Fornecedor */}
-                      <TableCell className="truncate max-w-[150px]"><Tooltip><TooltipTrigger asChild><span className="truncate block">{getContactLegalName(row.contact) || row.description}</span></TooltipTrigger><TooltipContent side="top" className="apple-tooltip"><p>{getContactLegalName(row.contact) || row.description}</p></TooltipContent></Tooltip></TableCell>
+                      <TableCell className="truncate max-w-[150px]"><Tooltip><TooltipTrigger asChild><span className="truncate block">{getTransactionCounterpartyName(row) || row.description}</span></TooltipTrigger><TooltipContent side="top" className="apple-tooltip"><p>{getTransactionCounterpartyName(row) || row.description}</p></TooltipContent></Tooltip></TableCell>
 
 
                       {/* A Receber */}
@@ -1135,7 +1139,7 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
           {confirmModal.row && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                O cliente <strong>{getContactLegalName(confirmModal.row.contact) || confirmModal.row.description}</strong> pagou o valor original ou com juros e multa?
+                O cliente <strong>{getTransactionCounterpartyName(confirmModal.row) || confirmModal.row.description}</strong> pagou o valor original ou com juros e multa?
               </p>
               <DialogFooter className="flex flex-col sm:flex-row gap-2">
                 <Button

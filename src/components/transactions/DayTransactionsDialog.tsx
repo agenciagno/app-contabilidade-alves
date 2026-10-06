@@ -5,12 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Pencil, CircleDollarSign, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getContactLegalName } from '@/lib/contact-display';
+import { getTransactionCounterpartyName } from '@/lib/contact-display';
 
 export interface DayTransactionRow {
   id: string;
   description: string;
   contact?: { name: string; display_name?: string | null; nome_fantasia?: string | null; razao_social?: string | null } | null;
+  party?: { nome: string; display_name?: string | null } | null;
   type: 'receita' | 'despesa';
   displayAmount: number;
   status: 'pago' | 'pendente' | 'vencido';
@@ -60,7 +61,7 @@ export function DayTransactionsDialog({
           {rows.map(row => (
             <div key={row.id} className="flex items-center justify-between gap-3 py-2.5">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{getContactLegalName(row.contact) || row.description}</p>
+                <p className="truncate text-sm font-medium">{getTransactionCounterpartyName(row) || row.description}</p>
                 <div className="mt-0.5 flex items-center gap-2">
                   <span className={cn('text-xs font-semibold', row.type === 'receita' ? 'text-ok' : 'text-danger')}>
                     {formatCurrency(row.displayAmount)}

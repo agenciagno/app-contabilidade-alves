@@ -14,11 +14,12 @@ import { useTransactions, Transaction, TransactionInsert } from '@/hooks/useTran
 import { useServerTransactions, useTransactionKPIs, useDistinctTransactionValues, PAGE_SIZE, ServerFilters, IS_EMPTY } from '@/hooks/useServerTransactions';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
-import { getContactLegalName } from '@/lib/contact-display';
+import { getContactLegalName, getTransactionCounterpartyName } from '@/lib/contact-display';
 import { useCategories } from '@/hooks/useCategories';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { useBanks } from '@/hooks/useBanks';
 import { useContacts } from '@/hooks/useContacts';
+import { useParties } from '@/hooks/useParties';
 import { useTransactionAttachments } from '@/hooks/useTransactionAttachments';
 import { TransactionFormDialog } from '@/components/transactions/TransactionFormDialog';
 import { ImportSpreadsheetDialog } from '@/components/transactions/ImportSpreadsheetDialog';
@@ -664,6 +665,7 @@ export default function Transactions() {
   const { isInternalCompany } = useActiveCompany();
   const { banks, createBank } = useBanks();
   const { contacts, createContact } = useContacts();
+  const { data: parties = [] } = useParties();
   const { uploadAttachment } = useTransactionAttachments();
 
   // Build server filters object
@@ -675,10 +677,14 @@ export default function Transactions() {
     bankId: bankFilter,
     searchTerm: debouncedSearchTerm || undefined,
     invisibleBankIds: invisibleBankIds.length > 0 ? invisibleBankIds : undefined,
+    // CA liga o lançamento a um contato; cliente do Financeiro, a um cliente/fornecedor (party).
+    // Só entra na chave da query com filtro de cliente ativo: isInternalCompany carrega
+    // assíncrono e, sem isso, a primeira carga da CA buscaria a lista duas vezes.
+    counterpartyColumn: columnFilters.contactIds?.length ? (isInternalCompany ? 'contact_id' : 'party_id') : undefined,
     columnFilters,
     sortField,
     sortOrder,
-  }), [typeFilter, categoryFilters, bankFilter, debouncedSearchTerm, invisibleBankIds, columnFilters, sortField, sortOrder]);
+  }), [typeFilter, categoryFilters, bankFilter, debouncedSearchTerm, invisibleBankIds, isInternalCompany, columnFilters, sortField, sortOrder]);
 
   // Server-side paginated data
   const { transactions, totalCount, totalPages, isLoading, isFetching } = useServerTransactions(currentPage, serverFilters);
@@ -739,13 +745,14 @@ export default function Transactions() {
     };
   }, [kpis, bankTotals]);
 
-  // Contact options for the multi-filter (from contacts list, not transactions)
+  // Opções do filtro da coluna Cliente (da lista de cadastro, não das transações):
+  // contatos na CA, Clientes & Fornecedores (parties) no cliente do Financeiro.
   const uniqueContactOptions = useMemo(() => {
-    return contacts
-      .filter(c => c.is_active)
-      .map(c => ({ id: c.id, name: getContactLegalName(c) }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [contacts]);
+    const options = isInternalCompany
+      ? contacts.filter(c => c.is_active).map(c => ({ id: c.id, name: getContactLegalName(c) }))
+      : parties.filter(p => p.is_active).map(p => ({ id: p.id, name: p.nome || p.display_name || '' }));
+    return options.sort((a, b) => a.name.localeCompare(b.name));
+  }, [isInternalCompany, contacts, parties]);
 
   // Category options pro filtro de coluna. Interno (Eventos Contábeis) só lista
   // sub-eventos — macro é cabeçalho de agrupamento, some visível na tela de
@@ -830,6 +837,14 @@ export default function Transactions() {
     });
   };
 
+  // Filtro "entre datas" da barra: é o mesmo filtro do cabeçalho da coluna Vencimento
+  // (columnFilters.due_date), só que visível — por isso os dois ficam sempre em sincronia
+  // e os KPIs (useTransactionKPIs lê due_date) acompanham o período.
+  const setDueDateRange = (patch: Partial<{ start: string; end: string }>) => {
+    const next = { start: columnFilters.due_date?.start ?? '', end: columnFilters.due_date?.end ?? '', ...patch };
+    updateColumnFilter('due_date', next.start || next.end ? next : undefined);
+  };
+
   const hasActiveColumnFilters = Object.keys(columnFilters).length > 0;
 
   const tableScrollRef = useRef<HTMLDivElement>(null);
@@ -854,7 +869,11 @@ export default function Transactions() {
     date: t.date, is_paid: t.is_paid,
     category: t.category ? { id: t.category.id, name: t.category.name, color: t.category.color || '#6B7280' } : null,
     bank: t.bank ? { id: t.bank.id, name: t.bank.name, color: t.bank.color || '#3B82F6' } : null,
-    contact: t.contact ? { id: t.contact.id, name: t.contact.name, type: t.contact.type, display_name: t.contact.display_name, nome_fantasia: t.contact.nome_fantasia, razao_social: t.contact.razao_social } : null,
+    contact: t.contact
+      ? { id: t.contact.id, name: t.contact.name, type: t.contact.type, display_name: t.contact.display_name, nome_fantasia: t.contact.nome_fantasia, razao_social: t.contact.razao_social }
+      : t.party
+        ? { id: t.party.id, name: t.party.nome, type: 'cliente', display_name: t.party.display_name, razao_social: t.party.nome }
+        : null,
   })) as ReportTransaction[];
 
 
@@ -1013,6 +1032,21 @@ export default function Transactions() {
             </PopoverContent>
           </Popover>
 
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-xs text-muted-foreground">Vencimento:</span>
+            <DateField
+              value={columnFilters.due_date?.start ?? ''}
+              onChange={v => setDueDateRange({ start: v })}
+              className="w-[138px] [&_input]:h-8 [&_input]:text-xs"
+            />
+            <span className="text-xs text-muted-foreground">até</span>
+            <DateField
+              value={columnFilters.due_date?.end ?? ''}
+              onChange={v => setDueDateRange({ end: v })}
+              className="w-[138px] [&_input]:h-8 [&_input]:text-xs"
+            />
+          </div>
+
           {hasActiveColumnFilters && (
             <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 text-muted-foreground" onClick={() => setColumnFilters({})}>
               <X className="w-3 h-3" /> Limpar filtros de coluna
@@ -1129,7 +1163,7 @@ export default function Transactions() {
                 <div className="divide-y divide-border/30">
                   {transactions.map(transaction => {
                     const isOverdue = !isEffectivelyPaid(transaction) && transaction.due_date && transaction.due_date < new Date().toISOString().split('T')[0];
-                    const contactDisplayName = getContactLegalName(transaction.contact) || transaction.description;
+                    const contactDisplayName = getTransactionCounterpartyName(transaction) || transaction.description;
                     return (
                       <div key={transaction.id} className={`grid grid-cols-[18px_minmax(120px,1fr)_minmax(120px,1fr)_96px_96px_96px_80px_100px_100px_90px] gap-2 px-4 py-[10px] hover:bg-muted/30 transition-colors items-center ${selectedIds.has(transaction.id) ? 'bg-primary/10 border-l-2 border-l-primary' : ''}`}>
                         <div className="flex items-center justify-center">

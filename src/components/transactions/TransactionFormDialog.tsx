@@ -65,7 +65,8 @@ function parseCurrencyInput(value: string): number {
 export function TransactionFormDialog({
   open, onOpenChange, transaction, categories, banks, contacts, onSubmit, onBulkSubmit, isLoading, defaultType = 'receita', mode = 'edit', resetKey,
 }: TransactionFormDialogProps) {
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Data local (não toISOString/UTC): depois das 21h em Brasília o UTC já é o dia seguinte.
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
   const isSettleMode = mode === 'settle';
   const isEditing = !!transaction;
   const saveActionRef = useRef<'close' | 'continue'>('close');
@@ -183,7 +184,8 @@ export function TransactionFormDialog({
       setPaidAmount(isPaid && transaction.paid_amount != null
         ? formatCurrencyInput(String(Math.round(Number(transaction.paid_amount) * 100)))
         : '');
-      setDate(isPaid ? (transaction.date || '') : '');
+      // Liquidar um título em aberto já sugere hoje como data do pagamento.
+      setDate(isPaid ? (transaction.date || '') : (isSettleMode ? todayStr : ''));
       setIssueDate(transaction.issue_date || todayStr);
       setDueDate(transaction.due_date || '');
       setExpectedDate(transaction.expected_date || '');
@@ -197,13 +199,13 @@ export function TransactionFormDialog({
       setType(defaultType);
       setPaymentCondition('a_vista');
       setAmount(''); setPaidAmount('');
-      setDate(''); setIssueDate(todayStr); setDueDate(''); setExpectedDate('');
+      setDate(todayStr); setIssueDate(todayStr); setDueDate(''); setExpectedDate('');
       setCategoryId(''); setBankId(''); setContactId(''); setPartyId('');
       setNotes(''); setPendingFiles([]);
       resetRecurring();
     } else if (!transaction && resetKey) {
       setAmount(''); setPaidAmount('');
-      setDate(''); setIssueDate(todayStr); setDueDate(''); setExpectedDate('');
+      setDate(paymentCondition === 'a_vista' ? todayStr : ''); setIssueDate(todayStr); setDueDate(''); setExpectedDate('');
       setCategoryId(''); setBankId(''); setContactId(''); setPartyId('');
       setNotes(''); setPendingFiles([]);
       resetRecurring();
@@ -261,8 +263,9 @@ export function TransactionFormDialog({
       setPaidAmount('');
       setDate('');
     } else if (next === 'a_vista') {
-      // À Vista não compõe Previsto da DRE — limpa data prevista
+      // À Vista não compõe Previsto da DRE — limpa data prevista; pagamento nasce hoje
       setExpectedDate('');
+      setDate(todayStr);
     } else if (next === 'recorrente') {
       setPaidAmount('');
       setDate('');

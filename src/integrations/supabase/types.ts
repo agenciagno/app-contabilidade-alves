@@ -7275,6 +7275,7 @@ export type Database = {
           p_company_id: string
           p_contact_id?: string
           p_end_date?: string
+          p_party_id?: string
           p_payment_status?: string
           p_search?: string
           p_start_date?: string

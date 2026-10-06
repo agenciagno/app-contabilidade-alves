@@ -50,3 +50,20 @@ export function getContactLegalName(c: {
     ''
   );
 }
+
+// Contraparte de um lançamento: empresa interna (CA) liga o lançamento a um
+// contato; cliente do módulo Financeiro liga a uma "parte" (Clientes &
+// Fornecedores). Sem este helper, quem só tem parte cai no fallback da descrição
+// — que é o nome do Evento Contábil — e a coluna Cliente mostra a categoria.
+export function getTransactionCounterpartyName(t: {
+  contact?: Parameters<typeof getContactLegalName>[0];
+  party?: { nome?: string | null; display_name?: string | null } | null;
+} | null | undefined): string {
+  if (!t) return '';
+  return (
+    getContactLegalName(t.contact) ||
+    (t.party?.nome && t.party.nome.trim()) ||
+    (t.party?.display_name && t.party.display_name.trim()) ||
+    ''
+  );
+}

@@ -13,6 +13,8 @@ export interface ServerFilters {
   bankId?: string;
   searchTerm?: string;
   invisibleBankIds?: string[];
+  /** Coluna da contraparte no filtro da coluna Cliente: contact_id (CA) ou party_id (cliente do Financeiro). */
+  counterpartyColumn?: 'contact_id' | 'party_id';
   columnFilters: {
     issue_date?: { start: string; end: string };
     issue_date_empty?: boolean;
@@ -110,7 +112,8 @@ function applyFilters(
 
   if (filters.searchTerm) {
     const term = filters.searchTerm.replace(/%/g, '');
-    query = query.or(`description.ilike.%${term}%,notes.ilike.%${term}%`);
+    // contraparte_busca: coluna calculada (migração 20261006140000) com o nome do contato ou da party
+    query = query.or(`description.ilike.%${term}%,notes.ilike.%${term}%,contraparte_busca.ilike.%${term}%`);
   }
 
   const cf = filters.columnFilters;
@@ -147,6 +150,7 @@ function applyFilters(
 
 
   // Contact multi-select + event names with OR logic + IS_EMPTY support
+  const cpCol = filters.counterpartyColumn ?? 'contact_id';
   const allContactIds = cf.contactIds || [];
   const hasContactEmpty = allContactIds.includes(IS_EMPTY);
   const realContactIds = allContactIds.filter(id => id !== IS_EMPTY);
@@ -155,13 +159,13 @@ function applyFilters(
 
   const orParts: string[] = [];
   if (hasContacts) {
-    orParts.push(`contact_id.in.(${realContactIds.join(',')})`);
+    orParts.push(`${cpCol}.in.(${realContactIds.join(',')})`);
   }
   if (hasEvents) {
-    orParts.push(`and(contact_id.is.null,description.in.(${cf.eventNames!.map(e => `"${e.replace(/"/g, '\\"')}"`).join(',')}))`);
+    orParts.push(`and(${cpCol}.is.null,description.in.(${cf.eventNames!.map(e => `"${e.replace(/"/g, '\\"')}"`).join(',')}))`);
   }
   if (hasContactEmpty) {
-    orParts.push('contact_id.is.null');
+    orParts.push(`${cpCol}.is.null`);
   }
   if (orParts.length > 0) {
     query = query.or(orParts.join(','));
@@ -192,7 +196,8 @@ export function useServerTransactions(page: number, filters: ServerFilters) {
           *,
           category:categories(id, name, color),
           bank:banks(id, name, color),
-          contact:contacts(id, name, type, display_name, nome_fantasia, razao_social)
+          contact:contacts(id, name, type, display_name, nome_fantasia, razao_social),
+          party:parties(id, nome, display_name)
         `, { count: 'exact' })
         .eq('company_id', activeCompanyId!);
 
@@ -265,7 +270,10 @@ export function useTransactionKPIs(filters: ServerFilters) {
   const p_category_id = realCategoryIds.length === 1 ? realCategoryIds[0] : null;
 
   const realContactIds = (cf.contactIds || []).filter(id => id !== IS_EMPTY);
-  const p_contact_id = realContactIds.length === 1 ? realContactIds[0] : null;
+  const singleCounterpartyId = realContactIds.length === 1 ? realContactIds[0] : null;
+  const isPartyColumn = filters.counterpartyColumn === 'party_id';
+  const p_contact_id = isPartyColumn ? null : singleCounterpartyId;
+  const p_party_id = isPartyColumn ? singleCounterpartyId : null;
 
   const p_payment_status =
     cf.status === 'Pago' ? 'paid' : cf.status === 'Pendente' ? 'pending' : null;
@@ -280,6 +288,7 @@ export function useTransactionKPIs(filters: ServerFilters) {
     p_bank_id,
     p_category_id,
     p_contact_id,
+    p_party_id,
     p_payment_status,
     p_search,
   };
