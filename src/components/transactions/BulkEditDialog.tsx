@@ -15,6 +15,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { getContactLegalName } from '@/lib/contact-display';
+import { getSelectableCategories } from '@/hooks/useCategories';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { Loader2, CalendarIcon } from 'lucide-react';
 
@@ -83,10 +84,9 @@ export function BulkEditDialog({
   const { isInternalCompany } = useActiveCompany();
   const activeContacts = contacts.filter(c => c.is_active);
   const activeBanks = banks.filter(b => b.is_active);
-  // Interno (Eventos Contábeis): só sub-eventos entram na edição em massa (macro
-  // é cabeçalho de agrupamento, some aqui mas segue visível no cadastro).
-  // Cliente (Categorias) não força hierarquia — toda categoria entra.
-  const subCategories = categories.filter(c => !isInternalCompany || c.parent_id !== null);
+  // CA: só subeventos. Cliente externo: macro com subevento não entra (só o subevento);
+  // macro sozinho entra.
+  const subCategories = getSelectableCategories(categories, isInternalCompany);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

@@ -15,7 +15,7 @@ import { useServerTransactions, useTransactionKPIs, useDistinctTransactionValues
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { isEffectivelyPaid } from '@/lib/financial-utils';
 import { getContactLegalName, getTransactionCounterpartyName } from '@/lib/contact-display';
-import { useCategories } from '@/hooks/useCategories';
+import { useCategories, getSelectableCategories } from '@/hooks/useCategories';
 import { useActiveCompany } from '@/contexts/CompanyContext';
 import { useBanks } from '@/hooks/useBanks';
 import { useContacts } from '@/hooks/useContacts';
@@ -754,13 +754,10 @@ export default function Transactions() {
     return options.sort((a, b) => a.name.localeCompare(b.name));
   }, [isInternalCompany, contacts, parties]);
 
-  // Category options pro filtro de coluna. Interno (Eventos Contábeis) só lista
-  // sub-eventos — macro é cabeçalho de agrupamento, some visível na tela de
-  // cadastro. Cliente (Categorias) não tem essa hierarquia obrigatória: toda
-  // categoria aparece, senão quem nunca criou sub-categoria via filtro vazio.
+  // Category options pro filtro de coluna. CA: só subeventos. Cliente externo: macro com
+  // subevento não entra (só o subevento); macro sozinho entra.
   const categoryOptions = useMemo(() => {
-    return categories
-      .filter(c => !isInternalCompany || c.parent_id !== null)
+    return getSelectableCategories(categories, isInternalCompany)
       .map(c => ({ id: c.id, name: c.name, color: c.color || '#3B82F6' }));
   }, [categories, isInternalCompany]);
 

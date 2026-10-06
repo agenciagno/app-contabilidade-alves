@@ -19,6 +19,25 @@ export interface Category {
   updated_at: string;
 }
 
+/**
+ * Categorias que podem ser escolhidas num lançamento (e nos filtros).
+ * - CA (interna, Eventos Contábeis): só subeventos — macro é cabeçalho de agrupamento e
+ *   fica oculto, mesmo sozinho.
+ * - Cliente externo (Categorias): macro que tem subevento ligado a ele fica de fora (só o
+ *   subevento aparece); macro sozinho continua na lista (regra de Gabriel, 06/10/2026).
+ * `keepId` preserva a categoria já gravada no registro em edição, mesmo que hoje seja um
+ * macro oculto pela regra (lançamento legado).
+ */
+export function getSelectableCategories<T extends { id: string; parent_id?: string | null }>(
+  categories: T[],
+  isInternalCompany: boolean,
+  keepId?: string | null,
+): T[] {
+  if (isInternalCompany) return categories.filter(c => !!c.parent_id || c.id === keepId);
+  const parentIds = new Set(categories.map(c => c.parent_id).filter((id): id is string => !!id));
+  return categories.filter(c => !parentIds.has(c.id) || c.id === keepId);
+}
+
 export type CategoryInsert = Omit<Category, 'id' | 'created_at' | 'updated_at' | 'parent_id' | 'show_in_dre' | 'scope'> & { parent_id?: string | null; show_in_dre?: boolean };
 export type CategoryUpdate = Partial<Omit<Category, 'id' | 'company_id' | 'created_at' | 'updated_at'>>;
 

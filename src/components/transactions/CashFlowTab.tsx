@@ -35,7 +35,7 @@ import { IconBox } from '@/components/ds';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useTransactionAttachments } from '@/hooks/useTransactionAttachments';
 import type { Transaction, TransactionInsert } from '@/hooks/useTransactions';
-import type { Category } from '@/hooks/useCategories';
+import { getSelectableCategories, type Category } from '@/hooks/useCategories';
 import type { Bank } from '@/hooks/useBanks';
 import type { Contact } from '@/hooks/useContacts';
 
@@ -539,13 +539,9 @@ export function CashFlowTab({ transactions: transactionsRaw, banks, categories, 
     return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
   }, [transactions]);
 
-  // Interno (Eventos Contábeis): filtro mostra só sub-eventos (macro é cabeçalho
-  // de agrupamento, some aqui mas segue visível na tela de cadastro). Cliente
-  // (Categorias) não força hierarquia — toda categoria entra.
-  const subCategories = useMemo(
-    () => categories.filter(c => !isInternalCompany || c.parent_id !== null),
-    [categories, isInternalCompany],
-  );
+  // Filtro de evento. CA: só subeventos. Cliente externo: macro com subevento não entra
+  // (só o subevento); macro sozinho entra.
+  const subCategories = useMemo(() => getSelectableCategories(categories, isInternalCompany), [categories, isInternalCompany]);
 
   const uniqueEventOptions = useMemo(() => {
     const set = new Set<string>();

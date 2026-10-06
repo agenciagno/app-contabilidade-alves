@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { FileText, X, ChevronDown, Search } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
 import { useParties } from '@/hooks/useParties';
+import { getSelectableCategories } from '@/hooks/useCategories';
 import { format, parseISO, isWithinInterval } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -210,13 +211,9 @@ export function CashFlowReportModal({
       .sort((a, b) => (Math.abs(b.receber) + Math.abs(b.pagar)) - (Math.abs(a.receber) + Math.abs(a.pagar)));
   };
 
-  // Interno (Eventos Contábeis): só sub-eventos aparecem nos filtros (macro é
-  // cabeçalho de agrupamento, some aqui mas segue visível na tela de cadastro).
-  // Cliente (Categorias) não força hierarquia — toda categoria entra.
-  const subCategories = useMemo(
-    () => categories.filter(c => !isInternalCompany || (c.parent_id !== null && c.parent_id !== undefined)),
-    [categories, isInternalCompany],
-  );
+  // Filtros de evento. CA: só subeventos. Cliente externo: macro com subevento não entra
+  // (só o subevento); macro sozinho entra.
+  const subCategories = useMemo(() => getSelectableCategories(categories, isInternalCompany), [categories, isInternalCompany]);
 
   const activeBanks = useMemo(() => banks.filter(b => b.is_active), [banks]);
   const totalBankBalance = useMemo(() => activeBanks.reduce((s, b) => s + Number(b.current_balance), 0), [activeBanks]);

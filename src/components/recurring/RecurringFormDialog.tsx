@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { useCategories, CategoryInsert, CLIENT_CATEGORY_LABELS } from '@/hooks/useCategories';
+import { useCategories, CategoryInsert, CLIENT_CATEGORY_LABELS, getSelectableCategories } from '@/hooks/useCategories';
 import { useBanks, BankInsert } from '@/hooks/useBanks';
 import { useContacts, ContactInsert } from '@/hooks/useContacts';
 import { useActiveCompany } from '@/contexts/CompanyContext';
@@ -170,15 +170,10 @@ export function RecurringFormDialog({
     });
   };
 
-  // Evento Contábil: só sub-eventos aparecem no lançamento (macros seguem visíveis só na
-  // tela de cadastro Eventos Contábeis). Exceção: preserva a categoria já selecionada mesmo
-  // se for macro, pra não sumir ao editar uma recorrência legada.
-  // Interno (Eventos Contábeis) só lista sub-eventos — macro é cabeçalho de
-  // agrupamento. Cliente (Categorias) não força hierarquia: toda categoria é
-  // selecionável direto (achado 24/08/2026, mesmo caso de TransactionFormDialog).
-  const filteredCategories = categories.filter(
-    c => !isInternalCompany || c.parent_id !== null || c.id === formData.category_id,
-  );
+  // Mesma regra de TransactionFormDialog (CA: só subeventos; cliente externo: macro com
+  // subevento oculto, macro sozinho aparece). Preserva a categoria já selecionada ao editar
+  // recorrência legada.
+  const filteredCategories = getSelectableCategories(categories, isInternalCompany, formData.category_id);
   const activeBanks = banks.filter(b => b.is_active);
   const filteredContacts = contacts.filter(c => c.is_active);
 

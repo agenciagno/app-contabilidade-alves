@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DateField, segmentedListClass, segmentedTriggerClass } from '@/components/ds';
 import { Transaction, TransactionInsert } from '@/hooks/useTransactions';
-import { Category, useCategories, CategoryInsert, CLIENT_CATEGORY_LABELS } from '@/hooks/useCategories';
+import { Category, useCategories, CategoryInsert, CLIENT_CATEGORY_LABELS, getSelectableCategories } from '@/hooks/useCategories';
 import { Bank, useBanks, BankInsert } from '@/hooks/useBanks';
 import { Contact, useContacts, ContactInsert } from '@/hooks/useContacts';
 import { useParties, PartyInput } from '@/hooks/useParties';
@@ -129,16 +129,10 @@ export function TransactionFormDialog({
   });
   const [categoryWasSuggested, setCategoryWasSuggested] = useState(false);
 
-  // Evento Contábil: só sub-eventos aparecem no lançamento (macros ficam ocultos aqui,
-  // mas seguem visíveis/editáveis na tela de cadastro Eventos Contábeis). Exceção: preserva
-  // a categoria já selecionada mesmo se for macro, pra não sumir ao editar lançamento legado.
-  // Interno (Eventos Contábeis) só lista sub-eventos — macro é cabeçalho de
-  // agrupamento. Cliente (Categorias) não força hierarquia: toda categoria do
-  // tipo é selecionável direto, senão quem nunca criou sub-categoria via
-  // dropdown vazio (achado 24/08/2026).
-  const filteredCategories = categories.filter(
-    c => c.type === type && (!isInternalCompany || c.parent_id !== null || c.id === categoryId),
-  );
+  // CA: só subeventos. Cliente externo: macro com subevento não aparece (só o subevento),
+  // macro sozinho aparece (regra de Gabriel, 06/10/2026). Exceção: preserva a categoria já
+  // selecionada mesmo se estiver oculta pela regra, pra não sumir ao editar lançamento legado.
+  const filteredCategories = getSelectableCategories(categories, isInternalCompany, categoryId).filter(c => c.type === type);
   const activeBanks = banks.filter(b => b.is_active);
   const filteredContacts = contacts.filter(c => c.is_active);
 
@@ -231,11 +225,11 @@ export function TransactionFormDialog({
   useEffect(() => {
     if (isEditing || isSettleMode) return;
     if (!suggestedCategoryId || categoryId) return;
-    if (categories.some(c => c.id === suggestedCategoryId && c.type === type)) {
+    if (getSelectableCategories(categories, isInternalCompany).some(c => c.id === suggestedCategoryId && c.type === type)) {
       setCategoryId(suggestedCategoryId);
       setCategoryWasSuggested(true);
     }
-  }, [suggestedCategoryId, contactId, partyId, categoryId, isEditing, isSettleMode, categories, type]);
+  }, [suggestedCategoryId, contactId, partyId, categoryId, isEditing, isSettleMode, categories, type, isInternalCompany]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => setAmount(formatCurrencyInput(e.target.value));
   const handlePaidAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => setPaidAmount(formatCurrencyInput(e.target.value));
