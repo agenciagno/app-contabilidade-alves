@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, Search, Users, LayoutGrid, List } from 'lucide-react';
+import { Plus, Search, Users, LayoutGrid, List, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,7 +13,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useParties, type Party, type PartyInput, type PartyTipo } from '@/hooks/useParties';
+import { useParties, PartyInUseError, type Party, type PartyInput, type PartyTipo } from '@/hooks/useParties';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { PartyFormDialog } from '@/components/parties/PartyFormDialog';
 import { PartyCard } from '@/components/parties/PartyCard';
 import { PageHeader, DsBadge, IconBox } from '@/components/ds';
@@ -41,13 +45,15 @@ const partySubtitle = (p: Party) => {
 };
 
 export default function PartiesPage() {
-  const { data: parties, isLoading, create, update, toggleActive } = useParties();
+  const { data: parties, isLoading, create, update, toggleActive, remove } = useParties();
   const [search, setSearch] = useState('');
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>('todos');
   const [ativoFilter, setAtivoFilter] = useState<AtivoFilter>('todos');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Party | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [deleting, setDeleting] = useState<Party | null>(null);
+  const [inUse, setInUse] = useState<{ party: Party; count: number } | null>(null);
 
   const filtered = useMemo(() => {
     const list = parties ?? [];
@@ -72,6 +78,18 @@ export default function PartiesPage() {
   const openEdit = (p: Party) => {
     setEditing(p);
     setDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (!deleting) return;
+    const party = deleting;
+    remove.mutate(party.id, {
+      onSuccess: () => setDeleting(null),
+      onError: (e) => {
+        setDeleting(null);
+        if (e instanceof PartyInUseError) setInUse({ party, count: e.count });
+      },
+    });
   };
 
   const handleSubmit = (input: PartyInput) => {
@@ -180,6 +198,7 @@ export default function PartiesPage() {
               party={p}
               subtitle={partySubtitle(p)}
               onEdit={() => openEdit(p)}
+              onDelete={() => setDeleting(p)}
               onToggleActive={() => toggleActive.mutate({ id: p.id, is_active: !p.is_active })}
             />
           ))}
@@ -194,7 +213,7 @@ export default function PartiesPage() {
                 <TableHead>Documento</TableHead>
                 <TableHead>Contato</TableHead>
                 <TableHead className="w-[120px]">Ativo</TableHead>
-                <TableHead className="w-[80px] text-right">Ações</TableHead>
+                <TableHead className="w-[130px] text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -219,10 +238,22 @@ export default function PartiesPage() {
                       </DsBadge>
                     </button>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>
-                      Editar
-                    </Button>
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>
+                        Editar
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                        title="Excluir"
+                        aria-label={`Excluir ${p.display_name || p.nome}`}
+                        onClick={() => setDeleting(p)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -241,6 +272,53 @@ export default function PartiesPage() {
         isLoading={create.isPending || update.isPending}
         initial={editing}
       />
+
+      <AlertDialog open={!!deleting} onOpenChange={(o) => { if (!o && !remove.isPending) setDeleting(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {deleting?.display_name || deleting?.nome}?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={remove.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); confirmDelete(); }}
+              disabled={remove.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {remove.isPending ? 'Excluindo…' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!inUse} onOpenChange={(o) => { if (!o) setInUse(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Não dá para excluir {inUse?.party.display_name || inUse?.party.nome}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {inUse?.count === 1 ? 'Há 1 lançamento' : `Há ${inUse?.count} lançamentos`} neste cadastro. Excluir apagaria o nome
+              dele do histórico.
+              {inUse?.party.is_active
+                ? ' Desative o cadastro: ele deixa de aparecer nas listas e o histórico continua igual.'
+                : ' Ele já está desativado e não aparece mais nas listas.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Fechar</AlertDialogCancel>
+            {inUse?.party.is_active && (
+              <AlertDialogAction
+                onClick={() => {
+                  toggleActive.mutate({ id: inUse.party.id, is_active: false });
+                  setInUse(null);
+                }}
+              >
+                Desativar
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Users, Pencil } from 'lucide-react';
+import { Users, Pencil, Trash2 } from 'lucide-react';
 import { IconBox, DsBadge } from '@/components/ds';
 import { cn } from '@/lib/utils';
 import type { Party, PartyTipo } from '@/hooks/useParties';
@@ -25,13 +25,14 @@ export interface PartyCardProps {
   party: Party;
   subtitle: string;
   onEdit: () => void;
+  onDelete?: () => void;
   onToggleActive: () => void;
   className?: string;
 }
 
 const VAZIO = '—';
 
-export function PartyCard({ party, subtitle, onEdit, onToggleActive, className }: PartyCardProps) {
+export function PartyCard({ party, subtitle, onEdit, onDelete, onToggleActive, className }: PartyCardProps) {
   const titulo = party.display_name || party.nome;
   const mostraNomeSecundario = !!party.display_name && party.display_name !== party.nome;
 
@@ -70,17 +71,30 @@ export function PartyCard({ party, subtitle, onEdit, onToggleActive, className }
         <Metrica label="Telefone" valor={party.telefone} className="border-l border-line-2" />
       </div>
 
-      <button
-        type="button"
-        onClick={onEdit}
-        className="mt-auto flex items-center gap-2.5 border-t border-line-2 bg-bg px-[18px] py-[11px] text-left hover:bg-bg-2"
-      >
-        <span className="flex-1 truncate text-meta text-muted-ink-2">{subtitle}</span>
-        <span className="flex shrink-0 items-center gap-1 text-link text-action">
-          Editar
-          <Pencil className="h-[13px] w-[13px]" strokeWidth={2} />
-        </span>
-      </button>
+      <div className="mt-auto flex items-center border-t border-line-2 bg-bg hover:bg-bg-2">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex min-w-0 flex-1 items-center gap-2.5 py-[11px] pl-[18px] pr-2 text-left"
+        >
+          <span className="flex-1 truncate text-meta text-muted-ink-2">{subtitle}</span>
+          <span className="flex shrink-0 items-center gap-1 text-link text-action">
+            Editar
+            <Pencil className="h-[13px] w-[13px]" strokeWidth={2} />
+          </span>
+        </button>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            title="Excluir"
+            aria-label={`Excluir ${titulo}`}
+            className="shrink-0 py-[11px] pl-2 pr-[18px] text-destructive hover:opacity-80"
+          >
+            <Trash2 className="h-[14px] w-[14px]" strokeWidth={2} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

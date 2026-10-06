@@ -47,6 +47,15 @@ export interface PartyInput {
   is_active?: boolean;
 }
 
+/** Cadastro com lançamentos vinculados: excluir deixaria esses lançamentos sem cliente/fornecedor. */
+export class PartyInUseError extends Error {
+  count: number;
+  constructor(count: number) {
+    super(`Cadastro vinculado a ${count} lançamento(s).`);
+    this.count = count;
+  }
+}
+
 export const useParties = () => {
   const qc = useQueryClient();
   const { activeCompanyId } = useActiveCompany();
@@ -114,5 +123,31 @@ export const useParties = () => {
     onError: (e: Error) => toast.error('Erro ao alterar status', { description: e.message }),
   });
 
-  return { ...query, create, update, toggleActive };
+  // Só exclui cadastro sem lançamentos: a FK de transactions.party_id é ON DELETE SET NULL, então
+  // excluir um cadastro em uso apagaria o nome do cliente/fornecedor do histórico. Nesse caso a
+  // tela oferece desativar (PartyInUseError).
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { count, error: countError } = await supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('party_id', id);
+      if (countError) throw countError;
+      if (count && count > 0) throw new PartyInUseError(count);
+
+      const { data, error } = await supabase.from('parties').delete().eq('id', id).select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('Não foi possível excluir este cadastro.');
+    },
+    onSuccess: () => {
+      toast.success('Cadastro excluído!');
+      qc.invalidateQueries({ queryKey: ['parties'] });
+    },
+    onError: (e: Error) => {
+      if (e instanceof PartyInUseError) return; // a tela explica e oferece desativar
+      toast.error('Erro ao excluir', { description: e.message });
+    },
+  });
+
+  return { ...query, create, update, toggleActive, remove };
 };
