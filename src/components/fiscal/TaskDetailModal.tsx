@@ -315,6 +315,16 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     return [...list].sort((a, b) => b.created_at.localeCompare(a.created_at));
   }, [notesRaw, task]);
 
+  // Situação do cliente (Status do Cliente): avisa quando não é "Ativo" (Suspensa, Inapta ou, em tarefa antiga, Baixada/Ex-cliente).
+  const { data: situacaoCliente } = useQuery({
+    queryKey: ['task-situacao-cliente', task?.contact_id],
+    enabled: open && !!task?.contact_id,
+    queryFn: async () => {
+      const { data } = await supabase.from('contacts').select('status_cliente').eq('id', task!.contact_id as string).maybeSingle();
+      return (data?.status_cliente as string | null) ?? null;
+    },
+  });
+
   if (!task) return null;
 
   const handleSaveTaskInfo = () => {
@@ -443,16 +453,6 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
     }
     toast({ title: 'Tarefa desmarcada.' });
   };
-
-  // Situação do cliente (Status do Cliente): avisa quando não é "Ativo" (Suspensa, Inapta ou, em tarefa antiga, Baixada/Ex-cliente).
-  const { data: situacaoCliente } = useQuery({
-    queryKey: ['task-situacao-cliente', task.contact_id],
-    enabled: open && !!task.contact_id,
-    queryFn: async () => {
-      const { data } = await supabase.from('contacts').select('status_cliente').eq('id', task.contact_id as string).maybeSingle();
-      return (data?.status_cliente as string | null) ?? null;
-    },
-  });
 
   const contactName = task.contact_id ? (contacts.find(c => c.id === task.contact_id)?.name || '—') : task.title;
   const responsibleName = profiles.find(p => p.id === responsibleId)?.full_name || '—';
