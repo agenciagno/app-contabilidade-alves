@@ -10,6 +10,7 @@ import { Loader2, User, Lock, Eye, EyeOff, ShieldX, Shield } from 'lucide-react'
 import { PendingApprovalScreen } from '@/components/auth/PendingApprovalScreen';
 import { Logo } from '@/components/brand/Logo';
 import { supabase } from '@/integrations/supabase/client';
+import { buscarAcessos } from '@/hooks/useAcessos';
 import { PUBLIC_APP_URL } from '@/lib/environment';
 import { z } from 'zod';
 
@@ -44,10 +45,16 @@ export default function Auth() {
     }
   }, [searchParams, setSearchParams]);
 
+  // Logado: mais de uma conta (ex.: CA e a própria empresa) passa pela escolha.
   useEffect(() => {
-    if (user) {
-      navigate('/');
-    }
+    if (!user) return;
+    let ativo = true;
+    buscarAcessos()
+      .catch(() => [])
+      .then((acessos) => {
+        if (ativo) navigate(acessos.length > 1 ? '/escolher-conta' : '/', { replace: true });
+      });
+    return () => { ativo = false; };
   }, [user, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -84,9 +91,8 @@ export default function Auth() {
         description: error.message,
         variant: 'destructive'
       });
-    } else {
-      navigate('/');
     }
+    // Sucesso: o efeito acima leva para a Home ou para a escolha de conta.
   };
 
   // O campo de login aceita e-mail ou usuário, mas o reset do Supabase só

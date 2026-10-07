@@ -1,10 +1,13 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronsUpDown, Check, Building, Rocket } from 'lucide-react';
+import { ChevronsUpDown, Check, Building, Building2, Loader2, Rocket } from 'lucide-react';
+import { toast } from 'sonner';
 import { useCompany } from '@/hooks/useCompany';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAcessos, trocarConta, CONTA_TROCADA_KEY, PAPEL_LABEL } from '@/hooks/useAcessos';
 import { useViewMode, type ViewMode } from '@/contexts/ViewModeContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { cn, maskCPFCNPJ } from '@/lib/utils';
 
 /**
  * Switch de conta — ajuste 24/08/2026: morava no topo da sidebar, migrou pro
@@ -12,10 +15,11 @@ import { cn } from '@/lib/utils';
  * antes vivia dentro do menu de Perfil (UserMenu) — os dois eram "qual
  * conta/visão eu estou usando", fez sentido juntar num só lugar.
  *
- * Troca de conta real (multi-tenant) não existe ainda — só a affordance
- * visual (empresa atual marcada + "em breve" desabilitado). "Ver como
- * cliente" (preview de tenant específico) continua no UserMenu — é outra
- * feature, só relacionada por também depender de viewMode.
+ * Troca de conta (07/10/2026): um login pode ter vários acessos (um por
+ * empresa). A lista vem de `meus_acessos`; trocar grava a conta na sessão
+ * (`trocar_conta`) e recarrega o app. "Visualização" é outra coisa: preview
+ * do super admin, sem trocar de conta nem de dados. "Ver como cliente" segue
+ * no UserMenu.
  *
  * Ajuste 24/08/2026 (print de referência: Staycloud): sem chip de fundo
  * escuro próprio — só o hover sutil, igual aos outros botões do header.
@@ -27,6 +31,29 @@ export function AccountSwitcher() {
   const { companyName, companyCnpj, company } = useCompany();
   const { isSuperAdmin } = useUserRole();
   const { viewMode, setViewMode } = useViewMode();
+  const { data: acessos } = useAcessos();
+  const [trocando, setTrocando] = useState<string | null>(null);
+  const outrasContas = (acessos ?? []).filter((a) => !a.atual && a.tipo === 'empresa');
+
+  // A sessão de login é a mesma em todas as abas: se a conta mudou em outra
+  // aba, esta recarrega para não mostrar dados de uma conta e gravar em outra.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === CONTA_TROCADA_KEY) window.location.reload();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  const handleTrocarConta = async (companyId: string) => {
+    setTrocando(companyId);
+    try {
+      await trocarConta(companyId);
+    } catch (err) {
+      setTrocando(null);
+      toast.error(err instanceof Error ? err.message : 'Não foi possível trocar de conta.');
+    }
+  };
 
   const logoUrl: string | null = (company as any)?.logo_url ?? null;
   const companyInitial = (companyName || 'C').charAt(0).toUpperCase();
@@ -53,7 +80,7 @@ export function AccountSwitcher() {
           <div className="flex min-w-0 flex-col">
             <span className="max-w-[160px] truncate text-ui-strong text-nav-on-surface">{companyName}</span>
             <span className="max-w-[160px] truncate font-mono text-meta text-nav-on-surface">
-              {companyCnpj || 'CNPJ não informado'}
+              {(company as any)?.cnpj ? maskCPFCNPJ((company as any).cnpj) : companyCnpj || 'CNPJ não informado'}
             </span>
           </div>
           <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-nav-on-surface" />
@@ -65,10 +92,31 @@ export function AccountSwitcher() {
           <Check className="h-4 w-4 shrink-0 text-action" />
           <span className="truncate">{companyName}</span>
         </div>
-        <div className="my-1.5 border-t border-line" />
-        <div className="cursor-not-allowed px-2 py-1.5 text-ui text-muted-ink-2">
-          Trocar de conta — em breve
-        </div>
+        {outrasContas.length > 0 && (
+          <>
+            <div className="my-1.5 border-t border-line" />
+            <p className="px-2 pb-1.5 text-kicker uppercase text-muted-ink-2">Trocar de conta</p>
+            {outrasContas.map((a) => (
+              <button
+                key={a.company_id}
+                type="button"
+                disabled={!!trocando}
+                onClick={() => handleTrocarConta(a.company_id)}
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-ui text-muted-ink transition-colors hover:bg-bg-2 disabled:opacity-60"
+              >
+                {trocando === a.company_id
+                  ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                  : <Building2 className="h-4 w-4 shrink-0" strokeWidth={1.75} />}
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-ink">{a.nome}</span>
+                  <span className="truncate text-meta text-muted-ink-2">
+                    {a.documento ? `${maskCPFCNPJ(a.documento)} · ` : ''}{PAPEL_LABEL[a.papel] ?? a.papel}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </>
+        )}
 
         {isSuperAdmin && (
           <>

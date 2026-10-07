@@ -16,6 +16,7 @@ import { PwaInstallBanner } from "@/components/PwaInstallBanner";
 
 // Páginas de entrada ficam no bundle inicial; o resto carrega sob demanda por rota.
 import Auth from "@/pages/Auth";
+import EscolherConta from "@/pages/EscolherConta";
 import RedefinirSenha from "@/pages/RedefinirSenha";
 import NoAccess from "@/pages/NoAccess";
 import NotFound from "@/pages/NotFound";
@@ -112,6 +113,7 @@ const App = () => (
               <Suspense fallback={<RouteFallback />}>
               <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/escolher-conta" element={<EscolherConta />} />
               <Route path="/redefinir-senha" element={<RedefinirSenha />} />
               <Route path="/newsletter/:slug" element={<Newsletter />} />
               <Route path="/sem-acesso" element={<NoAccess />} />

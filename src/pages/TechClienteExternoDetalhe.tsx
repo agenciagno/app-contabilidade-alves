@@ -636,7 +636,7 @@ function AbaUsuarios({
     setAcao(`senha-${u.user_id}`);
     try {
       const { data, error } = await supabase.functions.invoke('reset-tenant-user-password', {
-        body: { user_id: u.user_id },
+        body: { user_id: u.user_id, company_id: cliente.id },
       });
       if (error) throw new Error(error.message || 'Falha ao reemitir senha.');
       const payload = data as { provisional_password?: string; email?: string; error?: string } | null;
@@ -675,6 +675,7 @@ function AbaUsuarios({
       const { data, error } = await supabase.functions.invoke('admin-update-user', {
         body: {
           userId: modulosTarget.user_id,
+          companyId: cliente.id,
           fullName: modulosTarget.full_name || modulosTarget.email || 'Usuário',
           role: modulosTarget.role || 'colaborador',
           statusActive: modulosTarget.status_active ?? true,
@@ -699,7 +700,7 @@ function AbaUsuarios({
     setProcessando(true);
     try {
       const { data, error } = await supabase.functions.invoke('set-tenant-user-status', {
-        body: { user_id: blockTarget.user_id, blocked: bloqueando },
+        body: { user_id: blockTarget.user_id, blocked: bloqueando, company_id: cliente.id },
       });
       if (error) throw new Error(error.message || 'Falha ao alterar acesso.');
       if ((data as any)?.error) throw new Error((data as any).error);
@@ -718,7 +719,7 @@ function AbaUsuarios({
     setProcessando(true);
     try {
       const { data, error } = await supabase.functions.invoke('delete-tenant-user', {
-        body: { user_id: deleteTarget.user_id },
+        body: { user_id: deleteTarget.user_id, company_id: cliente.id },
       });
       if (error) throw new Error(error.message || 'Falha ao excluir usuário.');
       if ((data as any)?.error) throw new Error((data as any).error);
