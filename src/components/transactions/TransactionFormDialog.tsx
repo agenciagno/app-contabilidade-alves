@@ -497,10 +497,15 @@ export function TransactionFormDialog({
     createParty.mutate(data, { onSuccess: (np) => { setPartyId(np.id); setPartyDialogOpen(false); } });
   };
 
-  const handleCategoryChange = (v: string) => { if (v === '__new__') setCategoryDialogOpen(true); else { setCategoryId(v); setCategoryWasSuggested(false); } };
-  const handleBankChange = (v: string) => { if (v === '__new__') setBankDialogOpen(true); else setBankId(v); };
-  const handleContactChange = (v: string) => { if (v === '__new__') setContactDialogOpen(true); else setContactId(v); };
-  const handlePartyChange = (v: string) => { if (v === '__new__') setPartyDialogOpen(true); else setPartyId(v); };
+  // O Radix Select dispara onValueChange('') sozinho quando o valor e a lista de opções mudam no
+  // mesmo instante — ex.: abrir uma despesa para editar com o formulário ainda no tipo "receita":
+  // o tipo troca, a lista de categorias troca junto e o campo zerava (Categoria sumia ao editar
+  // ou liquidar em Pagar/Receber). Nenhum destes campos tem opção "limpar", então vazio nunca é
+  // escolha do usuário e é ignorado.
+  const handleCategoryChange = (v: string) => { if (!v) return; if (v === '__new__') setCategoryDialogOpen(true); else { setCategoryId(v); setCategoryWasSuggested(false); } };
+  const handleBankChange = (v: string) => { if (!v) return; if (v === '__new__') setBankDialogOpen(true); else setBankId(v); };
+  const handleContactChange = (v: string) => { if (!v) return; if (v === '__new__') setContactDialogOpen(true); else setContactId(v); };
+  const handlePartyChange = (v: string) => { if (!v) return; if (v === '__new__') setPartyDialogOpen(true); else setPartyId(v); };
 
   // Validation rules per mode
   const hasPartyOrContact = isInternalCompany ? !!contactId : !!partyId;
