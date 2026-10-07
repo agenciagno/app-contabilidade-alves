@@ -72,6 +72,12 @@ export function generateInstallments(
       is_paid: isFirst ? basePayload.is_paid : false,
       paid_amount: isFirst ? basePayload.paid_amount : null,
       date: isFirst ? basePayload.date : null,
+      // Histórico já nasce com "Parcela 1/4"; se o usuário escreveu algo, fica antes
+      // ("observação · Parcela 1/4") — mesmo formato das Contas Recorrentes
+      // (generate_due_recurring_transactions).
+      notes: basePayload.notes?.trim()
+        ? `${basePayload.notes.trim()} · Parcela ${i + 1}/${count}`
+        : `Parcela ${i + 1}/${count}`,
     });
   }
   return installments;
