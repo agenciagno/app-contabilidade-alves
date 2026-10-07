@@ -1,7 +1,8 @@
 // Dispara e-mail de cobrança pro cliente e grava no histórico
 // (boleto_client_notifications). Mesmo padrão de certificado-notificar-cliente —
 // API de e-mail da Hostinger (não SMTP), token/mailbox em secrets já configurados.
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2.117.2';
+import { perfilAtivo } from "../_shared/acesso.ts";
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -28,11 +29,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: ue } = await admin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (ue || !user) return json({ error: 'Invalid token' }, 401);
 
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('id, role, is_super_admin, company_id, allowed_modules')
-      .eq('user_id', user.id)
-      .single();
+    const { data: profile } = await perfilAtivo(authHeader, user.id, 'id, role, is_super_admin, company_id, allowed_modules');
     if (!profile) return json({ error: 'Perfil não encontrado.' }, 403);
 
     const hasFinanceiroModule = Array.isArray(profile.allowed_modules)

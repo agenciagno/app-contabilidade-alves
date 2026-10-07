@@ -1,9 +1,7 @@
-// Dispara UM e-mail de cobrança cobrindo 1+ boletos (aba Cobrança) e grava o histórico —
-// mesmo padrão de boleto-notificar-cliente, mas esse aceita boleto_ids[] e um destino
-// explícito em vez de derivar sempre do e-mail cadastrado no contato (a aba Cobrança permite
-// digitar o destino na hora, inclusive quando 2+ clientes da mesma pessoa responsável são
-// cobrados juntos e não têm o mesmo e-mail cadastrado).
-import { createClient } from 'npm:@supabase/supabase-js@2';
+// Dispara e-mail de aviso de vencimento de certificado pro cliente e grava no
+// histórico (certificate_client_notifications). Mesma API de e-mail da Hostinger
+// já usada em send-support-ticket-email (não SMTP) — token/mailbox em secrets.
+import { createClient } from 'npm:@supabase/supabase-js@2.117.2';
 import { perfilAtivo } from "../_shared/acesso.ts";
 
 const cors = {
@@ -34,35 +32,31 @@ Deno.serve(async (req) => {
     const { data: profile } = await perfilAtivo(authHeader, user.id, 'id, role, is_super_admin, company_id, allowed_modules');
     if (!profile) return json({ error: 'Perfil não encontrado.' }, 403);
 
-    const hasFinanceiroModule = Array.isArray(profile.allowed_modules)
-      && (profile.allowed_modules.includes('financeiro') || profile.allowed_modules.includes('financeiro_boletos'));
-    if (!profile.is_super_admin && profile.role !== 'admin' && !hasFinanceiroModule) {
-      return json({ error: 'Você não tem permissão para cobrar clientes.' }, 403);
+    const hasCadastroModule = Array.isArray(profile.allowed_modules) && profile.allowed_modules.includes('cadastro');
+    if (!profile.is_super_admin && profile.role !== 'admin' && !hasCadastroModule) {
+      return json({ error: 'Você não tem permissão para notificar clientes.' }, 403);
     }
 
     const body = await req.json().catch(() => null);
-    const boletoIds = Array.isArray(body?.boleto_ids) ? (body.boleto_ids as string[]) : [];
-    const destino = (body?.destino as string | undefined)?.trim();
+    const certificateId = body?.certificate_id as string | undefined;
     const assunto = (body?.assunto as string | undefined)?.trim();
     const mensagem = (body?.mensagem as string | undefined)?.trim();
-    if (boletoIds.length === 0 || !destino || !assunto || !mensagem) {
-      return json({ error: 'boleto_ids, destino, assunto e mensagem são obrigatórios.' }, 400);
+    if (!certificateId || !assunto || !mensagem) {
+      return json({ error: 'certificate_id, assunto e mensagem são obrigatórios.' }, 400);
     }
 
-    const { data: boletos, error: boletosErr } = await admin
-      .from('boleto_controls')
-      .select('id, company_id')
-      .in('id', boletoIds);
-    if (boletosErr) throw boletosErr;
-    if (!boletos || boletos.length !== boletoIds.length) {
-      return json({ error: 'Um ou mais boletos não foram encontrados.' }, 404);
+    const { data: certificado, error: certErr } = await admin
+      .from('certificates')
+      .select('id, company_id, contact_id, contacts:contact_id (email, name, display_name)')
+      .eq('id', certificateId)
+      .single();
+    if (certErr || !certificado) return json({ error: 'Certificado não encontrado.' }, 404);
+    if (certificado.company_id !== profile.company_id && !profile.is_super_admin) {
+      return json({ error: 'Sem permissão para este registro.' }, 403);
     }
-    const companyId = boletos[0].company_id;
-    const mesmaEmpresa = boletos.every((b) => b.company_id === companyId);
-    if (!mesmaEmpresa) return json({ error: 'Os boletos selecionados pertencem a empresas diferentes.' }, 400);
-    if (companyId !== profile.company_id && !profile.is_super_admin) {
-      return json({ error: 'Sem permissão para estes registros.' }, 403);
-    }
+
+    const destino = (certificado as any).contacts?.email as string | null;
+    if (!destino) return json({ error: 'Cliente não tem e-mail cadastrado.' }, 400);
 
     const token = Deno.env.get('HOSTINGER_MAIL_API_TOKEN');
     const resourceId = Deno.env.get('HOSTINGER_MAIL_RESOURCE_ID');
@@ -80,15 +74,14 @@ Deno.serve(async (req) => {
       return json({ error: `Falha ao enviar e-mail (${res.status}): ${detail}` }, 502);
     }
 
-    const rows = boletoIds.map((boletoId) => ({
-      boleto_id: boletoId,
-      company_id: companyId,
+    const { error: logErr } = await admin.from('certificate_client_notifications').insert({
+      certificate_id: certificateId,
+      company_id: certificado.company_id,
       canal: 'email',
       destino,
       mensagem,
       enviado_por: profile.id,
-    }));
-    const { error: logErr } = await admin.from('boleto_client_notifications').insert(rows);
+    });
     if (logErr) throw logErr;
 
     return json({ success: true });

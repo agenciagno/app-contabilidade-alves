@@ -3,6 +3,7 @@
 // desatualizada e o limite é o que foi vendido no plano.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@3';
+import { perfilAtivo } from "../_shared/acesso.ts";
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -41,7 +42,7 @@ Deno.serve(async (req) => {
     if (!authHeader?.startsWith('Bearer ')) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } });
     const { data: { user }, error: ue } = await admin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (ue || !user) return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } });
-    const { data: caller } = await admin.from('profiles').select('is_super_admin, role').eq('user_id', user.id).single();
+    const { data: caller } = await perfilAtivo(authHeader, user.id, 'is_super_admin, role');
     if (!caller || (!caller.is_super_admin && caller.role !== 'super_admin')) {
       return new Response(JSON.stringify({ error: 'Apenas super admin (GNO) pode adicionar usuario de cliente.' }), { status: 403, headers: { ...cors, 'Content-Type': 'application/json' } });
     }

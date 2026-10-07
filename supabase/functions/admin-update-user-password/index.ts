@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@3';
+import { acessosDe, perfilAtivo } from "../_shared/acesso.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,11 +58,7 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
     // Verify caller is admin/super_admin in same company as target user
-    const { data: callerProfile, error: callerErr } = await admin
-      .from('profiles')
-      .select('role, is_super_admin, company_id')
-      .eq('user_id', callerUserId)
-      .single();
+    const { data: callerProfile, error: callerErr } = await perfilAtivo(authHeader, callerUserId, 'role, is_super_admin, company_id');
     if (callerErr || !callerProfile) {
       return new Response(JSON.stringify({ error: 'Perfil do solicitante não encontrado' }), {
         status: 403,
@@ -77,19 +74,23 @@ Deno.serve(async (req) => {
     }
 
     if (!callerProfile.is_super_admin) {
-      const { data: targetProfile, error: targetErr } = await admin
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', userId)
-        .single();
-      if (targetErr || !targetProfile) {
+      const acessos = await acessosDe(admin, userId);
+      if (acessos.length === 0) {
         return new Response(JSON.stringify({ error: 'Usuário alvo não encontrado' }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      if (targetProfile.company_id !== callerProfile.company_id) {
+      if (!acessos.some((a) => a.company_id === callerProfile.company_id)) {
         return new Response(JSON.stringify({ error: 'Usuário de outra empresa' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      // A senha vale para todos os acessos da pessoa: admin de uma empresa não
+      // troca a senha de quem também entra em outra (só o suporte).
+      if (acessos.some((a) => a.company_id !== callerProfile.company_id)) {
+        return new Response(JSON.stringify({ error: 'Este usuário também tem acesso a outra empresa. A senha só pode ser trocada pelo suporte.' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

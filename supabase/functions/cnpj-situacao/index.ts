@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { lerTodas } from "../_shared/paginar.ts";
+import { perfilAtivo } from "../_shared/acesso.ts";
 
 // ---------------------------------------------------------------------------
 // Monitor semanal da situação cadastral do CNPJ (decisão de Gabriel, 06/10/2026: fonte gratuita, rotina aos domingos).
@@ -254,7 +255,7 @@ Deno.serve(async (req) => {
     const { data: userData } = await supabase.auth.getUser(bearer);
     const uid = userData?.user?.id;
     if (!uid) return json({ error: "Não autenticado" }, 401);
-    const { data: perfil } = await supabase.from("profiles").select("role,is_super_admin,company_id").eq("user_id", uid).maybeSingle();
+    const { data: perfil } = await perfilAtivo(bearer, uid, "role,is_super_admin,company_id");
     admin = perfil?.is_super_admin === true || (perfil?.role === "admin" && perfil?.company_id === COMPANY_ID);
     if (!admin) return json({ error: "Só administradores" }, 403);
   }

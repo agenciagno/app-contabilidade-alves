@@ -10,6 +10,7 @@
 // A tela nunca manda caminho de arquivo: manda (tipo, id do registro) e a função confere que o registro é do cliente.
 // Não chama o Serpro e não custa nada: só lê o que já foi guardado.
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { perfilAtivo } from "../_shared/acesso.ts";
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -74,7 +75,7 @@ async function equipeDe(req: Request) {
   const bearer = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
   const { data: u } = await admin.auth.getUser(bearer);
   if (!u?.user) return null;
-  const { data: perfil } = await admin.from('profiles').select('id, role, is_super_admin, company_id').eq('user_id', u.user.id).maybeSingle();
+  const { data: perfil } = await perfilAtivo(bearer, u.user.id, 'id, role, is_super_admin, company_id');
   if (!perfil) return null;
   const equipe = perfil.is_super_admin === true || perfil.role === 'admin' || perfil.role === 'colaborador';
   return equipe ? perfil : null;

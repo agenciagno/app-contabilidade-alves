@@ -15,7 +15,7 @@
 // Envio imediato (sem agendamento) não passa por aqui — a Central de Notificações despacha
 // direto (push via send-push, popup via insert direto), síncrono, como sempre foi.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient } from "jsr:@supabase/supabase-js@2.117.2";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -106,12 +106,13 @@ Deno.serve(async (req) => {
         let recipients: { user_id: string; company_id: string | null }[] = [];
 
         if (row.target_type === "user" && row.target_user_id) {
-          const { data: prof } = await admin
+          // Um login pode ter vários acessos: o aviso aparece em cada um.
+          const { data: profs, error: profErr } = await admin
             .from("profiles")
             .select("user_id, company_id")
-            .eq("user_id", row.target_user_id)
-            .maybeSingle();
-          if (prof) recipients = [prof];
+            .eq("user_id", row.target_user_id);
+          if (profErr) throw profErr;
+          recipients = profs ?? [];
         } else if (row.target_type === "users" && row.target_user_ids?.length) {
           const { data: profs, error: profErr } = await admin
             .from("profiles")

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.2"
+import { perfilAtivo } from "../_shared/acesso.ts";
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -22,11 +23,7 @@ serve(async (req) => {
     const { data: { user }, error: ue } = await admin.auth.getUser(auth.replace('Bearer ', ''))
     if (ue || !user) throw new Error('Invalid token')
 
-    const { data: caller, error: pe } = await admin
-      .from('profiles')
-      .select('role, is_super_admin, company_id')
-      .eq('user_id', user.id)
-      .single()
+    const { data: caller, error: pe } = await perfilAtivo(auth, user.id, 'role, is_super_admin, company_id')
 
     const callerIsSuper = !!caller?.is_super_admin || caller?.role === 'super_admin'
     const callerIsAdmin = callerIsSuper || caller?.role === 'admin'

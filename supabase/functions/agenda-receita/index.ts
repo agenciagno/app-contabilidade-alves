@@ -1,10 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { createClient } from "npm:@supabase/supabase-js@2.117.2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2.117.2/cors";
 import * as XLSX from "npm:xlsx@0.18.5";
 import { jwtRole } from "../_shared/serpro-core.ts";
 import { calcularRegistros, carregarFeriados, entregaInterna, type ObrigacaoCatalogo } from "../_shared/calendario-fiscal.ts";
 import { dataOficial, escolherXlsx, itensDeLinhas, MESES_PT, nomesDoMes, type ItemAgenda, type MapeamentoAgenda } from "../_shared/agenda-receita.ts";
+import { perfilAtivo } from "../_shared/acesso.ts";
 
 // Agenda oficial da Receita (planilha ADE do mês) como fonte soberana do calendário fiscal. 02/10/2026.
 //   rotina      cron (chave anon), de hora em hora: prepara o rascunho do mês do vencimento (e do próximo a partir do dia 25).
@@ -178,7 +179,7 @@ Deno.serve(async (req) => {
     const { data: userData } = await supabase.auth.getUser(bearer);
     const uid = userData?.user?.id;
     if (!uid) return json({ error: "Não autenticado" }, 401);
-    const { data: perfil } = await supabase.from("profiles").select("role,is_super_admin").eq("user_id", uid).maybeSingle();
+    const { data: perfil } = await perfilAtivo(bearer, uid, "role,is_super_admin");
     if (!(perfil?.is_super_admin === true || perfil?.role === "admin")) return json({ error: "Só administradores" }, 403);
 
     if (payload.action === "rotina") return await rotina();

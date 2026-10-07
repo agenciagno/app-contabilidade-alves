@@ -5,8 +5,9 @@
 // Web Push no edge runtime: usa @negrel/webpush (Web Crypto + fetch), NÃO web-push
 // do Node (que depende de node:https, o mesmo problema do mTLS Sicoob).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient } from "jsr:@supabase/supabase-js@2.117.2";
 import * as webpush from "jsr:@negrel/webpush@0.3.0";
+import { acessosDe, perfilAtivo } from "../_shared/acesso.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -81,11 +82,7 @@ Deno.serve(async (req) => {
     });
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return json({ error: "unauthorized" }, 401);
-    const { data: prof } = await admin
-      .from("profiles")
-      .select("company_id, role, is_super_admin")
-      .eq("user_id", user.id)
-      .single();
+    const { data: prof } = await perfilAtivo(authHeader, user.id, "company_id, role, is_super_admin");
     isSuper = prof?.role === "super_admin" || prof?.is_super_admin === true;
     callerCompany = prof?.company_id ?? null;
   }
@@ -114,12 +111,8 @@ Deno.serve(async (req) => {
     if (!target.userId) return json({ error: "missing_user" }, 400);
     if (!isService && !isSuper) {
       // admin comum só pode mirar usuário da própria empresa
-      const { data: tgt } = await admin
-        .from("profiles")
-        .select("company_id")
-        .eq("user_id", target.userId)
-        .single();
-      if (!tgt || tgt.company_id !== callerCompany) {
+      const acessos = await acessosDe(admin, target.userId);
+      if (!acessos.some((a) => a.company_id === callerCompany)) {
         return json({ error: "forbidden" }, 403);
       }
     }

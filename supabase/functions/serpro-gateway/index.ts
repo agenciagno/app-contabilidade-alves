@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { criarSerpro, onlyDigits, type Tipo } from "../_shared/serpro-core.ts";
+import { perfilAtivo } from "../_shared/acesso.ts";
 
 // ---------------------------------------------------------------------------
 // Gateway único do Serpro Integra Contador (F4, Onda 0 — 29/09/2026).
@@ -84,7 +85,7 @@ Deno.serve(async (req) => {
   const { data: userData } = await supabase.auth.getUser(bearer);
   const uid = userData?.user?.id;
   if (!uid) return json({ error: "Não autenticado" }, 401);
-  const { data: profile } = await supabase.from("profiles").select("role,is_super_admin,company_id").eq("user_id", uid).maybeSingle();
+  const { data: profile } = await perfilAtivo(bearer, uid, "role,is_super_admin,company_id");
   const autorizado = profile?.is_super_admin === true || (profile?.role === "admin" && profile?.company_id === COMPANY_ID);
   if (!autorizado) return json({ error: "Sem permissão" }, 403);
 

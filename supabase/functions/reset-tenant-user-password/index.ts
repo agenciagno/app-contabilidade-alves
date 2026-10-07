@@ -3,6 +3,7 @@
 // cliente fica sem acesso e a tela não tem como saber. Aqui a senha volta na resposta.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@3';
+import { acessosDe, empresaDoAlvo, perfilAtivo } from "../_shared/acesso.ts";
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -10,7 +11,8 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const BodySchema = z.object({ user_id: z.string().uuid() });
+// company_id só identifica o acesso no log; a senha é do login (vale em todos os acessos).
+const BodySchema = z.object({ user_id: z.string().uuid(), company_id: z.string().uuid().optional() });
 
 function genPassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -39,20 +41,19 @@ Deno.serve(async (req) => {
     const { data: { user }, error: ue } = await admin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (ue || !user) return json({ error: 'Invalid token' }, 401);
 
-    const { data: caller } = await admin
-      .from('profiles').select('is_super_admin, role, company_id, full_name')
-      .eq('user_id', user.id).single();
+    const { data: caller } = await perfilAtivo(authHeader, user.id, 'is_super_admin, role, company_id, full_name');
     if (!caller || (!caller.is_super_admin && caller.role !== 'super_admin')) {
       return json({ error: 'Apenas super admin (GNO) pode reemitir senha de cliente.' }, 403);
     }
 
     const parsed = BodySchema.safeParse(await req.json().catch(() => null));
     if (!parsed.success) return json({ error: 'Dados inválidos' }, 400);
-    const { user_id } = parsed.data;
+    const { user_id, company_id } = parsed.data;
 
-    const { data: target } = await admin
-      .from('profiles').select('user_id, full_name, email, company_id').eq('user_id', user_id).single();
-    if (!target) return json({ error: 'Usuário não encontrado.' }, 404);
+    const acessos = await acessosDe<{ user_id: string; full_name: string | null; email: string; company_id: string }>(
+      admin, user_id, 'user_id, full_name, email, company_id');
+    if (acessos.length === 0) return json({ error: 'Usuário não encontrado.' }, 404);
+    const target = acessos.find((a) => a.company_id === empresaDoAlvo(acessos, company_id)) ?? acessos[0];
 
     const password = genPassword();
     const { error: pwErr } = await admin.auth.admin.updateUserById(user_id, { password });

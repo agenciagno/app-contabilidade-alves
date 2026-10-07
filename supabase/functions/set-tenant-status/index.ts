@@ -3,6 +3,7 @@
 // O gate de `companies.status` só roda no login — sem isso, quem já está dentro continua.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@3';
+import { acessosDe, perfilAtivo } from "../_shared/acesso.ts";
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -39,9 +40,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: ue } = await admin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (ue || !user) return json({ error: 'Invalid token' }, 401);
 
-    const { data: caller } = await admin
-      .from('profiles').select('is_super_admin, role, company_id, full_name')
-      .eq('user_id', user.id).single();
+    const { data: caller } = await perfilAtivo(authHeader, user.id, 'is_super_admin, role, company_id, full_name');
     if (!caller || (!caller.is_super_admin && caller.role !== 'super_admin')) {
       return json({ error: 'Apenas super admin (GNO) pode alterar o status do cliente.' }, 403);
     }
@@ -62,7 +61,16 @@ Deno.serve(async (req) => {
     let revoked = 0;
     if (status === 'suspended' || status === 'inactive') {
       const { data: users } = await admin.from('profiles').select('user_id').eq('company_id', company_id);
-      const ids = (users ?? []).map((u) => u.user_id);
+      // Quem também tem acesso ativo a outra empresa ativa continua logado: o
+      // acesso suspenso já deixa de valer (o banco confere o status da empresa).
+      const ids: string[] = [];
+      for (const u of users ?? []) {
+        const { data: outros } = await admin.from('profiles')
+          .select('company_id, companies!inner(status)')
+          .eq('user_id', u.user_id).neq('company_id', company_id).eq('status_active', true)
+          .eq('companies.status', 'active');
+        if (!outros?.length) ids.push(u.user_id);
+      }
       if (ids.length) {
         const { data: killed } = await admin
           .from('active_sessions').delete().in('user_id', ids).select('id');

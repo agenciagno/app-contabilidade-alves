@@ -6,6 +6,7 @@ import { pega } from "../_shared/pgdasd-indice.ts";
 import { lerIndiceDefis } from "../_shared/defis-indice.ts";
 import { assinar, guardarPdf } from "../_shared/serpro-arquivos.ts";
 import { lerTodas } from "../_shared/paginar.ts";
+import { perfilAtivo } from "../_shared/acesso.ts";
 
 // ---------------------------------------------------------------------------
 // DEFIS (declaração anual do Simples Nacional, Serpro Integra Contador) — F4 Onda 2, passo 4, 30/09/2026. Só leitura.
@@ -343,7 +344,7 @@ Deno.serve(async (req) => {
   const { data: userData } = await supabase.auth.getUser(bearer);
   const uid = userData?.user?.id;
   if (!uid) return json({ error: "Não autenticado" }, 401);
-  const { data: perfil } = await supabase.from("profiles").select("role,is_super_admin,company_id").eq("user_id", uid).maybeSingle();
+  const { data: perfil } = await perfilAtivo(bearer, uid, "role,is_super_admin,company_id");
   const admin = perfil?.is_super_admin === true || (perfil?.role === "admin" && perfil?.company_id === COMPANY_ID);
   const equipe = admin || (perfil?.role === "colaborador" && perfil?.company_id === COMPANY_ID);
   if (!equipe) return json({ error: "Sem permissão" }, 403);

@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { criarSerpro, jwtRole, onlyDigits } from "../_shared/serpro-core.ts";
+import { perfilAtivo } from "../_shared/acesso.ts";
 
 // ---------------------------------------------------------------------------
 // Caixa Postal do e-CAC (Serpro Integra Contador) — F4 Fase A, 30/09/2026.
@@ -324,7 +325,7 @@ async function avisar(payload: any, uid: string) {
     .select("id,contact_id").eq("id", String(payload.mensagem_id ?? "")).eq("company_id", COMPANY_ID).maybeSingle();
   if (!msg) return json({ error: "Mensagem não encontrada" }, 404);
   const { data: contato } = await supabase.from("contacts").select("email,whatsapp,phone").eq("id", msg.contact_id).maybeSingle();
-  const { data: perfil } = await supabase.from("profiles").select("id").eq("user_id", uid).maybeSingle();
+  const { data: perfil } = await supabase.from("profiles").select("id").eq("user_id", uid).eq("company_id", COMPANY_ID).maybeSingle();
 
   let destino: string | null = null;
   if (canal === "email") {
@@ -368,7 +369,7 @@ Deno.serve(async (req) => {
   const { data: userData } = await supabase.auth.getUser(bearer);
   const uid = userData?.user?.id;
   if (!uid) return json({ error: "Não autenticado" }, 401);
-  const { data: perfil } = await supabase.from("profiles").select("role,is_super_admin,company_id").eq("user_id", uid).maybeSingle();
+  const { data: perfil } = await perfilAtivo(bearer, uid, "role,is_super_admin,company_id");
   const admin = perfil?.is_super_admin === true || (perfil?.role === "admin" && perfil?.company_id === COMPANY_ID);
   const equipe = admin || (perfil?.role === "colaborador" && perfil?.company_id === COMPANY_ID);
   if (!equipe) return json({ error: "Sem permissão" }, 403);

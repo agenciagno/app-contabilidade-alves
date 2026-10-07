@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { criarSerpro, jwtRole, onlyDigits, sleep } from "../_shared/serpro-core.ts";
+import { perfilAtivo } from "../_shared/acesso.ts";
 
 // ---------------------------------------------------------------------------
 // Mapa de procurações (Serpro Integra Contador, PROCURACOES.OBTERPROCURACAO41) — F4 Onda 2, passo 1, 30/09/2026.
@@ -226,7 +227,7 @@ Deno.serve(async (req) => {
   const { data: userData } = await supabase.auth.getUser(bearer);
   const uid = userData?.user?.id;
   if (!uid) return json({ error: "Não autenticado" }, 401);
-  const { data: perfil } = await supabase.from("profiles").select("role,is_super_admin,company_id").eq("user_id", uid).maybeSingle();
+  const { data: perfil } = await perfilAtivo(bearer, uid, "role,is_super_admin,company_id");
   const admin = perfil?.is_super_admin === true || (perfil?.role === "admin" && perfil?.company_id === COMPANY_ID);
   const equipe = admin || (perfil?.role === "colaborador" && perfil?.company_id === COMPANY_ID);
   if (!equipe) return json({ error: "Sem permissão" }, 403);

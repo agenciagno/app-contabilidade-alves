@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@3';
+import { acessosDe, perfilAtivo } from "../_shared/acesso.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +16,8 @@ const BodySchema = z.object({
   statusActive: z.boolean(),
   allowedModules: z.array(z.string()),
   department: z.string().nullable().optional(),
+  // Empresa do acesso a editar. Opcional: sem ela vale a do admin (ou a única da pessoa).
+  companyId: z.string().uuid().optional(),
 });
 
 Deno.serve(async (req) => {
@@ -56,15 +59,11 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
-    const { userId, fullName, email, role, statusActive, allowedModules, department } = parsed.data;
+    const { userId, fullName, email, role, statusActive, allowedModules, department, companyId } = parsed.data;
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-    const { data: callerProfile, error: callerErr } = await admin
-      .from('profiles')
-      .select('role, is_super_admin, company_id')
-      .eq('user_id', callerUserId)
-      .single();
+    const { data: callerProfile, error: callerErr } = await perfilAtivo(authHeader, callerUserId, 'role, is_super_admin, company_id');
     if (callerErr || !callerProfile) {
       return new Response(JSON.stringify({ error: 'Perfil do solicitante não encontrado' }), {
         status: 403,
@@ -79,24 +78,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!callerProfile.is_super_admin) {
-      const { data: targetProfile, error: targetErr } = await admin
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', userId)
-        .single();
-      if (targetErr || !targetProfile) {
-        return new Response(JSON.stringify({ error: 'Usuário alvo não encontrado' }), {
-          status: 404,
+    // Um login pode ter vários acessos: edita só o da empresa certa.
+    const acessos = await acessosDe(admin, userId);
+    if (acessos.length === 0) {
+      return new Response(JSON.stringify({ error: 'Usuário alvo não encontrado' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    let empresaAlvo: string | null = null;
+    if (callerProfile.is_super_admin) {
+      empresaAlvo = companyId
+        ?? (acessos.some((a) => a.company_id === callerProfile.company_id) ? callerProfile.company_id : null)
+        ?? (acessos.length === 1 ? acessos[0].company_id : null);
+      if (empresaAlvo && !acessos.some((a) => a.company_id === empresaAlvo)) empresaAlvo = null;
+      if (!empresaAlvo) {
+        return new Response(JSON.stringify({ error: 'Usuário com mais de um acesso: informe a empresa.' }), {
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      if (targetProfile.company_id !== callerProfile.company_id) {
+    } else {
+      if (!acessos.some((a) => a.company_id === callerProfile.company_id) || (companyId && companyId !== callerProfile.company_id)) {
         return new Response(JSON.stringify({ error: 'Usuário de outra empresa' }), {
           status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+      empresaAlvo = callerProfile.company_id;
     }
 
     const callerIsSuper = !!callerProfile.is_super_admin || callerProfile.role === 'super_admin';
@@ -144,13 +153,25 @@ Deno.serve(async (req) => {
     const { error: updErr } = await admin
       .from('profiles')
       .update(updatePayload)
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .eq('company_id', empresaAlvo);
 
     if (updErr) {
       return new Response(JSON.stringify({ error: updErr.message }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // E-mail é do login, não do acesso: vale em todas as linhas da pessoa.
+    if (email && acessos.length > 1) {
+      const { error: emailErr } = await admin.from('profiles').update({ email }).eq('user_id', userId);
+      if (emailErr) {
+        return new Response(JSON.stringify({ error: 'Acesso salvo, mas falhou repetir o e-mail nos outros acessos: ' + emailErr.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {

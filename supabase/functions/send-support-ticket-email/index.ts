@@ -4,6 +4,7 @@
 // criação do chamado: o front já salvou o registro antes de chamar esta function.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@3';
+import { perfilAtivo } from "../_shared/acesso.ts";
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -51,11 +52,7 @@ Deno.serve(async (req) => {
       .single();
     if (ticketErr || !ticket) return json({ error: 'Chamado não encontrado.' }, 404);
 
-    const { data: callerProfile } = await admin
-      .from('profiles')
-      .select('company_id, is_super_admin, full_name, email')
-      .eq('user_id', user.id)
-      .single();
+    const { data: callerProfile } = await perfilAtivo(authHeader, user.id, 'company_id, is_super_admin, full_name, email');
     if (!callerProfile || (callerProfile.company_id !== ticket.company_id && !callerProfile.is_super_admin)) {
       return json({ error: 'Sem permissão para este chamado.' }, 403);
     }
