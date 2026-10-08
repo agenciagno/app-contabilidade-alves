@@ -102,7 +102,7 @@ export const MODULE_TREE: ModuleNode[] = [
     key: 'cadastro',
     label: 'Cadastro',
     children: [
-      { key: 'contatos', label: 'Empresas' },
+      { key: 'contatos', label: 'Contatos' },
       { key: 'cadastros_procuracoes', label: 'Procurações' },
       { key: 'cadastros_certificados', label: 'Certificados' },
       { key: 'cadastros_alvaras', label: 'Alvarás' },
@@ -238,7 +238,7 @@ export const INTERNAL_PICKER_TREE: PickerNode[] = [
       { key: 'equipe', label: 'Equipe' },
       {
         key: 'contatos',
-        label: 'Empresas',
+        label: 'Contatos',
         standalone: true,
         // Cada aba do perfil da empresa é um acesso separado. Sócios é uma seção
         // dentro da aba Cadastro, então acompanha ela.

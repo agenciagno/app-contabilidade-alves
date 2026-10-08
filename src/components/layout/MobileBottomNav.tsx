@@ -14,7 +14,7 @@ const DESTINOS = [
   { title: 'Tarefas', url: '/fiscal/tarefas', icon: ListChecks, moduleKey: 'fiscal' },
   { title: 'Financeiro', url: '/painel-financeiro', icon: Wallet, moduleKey: 'financeiro' },
   // Empresas é filha de "cadastro" — precisa checar o par pai/filho, não a chave solta.
-  { title: 'Empresas', url: '/contatos', icon: Building2, parentKey: 'cadastro', subKey: 'contatos' },
+  { title: 'Contatos', url: '/contatos', icon: Building2, parentKey: 'cadastro', subKey: 'contatos' },
 ] as const;
 
 export function MobileBottomNav() {

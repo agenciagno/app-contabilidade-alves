@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, User, Mail, Phone, Copy, Users, X, FileText, LayoutGrid, List, Pencil, Trash2, Building2, CalendarDays, FolderOpen } from 'lucide-react';
+import { Plus, Search, User, Mail, Phone, Copy, Users, X, FileText, LayoutGrid, List, Pencil, Trash2, Building2, CalendarDays, FolderOpen, UserCheck } from 'lucide-react';
 import { useContacts, Contact, ContactInsert, TAX_REGIME_LABELS } from '@/hooks/useContacts';
 import { useTeamProfiles } from '@/hooks/useTeamProfiles';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -200,8 +200,8 @@ export default function Contacts() {
     </div>
   );
 
-  const activeContacts = filteredContacts.filter(c => c.is_active);
-  const inactiveContacts = filteredContacts.filter(c => !c.is_active);
+  // Aba Clientes: só quem está marcado como Cliente (mesmos filtros e busca da tela; arquivados ficam de fora como em Todos).
+  const clienteContacts = filteredContacts.filter(c => (c.categorias || []).some(x => (x || '').toLowerCase() === 'cliente'));
   const hasActiveFilters = searchTerm || filterStatusCliente !== 'all' || filterCategoria !== 'all' || filterRegime !== 'all' || filterResponsible !== 'all' || filterResponsibleDp !== 'all';
 
   const clearFilters = () => {
@@ -218,11 +218,12 @@ export default function Contacts() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  const toggleSelectAll = () => {
-    if (selectedIds.length === filteredContacts.length) {
+  // "Selecionar todos" vale para a lista da aba aberta (Todos ou Clientes), não para a soma das duas.
+  const toggleSelectAll = (list: Contact[]) => {
+    if (selectedIds.length === list.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(filteredContacts.map(c => c.id));
+      setSelectedIds(list.map(c => c.id));
     }
   };
 
@@ -386,26 +387,228 @@ export default function Contacts() {
     </>
   );
 
+  // Conteúdo das abas "Todos" e "Clientes": mesma tela, a aba Clientes só recebe a lista já limitada à categoria Cliente.
+  const renderLista = (base: Contact[], mostrarCategoria: boolean) => {
+    const ativosDaLista = base.filter(c => c.is_active);
+    const inativosDaLista = base.filter(c => !c.is_active);
+    return (
+            <div className="space-y-6">
+              <div className="flex items-center justify-end gap-2">
+                <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ViewMode)} className="border border-border rounded-md p-0.5">
+                  <ToggleGroupItem value="card" className="h-8 w-8 p-0" title="Visualização em cards">
+                    <LayoutGrid className="h-4 w-4" />
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="list" className="h-8 w-8 p-0" title="Visualização em lista">
+                    <List className="h-4 w-4" />
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                <Button className="gap-2" onClick={handleNew}>
+                  <Plus className="w-4 h-4" />
+                  Novo Cliente/Fornecedor
+                </Button>
+              </div>
+
+              {/* Filters Bar */}
+              <div className="flex flex-wrap gap-3 items-center">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nome ou CNPJ..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="pl-9 h-9 bg-card border-border"
+                  />
+                </div>
+                <Select value={filterStatusCliente} onValueChange={setFilterStatusCliente}>
+                  <SelectTrigger className="w-[140px] h-9 bg-card border-border">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="Ativo">Ativo</SelectItem>
+                    <SelectItem value="Suspensa - Contabilidade">Suspensa - Contabilidade</SelectItem>
+                    <SelectItem value="Suspensa - Receita Federal">Suspensa - Receita Federal</SelectItem>
+                    <SelectItem value="Inapta - Receita Federal">Inapta - Receita Federal</SelectItem>
+                    <SelectItem value="Cancelada - Receita Federal">Cancelada - Receita Federal</SelectItem>
+                  </SelectContent>
+                </Select>
+                {mostrarCategoria && (
+                  <Select value={filterCategoria} onValueChange={setFilterCategoria}>
+                    <SelectTrigger className="w-[160px] h-9 bg-card border-border">
+                      <SelectValue placeholder="Categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas categorias</SelectItem>
+                      <SelectItem value="cliente">Clientes</SelectItem>
+                      <SelectItem value="fornecedor">Fornecedores</SelectItem>
+                      <SelectItem value="colaborador">Colaboradores</SelectItem>
+                      <SelectItem value="outros">Outros</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+                <Select value={filterRegime} onValueChange={setFilterRegime}>
+                  <SelectTrigger className="w-[180px] h-9 bg-card border-border">
+                    <SelectValue placeholder="Regime Tributário" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os regimes</SelectItem>
+                    <SelectItem value="simples_nacional">Simples Nacional</SelectItem>
+                    <SelectItem value="lucro_presumido">Lucro Presumido</SelectItem>
+                    <SelectItem value="lucro_real">Lucro Real</SelectItem>
+                    <SelectItem value="mei">MEI</SelectItem>
+                    <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
+                    <SelectItem value="isento">Isento</SelectItem>
+                    <SelectItem value="ausente">Ausente / Não informado</SelectItem>
+
+                  </SelectContent>
+                </Select>
+                <Select value={filterResponsible} onValueChange={setFilterResponsible}>
+                  <SelectTrigger className="w-[200px] h-9 bg-card border-border">
+                    <SelectValue placeholder="Responsável Fiscal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos resp. Fiscal</SelectItem>
+                    <SelectItem value="none">Sem responsável Fiscal</SelectItem>
+                    {fiscalProfiles.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.full_name || p.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filterResponsibleDp} onValueChange={setFilterResponsibleDp}>
+                  <SelectTrigger className="w-[200px] h-9 bg-card border-border">
+                    <SelectValue placeholder="Responsável DP" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos resp. DP</SelectItem>
+                    <SelectItem value="none">Sem responsável DP</SelectItem>
+                    {activeProfiles.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.full_name || 'Sem nome'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 gap-1.5 text-muted-foreground">
+                    <X className="h-3.5 w-3.5" />
+                    Limpar
+                  </Button>
+                )}
+              </div>
+
+              {/* Total muda com os filtros aplicados — reflete base, não o total bruto */}
+              <div className="flex flex-wrap items-center gap-4">
+                <span className="text-kicker uppercase text-muted-ink-2">Ativos</span>
+                <Contador tom="bg-muted-ink-2" valor={base.length} label="total" />
+              </div>
+
+              {/* Card View */}
+              {viewMode === 'card' && (
+                <>
+                  {ativosDaLista.length > 0 && (
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {ativosDaLista.map(contact => <ContactCard key={contact.id} contact={contact} />)}
+                    </div>
+                  )}
+                  {inativosDaLista.length > 0 && (
+                    <div className="space-y-3">
+                      <h2 className="text-sm font-medium text-muted-foreground">Inativos ({inativosDaLista.length})</h2>
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {inativosDaLista.map(contact => <ContactCard key={contact.id} contact={contact} />)}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Bulk Action Bar */}
+              {canBulkAction && selectedIds.length > 0 && (
+                <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                  <span className="text-sm font-medium text-foreground">{selectedIds.length} selecionado(s)</span>
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setBulkEditOpen(true)}>
+                    <Pencil className="w-3.5 h-3.5" />
+                    Editar Selecionados
+                  </Button>
+                  <Button variant="destructive" size="sm" className="gap-1.5" onClick={() => setBulkDeleteOpen(true)}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Excluir Selecionados
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              )}
+
+              {/* List View */}
+              {viewMode === 'list' && base.length > 0 && (
+                <Card className="bg-card">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {canBulkAction && (
+                          <TableHead className="w-10">
+                            <Checkbox
+                              checked={selectedIds.length === base.length && base.length > 0}
+                              onCheckedChange={() => toggleSelectAll(base)}
+                            />
+                          </TableHead>
+                        )}
+                        <TableHead>Nome</TableHead>
+                        <TableHead>CPF/CNPJ</TableHead>
+                        <TableHead>Telefone</TableHead>
+                        <TableHead>E-mail</TableHead>
+                        <TableHead className="w-10">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ativosDaLista.length > 0 && (
+                        <ContactTableSection contacts={ativosDaLista} label="Ativos" />
+                      )}
+                      {inativosDaLista.length > 0 && (
+                        <ContactTableSection contacts={inativosDaLista} label="Inativos" />
+                      )}
+                    </TableBody>
+                  </Table>
+                </Card>
+              )}
+
+              {base.length === 0 && (
+                <Card className="bg-card">
+                  <CardContent className="text-muted-foreground text-center py-16">
+                    {hasActiveFilters ? 'Nenhum cliente/fornecedor encontrado com os filtros aplicados' : 'Nenhum cliente/fornecedor cadastrado ainda'}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
-      {/*
-        Título "Empresas." vem do Figma e resolve uma divergência que existia:
-        o menu já dizia "Empresas" enquanto a tela dizia "Clientes & Fornecedores".
-      */}
+      {/* Menu e título dizem "Contatos" (08/10/2026): a tela reúne clientes, fornecedores e colaboradores. */}
       <PageHeader
         kicker="~/cadastros"
-        title="Empresas."
+        title="Contatos."
       />
 
-      <Tabs defaultValue="clientes" className="space-y-4">
+      <Tabs defaultValue="todos" className="space-y-4">
         {/* Abas com underline e ícone, como no protótipo — não pills */}
         <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b border-line bg-transparent p-0">
           <TabsTrigger
-            value="clientes"
+            value="todos"
             className="h-11 gap-[7px] rounded-none border-b-2 border-transparent px-3.5 text-nav text-muted-ink data-[state=active]:border-ink data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-none"
           >
             <Building2 className="h-4 w-4" strokeWidth={1.75} />
-            Contatos
+            Todos
+          </TabsTrigger>
+          <TabsTrigger
+            value="somente-clientes"
+            className="h-11 gap-[7px] rounded-none border-b-2 border-transparent px-3.5 text-nav text-muted-ink data-[state=active]:border-ink data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-none"
+          >
+            <UserCheck className="h-4 w-4" strokeWidth={1.75} />
+            Clientes ({clienteContacts.length})
           </TabsTrigger>
           <TabsTrigger
             value="entrada-clientes"
@@ -437,195 +640,12 @@ export default function Contacts() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="clientes">
-          <div className="space-y-6">
-            <div className="flex items-center justify-end gap-2">
-              <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ViewMode)} className="border border-border rounded-md p-0.5">
-                <ToggleGroupItem value="card" className="h-8 w-8 p-0" title="Visualização em cards">
-                  <LayoutGrid className="h-4 w-4" />
-                </ToggleGroupItem>
-                <ToggleGroupItem value="list" className="h-8 w-8 p-0" title="Visualização em lista">
-                  <List className="h-4 w-4" />
-                </ToggleGroupItem>
-              </ToggleGroup>
-              <Button className="gap-2" onClick={handleNew}>
-                <Plus className="w-4 h-4" />
-                Novo Cliente/Fornecedor
-              </Button>
-            </div>
+        <TabsContent value="todos">
+          {renderLista(filteredContacts, true)}
+        </TabsContent>
 
-            {/* Filters Bar */}
-            <div className="flex flex-wrap gap-3 items-center">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nome ou CNPJ..."
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className="pl-9 h-9 bg-card border-border"
-                />
-              </div>
-              <Select value={filterStatusCliente} onValueChange={setFilterStatusCliente}>
-                <SelectTrigger className="w-[140px] h-9 bg-card border-border">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="Ativo">Ativo</SelectItem>
-                  <SelectItem value="Suspensa - Contabilidade">Suspensa - Contabilidade</SelectItem>
-                  <SelectItem value="Suspensa - Receita Federal">Suspensa - Receita Federal</SelectItem>
-                  <SelectItem value="Inapta - Receita Federal">Inapta - Receita Federal</SelectItem>
-                  <SelectItem value="Cancelada - Receita Federal">Cancelada - Receita Federal</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filterCategoria} onValueChange={setFilterCategoria}>
-                <SelectTrigger className="w-[160px] h-9 bg-card border-border">
-                  <SelectValue placeholder="Categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas categorias</SelectItem>
-                  <SelectItem value="cliente">Clientes</SelectItem>
-                  <SelectItem value="fornecedor">Fornecedores</SelectItem>
-                  <SelectItem value="colaborador">Colaboradores</SelectItem>
-                  <SelectItem value="outros">Outros</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filterRegime} onValueChange={setFilterRegime}>
-                <SelectTrigger className="w-[180px] h-9 bg-card border-border">
-                  <SelectValue placeholder="Regime Tributário" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os regimes</SelectItem>
-                  <SelectItem value="simples_nacional">Simples Nacional</SelectItem>
-                  <SelectItem value="lucro_presumido">Lucro Presumido</SelectItem>
-                  <SelectItem value="lucro_real">Lucro Real</SelectItem>
-                  <SelectItem value="mei">MEI</SelectItem>
-                  <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
-                  <SelectItem value="isento">Isento</SelectItem>
-                  <SelectItem value="ausente">Ausente / Não informado</SelectItem>
-
-                </SelectContent>
-              </Select>
-              <Select value={filterResponsible} onValueChange={setFilterResponsible}>
-                <SelectTrigger className="w-[200px] h-9 bg-card border-border">
-                  <SelectValue placeholder="Responsável Fiscal" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos resp. Fiscal</SelectItem>
-                  <SelectItem value="none">Sem responsável Fiscal</SelectItem>
-                  {fiscalProfiles.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.full_name || p.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filterResponsibleDp} onValueChange={setFilterResponsibleDp}>
-                <SelectTrigger className="w-[200px] h-9 bg-card border-border">
-                  <SelectValue placeholder="Responsável DP" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos resp. DP</SelectItem>
-                  <SelectItem value="none">Sem responsável DP</SelectItem>
-                  {activeProfiles.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.full_name || 'Sem nome'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 gap-1.5 text-muted-foreground">
-                  <X className="h-3.5 w-3.5" />
-                  Limpar
-                </Button>
-              )}
-            </div>
-
-            {/* Total muda com os filtros aplicados — reflete filteredContacts, não o total bruto */}
-            <div className="flex flex-wrap items-center gap-4">
-              <span className="text-kicker uppercase text-muted-ink-2">Ativos</span>
-              <Contador tom="bg-muted-ink-2" valor={filteredContacts.length} label="total" />
-            </div>
-
-            {/* Card View */}
-            {viewMode === 'card' && (
-              <>
-                {activeContacts.length > 0 && (
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {activeContacts.map(contact => <ContactCard key={contact.id} contact={contact} />)}
-                  </div>
-                )}
-                {inactiveContacts.length > 0 && (
-                  <div className="space-y-3">
-                    <h2 className="text-sm font-medium text-muted-foreground">Inativos ({inactiveContacts.length})</h2>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {inactiveContacts.map(contact => <ContactCard key={contact.id} contact={contact} />)}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Bulk Action Bar */}
-            {canBulkAction && selectedIds.length > 0 && (
-              <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                <span className="text-sm font-medium text-foreground">{selectedIds.length} selecionado(s)</span>
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setBulkEditOpen(true)}>
-                  <Pencil className="w-3.5 h-3.5" />
-                  Editar Selecionados
-                </Button>
-                <Button variant="destructive" size="sm" className="gap-1.5" onClick={() => setBulkDeleteOpen(true)}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Excluir Selecionados
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
-                  <X className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            )}
-
-            {/* List View */}
-            {viewMode === 'list' && filteredContacts.length > 0 && (
-              <Card className="bg-card">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {canBulkAction && (
-                        <TableHead className="w-10">
-                          <Checkbox
-                            checked={selectedIds.length === filteredContacts.length && filteredContacts.length > 0}
-                            onCheckedChange={toggleSelectAll}
-                          />
-                        </TableHead>
-                      )}
-                      <TableHead>Nome</TableHead>
-                      <TableHead>CPF/CNPJ</TableHead>
-                      <TableHead>Telefone</TableHead>
-                      <TableHead>E-mail</TableHead>
-                      <TableHead className="w-10">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {activeContacts.length > 0 && (
-                      <ContactTableSection contacts={activeContacts} label="Ativos" />
-                    )}
-                    {inactiveContacts.length > 0 && (
-                      <ContactTableSection contacts={inactiveContacts} label="Inativos" />
-                    )}
-                  </TableBody>
-                </Table>
-              </Card>
-            )}
-
-            {filteredContacts.length === 0 && (
-              <Card className="bg-card">
-                <CardContent className="text-muted-foreground text-center py-16">
-                  {hasActiveFilters ? 'Nenhum cliente/fornecedor encontrado com os filtros aplicados' : 'Nenhum cliente/fornecedor cadastrado ainda'}
-                </CardContent>
-              </Card>
-            )}
-          </div>
+        <TabsContent value="somente-clientes">
+          {renderLista(clienteContacts, false)}
         </TabsContent>
 
         <TabsContent value="entrada-clientes">

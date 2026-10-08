@@ -374,7 +374,7 @@ export const menuEntries: MenuEntry[] = [
     icon: FolderOpen,
     moduleKey: 'cadastro',
     items: [
-      { title: 'Empresas', url: '/contatos', icon: Building2, iconName: 'building-2', subKey: 'contatos' },
+      { title: 'Contatos', url: '/contatos', icon: Building2, iconName: 'building-2', subKey: 'contatos' },
       { title: 'Acessos', url: '/acessos', icon: LockKeyhole, iconName: 'lock-keyhole', subKey: 'acessos' },
       { title: 'Equipe', url: '/cadastros/equipe', icon: UsersRound, iconName: 'users-round', subKey: 'equipe' },
       // Veio do grupo Financeiro: no Cadastro da visão externa (audiência
