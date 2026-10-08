@@ -121,6 +121,32 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   // Externa: todo mundo escolhe módulo, mesmo admin — nasce zerado.
   const showModulePicker = role === 'colaborador' || isExternalCompany;
 
+  // Usuários da CA de quem dá para copiar as permissões (só equipe interna, sem o próprio).
+  const { data: copySources = [] } = useQuery({
+    queryKey: ['user-form-copy-sources', companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email, allowed_modules')
+        .eq('company_id', companyId)
+        .eq('status_active', true)
+        .order('full_name', { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as { user_id: string; full_name: string | null; email: string; allowed_modules: string[] | null }[];
+    },
+    enabled: open && !!companyId && showModulePicker && !isExternalCompany,
+  });
+  const copyOptions = copySources.filter((u) => u.user_id !== editUser?.userId);
+
+  const copyPermissionsFrom = (userId: string) => {
+    // Radix devolve '' quando a lista muda sozinha — não é escolha do usuário.
+    if (!userId) return;
+    const source = copyOptions.find((u) => u.user_id === userId);
+    if (!source) return;
+    setAllowedModules(source.allowed_modules ?? []);
+    toast.success(`Permissões de ${source.full_name || source.email} aplicadas. Revise e salve.`);
+  };
+
   // Suporte vai para todo colaborador interno (fora do seletor, decisão 08/10/2026).
   const resolveModules = () => {
     const base = showModulePicker ? allowedModules : ALL_MODULE_KEYS;
@@ -414,9 +440,25 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
                   Só aparece o que sua empresa já contratou — nasce tudo desmarcado, libere módulo por módulo.
                 </p>
               )}
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-primary" />
-                <Label className="font-semibold">Módulos de Acesso</Label>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-primary" />
+                  <Label className="font-semibold">Módulos de Acesso</Label>
+                </div>
+                {!isExternalCompany && copyOptions.length > 0 && (
+                  <Select value="" onValueChange={copyPermissionsFrom}>
+                    <SelectTrigger className="h-8 w-[220px] text-xs">
+                      <SelectValue placeholder="Copiar permissões de…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {copyOptions.map((u) => (
+                        <SelectItem key={u.user_id} value={u.user_id}>
+                          {u.full_name || u.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               {isExternalCompany ? (
                 <div className="rounded-lg border border-border p-3 bg-muted/30 max-h-[320px] overflow-y-auto">
