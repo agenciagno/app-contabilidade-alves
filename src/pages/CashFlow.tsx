@@ -5,6 +5,8 @@ import {
   addDays,
   addWeeks,
   addMonths,
+  startOfDay,
+  endOfDay,
   startOfWeek,
   startOfMonth,
   endOfWeek,
@@ -48,8 +50,8 @@ import { cn } from '@/lib/utils';
 import { useBanks } from '@/hooks/useBanks';
 import { useTransactions, type Transaction } from '@/hooks/useTransactions';
 
-type Granularidade = 'semana' | 'mes';
-type HorizonteKey = '30' | '90' | '180';
+type Granularidade = 'dia' | 'semana' | 'mes';
+type HorizonteKey = '30' | '60' | '90' | '180';
 
 interface Bucket {
   key: string;
@@ -64,6 +66,7 @@ interface Bucket {
 
 const HORIZONS: Record<HorizonteKey, { label: string; days: number }> = {
   '30': { label: 'Próximos 30 dias', days: 30 },
+  '60': { label: 'Próximos 60 dias', days: 60 },
   '90': { label: 'Próximos 90 dias', days: 90 },
   '180': { label: 'Próximos 6 meses', days: 180 },
 };
@@ -73,7 +76,22 @@ const brl = (v: number) =>
 
 function buildBuckets(start: Date, end: Date, gran: Granularidade): Bucket[] {
   const out: Bucket[] = [];
-  if (gran === 'semana') {
+  if (gran === 'dia') {
+    let cur = startOfDay(start);
+    while (cur <= end) {
+      out.push({
+        key: format(cur, 'yyyy-MM-dd'),
+        label: format(cur, 'EEE dd/MM', { locale: ptBR }),
+        start: cur,
+        end: endOfDay(cur),
+        entradas: 0,
+        saidas: 0,
+        resultado: 0,
+        saldo: 0,
+      });
+      cur = addDays(cur, 1);
+    }
+  } else if (gran === 'semana') {
     let cur = startOfWeek(start, { weekStartsOn: 1 });
     while (cur <= end) {
       const s = cur;
@@ -181,7 +199,7 @@ export default function CashFlow() {
       <PageHeader
         kicker="~/financeiro · projeção"
         title="Fluxo de caixa."
-        subtitle="Projeção semanal a partir do saldo em contas."
+        subtitle="Projeção a partir do saldo em contas."
         actions={
           <>
             <Button
@@ -196,6 +214,7 @@ export default function CashFlow() {
             <Select value={granularidade} onValueChange={(v) => setGranularidade(v as Granularidade)}>
               <SelectTrigger className="h-9 w-[130px] border-line bg-paper text-ui"><SelectValue /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="dia">Diário</SelectItem>
                 <SelectItem value="semana">Semanal</SelectItem>
                 <SelectItem value="mes">Mensal</SelectItem>
               </SelectContent>
@@ -220,7 +239,7 @@ export default function CashFlow() {
           {
             label: projetadoNegativo ? 'Menor saldo projetado' : 'Saldo projetado (fim)',
             value: brl(projetadoNegativo ? menorSaldo.saldo : saldoFinal),
-            hint: projetadoNegativo ? `semana de ${menorSaldo.label}` : HORIZONS[horizonteKey].label.toLowerCase(),
+            hint: projetadoNegativo ? `${granularidade === 'dia' ? 'dia' : granularidade === 'mes' ? 'mês de' : 'semana de'} ${menorSaldo.label}` : HORIZONS[horizonteKey].label.toLowerCase(),
             emphasis: projetadoNegativo ? 'warm' : 'none',
           },
         ]}

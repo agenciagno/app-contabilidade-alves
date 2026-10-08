@@ -11,6 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useDashboardSummary, useAnnualMetrics, useMonthlyEvolution, useCategoryBreakdown } from '@/hooks/useRpcDashboard';
 import { useBanks } from '@/hooks/useBanks';
 import { useActiveCompany } from '@/contexts/CompanyContext';
+import { cn } from '@/lib/utils';
 import { useRecurringTransactions } from '@/hooks/useRecurringTransactions';
 import {
   ChartTooltip,
@@ -74,7 +75,7 @@ export default function Dashboard() {
   const { isWidgetEnabled } = useDashboardWidgets();
 
   const queryClient = useQueryClient();
-  const { activeCompanyId } = useActiveCompany();
+  const { activeCompanyId, isInternalCompany } = useActiveCompany();
   const { banks, isLoading: loadingBanks } = useBanks();
   const { recurringTransactions } = useRecurringTransactions();
 
@@ -181,6 +182,8 @@ export default function Dashboard() {
   const thisMonthData = useMemo(() => processReportData(thisMonthTx), [thisMonthTx]);
   const lastMonthData = useMemo(() => processReportData(lastMonthTx), [lastMonthTx]);
 
+  const showPeriodComparison = isInternalCompany && isWidgetEnabled('periodComparison');
+
   const isLoading = loadingBanks || loadingSummary || loadingAnnual || loadingMonthly || loadingCategory;
 
   return (
@@ -197,7 +200,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <FinancialHealthBadge lucroPrevisto={annualMetrics.lucroPrevisto} saldoBancario={summary.saldoBancario} />
+        {/* Selo de saúde financeira e Comparativo de Períodos: só na CA — saem do Dashboard do cliente externo (Gabriel, 07/10/2026). */}
+        {isInternalCompany && (
+          <FinancialHealthBadge lucroPrevisto={annualMetrics.lucroPrevisto} saldoBancario={summary.saldoBancario} />
+        )}
       </div>
 
       {/* 4 StatCards separados, cada um com barra de progresso (Figma 21/08/2026) */}
@@ -238,7 +244,7 @@ export default function Dashboard() {
       </div>
 
       {/* Evolução Mensal + Comparativo de Períodos lado a lado (Figma 21/08/2026) */}
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className={cn('grid grid-cols-1 gap-5', showPeriodComparison && 'xl:grid-cols-[minmax(0,1fr)_380px]')}>
         {isWidgetEnabled('evolution') && (
           <Card>
             <CardHeader className="pb-2">
@@ -306,7 +312,7 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {isWidgetEnabled('periodComparison') && (
+        {showPeriodComparison && (
           <PeriodComparison
             currentPeriod={{
               receitas: thisMonthData.totals.receitas,

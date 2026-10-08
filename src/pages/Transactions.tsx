@@ -908,9 +908,12 @@ export default function Transactions() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="outline" onClick={() => setImportOpen(true)}>
-              <Upload className="w-4 h-4" /> Importar
-            </Button>
+            {/* Importar planilha: só na CA — sai de Lançamentos do cliente externo (Gabriel, 07/10/2026). */}
+            {isInternalCompany && (
+              <Button variant="outline" onClick={() => setImportOpen(true)}>
+                <Upload className="w-4 h-4" /> Importar
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setTransferOpen(true)}>
               <ArrowLeftRight className="w-4 h-4" /> Transferência
             </Button>
