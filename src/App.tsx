@@ -188,8 +188,8 @@ const App = () => (
               <Route path="/dashboard-federal/das" element={<Navigate to="/dashboard-federal/pagamentos" replace />} />
               <Route path="/dashboard-federal/faturamento" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><FaturamentoFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/defis" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><DefisFederal /></ModuleGuard></AppLayout>} />
-              <Route path="/dashboard-federal/procuracoes" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><ProcuracoesFederal /></ModuleGuard></AppLayout>} />
-              <Route path="/dashboard-federal/situacao-fiscal" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><SituacaoFiscalFederal /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal/procuracoes" element={<AppLayout><ModuleGuard moduleName="monitoramento_procuracoes"><ProcuracoesFederal /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal/situacao-fiscal" element={<AppLayout><ModuleGuard moduleName="monitoramento_situacao_fiscal"><SituacaoFiscalFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/parcelamentos" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><EmBreve moduleKey="parcelamentos" /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/darf" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><EmBreve moduleKey="darf_atualizado" /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/dctfweb-mit" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><DctfwebMitFederal /></ModuleGuard></AppLayout>} />

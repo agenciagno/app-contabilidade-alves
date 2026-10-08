@@ -20,9 +20,23 @@ export interface ModuleNode {
   children?: { key: string; label: string }[];
 }
 
-/** Árvore de permissões exibida no cadastro de usuário. */
+/**
+ * Registro das chaves reais de permissão (pais e filhos) — é daqui que saem a
+ * lista de submódulos por pai (gates do menu e das rotas), os rótulos e
+ * ALL_MODULE_KEYS. O que o cadastro de usuário INTERNO desenha é
+ * `INTERNAL_PICKER_TREE`, logo abaixo: a organização visual (grupos, ordem,
+ * Empresa com abas) não precisa seguir esta árvore.
+ */
 export const MODULE_TREE: ModuleNode[] = [
   { key: 'home', label: 'Início' },
+  {
+    key: 'tech',
+    label: 'Tech',
+    children: [
+      { key: 'tech_consumo_serpro', label: 'Consumo Serpro' },
+      { key: 'tech_central_notificacoes', label: 'Central de Notificações' },
+    ],
+  },
   {
     key: 'reforma_tributaria',
     label: 'Reforma Tributária',
@@ -53,6 +67,10 @@ export const MODULE_TREE: ModuleNode[] = [
   },
   { key: 'dashboard_federal', label: 'Dashboard Federal' },
   { key: 'mensagens', label: 'Mensagens e-CAC' },
+  // Situação Fiscal e Procurações já tiveram item de menu próprio (01/10/2026),
+  // mas seguiam a chave do Dashboard Federal. Agora cada um tem a sua.
+  { key: 'monitoramento_situacao_fiscal', label: 'Situação Fiscal' },
+  { key: 'monitoramento_procuracoes', label: 'Procurações' },
   { key: 'parcelamentos', label: 'Parcelamentos' },
   { key: 'certidoes', label: 'Certidões' },
   { key: 'processos', label: 'Processos' },
@@ -121,6 +139,137 @@ export const MODULE_TREE: ModuleNode[] = [
 ];
 
 /**
+ * Nó do seletor de módulos do usuário INTERNO (equipe da CA).
+ * - `key` ausente = grupo só visual (marca/desmarca os filhos, não grava nada).
+ * - `grants` = chaves reais gravadas junto, que o gate do menu/rota checa além
+ *   da própria (ex.: Certificados mora no Monitoramento, mas a permissão é do
+ *   Cadastro).
+ * - `standalone` = tela própria além dos filhos: continua marcado mesmo sem
+ *   nenhum filho (ex.: Empresas, que tem lista e abas).
+ */
+export interface PickerNode {
+  label: string;
+  key?: string;
+  grants?: string[];
+  standalone?: boolean;
+  children?: PickerNode[];
+}
+
+/**
+ * Ordem e agrupamento iguais ao menu lateral interno (decisão Gabriel,
+ * 08/10/2026). Só entra o que se concede por usuário: Suporte vai para todo
+ * colaborador por padrão (UserFormDialog); Reforma Tributária, Parcelamentos,
+ * Score Fiscal e Agenda são "em breve" e ficam fora até ganharem tela; Clientes
+ * & Fornecedores, Categorias e Relatórios existem só na visão externa.
+ */
+export const INTERNAL_PICKER_TREE: PickerNode[] = [
+  { key: 'home', label: 'Início' },
+  {
+    key: 'tech',
+    label: 'Tech',
+    children: [
+      { key: 'tech_consumo_serpro', label: 'Consumo Serpro' },
+      { key: 'tech_central_notificacoes', label: 'Central de Notificações' },
+    ],
+  },
+  {
+    key: 'gestao360',
+    label: 'Gestão 360°',
+    children: [
+      { key: 'gestao360_portal', label: 'Portal 360°' },
+      { key: 'gestao360_ausencias', label: 'CA · Ausências' },
+      { key: 'gestao360_diagnosticos', label: 'CA · Diagnósticos' },
+    ],
+  },
+  {
+    key: 'fiscal',
+    label: 'Tarefas',
+    children: [
+      { key: 'fiscal_dashboard', label: 'Dashboard' },
+      { key: 'fiscal_tarefas', label: 'Tarefas' },
+      { key: 'fiscal_colaboradores', label: 'Colaboradores' },
+      { key: 'fiscal_obrigacoes_declaracoes', label: 'Obrigações e Declarações' },
+      { key: 'fiscal_calendario', label: 'Calendário Fiscal' },
+    ],
+  },
+  {
+    label: 'Monitoramento',
+    children: [
+      { key: 'dashboard_federal', label: 'Dashboard Federal' },
+      { key: 'mensagens', label: 'Mensagens e-CAC' },
+      { key: 'monitoramento_situacao_fiscal', label: 'Situação Fiscal' },
+      { key: 'monitoramento_procuracoes', label: 'Procurações' },
+      { key: 'certidoes', label: 'Certidões' },
+      { key: 'cadastros_certificados', label: 'Certificados', grants: ['cadastro'] },
+      { key: 'cadastros_alvaras', label: 'Alvarás', grants: ['cadastro'] },
+      { key: 'processos', label: 'Processos' },
+    ],
+  },
+  {
+    label: 'Diagnóstico Fiscal',
+    children: [
+      { key: 'classificacao_fiscal', label: 'Classificação Fiscal' },
+      { key: 'analise_fiscal', label: 'Análise Fiscal' },
+      { key: 'simulador_tributario', label: 'Simulador Tributário' },
+      { key: 'diagnostico_ca', label: 'Diagnóstico CA' },
+    ],
+  },
+  {
+    key: 'financeiro',
+    label: 'Financeiro',
+    children: [
+      { key: 'financeiro_dashboard', label: 'Dashboard' },
+      { key: 'financeiro_lancamentos', label: 'Lançamentos' },
+      { key: 'financeiro_pagar_receber', label: 'Pagar/Receber' },
+      { key: 'financeiro_fluxo_caixa', label: 'Fluxo de Caixa' },
+      { key: 'financeiro_boletos', label: 'Boletos' },
+      { key: 'financeiro_conta_corrente', label: 'Conta Corrente' },
+      { key: 'financeiro_conciliacao_sicoob', label: 'Conciliação Sicoob' },
+      { key: 'financeiro_eventos_contabeis', label: 'Eventos Contábeis' },
+      { key: 'financeiro_dre', label: 'DRE' },
+      { key: 'financeiro_metas_orcamentos', label: 'Metas e Orçamentos' },
+    ],
+  },
+  {
+    key: 'cadastro',
+    label: 'Cadastro',
+    children: [
+      { key: 'acessos', label: 'Acessos' },
+      { key: 'equipe', label: 'Equipe' },
+      {
+        key: 'contatos',
+        label: 'Empresas',
+        standalone: true,
+        // Cada aba do perfil da empresa é um acesso separado. Sócios é uma seção
+        // dentro da aba Cadastro, então acompanha ela.
+        children: [
+          { key: 'perfil_cliente_identificacao', label: 'Cadastro', grants: ['perfil_cliente', 'perfil_cliente_socios'] },
+          { key: 'perfil_cliente_fiscal', label: 'Dpto Fiscal', grants: ['perfil_cliente'] },
+          { key: 'perfil_cliente_pessoal', label: 'Dpto Pessoal', grants: ['perfil_cliente'] },
+          { key: 'perfil_cliente_acessos', label: 'Acessos', grants: ['perfil_cliente'] },
+          { key: 'perfil_cliente_financeiro', label: 'Financeiro', grants: ['perfil_cliente'] },
+          { key: 'perfil_cliente_operacional', label: 'Operacional', grants: ['perfil_cliente'] },
+          { key: 'perfil_cliente_logs', label: 'Logs', grants: ['perfil_cliente'] },
+        ],
+      },
+    ],
+  },
+  // Item solto: não pode ficar debaixo de Cadastro (marcar o grupo ligaria o
+  // `cadastro` sem filho, e `cadastro` sem filho libera tudo — regra legada).
+  { key: 'perfil_cliente_operacional_excluir', label: 'Excluir cliente', grants: ['perfil_cliente'] },
+  {
+    key: 'configuracoes',
+    label: 'Configurações',
+    children: [
+      { key: 'configuracoes_empresa', label: 'Dados da Empresa' },
+      { key: 'configuracoes_logs', label: 'Logs Globais' },
+      { key: 'configuracoes_lixeira', label: 'Lixeira' },
+      { key: 'configuracoes_backup', label: 'Backup' },
+    ],
+  },
+];
+
+/**
  * Fronteira estrutural interno × externo, por módulo de topo.
  *
  * AUDIÊNCIA ≠ PLANO: `plan_modules` diz o que o tenant CONTRATOU (comercial,
@@ -160,6 +309,8 @@ export const MODULE_AUDIENCE: Record<string, ModuleAudience> = {
   // (Clientes Externos, LGPD e Consumo Serpro não têm chave de submódulo — a
   // audiência deles vive no item do menu e no guard da rota.)
   tech: 'both',
+  tech_consumo_serpro: 'internal',
+  tech_central_notificacoes: 'both',
 
   // Cadastro: na visão externa só existem C&F (acima) e Equipe.
   cadastro: 'both',
@@ -175,6 +326,8 @@ export const MODULE_AUDIENCE: Record<string, ModuleAudience> = {
   fiscal: 'internal',
   mensagens: 'internal',
   dashboard_federal: 'internal',
+  monitoramento_situacao_fiscal: 'internal',
+  monitoramento_procuracoes: 'internal',
   parcelamentos: 'internal',
   certidoes: 'internal',
   processos: 'internal',

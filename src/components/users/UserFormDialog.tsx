@@ -20,7 +20,8 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { z } from 'zod';
 import { PasswordStrength, isPasswordStrong } from '@/components/ui/PasswordStrength';
 
-import { ALL_MODULE_KEYS, MODULE_TREE } from '@/constants/modules';
+import { ALL_MODULE_KEYS } from '@/constants/modules';
+import { ModulosPickerInterno } from '@/components/users/ModulosPickerInterno';
 import { DEPARTMENT_OPTIONS } from '@/constants/departments';
 import { ModulosPickerTree, toggleModuloKey } from '@/components/tech/ModulosPickerTree';
 
@@ -119,6 +120,12 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
   // Interna: só colaborador escolhe módulo (admin/super_admin ganham tudo).
   // Externa: todo mundo escolhe módulo, mesmo admin — nasce zerado.
   const showModulePicker = role === 'colaborador' || isExternalCompany;
+
+  // Suporte vai para todo colaborador interno (fora do seletor, decisão 08/10/2026).
+  const resolveModules = () => {
+    const base = showModulePicker ? allowedModules : ALL_MODULE_KEYS;
+    return isExternalCompany ? base : Array.from(new Set([...base, 'suporte']));
+  };
 
   useEffect(() => {
     if (open && editUser) {
@@ -224,7 +231,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
     try {
 
       if (isEditMode) {
-        const resolvedModules = showModulePicker ? allowedModules : ALL_MODULE_KEYS;
+        const resolvedModules = resolveModules();
 
         const emailChanged = email !== editUser!.email;
         const { data: updateData, error: updateError } = await supabase.functions.invoke(
@@ -264,7 +271,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
         handleClose();
       } else {
         // CREATE MODE
-        const resolvedModules = showModulePicker ? allowedModules : ALL_MODULE_KEYS;
+        const resolvedModules = resolveModules();
         const { data, error: fnError } = await supabase.functions.invoke('create-user-v2', {
           body: {
             email,
@@ -421,77 +428,7 @@ export default function UserFormDialog({ open, onOpenChange, companyId, onSucces
                 </div>
               ) : (
               <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/30 max-h-[320px] overflow-y-auto">
-                {MODULE_TREE.map((mod) => {
-                  const childKeys = mod.children?.map((c) => c.key) ?? [];
-                  const checkedChildren = childKeys.filter((k) => allowedModules.includes(k));
-                  const parentChecked = allowedModules.includes(mod.key);
-                  const allChildrenChecked = childKeys.length > 0 && checkedChildren.length === childKeys.length;
-                  const someChildrenChecked = checkedChildren.length > 0 && !allChildrenChecked;
-
-                  const toggleParent = () => {
-                    setAllowedModules((prev) => {
-                      const set = new Set(prev);
-                      if (parentChecked) {
-                        // Uncheck parent + all children
-                        set.delete(mod.key);
-                        childKeys.forEach((k) => set.delete(k));
-                      } else {
-                        set.add(mod.key);
-                        childKeys.forEach((k) => set.add(k));
-                      }
-                      return Array.from(set);
-                    });
-                  };
-
-                  const toggleChild = (childKey: string) => {
-                    setAllowedModules((prev) => {
-                      const set = new Set(prev);
-                      if (set.has(childKey)) {
-                        set.delete(childKey);
-                        // If no children remain, also remove parent
-                        const remaining = childKeys.filter((k) => k !== childKey && set.has(k));
-                        if (remaining.length === 0) set.delete(mod.key);
-                      } else {
-                        set.add(childKey);
-                        set.add(mod.key); // ensure parent
-                      }
-                      return Array.from(set);
-                    });
-                  };
-
-                  return (
-                    <div key={mod.key} className="space-y-1.5">
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={parentChecked}
-                          ref={(el) => {
-                            if (el) el.indeterminate = someChildrenChecked && !parentChecked ? true : someChildrenChecked;
-                          }}
-                          onChange={toggleParent}
-                          className="rounded border-border"
-                        />
-                        <span className="text-sm font-medium">{mod.label}</span>
-                      </label>
-
-                      {mod.children && (
-                        <div className="ml-6 grid grid-cols-2 gap-1.5">
-                          {mod.children.map((child) => (
-                            <label key={child.key} className="flex items-center gap-2 cursor-pointer select-none">
-                              <input
-                                type="checkbox"
-                                checked={allowedModules.includes(child.key)}
-                                onChange={() => toggleChild(child.key)}
-                                className="rounded border-border"
-                              />
-                              <span className="text-sm text-muted-foreground">{child.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                <ModulosPickerInterno selecionados={allowedModules} onChange={setAllowedModules} />
               </div>
               )}
             </div>

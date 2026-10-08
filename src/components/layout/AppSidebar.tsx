@@ -207,8 +207,8 @@ export const menuEntries: MenuEntry[] = [
       { title: 'Clientes Externos', url: '/tech/clientes-externos', icon: Building2, iconName: 'building-2', requireSuperAdmin: true, audience: 'external' },
       { title: 'Canais de Suporte', url: '/tech/suporte-canais', icon: MessageSquare, iconName: 'message-square', requireSuperAdmin: true, audience: 'external' },
       { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check', requireAdmin: true, audience: 'external' },
-      { title: 'Consumo Serpro', url: '/tech/consumo-serpro', icon: Gauge, iconName: 'gauge', requireAdmin: true, audience: 'internal' },
-      { title: 'Central de Notificações', url: '/central-notificacoes', icon: BellRing, iconName: 'bell-ring', requireSuperAdmin: true },
+      { title: 'Consumo Serpro', url: '/tech/consumo-serpro', icon: Gauge, iconName: 'gauge', subKey: 'tech_consumo_serpro', requireAdmin: true, audience: 'internal' },
+      { title: 'Central de Notificações', url: '/central-notificacoes', icon: BellRing, iconName: 'bell-ring', subKey: 'tech_central_notificacoes', requireSuperAdmin: true },
     ],
   },
   {
@@ -244,7 +244,8 @@ export const menuEntries: MenuEntry[] = [
     icon: Landmark,
     iconName: 'landmark',
     moduleKey: 'dashboard_federal',
-    // Situação Fiscal e Procurações viraram itens próprios (01/10/2026).
+    // Situação Fiscal e Procurações viraram itens próprios (01/10/2026), e em
+    // 08/10/2026 ganharam chave de permissão própria.
     activeExcept: ['/dashboard-federal/situacao-fiscal', '/dashboard-federal/procuracoes'],
   },
   {
@@ -261,7 +262,7 @@ export const menuEntries: MenuEntry[] = [
     url: '/dashboard-federal/situacao-fiscal',
     icon: ShieldCheck,
     iconName: 'shield-check',
-    moduleKey: 'dashboard_federal',
+    moduleKey: 'monitoramento_situacao_fiscal',
   },
   {
     kind: 'simple',
@@ -269,7 +270,7 @@ export const menuEntries: MenuEntry[] = [
     url: '/dashboard-federal/procuracoes',
     icon: FileSignature,
     iconName: 'file-signature',
-    moduleKey: 'dashboard_federal',
+    moduleKey: 'monitoramento_procuracoes',
   },
   {
     kind: 'simple',
