@@ -168,7 +168,7 @@ const lista = (pas: string[]) => (pas.length <= 3 ? pas.map(sigla).join(', ') : 
  * Leitura de faturamento confiável mais recente do cliente, até a competência em aberto. O limite do Simples é do acumulado, não de um mês:
  * no começo do mês a declaração da competência ainda não existe, e a leitura do mês anterior continua valendo.
  */
-function ultimaLeituraAte(rows: FaturamentoRow[], contactId: string, competencia: string): FaturamentoRow | null {
+export function ultimaLeituraAte(rows: FaturamentoRow[], contactId: string, competencia: string): FaturamentoRow | null {
   let melhor: FaturamentoRow | null = null;
   for (const r of rows) {
     if (r.contact_id !== contactId || !r.confiavel || r.periodo_apuracao.slice(0, 7) > competencia) continue;
@@ -359,7 +359,7 @@ export function filtrarPorResponsavel(linhas: LinhaCarteira[], resp: string | nu
 }
 
 /** Responsáveis que aparecem na carteira, com quantos clientes cada um tem; os sem responsável vêm à parte. */
-export function resumirResponsaveis(linhas: LinhaCarteira[]): { responsaveis: (ResponsavelCliente & { clientes: number })[]; semResponsavel: number } {
+export function resumirResponsaveis(linhas: Pick<LinhaCarteira, 'responsavel'>[]): { responsaveis: (ResponsavelCliente & { clientes: number })[]; semResponsavel: number } {
   const m = new Map<string, ResponsavelCliente & { clientes: number }>();
   let sem = 0;
   for (const l of linhas) {

@@ -67,7 +67,7 @@ export function DiagnosticosOportunidades({ linhas, faturamento }: { linhas: Lin
                       <DicaBotao texto="Abre um aviso consultivo ao cliente sobre o limite, com texto pronto para você revisar.">
                         <Button variant="ghost" size="icon" aria-label="Avisar cliente" onClick={() => setAvisar(x)}><Send className="h-4 w-4" /></Button>
                       </DicaBotao>
-                      <Link to={`/dashboard-federal/faturamento?q=${digitos(x.linha.documento)}`} className="px-2 text-ui-strong text-action hover:underline">Ver</Link>
+                      <Link to={`/dashboard-federal/simples-nacional?q=${digitos(x.linha.documento)}`} className="px-2 text-ui-strong text-action hover:underline">Ver</Link>
                     </div>
                   </TableCell>
                 </TableRow>

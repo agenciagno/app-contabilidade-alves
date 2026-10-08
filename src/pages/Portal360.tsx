@@ -75,7 +75,7 @@ export default function Portal360() {
     // Só o que pede ação. O que "está bem" (declarações em dia, situação fiscal sem pendência) fica no chip de nível e na ficha do cliente.
     return [
       {
-        id: 'em-falta', titulo: 'Declarações em falta', icone: FileX, valor: String(emFalta), tom: tomPor(emFalta, consultadas), filtro: FILTROS.declaracoesEmFalta, to: '/dashboard-federal/pgdas',
+        id: 'em-falta', titulo: 'Declarações em falta', icone: FileX, valor: String(emFalta), tom: tomPor(emFalta, consultadas), filtro: FILTROS.declaracoesEmFalta, to: '/dashboard-federal/simples-nacional',
         cobertura: { n: consultadas, total: aplicaveis },
         hint: `${plural(pendencias, 'pendência', 'pendências')} (PGDAS-D e DEFIS)${aConfirmarDecl ? ` · ${aConfirmarDecl} a confirmar` : ''}${dctfMitConfirmar ? ` · DCTFWeb/MIT a confirmar: ${dctfMitConfirmar}` : ''}`,
         detalhe: (l) => l.ausencias.filter((a) => a.situacao === 'em_falta').map((a) => (a.obrigacao === 'DEFIS' ? `DEFIS ${a.competencia}` : `PGDAS-D ${sigla(a.competencia)}`)).join(', '),

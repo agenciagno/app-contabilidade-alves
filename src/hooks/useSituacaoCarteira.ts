@@ -34,6 +34,26 @@ function useCadastroCarteira() {
 }
 
 /**
+ * Do cadastro, para as listas de Monitoramento: responsável (com o nome da equipe) e data de abertura de cada cliente ativo.
+ * Reaproveita a mesma consulta do Portal 360° (o React Query divide o cache).
+ */
+export function useCadastroMonitor() {
+  const cadastro = useCadastroCarteira();
+  const equipe = useTeamProfiles();
+  const responsaveis = useMemo(() => {
+    const nomes = new Map((equipe.data ?? []).map((p) => [p.id, p.full_name?.trim() || 'Sem nome'] as const));
+    const m = new Map<string, ResponsavelCliente>();
+    for (const [contato, id] of cadastro.data?.responsavelDe ?? []) m.set(contato, { id, nome: nomes.get(id) ?? 'Responsável inativo' });
+    return m;
+  }, [cadastro.data, equipe.data]);
+  return {
+    responsaveis,
+    aberturas: cadastro.data?.aberturas ?? new Map<string, string | null>(),
+    carregando: cadastro.isLoading || equipe.isLoading,
+  };
+}
+
+/**
  * Uma linha por cliente monitorado, com o estado de cada fonte do Serpro já salva. Só leitura: não chama o Serpro e não custa nada.
  * Junta os mesmos hooks que o Dashboard Federal usa; o React Query reaproveita o cache entre as telas.
  */

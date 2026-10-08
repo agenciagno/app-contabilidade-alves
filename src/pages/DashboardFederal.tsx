@@ -1,214 +1,270 @@
-import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import {
-  BadgeCheck, BarChart3, ClipboardList, CreditCard, FileCheck, FileSpreadsheet, FileX,
-  Calculator, ClipboardCheck, Gavel, Landmark, Mail, Receipt, Scale, ShieldCheck, UserX, ArrowRight,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
+import { ArrowRight, ClipboardCheck } from 'lucide-react';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RTooltip } from 'recharts';
 
-import { DsBadge, IconBox, PageHeader } from '@/components/ds';
+import { DsAlert, PageHeader } from '@/components/ds';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ResponsavelFiltro } from '@/components/gestao360/ResponsavelFiltro';
+import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
+import { SeloMonitor } from '@/components/monitor/MonitorUi';
+import { useSituacaoCarteira, useCadastroMonitor } from '@/hooks/useSituacaoCarteira';
+import { useFiltroCarteira } from '@/hooks/useFiltroCarteira';
 import { diasParaVencer, useCertificates } from '@/hooks/useCertificates';
-import { STATUS_MONITORADO, seloCaixa, useClientesCaixa, useMensagensCriticas } from '@/hooks/useSerproCaixaPostal';
-import { competenciaPadrao, rotuloCompetencia, useMatrizPagamentos } from '@/hooks/useSerproPagamentos';
-import { anoDe, declaracaoVigente, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
-import { unificarLinhas } from '@/hooks/useSerproDasUnificado';
-import { faturamentoVigente, nivelLimite, nivelSublimite, useFaturamentoAno } from '@/hooks/useSerproFaturamento';
-import { statusDefis, useMatrizDefis } from '@/hooks/useSerproDefis';
-import { useProcuracoes, vencendo as procVencendo } from '@/hooks/useSerproProcuracoes';
-import { estadoSitfis, useMatrizSitfis } from '@/hooks/useSerproSitfis';
-import { estadoDctfweb, estadoMit, useMatrizDctfwebMit } from '@/hooks/useSerproDctfweb';
+import { anoDe, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
 import { useConferenciaCadastro } from '@/hooks/useSerproConferenciaCadastro';
+import { siglaCompetencia, useMatrizPagamentos } from '@/hooks/useSerproPagamentos';
+import { montarLinhasSimples } from '@/lib/simplesNacionalLinhas';
+import {
+  COR_ESTADO, DICA_ESTADO, ESTADOS, FORA_DA_SITUACAO_DO_CLIENTE, ROTULO_ESTADO,
+  contarEstados, outrosMotivos, seloDoCliente, selosDaCarteira,
+  type EstadoMonitor, type ProcessoPainel, type Selo,
+} from '@/lib/monitorEstados';
+import type { LinhaCarteira } from '@/lib/situacaoCarteira';
 
-type Tom = 'ok' | 'warn' | 'danger' | 'info' | 'neutral';
+const SIMPLES = '/dashboard-federal/simples-nacional';
 
-interface CartaoAtivo {
-  titulo: string;
-  icone: LucideIcon;
-  to: string;
-  tom: Tom;
-  linhas: string[];
-}
-
-interface CartaoEmBreve {
-  titulo: string;
-  icone: LucideIcon;
-  onda?: string;
-  fonte: string;
-}
-
-// Cartões que ainda não têm dado: acendem conforme cada onda do Integra Contador entra (relatório serpro-integra-contador-oportunidades-set2026).
-// Parcelamentos e DARF atualizado já estão desenvolvidos (src/pages/ParcelamentosFederal.tsx e DarfFederal.tsx, hooks useSerproParcelamentos e useSerproDarf),
-// mas ficam guardados, sem cartão nem rota, até Gabriel decidir usar: para ligar, volte o cartão em `ativos` e as duas rotas em App.tsx.
-const EM_BREVE: CartaoEmBreve[] = [
-  { titulo: 'Parcelamentos', icone: CreditCard, fonte: 'Parcelas, situação e guia por cliente' },
-  { titulo: 'DARF atualizado', icone: Calculator, fonte: 'Guia com multa e juros calculados' },
-  { titulo: 'e-Processo', icone: Scale, onda: 'Onda 3', fonte: 'Processos por interessado' },
-  { titulo: 'Declarações em falta', icone: FileX, onda: 'Onda 2 a 4', fonte: 'PGDAS-D, DCTFWeb e DEFIS' },
-  { titulo: 'Exclusão do Simples', icone: UserX, onda: 'Onda 3', fonte: 'Termos e riscos de exclusão' },
+/** Uma barra por fonte. `filtra`: a tela de destino já abre filtrada no estado clicado (`?estado=`). */
+const PROCESSOS: { chave: ProcessoPainel; titulo: string; to: string; filtra: boolean; nota?: string }[] = [
+  { chave: 'caixa', titulo: 'Mensagens e-CAC', to: '/mensagens', filtra: false },
+  { chave: 'intimacoes', titulo: 'Termos de intimação', to: '/dashboard-federal/intimacoes', filtra: false },
+  { chave: 'pgdas', titulo: 'PGDAS-D', to: `${SIMPLES}?fonte=declaracao`, filtra: true },
+  { chave: 'das', titulo: 'DAS do Simples', to: `${SIMPLES}?fonte=das`, filtra: true },
+  { chave: 'defis', titulo: 'DEFIS', to: `${SIMPLES}?aba=defis`, filtra: true },
+  { chave: 'limite', titulo: 'Limite do Simples', to: `${SIMPLES}?fonte=limite`, filtra: true, nota: 'Não entra na situação do cliente: sem leitura do faturamento é falta de leitura nossa, não obrigação dele.' },
+  { chave: 'dctfweb_mit', titulo: 'DCTFWeb e MIT', to: '/dashboard-federal/dctfweb-mit', filtra: false },
+  { chave: 'sitfis', titulo: 'Situação fiscal', to: '/dashboard-federal/situacao-fiscal', filtra: false },
+  { chave: 'procuracao', titulo: 'Procurações', to: '/dashboard-federal/procuracoes', filtra: false },
+  { chave: 'certificado', titulo: 'Certificados', to: '/cadastros/certificados', filtra: false },
 ];
 
+const comEstado = (to: string, e: EstadoMonitor) => `${to}${to.includes('?') ? '&' : '?'}estado=${e}`;
+
+interface LinhaPainel { l: LinhaCarteira; selos: Record<ProcessoPainel, Selo | null>; cliente: Selo }
+
 export default function DashboardFederal() {
-  const { data: todos = [], isLoading: carregandoClientes } = useClientesCaixa();
-  const clientes = useMemo(() => todos.filter((c) => c.status_cliente === STATUS_MONITORADO), [todos]);
-  const { data: criticas = [], isLoading: carregandoCriticas } = useMensagensCriticas();
-  const { data: certificados = [], isLoading: carregandoCert } = useCertificates();
-  const competencia = competenciaPadrao();
+  const navigate = useNavigate();
+  const { linhas, carregando, competencia, hoje, fontesAtualizadas, faturamento } = useSituacaoCarteira();
+  const { aberturas, responsaveis, carregando: carregandoCadastro } = useCadastroMonitor();
+  const { data: pgdas = [], isLoading: carregandoPgdas } = useMatrizPgdasd(anoDe(competencia));
   const { data: pagamentos = [], isLoading: carregandoPag } = useMatrizPagamentos(competencia);
-  const { data: simples = [], isLoading: carregandoSn } = useMatrizPgdasd(anoDe(competencia));
-  const { data: leituras = [], isLoading: carregandoFat } = useFaturamentoAno(anoDe(competencia));
-  const { data: defis = [], isLoading: carregandoDefis } = useMatrizDefis();
-  const { data: procuracoes = [], isLoading: carregandoProc } = useProcuracoes();
-  const { data: sitfis = [], isLoading: carregandoSitfis } = useMatrizSitfis();
-  const { data: declMensais = [], isLoading: carregandoDecl } = useMatrizDctfwebMit(competencia);
+  const { data: certificados = [], isLoading: carregandoCert } = useCertificates();
   const conferencia = useConferenciaCadastro();
+  const { resp, doResponsavel, escolherResponsavel } = useFiltroCarteira(linhas);
+  const [lista, setLista] = useState<EstadoMonitor | null>(null);
 
-  const ativos = useMemo<CartaoAtivo[]>(() => {
-    const selos = clientes.map((c) => seloCaixa(c).estado);
-    const comMensagem = selos.filter((s) => s === 'nao_lida' || s === 'nova').length;
-    const semProc = selos.filter((s) => s === 'sem_procuracao').length;
-    const abertas = criticas.filter((m) => m.situacao === 'nova' || m.situacao === 'em_tratamento');
-    const vencidos = certificados.filter((c) => diasParaVencer(c.data_validade) < 0).length;
-    const aVencer = certificados.filter((c) => { const d = diasParaVencer(c.data_validade); return d >= 0 && d <= 30; }).length;
-    const pagNovos = pagamentos.filter((l) => l.novo).length;
-    const pagConsultados = pagamentos.filter((l) => l.consultadoEm).length;
-    const snConsultados = simples.filter((l) => !l.filial && l.consultadoEm);
-    const snTransmitidas = snConsultados.filter((l) => declaracaoVigente(l, competencia)).length;
-    const unif = unificarLinhas(pagamentos, simples, competencia);
-    const dasPagos = unif.filter((l) => l.das.estado === 'pago').length;
-    const dasVencidos = unif.filter((l) => l.das.estado === 'vencido').length;
-    const dasAVencer = unif.filter((l) => l.das.estado === 'a_vencer').length;
-    const snTotal = simples.filter((l) => !l.filial).length;
-    const fatLidos = simples.filter((l) => !l.filial).map((l) => faturamentoVigente(l, leituras, competencia)).filter((f): f is NonNullable<typeof f> => !!f);
-    const fatConfiaveis = fatLidos.filter((f) => f.confiavel);
-    const fatAtencao = fatConfiaveis.filter((f) => ['atencao', 'critico'].includes(nivelLimite(f) ?? '')).length;
-    const fatAcima = fatConfiaveis.filter((f) => nivelLimite(f) === 'acima' || nivelSublimite(f) === 'acima').length;
-    const fatPertoSub = fatConfiaveis.filter((f) => nivelSublimite(f) === 'perto').length;
-    const fatFatorR = fatConfiaveis.filter((f) => f.fator_r_aplica === true).length;
-    const dmAtivos = declMensais.filter((l) => !l.filial);
-    const dmConsultados = dmAtivos.filter((l) => l.dctfweb || l.mitConsultado).length;
-    const dctfOk = dmAtivos.filter((l) => estadoDctfweb(l) === 'transmitida').length;
-    const dctfSem = dmAtivos.filter((l) => estadoDctfweb(l) === 'sem_declaracao').length;
-    const dctfNovos = dmAtivos.filter((l) => l.novo).length;
-    const mitOk = dmAtivos.filter((l) => estadoMit(l) === 'encerrada').length;
-    const mitSem = dmAtivos.filter((l) => estadoMit(l) === 'sem_apuracao').length;
-    const sfEstados = sitfis.filter((l) => !l.filial).map(estadoSitfis);
-    const sfSemPend = sfEstados.filter((e) => e === 'sem_pendencias').length;
-    const sfComPend = sfEstados.filter((e) => e === 'com_pendencias').length;
-    const sfConferir = sfEstados.filter((e) => e === 'a_conferir').length;
-    const sfGerados = sfEstados.filter((e) => e !== 'sem_relatorio').length;
-    const pcCompletas = procuracoes.filter((l) => l.situacao === 'total').length;
-    const pcSem = procuracoes.filter((l) => l.situacao === 'sem' || l.situacao === 'vencida').length;
-    const pcVencendo = procuracoes.filter((l) => l.situacao !== 'vencida' && procVencendo(l)).length;
-    const pcNaoMapeados = procuracoes.filter((l) => l.situacao === 'nao_mapeado').length;
-    const anoDefis = new Date().getFullYear() - 1;
-    const dfStatus = defis.filter((l) => !l.filial).map((l) => statusDefis(l, anoDefis));
-    const dfConsultados = defis.filter((l) => !l.filial && l.consultadoEm).length;
-    const dfEntregues = dfStatus.filter((s) => s === 'entregue' || s === 'retificada').length;
-    const dfAtraso = dfStatus.filter((s) => s === 'em_atraso').length;
-    return [
-      {
-        titulo: 'Conferência do cadastro', icone: ClipboardCheck, to: '/dashboard-federal/conferencia-cadastro', tom: conferencia.linhas.length > 0 ? 'warn' : 'ok',
-        linhas: [`${conferencia.linhas.length} clientes com algo que não bate`, `${conferencia.totalAtivos} clientes ativos conferidos`],
-      },
-      {
-        titulo: 'Mensagens e-CAC', icone: Mail, to: '/mensagens', tom: comMensagem > 0 ? 'warn' : 'ok',
-        linhas: [`${comMensagem} com mensagem não lida ou nova`, `${clientes.length - semProc} clientes monitorados`],
-      },
-      {
-        titulo: 'Pagamentos e DAS', icone: Receipt, to: '/dashboard-federal/pagamentos',
-        tom: dasVencidos > 0 ? 'danger' : pagNovos > 0 || dasAVencer > 0 ? 'warn' : dasPagos > 0 || pagConsultados > 0 ? 'ok' : 'neutral',
-        linhas: [`${dasPagos} DAS pagos · ${dasVencidos} vencidos · ${pagNovos} com pagamento novo`, `${pagConsultados} de ${pagamentos.length} consultados em ${rotuloCompetencia(competencia)}`],
-      },
-      {
-        titulo: 'PGDAS', icone: FileCheck, to: '/dashboard-federal/pgdas', tom: snConsultados.length === 0 ? 'neutral' : snTransmitidas < snConsultados.length ? 'warn' : 'ok',
-        linhas: [`${snTransmitidas} de ${snConsultados.length} transmitidas em ${rotuloCompetencia(competencia)}`, `${snConsultados.length} de ${snTotal} clientes do Simples consultados`],
-      },
-      {
-        titulo: 'Faturamento e limites', icone: BarChart3, to: '/dashboard-federal/faturamento', tom: fatConfiaveis.length === 0 ? 'neutral' : fatAcima > 0 ? 'danger' : fatAtencao > 0 || fatPertoSub > 0 ? 'warn' : 'ok',
-        linhas: [`${fatLidos.length} de ${snTransmitidas} declarações lidas em ${rotuloCompetencia(competencia)} · ${fatFatorR} com fator r`, `${fatAcima} acima do limite ou sublimite · ${fatAtencao} em atenção (80% do limite) · ${fatPertoSub} perto do sublimite`],
-      },
-      {
-        titulo: 'DEFIS', icone: ClipboardList, to: '/dashboard-federal/defis', tom: dfConsultados === 0 ? 'neutral' : dfAtraso > 0 ? 'warn' : 'ok',
-        linhas: [`${dfEntregues} entregues em ${anoDefis}`, `${dfAtraso} não entregues · ${dfConsultados} clientes consultados`],
-      },
-      {
-        titulo: 'Situação fiscal', icone: Landmark, to: '/dashboard-federal/situacao-fiscal', tom: sfGerados === 0 ? 'neutral' : sfComPend > 0 ? 'danger' : sfConferir > 0 ? 'warn' : 'ok',
-        linhas: [`${sfSemPend} sem pendências · ${sfComPend} com pendências`, `${sfGerados} de ${sfEstados.length} clientes com relatório${sfConferir ? ` · ${sfConferir} a conferir` : ''}`],
-      },
-      {
-        titulo: 'DCTFWeb e MIT', icone: FileSpreadsheet, to: '/dashboard-federal/dctfweb-mit',
-        tom: dctfNovos > 0 || dctfSem > 0 || mitSem > 0 ? 'warn' : dmConsultados === 0 ? 'neutral' : 'ok',
-        linhas: [
-          `${dctfOk} DCTFWeb com recibo · ${mitOk} MIT encerradas`,
-          `${dctfSem} sem DCTFWeb · ${mitSem} sem MIT em ${rotuloCompetencia(competencia)}`,
-          `${dctfNovos} com movimento novo · ${dmConsultados} de ${dmAtivos.length} consultados`,
-        ],
-      },
-      {
-        titulo: 'Termos de intimação', icone: Gavel, to: '/dashboard-federal/intimacoes', tom: abertas.length > 0 ? 'danger' : 'ok',
-        linhas: [`${abertas.length} em aberto`, `${abertas.filter((m) => m.situacao === 'nova').length} novas sem responsável`],
-      },
-      {
-        titulo: 'Procurações', icone: ShieldCheck, to: '/dashboard-federal/procuracoes',
-        tom: pcNaoMapeados === procuracoes.length ? 'neutral' : pcSem > 0 || pcVencendo > 0 ? 'warn' : 'ok',
-        linhas: [`${pcCompletas} completas · ${pcSem} sem procuração ou vencidas`, `${pcVencendo} vencem em 60 dias · ${pcNaoMapeados} não mapeadas`],
-      },
-      {
-        titulo: 'Certificados', icone: BadgeCheck, to: '/cadastros/certificados', tom: vencidos > 0 ? 'danger' : aVencer > 0 ? 'warn' : 'ok',
-        linhas: [`${vencidos} vencidos`, `${aVencer} vencem em 30 dias · ${certificados.length} no total`],
-      },
-    ];
-  }, [clientes, criticas, certificados, pagamentos, simples, leituras, defis, procuracoes, sitfis, declMensais, conferencia.linhas, conferencia.totalAtivos, competencia]);
+  // Certificado do próprio cliente (não do sócio): o mais novo entre os ativos ou vencidos.
+  const diasCert = useMemo(() => {
+    const m = new Map<string, { validade: string; dias: number }>();
+    for (const c of certificados) {
+      if (c.partner_id || (c.status !== 'ativo' && c.status !== 'vencido')) continue;
+      const atual = m.get(c.contact_id);
+      if (!atual || c.data_validade > atual.validade) m.set(c.contact_id, { validade: c.data_validade, dias: diasParaVencer(c.data_validade) });
+    }
+    return m;
+  }, [certificados]);
 
-  const carregando = carregandoClientes || carregandoCriticas || carregandoCert || carregandoPag || carregandoSn || carregandoFat || carregandoDefis || carregandoProc || carregandoSitfis || carregandoDecl || conferencia.carregando;
+  const painel = useMemo<LinhaPainel[]>(() => {
+    // PGDAS-D, DAS e limite saem da mesma linha da tela Simples Nacional: o número da barra é o número da lista.
+    const simples = new Map(montarLinhasSimples({ pgdas, pagamentos, faturamento, responsaveis, aberturas, pa: competencia, hoje }).map((x) => [x.contact_id, x]));
+    return doResponsavel.map((l) => {
+      const ls = simples.get(l.contact_id);
+      const selos = selosDaCarteira(l, {
+        // Fora da lista do Simples no mês (outro regime, filial, aberta depois): PGDAS-D, DAS e limite não se aplicam.
+        ...(ls ? { pgdas: ls.declaracao, das: ls.dasSelo, limite: ls.limite } : { pgdas: null, das: null, limite: null }),
+        diasCertificado: diasCert.get(l.contact_id)?.dias ?? null,
+      });
+      return { l, selos, cliente: seloDoCliente(selos) };
+    });
+  }, [doResponsavel, pgdas, pagamentos, faturamento, responsaveis, competencia, hoje, aberturas, diasCert]);
+
+  const porCliente = useMemo(() => contarEstados(painel.map((p) => p.cliente)), [painel]);
+  const porProcesso = useMemo(
+    () => PROCESSOS.map((p) => ({ ...p, contagem: contarEstados(painel.map((x) => x.selos[p.chave])) })),
+    [painel],
+  );
+
+  const ocupado = carregando || carregandoCadastro || carregandoPgdas || carregandoPag || carregandoCert;
+  const fatias = ESTADOS.map((e) => ({ chave: e, nome: ROTULO_ESTADO[e], valor: porCliente[e] })).filter((f) => f.valor > 0);
+  const listaAberta = lista ? painel.filter((p) => p.cliente.estado === lista) : [];
 
   return (
     <div className="space-y-6">
       <PageHeader
         kicker="~/dashboard federal"
         title="Dashboard Federal."
-        subtitle="Atalhos para o monitoramento fiscal dos clientes na Receita Federal. Os cartões cinza acendem conforme cada etapa da integração com o Serpro entra no ar."
+        subtitle={`Situação dos clientes monitorados na Receita Federal, competência ${siglaCompetencia(competencia)}. Mesmas cores em todas as telas: verde em dia, amarelo pendência, vermelho atenção, cinza não verificado. Clique numa barra para abrir a lista já filtrada.`}
+        actions={<ResponsavelFiltro linhas={linhas} valor={resp} onChange={escolherResponsavel} />}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {carregando
-          ? Array.from({ length: 16 }).map((_, i) => <Skeleton key={i} className="h-[150px] w-full" />)
-          : ativos.map((c) => {
-            const Icone = c.icone;
-            return (
-              <Link
-                key={c.titulo}
-                to={c.to}
-                className="group flex min-h-[150px] flex-col gap-3 rounded-lg border border-line bg-paper p-5 transition-colors hover:border-ink"
-              >
-                <div className="flex items-center justify-between">
-                  <IconBox tone={c.tom} icon={<Icone className="h-5 w-5" />} />
-                  <ArrowRight className="h-4 w-4 text-muted-ink-2 transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
-                </div>
-                <h2 className="text-h4-card text-ink">{c.titulo}</h2>
-                <div className="space-y-0.5">
-                  {c.linhas.map((l) => <p key={l} className="text-meta text-muted-ink">{l}</p>)}
-                </div>
-              </Link>
-            );
-          })}
+      {!conferencia.carregando && conferencia.linhas.length > 0 && (
+        <DsAlert
+          tone="warn"
+          icon={<ClipboardCheck />}
+          title={`${conferencia.linhas.length} ${conferencia.linhas.length === 1 ? 'cliente com algo' : 'clientes com algo'} que não bate no cadastro`}
+          description="Regime, CNPJ ou situação diferentes da Receita deixam o cliente fora das consultas certas."
+          action={<Link to="/dashboard-federal/conferencia-cadastro" className="shrink-0 text-ui-strong text-action hover:underline">Conferir</Link>}
+        />
+      )}
 
-        {EM_BREVE.map((c) => {
-          const Icone = c.icone;
-          return (
-            <div key={c.titulo} className={cn('flex min-h-[150px] flex-col gap-3 rounded-lg border border-dashed border-line bg-bg-2/40 p-5')}>
-              <div className="flex items-center justify-between">
-                <IconBox tone="neutral" icon={<Icone className="h-5 w-5" />} />
-                <DsBadge tone="neutral" dot={false}>{c.onda ? `Em breve · ${c.onda}` : 'Em breve'}</DsBadge>
-              </div>
-              <h2 className="text-h4-card text-muted-ink">{c.titulo}</h2>
-              <p className="text-meta text-muted-ink-2">{c.fonte}</p>
+      {ocupado ? (
+        <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
+          <Skeleton className="h-[380px] w-full" />
+          <Skeleton className="h-[380px] w-full" />
+        </div>
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
+          <section className="space-y-4 rounded-lg border border-line bg-paper p-5">
+            <div>
+              <h2 className="text-h4-card text-ink">Clientes</h2>
+              <p className="text-meta text-muted-ink">Cada cliente fica com o pior estado entre as fontes que valem para ele.</p>
             </div>
-          );
-        })}
+            <div className="relative mx-auto h-[200px] w-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={fatias} dataKey="valor" nameKey="nome" innerRadius={64} outerRadius={92} paddingAngle={2} stroke="none"
+                    onClick={(f: { chave?: EstadoMonitor }) => f.chave && setLista(f.chave)} className="cursor-pointer">
+                    {fatias.map((f) => <Cell key={f.chave} fill={COR_ESTADO[f.chave]} />)}
+                  </Pie>
+                  <RTooltip formatter={(v: number, n: string) => [`${v} ${v === 1 ? 'cliente' : 'clientes'}`, n]} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-metric-xl text-ink">{porCliente.total}</span>
+                <span className="text-meta text-muted-ink">clientes</span>
+              </div>
+            </div>
+            <ul className="divide-y divide-line-2">
+              {ESTADOS.filter((e) => e !== 'processando').map((e) => (
+                <li key={e}>
+                  <button type="button" onClick={() => setLista(e)} className="flex w-full items-center gap-3 py-2 text-left hover:bg-bg-2">
+                    <span className="h-6 w-1 shrink-0 rounded-pill" style={{ background: COR_ESTADO[e] }} aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-ui-strong text-ink">{ROTULO_ESTADO[e]}</span>
+                      <span className="block text-meta text-muted-ink">{DICA_ESTADO[e]}</span>
+                    </span>
+                    <span className="text-ui-strong text-ink">{porCliente[e]}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="space-y-4 rounded-lg border border-line bg-paper p-5">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-h4-card text-ink">Por assunto</h2>
+                <p className="text-meta text-muted-ink">Quantos clientes em cada estado. Cada pedaço da barra leva à lista.</p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {ESTADOS.filter((e) => e !== 'processando').map((e) => (
+                  <span key={e} className="flex items-center gap-1.5 text-meta text-muted-ink">
+                    <span className="h-2 w-2 rounded-pill" style={{ background: COR_ESTADO[e] }} aria-hidden />{ROTULO_ESTADO[e]}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2.5">
+              {porProcesso.map((p) => (
+                <div key={p.chave} className="grid grid-cols-[150px_1fr_48px] items-center gap-3">
+                  <Link to={p.to} className="group flex items-center gap-1 truncate text-ui text-ink hover:text-action">
+                    <span className="truncate">{p.titulo}</span>
+                    {FORA_DA_SITUACAO_DO_CLIENTE.includes(p.chave) && <span className="text-meta text-muted-ink-2">*</span>}
+                    <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+                  </Link>
+                  {p.contagem.total === 0 ? (
+                    <div className="h-6 rounded-sm bg-bg-2" />
+                  ) : (
+                    <div className="flex h-6 overflow-hidden rounded-sm bg-bg-2">
+                      {ESTADOS.map((e) => p.contagem[e] > 0 && (
+                        <Tooltip key={e}>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={`${p.titulo}: ${p.contagem[e]} ${ROTULO_ESTADO[e]}`}
+                              onClick={() => navigate(p.filtra ? comEstado(p.to, e) : p.to)}
+                              className="h-full border-r border-paper transition-opacity last:border-r-0 hover:opacity-80"
+                              style={{ width: `${(p.contagem[e] / p.contagem.total) * 100}%`, background: COR_ESTADO[e] }}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>{ROTULO_ESTADO[e]}: {p.contagem[e]} {p.contagem[e] === 1 ? 'cliente' : 'clientes'}</TooltipContent>
+                        </Tooltip>
+                      ))}
+                    </div>
+                  )}
+                  <span className="text-right text-ui-strong text-ink">{p.contagem.total}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-meta text-muted-ink-2">* {PROCESSOS.find((p) => p.nota)?.nota}</p>
+          </section>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3 rounded-lg border border-line bg-paper p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-x-5 gap-y-1">
+          <span className="text-kicker uppercase text-muted-ink-2">Última leitura</span>
+          {fontesAtualizadas.map((f) => (
+            <span key={f.rotulo} className="text-meta text-muted-ink">{f.rotulo}: <span className="text-ink">{f.em ? format(new Date(f.em), 'dd/MM HH:mm') : 'nunca'}</span></span>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-4">
+          <Link to="/dashboard-federal/pagamentos" className="text-ui-strong text-action hover:underline">Pagamentos (DARF e DAE)</Link>
+          <Link to="/gestao-360/ausencias" className="text-ui-strong text-action hover:underline">Ausências</Link>
+          <Link to="/gestao-360/diagnosticos?aba=oportunidades" className="text-ui-strong text-action hover:underline">Oportunidades</Link>
+        </div>
       </div>
+
+      <Sheet open={!!lista} onOpenChange={(o) => !o && setLista(null)}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-[820px]">
+          {lista && (
+            <>
+              <SheetHeader className="space-y-1 text-left">
+                <SheetTitle className="text-[20px]">{ROTULO_ESTADO[lista]}</SheetTitle>
+                <SheetDescription>{listaAberta.length} {listaAberta.length === 1 ? 'cliente' : 'clientes'} · {DICA_ESTADO[lista]}</SheetDescription>
+              </SheetHeader>
+              {listaAberta.length === 0 ? (
+                <p className="mt-8 text-center text-ui text-muted-ink">Nenhum cliente nesta situação.</p>
+              ) : (
+                <Table className="mt-6">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Empresa</TableHead>
+                      <TableHead>Regime</TableHead>
+                      <TableHead>Situação</TableHead>
+                      <TableHead>Responsável</TableHead>
+                      <TableHead className="text-right">Ação</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[...listaAberta].sort((a, b) => a.l.nome.localeCompare(b.l.nome, 'pt-BR')).map(({ l, selos, cliente }) => {
+                      const conta = (Object.keys(selos) as ProcessoPainel[]).filter((k) => !FORA_DA_SITUACAO_DO_CLIENTE.includes(k)).map((k) => selos[k]);
+                      return (
+                        <TableRow key={l.contact_id}>
+                          <TableCell>
+                            <p className="text-ui-strong text-ink">{l.nome}</p>
+                            <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-ui text-muted-ink">{l.regimeRotulo}</TableCell>
+                          <TableCell><SeloMonitor selo={cliente} outros={outrosMotivos(conta, cliente)} /></TableCell>
+                          <TableCell className="text-ui text-muted-ink">{l.responsavel?.nome ?? 'Sem responsável'}</TableCell>
+                          <TableCell className="text-right">
+                            <Link to={`/crm/cliente/${l.contact_id}`} className="text-ui-strong text-action hover:underline">Ver</Link>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

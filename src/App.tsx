@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
@@ -64,9 +64,7 @@ const CaDiagnosticos = lazy(() => import("@/pages/CaDiagnosticos"));
 const MensagensEcac = lazy(() => import("@/pages/MensagensEcac"));
 const TermosIntimacao = lazy(() => import("@/pages/TermosIntimacao"));
 const PagamentosFederal = lazy(() => import("@/pages/PagamentosFederal"));
-const PgdasFederal = lazy(() => import("@/pages/PgdasFederal"));
-const FaturamentoFederal = lazy(() => import("@/pages/FaturamentoFederal"));
-const DefisFederal = lazy(() => import("@/pages/DefisFederal"));
+const SimplesNacionalFederal = lazy(() => import("@/pages/SimplesNacionalFederal"));
 const ProcuracoesFederal = lazy(() => import("@/pages/ProcuracoesFederal"));
 const SituacaoFiscalFederal = lazy(() => import("@/pages/SituacaoFiscalFederal"));
 const DctfwebMitFederal = lazy(() => import("@/pages/DctfwebMitFederal"));
@@ -98,6 +96,14 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+/** Endereço antigo que virou aba de outra tela: redireciona mantendo o `?q=` e os demais filtros do link. */
+function Redireciona({ para }: { para: string }) {
+  const { search } = useLocation();
+  const [caminho, fixo] = para.split("?");
+  const busca = [fixo, search.replace(/^\?/, "")].filter(Boolean).join("&");
+  return <Navigate to={`${caminho}${busca ? `?${busca}` : ""}`} replace />;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -184,10 +190,11 @@ const App = () => (
               <Route path="/dashboard-federal/mensagens" element={<Navigate to="/mensagens" replace />} />
               <Route path="/dashboard-federal/intimacoes" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><TermosIntimacao /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/pagamentos" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><PagamentosFederal /></ModuleGuard></AppLayout>} />
-              <Route path="/dashboard-federal/pgdas" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><PgdasFederal /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal/simples-nacional" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><SimplesNacionalFederal /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal/pgdas" element={<Redireciona para="/dashboard-federal/simples-nacional" />} />
               <Route path="/dashboard-federal/das" element={<Navigate to="/dashboard-federal/pagamentos" replace />} />
-              <Route path="/dashboard-federal/faturamento" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><FaturamentoFederal /></ModuleGuard></AppLayout>} />
-              <Route path="/dashboard-federal/defis" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><DefisFederal /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal/faturamento" element={<Redireciona para="/dashboard-federal/simples-nacional?fonte=limite" />} />
+              <Route path="/dashboard-federal/defis" element={<Redireciona para="/dashboard-federal/simples-nacional?aba=defis" />} />
               <Route path="/dashboard-federal/procuracoes" element={<AppLayout><ModuleGuard moduleName="monitoramento_procuracoes"><ProcuracoesFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/situacao-fiscal" element={<AppLayout><ModuleGuard moduleName="monitoramento_situacao_fiscal"><SituacaoFiscalFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/parcelamentos" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><EmBreve moduleKey="parcelamentos" /></ModuleGuard></AppLayout>} />

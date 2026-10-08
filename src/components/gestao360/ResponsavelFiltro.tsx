@@ -5,13 +5,13 @@ const TODOS = '__todos__';
 
 interface Props {
   /** Carteira inteira: as contagens ao lado de cada nome não mudam com o filtro. */
-  linhas: LinhaCarteira[];
+  linhas: Pick<LinhaCarteira, 'responsavel'>[];
   /** id do responsável, 'sem' ou null (todos). */
   valor: string | null;
   onChange: (resp: string | null) => void;
 }
 
-/** Filtro por responsável do cadastro, do Portal 360° e de CA · Ausências. O valor vive na URL (`?resp=`). */
+/** Filtro por responsável do cadastro, do Portal 360°, de CA · Ausências e das listas de Monitoramento. O valor vive na URL (`?resp=`). */
 export function ResponsavelFiltro({ linhas, valor, onChange }: Props) {
   const { responsaveis, semResponsavel } = resumirResponsaveis(linhas);
   return (

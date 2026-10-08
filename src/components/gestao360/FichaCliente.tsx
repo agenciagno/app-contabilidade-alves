@@ -240,7 +240,7 @@ export function FichaCliente({ linha: l, faturamento = null }: { linha: LinhaCar
                 </DicaBotao>
               </>
             ) : (
-              <Link to={`/dashboard-federal/faturamento?q=${digitos(l.documento)}`} className="text-ui-strong text-action hover:underline">Abrir Faturamento</Link>
+              <Link to={`/dashboard-federal/simples-nacional?q=${digitos(l.documento)}`} className="text-ui-strong text-action hover:underline">Abrir no Simples Nacional</Link>
             )}
           </div>
         )}
