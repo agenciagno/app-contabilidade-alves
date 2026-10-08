@@ -77,6 +77,7 @@ export const MODULE_TREE: ModuleNode[] = [
       { key: 'financeiro_clientes_fornecedores', label: 'Clientes & Fornecedores' },
       { key: 'financeiro_categorias', label: 'Categorias' },
       { key: 'financeiro_metas_orcamentos', label: 'Metas & Orçamentos' },
+      { key: 'financeiro_relatorios', label: 'Relatórios' },
     ],
   },
   {
@@ -153,6 +154,7 @@ export const MODULE_AUDIENCE: Record<string, ModuleAudience> = {
   financeiro_eventos_contabeis: 'internal',
   financeiro_clientes_fornecedores: 'external',
   financeiro_categorias: 'external',
+  financeiro_relatorios: 'external',
 
   // Tech: o grupo existe nos dois mundos; cada item declara o seu lado.
   // (Clientes Externos, LGPD e Consumo Serpro não têm chave de submódulo — a
@@ -242,7 +244,7 @@ export const EXTERNAL_MODULE_GROUPS: ExternalModuleGroup[] = [
     children: [
       'financeiro_dashboard', 'financeiro_lancamentos', 'financeiro_pagar_receber',
       'financeiro_fluxo_caixa', 'financeiro_conta_corrente', 'financeiro_categorias',
-      'financeiro_metas_orcamentos',
+      'financeiro_metas_orcamentos', 'financeiro_relatorios',
     ],
   },
   { key: 'cadastro', children: ['equipe', 'financeiro_clientes_fornecedores'] },

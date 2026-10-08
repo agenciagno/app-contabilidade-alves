@@ -364,6 +364,7 @@ export const menuEntries: MenuEntry[] = [
       // Cadastro (decisão Gabriel 10/08). Categorias segue aqui, só no externo.
       { title: 'Categorias', url: '/financeiro/categorias-clientes', icon: Tags, iconName: 'tags', subKey: 'financeiro_categorias' },
       { title: 'Metas & Orçamentos', url: '/financeiro/metas-orcamentos', icon: Target, iconName: 'target', subKey: 'financeiro_metas_orcamentos' },
+      { title: 'Relatórios', url: '/financeiro/relatorios', icon: FileBarChart, iconName: 'file-bar-chart', subKey: 'financeiro_relatorios' },
     ],
   },
   {

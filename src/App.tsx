@@ -31,6 +31,7 @@ const Banks = lazy(() => import("@/pages/Banks"));
 const Categories = lazy(() => import("@/pages/Categories"));
 const ClientCategories = lazy(() => import("@/pages/ClientCategories"));
 const DRE = lazy(() => import("@/pages/DRE"));
+const Relatorios = lazy(() => import("@/pages/Relatorios"));
 const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
 const ClientReport = lazy(() => import("@/pages/ClientReport"));
 const Boletos = lazy(() => import("@/pages/Boletos"));
@@ -131,6 +132,7 @@ const App = () => (
               <Route path="/bancos" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_conta_corrente"><Banks /></ModuleGuard></AppLayout>} />
               <Route path="/categorias" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_eventos_contabeis"><Categories /></ModuleGuard></AppLayout>} />
               <Route path="/financeiro/categorias-clientes" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_categorias"><ClientCategories /></ModuleGuard></AppLayout>} />
+              <Route path="/financeiro/relatorios" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_relatorios"><Relatorios /></ModuleGuard></AppLayout>} />
               <Route path="/dre" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_dre"><DRE /></ModuleGuard></AppLayout>} />
               
               <Route path="/configuracoes" element={<AppLayout><ModuleGuard moduleName="configuracoes" internalOnly><SettingsPage /></ModuleGuard></AppLayout>} />
