@@ -4,11 +4,12 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { criarSerpro, onlyDigits } from "../_shared/serpro-core.ts";
 import { pega } from "../_shared/pgdasd-indice.ts";
 import { assinar, guardarPdf } from "../_shared/serpro-arquivos.ts";
-import { lerParcelasAbertas, lerPedidos, MODALIDADES, type Modalidade } from "../_shared/parcelamentos-indice.ts";
+import { lerParcelasAbertas, lerPedidos, MODALIDADES, modalidadesDoRegime, type Modalidade } from "../_shared/parcelamentos-indice.ts";
 import { perfilAtivo } from "../_shared/acesso.ts";
 
 // ---------------------------------------------------------------------------
 // Parcelamentos do Simples Nacional (PARCSN ordinário, PARCSN-ESP, PERTSN, RELPSN) — F4 Onda 3, 30/09/2026.
+// MEI (09/10/2026): cliente com regime MEI usa PARCMEI, PARCMEI-ESP, PERTMEI e RELPMEI, com os mesmos serviços.
 // Só leitura + emissão da guia da parcela (DAS de parcelamento), tudo por clique de UM cliente.
 //
 //   consultar   { contact_id, force?, todas? }
@@ -42,7 +43,7 @@ const hojeBR = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 
 const msgErro = (r: { resposta: any }) => String(r.resposta?.mensagens?.[0]?.texto ?? r.resposta?.error ?? "Falha na consulta ao Serpro");
 
 async function carregarCliente(contactId: string) {
-  const { data: c } = await supabase.from("contacts").select("id,name,document,status_cliente").eq("id", contactId).eq("company_id", COMPANY_ID).maybeSingle();
+  const { data: c } = await supabase.from("contacts").select("id,name,document,status_cliente,tax_regime").eq("id", contactId).eq("company_id", COMPANY_ID).maybeSingle();
   if (!c) return { resp: json({ error: "Cliente não encontrado" }, 404) };
   if (c.status_cliente !== STATUS_MONITORADO) {
     return { resp: json({ ok: false, foraDoMonitoramento: true, error: `Cliente fora do monitoramento (status: ${c.status_cliente ?? "sem status"}). O Serpro só é consultado para clientes com status "${STATUS_MONITORADO}".` }) };
@@ -75,7 +76,9 @@ async function consultar(payload: any, uid: string) {
     const ultima = Math.max(...feitas.map((f: { consultado_em: string }) => Date.parse(f.consultado_em)));
     if (Date.now() - ultima < RECENTE_MIN * 60_000) return json({ ok: true, recente: true, consultado_em: new Date(ultima).toISOString() });
   }
-  const alvo = MODALIDADES.filter((m) => payload.todas === true || m.mod === "PARCSN" || !porMod.has(m.mod) || (porMod.get(m.mod)?.pedidos ?? 0) > 0);
+  const doRegime = modalidadesDoRegime(c.contato!.tax_regime);
+  const ordinaria = doRegime[0].mod;
+  const alvo = doRegime.filter((m) => payload.todas === true || m.mod === ordinaria || !porMod.has(m.mod) || (porMod.get(m.mod)?.pedidos ?? 0) > 0);
 
   const resultados: ResultadoMod[] = [];
   for (const m of alvo) {
@@ -84,7 +87,7 @@ async function consultar(payload: any, uid: string) {
       tipo: "Consultar", idSistema: m.sistema, idServico: m.pedidos,
       contribuinte: { numero: c.cnpj!, tipo: 2 }, dados: "",
       uid, contactId, origem: "manual",
-      finalidade: `Consulta dos pedidos de parcelamento do Simples (${m.rotulo}) acionada por usuário para acompanhamento fiscal do cliente`,
+      finalidade: `Consulta dos pedidos de parcelamento (${m.rotulo}) acionada por usuário para acompanhamento fiscal do cliente`,
     });
     const agora = new Date().toISOString();
     const textoErro = msgErro(ped);
@@ -111,7 +114,7 @@ async function consultar(payload: any, uid: string) {
           tipo: "Consultar", idSistema: m.sistema, idServico: m.parcelas,
           contribuinte: { numero: c.cnpj!, tipo: 2 }, dados: "",
           uid, contactId, origem: "manual",
-          finalidade: `Consulta das parcelas em aberto do parcelamento do Simples (${m.rotulo}) acionada por usuário para o cliente`,
+          finalidade: `Consulta das parcelas em aberto do parcelamento (${m.rotulo}) acionada por usuário para o cliente`,
         });
         if (par.status === 200) {
           const parcelas = lerParcelasAbertas(par.resposta?.dados);
@@ -165,7 +168,7 @@ async function gerarGuia(payload: any, uid: string) {
     tipo: "Emitir", idSistema: m.sistema, idServico: m.das,
     contribuinte: { numero: c.cnpj!, tipo: 2 }, dados: JSON.stringify({ parcelaParaEmitir: parcela }),
     uid, contactId, origem: "manual",
-    finalidade: `Emissão da guia da parcela ${String(parcela).slice(4)}/${String(parcela).slice(0, 4)} do parcelamento do Simples (${m.rotulo}) confirmada por usuário para o cliente`,
+    finalidade: `Emissão da guia da parcela ${String(parcela).slice(4)}/${String(parcela).slice(0, 4)} do parcelamento (${m.rotulo}) confirmada por usuário para o cliente`,
   });
   if (r.status === 403) return json({ ok: false, semProcuracao: true, error: "Sem procuração eletrônica para emitir a guia deste parcelamento" });
   if (r.status !== 200) return json({ ok: false, status: r.status, error: msgErro(r) });

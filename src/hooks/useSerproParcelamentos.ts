@@ -5,13 +5,19 @@ import { invocarSerpro } from '@/lib/invocarSerpro';
 import { fetchAllPages } from '@/lib/fetch-all';
 import { STATUS_MONITORADO } from '@/hooks/useSerproCaixaPostal';
 
-export type Modalidade = 'PARCSN' | 'PARCSN-ESP' | 'PERTSN' | 'RELPSN';
-export const MODALIDADES: { mod: Modalidade; rotulo: string }[] = [
+export type Modalidade = 'PARCSN' | 'PARCSN-ESP' | 'PERTSN' | 'RELPSN' | 'PARCMEI' | 'PARCMEI-ESP' | 'PERTMEI' | 'RELPMEI';
+/** Simples e MEI (09/10/2026): cada cliente usa as 4 do seu regime; a primeira de cada grupo é a ordinária. */
+export const MODALIDADES: { mod: Modalidade; rotulo: string; mei?: boolean }[] = [
   { mod: 'PARCSN', rotulo: 'Parcelamento ordinário' },
   { mod: 'PARCSN-ESP', rotulo: 'Parcelamento especial' },
   { mod: 'PERTSN', rotulo: 'PERT-SN' },
   { mod: 'RELPSN', rotulo: 'RELP-SN' },
+  { mod: 'PARCMEI', rotulo: 'Parcelamento do MEI', mei: true },
+  { mod: 'PARCMEI-ESP', rotulo: 'Parcelamento especial do MEI', mei: true },
+  { mod: 'PERTMEI', rotulo: 'PERT-MEI', mei: true },
+  { mod: 'RELPMEI', rotulo: 'RELP-MEI', mei: true },
 ];
+export const modalidadesDoRegime = (regime: string | null) => MODALIDADES.filter((m) => !!m.mei === (regime === 'mei'));
 export const ROTULO_MOD = Object.fromEntries(MODALIDADES.map((m) => [m.mod, m.rotulo])) as Record<Modalidade, string>;
 
 export interface PedidoRow { id: string; contact_id: string; modalidade: Modalidade; numero: number; data_pedido: string | null; situacao: string | null; data_situacao: string | null; ativo: boolean }
@@ -23,6 +29,8 @@ export interface LinhaParcelamentos {
   contact_id: string;
   nome: string;
   documento: string;
+  /** simples_nacional ou mei: decide quais modalidades a consulta olha. */
+  regime: string | null;
   /** Filial: o parcelamento é do CNPJ da matriz, então a consulta é bloqueada. */
   filial: boolean;
   consultas: ConsultaRow[];
@@ -61,9 +69,10 @@ export function estadoParcelamento(l: LinhaParcelamentos, atual = competenciaAtu
 
 /** Quantas chamadas o próximo "Consultar" deve fazer (estimativa igual à regra da função): 1ª vez = 4 modalidades; depois, PARCSN + as que já tiveram pedido; mais 1 por modalidade ativa. */
 export function chamadasDaConsulta(l: LinhaParcelamentos): number {
-  if (!l.consultas.length) return MODALIDADES.length + modalidadesAtivas(l).length;
+  const doRegime = modalidadesDoRegime(l.regime);
+  if (!l.consultas.length) return doRegime.length + modalidadesAtivas(l).length;
   const comHistorico = new Set(l.consultas.filter((c) => c.pedidos > 0).map((c) => c.modalidade));
-  comHistorico.add('PARCSN');
+  comHistorico.add(doRegime[0].mod);
   return comHistorico.size + modalidadesAtivas(l).length;
 }
 
@@ -74,9 +83,9 @@ export function useMatrizParcelamentos() {
     enabled: !!company?.id,
     queryFn: async (): Promise<LinhaParcelamentos[]> => {
       const companyId = company!.id;
-      const contatos = await fetchAllPages<{ id: string; name: string | null; display_name: string | null; document: string | null }>(
-        () => supabase.from('contacts').select('id, name, display_name, document')
-          .eq('company_id', companyId).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true).eq('tax_regime', 'simples_nacional').order('name').order('id'));
+      const contatos = await fetchAllPages<{ id: string; name: string | null; display_name: string | null; document: string | null; tax_regime: string | null }>(
+        () => supabase.from('contacts').select('id, name, display_name, document, tax_regime')
+          .eq('company_id', companyId).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true).in('tax_regime', ['simples_nacional', 'mei']).order('name').order('id'));
       const consultas = await fetchAllPages<ConsultaRow>(
         () => supabase.from('serpro_parcelamentos_consultas').select('contact_id, modalidade, consultado_em, pedidos, ativos, sem_procuracao, erro').eq('company_id', companyId).order('contact_id').order('modalidade'));
       const pedidos = await fetchAllPages<PedidoRow>(
@@ -99,6 +108,7 @@ export function useMatrizParcelamentos() {
           contact_id: c.id,
           nome: c.display_name || c.name || 'Cliente',
           documento: c.document ?? '',
+          regime: c.tax_regime ?? null,
           filial: digitos(c.document).slice(8, 12) !== '0001',
           consultas: cPor.get(c.id) ?? [],
           pedidos: pPor.get(c.id) ?? [],

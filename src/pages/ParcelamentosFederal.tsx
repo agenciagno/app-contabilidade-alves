@@ -38,7 +38,7 @@ export function seloDaLinha(l: LinhaParcelamentos, atual = competenciaAtual()): 
 }
 
 /**
- * Parcelamentos do Simples Nacional (ordinário, especial, PERT-SN e RELP-SN). Ativado em 09/10/2026 (estava pronto desde 30/09, sem rota),
+ * Parcelamentos do Simples Nacional (ordinário, especial, PERT-SN e RELP-SN) e do MEI (PARCMEI, especial, PERT-MEI e RELP-MEI). Ativado em 09/10/2026 (estava pronto desde 30/09, sem rota),
  * no molde do Monitoramento: faixa de estados, selo, lote de consulta e de guias da parcela, envio com conferência e ZIP das guias.
  */
 export default function ParcelamentosFederal() {
@@ -202,6 +202,7 @@ export default function ParcelamentosFederal() {
                       <TableCell className="min-w-[200px] max-w-[280px]">
                         <p className="text-ui text-ink">{l.nome}</p>
                         <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
+                        <p className="text-meta text-muted-ink-2">{l.regime === 'mei' ? 'MEI' : 'Simples Nacional'}</p>
                       </TableCell>
                       <TableCell><UltimaBusca iso={consultadoEm(l)} contactId={l.contact_id} /></TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
@@ -229,7 +230,7 @@ export default function ParcelamentosFederal() {
           )}
         </div>
 
-        <RodapeLista mostrando={filtradas.length} total={matrizes.length} unidade="clientes do Simples Nacional" filiais={linhas.length - matrizes.length} />
+        <RodapeLista mostrando={filtradas.length} total={matrizes.length} unidade="clientes do Simples Nacional e MEI" filiais={linhas.length - matrizes.length} />
       </div>
 
       <ParcelamentosClienteSheet linha={linhaAberta} onClose={() => setAberto(null)} />
@@ -239,7 +240,7 @@ export default function ParcelamentosFederal() {
         aberto={lote === 'consultar'}
         onClose={() => setLote(null)}
         titulo="Consultar parcelamentos"
-        descricao="Por cliente marcado: os pedidos de parcelamento e as parcelas em aberto dos ativos, um de cada vez. A primeira consulta de um cliente olha as quatro modalidades."
+        descricao="Por cliente marcado: os pedidos de parcelamento e as parcelas em aberto dos ativos, um de cada vez. A primeira consulta de um cliente olha as quatro modalidades do regime dele (Simples ou MEI)."
         itens={marcadas.map((l) => ({
           contactId: l.contact_id, nome: l.nome, vezes: chamadasDaConsulta(l),
           pular: (consultadoEm(l) ?? '').slice(0, 10) === hoje ? 'Consultado hoje' : null,

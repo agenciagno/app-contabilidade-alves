@@ -78,6 +78,10 @@ const DOCS: Record<string, Spec> = {
   parcela_guia: { tabela: 'serpro_parcelas_guias', coluna: 'pdf_path', bucket: 'serpro-parcelamentos', extra: 'modalidade,parcela,gerado_em', ordem: 'gerado_em',
     rotulo: (r) => `Guia da parcela ${String(r.parcela ?? '').replace(/^(\d{4})(\d{2})$/, '$2/$1')} (${r.modalidade ?? ''})`, data: (r) => String(r.gerado_em ?? ''),
     periodo: { coluna: 'parcela', formato: 'aaaamm' } },
+  mei_das: { tabela: 'serpro_mei_das', coluna: 'pdf_path', bucket: 'serpro-mei', extra: 'periodo,emitido_em', ordem: 'emitido_em',
+    rotulo: (r) => `DAS do MEI ${mesAno(r.periodo)}`, data: (r) => String(r.emitido_em ?? ''), periodo: { coluna: 'periodo', formato: 'mes' } },
+  mei_ccmei: { tabela: 'serpro_mei_ccmei', coluna: 'pdf_path', bucket: 'serpro-mei', extra: 'emitido_em', ordem: 'emitido_em',
+    rotulo: (r) => `Certificado da Condição de MEI (${dataBR(r.emitido_em)})`, data: (r) => String(r.emitido_em ?? '') },
   darf: { tabela: 'serpro_darfs', coluna: 'pdf_path', bucket: 'serpro-darf', extra: 'codigo_receita,data_pa,created_at', ordem: 'created_at',
     rotulo: (r) => `DARF ${r.codigo_receita ?? ''} ${r.data_pa ?? ''}`.trim(), data: (r) => String(r.created_at ?? '') },
 };

@@ -20,6 +20,7 @@ import { useAbrirDefis, useConsultaDefis } from '@/components/serpro/defisUi';
 import { useLeituraFaturamento } from '@/components/serpro/useLeituraFaturamento';
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
 import { FaixaEstados, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
+import { AbaMei } from '@/components/monitor/AbaMei';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
 import { useGuiasEnviadas, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
@@ -34,7 +35,7 @@ import { digitos, type ResponsavelCliente } from '@/lib/situacaoCarteira';
 import { hojeBR } from '@/lib/prazosFederais';
 import type { TabelaExport } from '@/lib/exportarTabela';
 
-type Aba = 'mensal' | 'defis';
+type Aba = 'mensal' | 'defis' | 'mei';
 
 const ROTULO_FONTE: Record<Exclude<FonteSimples, 'situacao'>, string> = { declaracao: 'Declaração', das: 'DAS', limite: 'Limite do Simples' };
 const moeda = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -54,7 +55,8 @@ function bate(busca: string, nome: string, documento: string) {
  */
 export default function SimplesNacionalFederal() {
   const [params, setParams] = useSearchParams();
-  const aba: Aba = params.get('aba') === 'defis' ? 'defis' : 'mensal';
+  const abaParam = params.get('aba');
+  const aba: Aba = abaParam === 'defis' || abaParam === 'mei' ? abaParam : 'mensal';
   const fonteParam = params.get('fonte');
   const fonte: FonteSimples = fonteParam === 'declaracao' || fonteParam === 'das' || fonteParam === 'limite' ? fonteParam : 'situacao';
   const [estado, setEstado] = useEstadoUrl();
@@ -73,6 +75,7 @@ export default function SimplesNacionalFederal() {
       <div className="flex gap-1 border-b border-line">
         <DsTab active={aba === 'mensal'} onClick={() => irPara('mensal')}>Mensal</DsTab>
         <DsTab active={aba === 'defis'} onClick={() => irPara('defis')}>DEFIS</DsTab>
+        <DsTab active={aba === 'mei'} onClick={() => irPara('mei')}>MEI</DsTab>
       </div>
 
       {aba === 'mensal' ? (
@@ -81,8 +84,10 @@ export default function SimplesNacionalFederal() {
           fonte={fonte} limparFonte={() => mudar((n) => { n.delete('fonte'); n.delete('estado'); })}
           responsaveis={responsaveis} aberturas={aberturas} carregandoCadastro={carregandoCadastro}
         />
-      ) : (
+      ) : aba === 'defis' ? (
         <AbaDefis busca={busca} setBusca={setBusca} estado={estado} setEstado={setEstado} responsaveis={responsaveis} carregandoCadastro={carregandoCadastro} />
+      ) : (
+        <AbaMei />
       )}
     </div>
   );

@@ -4,14 +4,22 @@
 //   GERARDAS1x1 (Emitir) com { parcelaParaEmitir: 202304 } → { docArrecadacaoPdfB64 }
 import { pega } from "./pgdasd-indice.ts";
 
-export type Modalidade = "PARCSN" | "PARCSN-ESP" | "PERTSN" | "RELPSN";
+// MEI (09/10/2026): PARCMEI, PARCMEI-ESP, PERTMEI e RELPMEI (20 a 23) seguem o mesmo desenho; cada cliente usa as do seu regime.
+export type Modalidade = "PARCSN" | "PARCSN-ESP" | "PERTSN" | "RELPSN" | "PARCMEI" | "PARCMEI-ESP" | "PERTMEI" | "RELPMEI";
 
-export const MODALIDADES: { mod: Modalidade; sistema: string; pedidos: string; parcelas: string; das: string; rotulo: string }[] = [
+export const MODALIDADES: { mod: Modalidade; sistema: string; pedidos: string; parcelas: string; das: string; rotulo: string; mei?: boolean }[] = [
   { mod: "PARCSN", sistema: "PARCSN", pedidos: "PEDIDOSPARC163", parcelas: "PARCELASPARAGERAR162", das: "GERARDAS161", rotulo: "Parcelamento ordinário" },
   { mod: "PARCSN-ESP", sistema: "PARCSN-ESP", pedidos: "PEDIDOSPARC173", parcelas: "PARCELASPARAGERAR172", das: "GERARDAS171", rotulo: "Parcelamento especial" },
   { mod: "PERTSN", sistema: "PERTSN", pedidos: "PEDIDOSPARC183", parcelas: "PARCELASPARAGERAR182", das: "GERARDAS181", rotulo: "PERT-SN" },
   { mod: "RELPSN", sistema: "RELPSN", pedidos: "PEDIDOSPARC193", parcelas: "PARCELASPARAGERAR192", das: "GERARDAS191", rotulo: "RELP-SN" },
+  { mod: "PARCMEI", sistema: "PARCMEI", pedidos: "PEDIDOSPARC203", parcelas: "PARCELASPARAGERAR202", das: "GERARDAS201", rotulo: "Parcelamento do MEI", mei: true },
+  { mod: "PARCMEI-ESP", sistema: "PARCMEI-ESP", pedidos: "PEDIDOSPARC213", parcelas: "PARCELASPARAGERAR212", das: "GERARDAS211", rotulo: "Parcelamento especial do MEI", mei: true },
+  { mod: "PERTMEI", sistema: "PERTMEI", pedidos: "PEDIDOSPARC223", parcelas: "PARCELASPARAGERAR222", das: "GERARDAS221", rotulo: "PERT-MEI", mei: true },
+  { mod: "RELPMEI", sistema: "RELPMEI", pedidos: "PEDIDOSPARC233", parcelas: "PARCELASPARAGERAR232", das: "GERARDAS231", rotulo: "RELP-MEI", mei: true },
 ];
+
+/** Modalidades do regime do cliente: MEI usa as 4 do MEI; os demais, as 4 do Simples. A primeira é a ordinária (sempre consultada). */
+export const modalidadesDoRegime = (regime: string | null | undefined) => MODALIDADES.filter((m) => !!m.mei === (regime === "mei"));
 
 export interface PedidoParc { numero: number; data_pedido: string | null; situacao: string | null; data_situacao: string | null; ativo: boolean }
 export interface ParcelaAberta { parcela: number; valor: number | null }
