@@ -42,6 +42,7 @@ import {
   BadgeCheck,
   FileText,
   BookOpen,
+  Receipt,
   Users,
   LifeBuoy,
   type LucideIcon,
@@ -118,6 +119,7 @@ const iconMap: Record<string, LucideIcon> = {
   'file-signature': FileSignature,
   'badge-check': BadgeCheck,
   'file-text': FileText,
+  'receipt': Receipt,
   'lock-keyhole': LockKeyhole,
   'settings': Settings,
   'wallet': Wallet,
@@ -268,16 +270,25 @@ export const menuEntries: MenuEntry[] = [
     iconName: 'landmark',
     moduleKey: 'dashboard_federal',
     // Situação Fiscal e Procurações viraram itens próprios (01/10/2026), e em
-    // 08/10/2026 ganharam chave de permissão própria.
-    activeExcept: ['/dashboard-federal/situacao-fiscal', '/dashboard-federal/procuracoes'],
+    // 08/10/2026 ganharam chave de permissão própria. Simples Nacional, em 09/10/2026.
+    activeExcept: ['/dashboard-federal/situacao-fiscal', '/dashboard-federal/procuracoes', '/dashboard-federal/simples-nacional'],
   },
   {
     kind: 'simple',
-    title: 'Mensagens e-CAC',
+    title: 'Caixa Postal e-CAC',
     url: '/mensagens',
     icon: MessageSquare,
     iconName: 'message-square',
     moduleKey: 'mensagens',
+  },
+  // Simples Nacional virou item próprio em 09/10/2026 (pedido de Gabriel); a permissão segue a do Dashboard Fiscal, como a rota.
+  {
+    kind: 'simple',
+    title: 'Simples Nacional',
+    url: '/dashboard-federal/simples-nacional',
+    icon: Receipt,
+    iconName: 'receipt',
+    moduleKey: 'dashboard_federal',
   },
   {
     kind: 'simple',

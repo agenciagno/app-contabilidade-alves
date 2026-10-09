@@ -17,7 +17,6 @@ import { FichaSimplesSheet } from '@/components/serpro/FichaSimplesSheet';
 import { useAbrirArquivo, useConsultaPgdasd } from '@/components/serpro/pgdasdUi';
 import { useAbrirDefis, useConsultaDefis } from '@/components/serpro/defisUi';
 import { useLeituraFaturamento } from '@/components/serpro/useLeituraFaturamento';
-import { ResponsavelFiltro } from '@/components/gestao360/ResponsavelFiltro';
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
 import { FaixaEstados, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
@@ -28,7 +27,7 @@ import { percentualLimite, useFaturamentoAno } from '@/hooks/useSerproFaturament
 import { TIPO_DEFIS, defisDoAno, prazoDefis, statusDefis, useMatrizDefis, type LinhaDefis } from '@/hooks/useSerproDefis';
 import { ROTULO_ESTADO, contarEstados, seloDefis, type Selo } from '@/lib/monitorEstados';
 import { montarLinhasSimples, seloDaFonte, type FonteSimples, type LinhaSimples } from '@/lib/simplesNacionalLinhas';
-import { SEM_RESPONSAVEL, digitos, type ResponsavelCliente } from '@/lib/situacaoCarteira';
+import { digitos, type ResponsavelCliente } from '@/lib/situacaoCarteira';
 import { hojeBR } from '@/lib/prazosFederais';
 import type { TabelaExport } from '@/lib/exportarTabela';
 
@@ -44,7 +43,6 @@ function bate(busca: string, nome: string, documento: string) {
   const qd = q.replace(/\D/g, '');
   return nome.toLowerCase().includes(q) || (!!qd && digitos(documento).includes(qd));
 }
-const doResponsavel = (resp: string | null, r: ResponsavelCliente | null) => !resp || (resp === SEM_RESPONSAVEL ? !r : r?.id === resp);
 
 /**
  * Simples Nacional (Rodada 2, 08/10/2026): junta as telas PGDAS, Faturamento e DEFIS no molde único do Monitoramento.
@@ -56,7 +54,6 @@ export default function SimplesNacionalFederal() {
   const aba: Aba = params.get('aba') === 'defis' ? 'defis' : 'mensal';
   const fonteParam = params.get('fonte');
   const fonte: FonteSimples = fonteParam === 'declaracao' || fonteParam === 'das' || fonteParam === 'limite' ? fonteParam : 'situacao';
-  const resp = params.get('resp');
   const [estado, setEstado] = useEstadoUrl();
   const buscaInicial = useBuscaInicial();
   const [busca, setBusca] = useState(buscaInicial);
@@ -65,16 +62,10 @@ export default function SimplesNacionalFederal() {
   const irPara = (a: Aba) => mudar((n) => { n.delete('estado'); n.delete('fonte'); if (a === 'mensal') n.delete('aba'); else n.set('aba', a); });
 
   const { responsaveis, aberturas, carregando: carregandoCadastro } = useCadastroMonitor();
-  const respLinhas = useMemo(() => [...responsaveis.values()].map((r) => ({ responsavel: r })), [responsaveis]);
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        kicker="~/dashboard fiscal · simples nacional"
-        title="Simples Nacional."
-        subtitle="Declaração (PGDAS-D), DAS e limite de cada cliente do Simples numa linha só, e a DEFIS. Mesmas cores do painel: azul em dia, amarelo pendência, vermelho atenção, cinza não verificado. Abrir a ficha é grátis; consultar e gerar cobram, e o botão diz quanto. Filiais seguem a matriz e ficam de fora."
-        actions={<ResponsavelFiltro linhas={respLinhas} valor={resp} onChange={(r) => mudar((n) => { if (r) n.set('resp', r); else n.delete('resp'); })} />}
-      />
+      <PageHeader kicker="~/dashboard fiscal · simples nacional" title="Simples Nacional." />
 
       <div className="flex gap-1 border-b border-line">
         <DsTab active={aba === 'mensal'} onClick={() => irPara('mensal')}>Mensal</DsTab>
@@ -83,12 +74,12 @@ export default function SimplesNacionalFederal() {
 
       {aba === 'mensal' ? (
         <AbaMensal
-          busca={busca} setBusca={setBusca} resp={resp} estado={estado} setEstado={setEstado}
+          busca={busca} setBusca={setBusca} estado={estado} setEstado={setEstado}
           fonte={fonte} limparFonte={() => mudar((n) => { n.delete('fonte'); n.delete('estado'); })}
           responsaveis={responsaveis} aberturas={aberturas} carregandoCadastro={carregandoCadastro}
         />
       ) : (
-        <AbaDefis busca={busca} setBusca={setBusca} resp={resp} estado={estado} setEstado={setEstado} responsaveis={responsaveis} carregandoCadastro={carregandoCadastro} />
+        <AbaDefis busca={busca} setBusca={setBusca} estado={estado} setEstado={setEstado} responsaveis={responsaveis} carregandoCadastro={carregandoCadastro} />
       )}
     </div>
   );
@@ -97,9 +88,9 @@ export default function SimplesNacionalFederal() {
 // ---------------------------------------------------------------- aba Mensal
 
 function AbaMensal({
-  busca, setBusca, resp, estado, setEstado, fonte, limparFonte, responsaveis, aberturas, carregandoCadastro,
+  busca, setBusca, estado, setEstado, fonte, limparFonte, responsaveis, aberturas, carregandoCadastro,
 }: {
-  busca: string; setBusca: (v: string) => void; resp: string | null;
+  busca: string; setBusca: (v: string) => void;
   estado: ReturnType<typeof useEstadoUrl>[0]; setEstado: ReturnType<typeof useEstadoUrl>[1];
   fonte: FonteSimples; limparFonte: () => void;
   responsaveis: Map<string, ResponsavelCliente>; aberturas: Map<string, string | null>; carregandoCadastro: boolean;
@@ -129,8 +120,8 @@ function AbaMensal({
 
   // Contando uma coluna só (link do painel): quem não tem aquele selo (ex.: sem declaração, logo sem DAS) sai, para o total bater com a barra.
   const base = useMemo(
-    () => linhas.filter((l) => (fonte === 'situacao' || seloDaFonte(l, fonte) !== null) && doResponsavel(resp, l.responsavel) && bate(busca, l.nome, l.documento)),
-    [linhas, fonte, resp, busca],
+    () => linhas.filter((l) => (fonte === 'situacao' || seloDaFonte(l, fonte) !== null) && bate(busca, l.nome, l.documento)),
+    [linhas, fonte, busca],
   );
   const contagem = contarEstados(base.map(seloDe));
   const filtradas = base
@@ -186,7 +177,6 @@ function AbaMensal({
                 <TableHead>Declaração e DAS</TableHead>
                 <TableHead>Últimos 12 meses</TableHead>
                 <TableHead>Cliente</TableHead>
-                <TableHead>Responsável</TableHead>
                 <TableHead>Última busca</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -222,7 +212,6 @@ function AbaMensal({
                       <p className="text-ui text-ink">{l.nome}</p>
                       <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
                     </TableCell>
-                    <TableCell className="text-ui text-muted-ink">{l.responsavel?.nome ?? '—'}</TableCell>
                     <TableCell><UltimaBusca iso={l.ultimaBusca} /></TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
@@ -306,9 +295,9 @@ function AbaMensal({
 // ---------------------------------------------------------------- aba DEFIS
 
 function AbaDefis({
-  busca, setBusca, resp, estado, setEstado, responsaveis, carregandoCadastro,
+  busca, setBusca, estado, setEstado, responsaveis, carregandoCadastro,
 }: {
-  busca: string; setBusca: (v: string) => void; resp: string | null;
+  busca: string; setBusca: (v: string) => void;
   estado: ReturnType<typeof useEstadoUrl>[0]; setEstado: ReturnType<typeof useEstadoUrl>[1];
   responsaveis: Map<string, ResponsavelCliente>; carregandoCadastro: boolean;
 }) {
@@ -325,8 +314,8 @@ function AbaDefis({
 
   // Filial (a DEFIS é da matriz) e empresa aberta depois do ano-calendário não têm DEFIS daquele ano: ficam fora da lista e da conta.
   const base = useMemo(
-    () => linhas.filter((l) => !l.filial && statusDefis(l, ano) !== 'nao_se_aplica' && doResponsavel(resp, responsaveis.get(l.contact_id) ?? null) && bate(busca, l.nome, l.documento)),
-    [linhas, ano, resp, responsaveis, busca],
+    () => linhas.filter((l) => !l.filial && statusDefis(l, ano) !== 'nao_se_aplica' && bate(busca, l.nome, l.documento)),
+    [linhas, ano, busca],
   );
   const contagem = contarEstados(base.map(seloDe));
   const filtradas = base.filter((l) => !estado || seloDe(l)?.estado === estado).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -381,7 +370,6 @@ function AbaDefis({
                 <TableHead>Nº da DEFIS</TableHead>
                 <TableHead>Transmissão</TableHead>
                 <TableHead>Cliente</TableHead>
-                <TableHead>Responsável</TableHead>
                 <TableHead>Última busca</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -399,7 +387,6 @@ function AbaDefis({
                       <p className="text-ui text-ink">{l.nome}</p>
                       <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}{l.anoAbertura ? ` · aberta em ${l.anoAbertura}` : ''}</p>
                     </TableCell>
-                    <TableCell className="text-ui text-muted-ink">{responsaveis.get(l.contact_id)?.nome ?? '—'}</TableCell>
                     <TableCell><UltimaBusca iso={l.consultadoEm} /></TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
