@@ -224,31 +224,6 @@ export function useUltimasMensagensCaixa(quantas = 3) {
   });
 }
 
-export interface AssuntoCaixa { contact_id: string; assunto: string; data_envio: string | null }
-
-/** Assunto de toda mensagem já baixada, para a busca "por assunto" da Caixa Postal (G10). Só o que foi baixado pelo Consultar. */
-export function useAssuntosCaixa(enabled: boolean) {
-  return useQuery({
-    queryKey: ['serpro-cp-assuntos'],
-    enabled,
-    queryFn: async (): Promise<AssuntoCaixa[]> => {
-      const linhas: AssuntoCaixa[] = [];
-      for (let de = 0; ; de += 1000) {
-        const { data, error } = await supabase
-          .from('serpro_caixa_postal_mensagens')
-          .select('contact_id, assunto, data_envio')
-          .order('data_envio', { ascending: false, nullsFirst: false })
-          .order('id')
-          .range(de, de + 999);
-        if (error) throw error;
-        linhas.push(...((data ?? []) as AssuntoCaixa[]));
-        if (!data || data.length < 1000) break; // PostgREST corta em 1000 linhas por página
-      }
-      return linhas;
-    },
-  });
-}
-
 // ---------------------------------------------------------------- ações (edge function serpro-caixa-postal)
 function chamarCaixa<T>(body: Record<string, unknown>): Promise<T> {
   return invocarSerpro<T>('serpro-caixa-postal', body);
@@ -274,7 +249,6 @@ function useInvalidarCaixa() {
   return (contactId?: string) => {
     qc.invalidateQueries({ queryKey: ['serpro-cp-clientes'] });
     qc.invalidateQueries({ queryKey: ['serpro-cp-criticas'] });
-    qc.invalidateQueries({ queryKey: ['serpro-cp-assuntos'] });
     qc.invalidateQueries({ queryKey: ['serpro-cp-ultimas'] });
     qc.invalidateQueries({ queryKey: ['serpro-consumo'] });
     if (contactId) qc.invalidateQueries({ queryKey: ['serpro-cp-mensagens', contactId] });
@@ -361,13 +335,13 @@ export function useAvisosCaixa() {
   });
 }
 
-/** E-mail sai pelo servidor; WhatsApp/copiar só registram o histórico (o envio acontece no navegador de quem clicou). */
+/** E-mail sai pelo servidor (um só, mesmo com várias mensagens do cliente); WhatsApp/copiar só registram o histórico (o envio acontece no navegador de quem clicou). */
 export function useAvisarCliente() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { mensagemId: string; canal: CanalAviso; mensagem: string; assunto?: string }) =>
+    mutationFn: (v: { mensagemIds: string[]; canal: CanalAviso; mensagem: string; assunto?: string }) =>
       chamarCaixa<{ ok?: boolean; error?: string; aviso?: string }>({
-        action: 'avisar', mensagem_id: v.mensagemId, canal: v.canal, mensagem: v.mensagem, assunto: v.assunto,
+        action: 'avisar', mensagem_ids: v.mensagemIds, canal: v.canal, mensagem: v.mensagem, assunto: v.assunto,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['serpro-cp-avisos'] }),
   });

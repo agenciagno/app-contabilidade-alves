@@ -14,8 +14,9 @@ import { perfilAtivo } from "../_shared/acesso.ts";
 //                    GERA CIÊNCIA da intimação (art. 23 §2º III, Dec. 70.235/72). Só com confirmação explícita.
 //   acompanhar       { mensagem_id, situacao?, responsavel_id?, observacoes?, visivel_portal? }
 //   acompanhar_cliente { contact_id, observacoes }   (bloco de notas do cliente, Termos de Intimação)
-//   avisar           { mensagem_id, canal: email|whatsapp|copiar, mensagem, assunto? }  avisa o CLIENTE (nunca envia o corpo da
-//                    intimação); e-mail sai daqui, WhatsApp/copiar só registram o histórico.
+//   avisar           { mensagem_id | mensagem_ids[], canal: email|whatsapp|copiar, mensagem, assunto? }  avisa o CLIENTE (nunca envia
+//                    o corpo da intimação); e-mail sai daqui, WhatsApp/copiar só registram o histórico. Com várias mensagens (todas do
+//                    mesmo cliente) sai UM aviso e o histórico é gravado em cada uma.
 //   rotina_eventos   rotina diária (07:30 BRT, cron): EVENTOSATUALIZACAO E0601, grátis (/Monitorar), sem ciência.
 //                    { limite?: n } (teste com poucos CNPJs) · { forcar?: true } (ignora a trava de 12 h)
 //
@@ -321,9 +322,12 @@ async function avisar(payload: any, uid: string) {
   if (!["email", "whatsapp", "copiar"].includes(canal)) return json({ error: "Canal inválido" }, 400);
   const texto = String(payload.mensagem ?? "").trim().slice(0, 4000);
   if (!texto) return json({ error: "Escreva a mensagem ao cliente" }, 400);
-  const { data: msg } = await supabase.from("serpro_caixa_postal_mensagens")
-    .select("id,contact_id").eq("id", String(payload.mensagem_id ?? "")).eq("company_id", COMPANY_ID).maybeSingle();
-  if (!msg) return json({ error: "Mensagem não encontrada" }, 404);
+  const ids = [...new Set((Array.isArray(payload.mensagem_ids) && payload.mensagem_ids.length ? payload.mensagem_ids : [payload.mensagem_id]).map((x: unknown) => String(x ?? "")))].slice(0, 20);
+  const { data: msgs } = await supabase.from("serpro_caixa_postal_mensagens")
+    .select("id,contact_id").in("id", ids).eq("company_id", COMPANY_ID);
+  if (!msgs?.length || msgs.length !== ids.length) return json({ error: "Mensagem não encontrada" }, 404);
+  if (new Set(msgs.map((m) => m.contact_id)).size !== 1) return json({ error: "As mensagens são de clientes diferentes" }, 400);
+  const msg = msgs[0];
   const { data: contato } = await supabase.from("contacts").select("email,whatsapp,phone").eq("id", msg.contact_id).maybeSingle();
   const { data: perfil } = await supabase.from("profiles").select("id").eq("user_id", uid).eq("company_id", COMPANY_ID).maybeSingle();
 
@@ -345,9 +349,9 @@ async function avisar(payload: any, uid: string) {
     destino = contato?.whatsapp || contato?.phone || null;
   }
 
-  const { error } = await supabase.from("serpro_caixa_postal_avisos").insert({
-    company_id: COMPANY_ID, mensagem_id: msg.id, contact_id: msg.contact_id, canal, destino, mensagem: texto, enviado_por: perfil?.id ?? null,
-  });
+  const { error } = await supabase.from("serpro_caixa_postal_avisos").insert(msgs.map((m) => ({
+    company_id: COMPANY_ID, mensagem_id: m.id, contact_id: m.contact_id, canal, destino, mensagem: texto, enviado_por: perfil?.id ?? null,
+  })));
   if (error) return json({ ok: true, aviso: "Aviso enviado, mas o histórico não foi gravado." });
   return json({ ok: true });
 }

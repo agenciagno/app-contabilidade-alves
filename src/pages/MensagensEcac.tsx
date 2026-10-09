@@ -1,26 +1,24 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Eye, Loader2, RefreshCw } from 'lucide-react';
 
-import { DsTab, PageHeader, SearchField, segmentedListClass, segmentedTriggerClass } from '@/components/ds';
+import { DsTab, PageHeader, SearchField } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AcaoLoteDialog, BarraSelecao, useSelecao } from '@/components/monitor/GuiasLote';
 import { hojeBR } from '@/lib/prazosFederais';
-import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { IntimacoesAba } from '@/components/serpro/IntimacoesAba';
+import { ConsultaLoteCaixaDialog } from '@/components/serpro/ConsultaLoteCaixaDialog';
 import { MensagensClienteSheet } from '@/components/serpro/MensagensClienteSheet';
-import { useConsultaCliente } from '@/components/serpro/useConsultaCliente';
-import { FaixaEstados, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
 import { seloDte, useConsultarDte, useDteMapa } from '@/hooks/useSerproExtras';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
-import { STATUS_MONITORADO, seloCaixa, useAssuntosCaixa, useClientesCaixa, useConsultarCaixa, type ClienteCaixa } from '@/hooks/useSerproCaixaPostal';
+import { STATUS_MONITORADO, seloCaixa, useClientesCaixa, type ClienteCaixa, type SeloEstado } from '@/hooks/useSerproCaixaPostal';
 import { ROTULO_ESTADO, contarEstados, seloCaixaPostal, type Selo } from '@/lib/monitorEstados';
 import type { TabelaExport } from '@/lib/exportarTabela';
 
@@ -40,11 +38,14 @@ const digitos = (v: string) => v.replace(/\D/g, '');
 const ehFilial = (c: ClienteCaixa) => digitos(c.documento).length === 14 && digitos(c.documento).slice(8, 12) !== '0001';
 
 type Aba = 'clientes' | 'intimacoes';
-type BuscarPor = 'cliente' | 'assunto';
+
+/** Situações que a coluna Situação mostra, na ordem do filtro. */
+const SITUACOES_CLIENTE: SeloEstado[] = ['nao_lida', 'nova', 'todas_lidas', 'sem_procuracao', 'nao_verificada'];
 
 /**
  * Caixa Postal e-CAC (Rodada 3, 09/10/2026). Duas abas: Clientes (molde único do Monitoramento, selo de `seloCaixaPostal`, o mesmo que o
- * Dashboard Fiscal conta) e Intimações (a antiga tela Termos de intimação). Na aba Clientes dá para buscar pelo assunto das mensagens já baixadas.
+ * Dashboard Fiscal conta) e Intimações (a antiga tela Termos de intimação). A aba Clientes é paginada (30, 50 ou 100) e a consulta de um
+ * cliente fica só no painel dele; consultar vários é pelo botão Consulta em Lote.
  */
 export default function MensagensEcac() {
   const [params, setParams] = useSearchParams();
@@ -74,47 +75,45 @@ export default function MensagensEcac() {
 
 function AbaClientes() {
   const { data: clientes = [], isLoading } = useClientesCaixa();
-  const { executar, emAndamento, dialog } = useConsultaCliente();
   const [estado, setEstado] = useEstadoUrl();
   const buscaInicial = useBuscaInicial();
   const [busca, setBusca] = useState(buscaInicial);
-  const [buscarPor, setBuscarPor] = useState<BuscarPor>('cliente');
+  const [situacao, setSituacao] = useState<'todas' | SeloEstado>('todas');
   const [aberto, setAberto] = useState<string | null>(null);
-  const { data: assuntos = [], isLoading: carregandoAssuntos } = useAssuntosCaixa(buscarPor === 'assunto');
   const sel = useSelecao();
-  const consultarCaixa = useConsultarCaixa();
-  const [loteAberto, setLoteAberto] = useState(false);
+  const [lote, setLote] = useState<{ inicial: string[] | null } | null>(null);
   const { data: dtes } = useDteMapa();
   const consultarDte = useConsultarDte();
   const [dteLote, setDteLote] = useState(false);
+  const topoTabela = useRef<HTMLDivElement>(null);
   const hoje = hojeBR();
 
-  const seloDe = (c: ClienteCaixa): Selo | null => (emAndamento === c.contact_id
-    ? { estado: 'processando', motivo: 'Consultando…' }
-    : seloCaixaPostal(seloCaixa(c).estado));
+  const seloDe = (c: ClienteCaixa): Selo | null => seloCaixaPostal(seloCaixa(c).estado);
 
   // Mesmo universo do painel: clientes monitorados, só a matriz.
   const monitorados = useMemo(() => clientes.filter((c) => c.status_cliente === STATUS_MONITORADO), [clientes]);
   const matrizes = useMemo(() => monitorados.filter((c) => !ehFilial(c)), [monitorados]);
 
-  // Busca por assunto: clientes com ao menos uma mensagem baixada cujo assunto tem o texto, e quais são.
-  const achadosPorAssunto = useMemo(() => {
-    const q = busca.trim().toLowerCase();
-    if (buscarPor !== 'assunto' || !q) return null;
-    const m = new Map<string, string[]>();
-    for (const a of assuntos) if (a.assunto.toLowerCase().includes(q)) m.set(a.contact_id, [...(m.get(a.contact_id) ?? []), a.assunto]);
-    return m;
-  }, [assuntos, busca, buscarPor]);
-
+  // Os cartões do topo e os números do filtro de situação olham a lista inteira da busca, nunca só a página que está na tela.
   const base = useMemo(() => {
     const q = busca.trim().toLowerCase();
     const qDigitos = digitos(q);
-    if (achadosPorAssunto) return matrizes.filter((c) => achadosPorAssunto.has(c.contact_id));
-    if (buscarPor === 'assunto') return matrizes;
     return matrizes.filter((c) => !q || c.nome.toLowerCase().includes(q) || (!!qDigitos && digitos(c.documento).includes(qDigitos)));
-  }, [matrizes, busca, buscarPor, achadosPorAssunto]);
+  }, [matrizes, busca]);
   const contagem = contarEstados(base.map(seloDe));
-  const filtrados = base.filter((c) => !estado || seloDe(c)?.estado === estado);
+  const porSituacao = useMemo(() => {
+    const m = new Map<SeloEstado, number>();
+    for (const c of base) { const e = seloCaixa(c).estado; m.set(e, (m.get(e) ?? 0) + 1); }
+    return m;
+  }, [base]);
+  const filtrados = base.filter((c) => (!estado || seloDe(c)?.estado === estado) && (situacao === 'todas' || seloCaixa(c).estado === situacao));
+
+  const pag = usePaginacao(filtrados, `${busca}|${estado ?? ''}|${situacao}`);
+  const irParaPagina = (p: number) => {
+    pag.setPagina(p);
+    requestAnimationFrame(() => topoTabela.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  const idsDaPagina = pag.recorte.map((c) => c.contact_id);
 
   const clienteAberto = clientes.find((c) => c.contact_id === aberto) ?? null;
   const comNovidade = matrizes.filter((c) => { const e = seloCaixa(c).estado; return (e === 'nova' || e === 'nao_lida') && c.procuracao !== 'ausente'; });
@@ -137,122 +136,100 @@ function AbaClientes() {
       {isLoading ? <Skeleton className="h-[88px] w-full" /> : <FaixaEstados contagem={contagem} ativo={estado} onChange={setEstado} />}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <Tabs value={buscarPor} onValueChange={(v) => setBuscarPor(v as BuscarPor)}>
-          <TabsList className={segmentedListClass}>
-            <TabsTrigger value="cliente" className={segmentedTriggerClass}>Cliente</TabsTrigger>
-            <TabsTrigger value="assunto" className={segmentedTriggerClass}>Assunto</TabsTrigger>
-          </TabsList>
-        </Tabs>
         <SearchField
-          placeholder={buscarPor === 'assunto' ? 'Buscar no assunto das mensagens baixadas...' : 'Buscar por razão social ou CNPJ...'}
+          placeholder="Buscar por razão social ou CNPJ..."
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           wrapperClassName="max-w-[429px] flex-1"
         />
-        {buscarPor === 'assunto' && (
-          <p className="text-meta text-muted-ink-2">Procura só nas mensagens já baixadas pelo Consultar.</p>
-        )}
+        <Select value={situacao} onValueChange={(v) => { if (v) setSituacao(v as typeof situacao); }}>
+          <SelectTrigger className="w-[220px]" aria-label="Filtrar por situação"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas as situações ({base.length})</SelectItem>
+            {SITUACOES_CLIENTE.map((e) => (
+              <SelectItem key={e} value={e}>{seloCaixaPostal(e)?.motivo ?? e} ({porSituacao.get(e) ?? 0})</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="flex items-center gap-2 sm:ml-auto">
-          <DicaBotao texto={`Marca na lista quem tem mensagem nova ou não lida (${comNovidade.length}), para baixar as listas de uma vez.`}>
-            <Button variant="outline" size="sm" className="h-10" disabled={!comNovidade.length} onClick={() => sel.definir(comNovidade.map((c) => c.contact_id))}>
-              Selecionar com mensagem nova ({comNovidade.length})
-            </Button>
+          <DicaBotao custo="Consultar" texto={`Escolha quem consultar de uma vez: clientes com mensagem não lida, com mensagem nova (${comNovidade.length} agora) ou os que você marcar. Baixa só a lista, sem registrar ciência.`}>
+            <Button variant="outline" size="sm" className="h-10" onClick={() => setLote({ inicial: null })}>Consulta em Lote</Button>
           </DicaBotao>
           <ExportarMenu montar={tabelaExport} disabled={filtrados.length === 0} escolherColunas />
         </div>
       </div>
 
       <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
-        <DicaBotao custo="Consultar" texto="Baixa da Receita a lista de mensagens de cada cliente marcado, um de cada vez. Não registra ciência. Quem já foi consultado hoje fica de fora.">
-          <Button size="sm" onClick={() => setLoteAberto(true)}>Baixar listas ({sel.marcados.size})</Button>
+        <DicaBotao custo="Consultar" texto="Abre a Consulta em Lote já com os clientes marcados na lista. Você confere antes de começar; quem já foi consultado hoje fica de fora.">
+          <Button size="sm" onClick={() => setLote({ inicial: [...sel.marcados] })}>Consulta em Lote ({sel.marcados.size})</Button>
         </DicaBotao>
         <DicaBotao custo="Consultar" texto="Consulta se cada cliente marcado aderiu ao Domicílio Tributário Eletrônico (DTE) da Receita e do Simples.">
           <Button size="sm" variant="outline" onClick={() => setDteLote(true)}>Consultar DTE</Button>
         </DicaBotao>
       </BarraSelecao>
 
-      <div className="overflow-x-auto rounded-lg border border-line bg-paper">
-        {isLoading || (buscarPor === 'assunto' && carregandoAssuntos) ? (
+      <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
+        {isLoading ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : filtrados.length === 0 ? (
-          <div className="p-10 text-center text-ui text-muted-ink">
-            {achadosPorAssunto ? 'Nenhuma mensagem baixada com esse assunto.' : 'Nenhum cliente nesta situação.'}
-          </div>
+          <div className="p-10 text-center text-ui text-muted-ink">Nenhum cliente nesta situação.</div>
         ) : (
           <Table className="[&_td]:px-3 [&_th]:px-3">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-8">
-                  <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtrados.map((c) => c.contact_id))}
-                    onCheckedChange={(v) => (v ? sel.somar(filtrados.map((c) => c.contact_id)) : sel.limpar())} />
+                <TableHead>
+                  <div className="flex items-center gap-3">
+                    <Checkbox aria-label="Marcar todos desta página" checked={sel.todos(idsDaPagina)}
+                      onCheckedChange={(v) => (v ? sel.somar(idsDaPagina) : sel.limpar())} />
+                    Cliente
+                  </div>
                 </TableHead>
                 <TableHead>Situação</TableHead>
                 <TableHead>Mensagens baixadas</TableHead>
                 <TableHead>DTE</TableHead>
-                <TableHead>Cliente</TableHead>
                 <TableHead>Última busca</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtrados.map((c) => {
-                const consultando = emAndamento === c.contact_id;
-                const semProcuracao = c.procuracao === 'ausente';
-                const achados = achadosPorAssunto?.get(c.contact_id) ?? [];
-                return (
-                  <TableRow key={c.contact_id} className="cursor-pointer" onClick={() => setAberto(c.contact_id)}>
-                    <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox aria-label={`Marcar ${c.nome}`} checked={sel.marcados.has(c.contact_id)} onCheckedChange={() => sel.alternar(c.contact_id)} />
-                    </TableCell>
-                    <TableCell className="min-w-[170px]"><SeloMonitor selo={seloDe(c)} /></TableCell>
-                    <TableCell className="whitespace-nowrap text-ui text-muted-ink">
-                      {c.consultado_em ? (
-                        <>
-                          {c.mensagens_salvas} {c.mensagens_salvas === 1 ? 'mensagem' : 'mensagens'}
-                          {c.nao_lidas_salvas > 0 && <span className="text-meta text-muted-ink-2"> · {c.nao_lidas_salvas} não {c.nao_lidas_salvas === 1 ? 'lida' : 'lidas'}</span>}
-                        </>
-                      ) : <span className="text-meta text-muted-ink-2">Lista não baixada</span>}
-                    </TableCell>
-                    <TableCell><SeloMini selo={seloDte(dtes?.get(c.contact_id))} /></TableCell>
-                    <TableCell className="min-w-[200px] max-w-[320px]">
-                      <p className="text-ui text-ink">{c.nome}</p>
-                      <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(c.documento)}</p>
-                      {achados.length > 0 && (
-                        <p className="mt-0.5 line-clamp-2 text-meta text-muted-ink">
-                          {achados[0]}{achados.length > 1 ? ` · e mais ${achados.length - 1}` : ''}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell><UltimaBusca iso={c.consultado_em} contactId={c.contact_id} /></TableCell>
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1">
-                        <DicaBotao texto="Abre o painel do cliente com as mensagens já salvas. Não consulta a Receita.">
-                          <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Ver mensagens salvas" onClick={() => setAberto(c.contact_id)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </DicaBotao>
-                        <DicaBotao custo={semProcuracao ? undefined : 'Consultar'}
-                          texto={semProcuracao ? 'Sem procuração para a Caixa Postal: peça ao cliente para outorgá-la no e-CAC.'
-                            : 'Baixa da Receita a lista de mensagens da Caixa Postal deste cliente. Não registra ciência. O selo é atualizado de graça todo dia às 07:30.'}>
-                          <Button size="sm" variant="outline" disabled={consultando || semProcuracao} onClick={() => executar(c.contact_id)}>
-                            {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-                            Consultar{!semProcuracao && <Preco tipo="Consultar" />}
-                          </Button>
-                        </DicaBotao>
+              {pag.recorte.map((c) => (
+                <TableRow key={c.contact_id} className="cursor-pointer" onClick={() => setAberto(c.contact_id)}>
+                  <TableCell className="min-w-[240px] max-w-[360px]">
+                    <div className="flex items-start gap-3">
+                      <span className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox aria-label={`Marcar ${c.nome}`} checked={sel.marcados.has(c.contact_id)} onCheckedChange={() => sel.alternar(c.contact_id)} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-ui text-ink">{c.nome}</p>
+                        <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(c.documento)}</p>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+                    </div>
+                  </TableCell>
+                  <TableCell className="min-w-[170px]"><SeloMonitor selo={seloDe(c)} /></TableCell>
+                  <TableCell className="whitespace-nowrap text-ui text-muted-ink">
+                    {c.consultado_em ? (
+                      <>
+                        {c.mensagens_salvas} {c.mensagens_salvas === 1 ? 'mensagem' : 'mensagens'}
+                        {c.nao_lidas_salvas > 0 && <span className="text-meta text-muted-ink-2"> · {c.nao_lidas_salvas} não {c.nao_lidas_salvas === 1 ? 'lida' : 'lidas'}</span>}
+                      </>
+                    ) : <span className="text-meta text-muted-ink-2">Lista não baixada</span>}
+                  </TableCell>
+                  <TableCell><SeloMini selo={seloDte(dtes?.get(c.contact_id))} /></TableCell>
+                  <TableCell><UltimaBusca iso={c.consultado_em} /></TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         )}
       </div>
 
-      <RodapeLista mostrando={filtrados.length} total={matrizes.length} unidade="clientes ativos" filiais={monitorados.length - matrizes.length} />
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <RodapeLista mostrando={filtrados.length} total={matrizes.length} unidade="clientes ativos" filiais={monitorados.length - matrizes.length} faixa={pag.faixa} />
+        <PaginacaoLista pagina={pag.pagina} totalPaginas={pag.totalPaginas} porPagina={pag.porPagina} total={filtrados.length}
+          onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
+      </div>
 
       <MensagensClienteSheet cliente={clienteAberto} onClose={() => setAberto(null)} />
-      {dialog}
+      <ConsultaLoteCaixaDialog aberto={!!lote} onClose={() => setLote(null)} clientes={matrizes} inicial={lote?.inicial ?? null} />
       <AcaoLoteDialog
         aberto={dteLote}
         onClose={() => setDteLote(false)}
@@ -267,26 +244,6 @@ function AbaClientes() {
         executar={async (item) => {
           const r = await consultarDte.mutateAsync({ contactId: item.contactId });
           return { ok: r.ok && !r.foraDoMonitoramento, error: r.semProcuracao ? 'Sem procuração para o DTE' : r.error, resumo: seloDte({ contact_id: item.contactId, consultado_em: '', indicador: r.indicador ?? null, status: null })?.motivo };
-        }}
-      />
-      <AcaoLoteDialog
-        aberto={loteAberto}
-        onClose={() => setLoteAberto(false)}
-        titulo="Baixar listas da Caixa Postal"
-        descricao="Baixa da Receita a lista de mensagens de cada cliente marcado, um de cada vez. Não abre as mensagens nem registra ciência."
-        itens={matrizes.filter((c) => sel.marcados.has(c.contact_id)).map((c) => ({
-          contactId: c.contact_id, nome: c.nome,
-          pular: c.procuracao === 'ausente' ? 'Sem procuração' : c.consultado_em?.slice(0, 10) === hoje ? 'Consultado hoje' : null,
-        }))}
-        tipo="Consultar"
-        rotuloAcao="Baixar"
-        rotuloFeito="Lista baixada"
-        executar={async (item) => {
-          const r = await consultarCaixa.mutateAsync({ contactId: item.contactId });
-          return {
-            ok: r.ok, recente: r.recente, error: r.semProcuracao ? 'Sem procuração para a Caixa Postal' : r.error,
-            resumo: r.novas ? `${r.novas} ${r.novas === 1 ? 'mensagem nova' : 'mensagens novas'}` : 'Lista baixada, sem mensagem nova',
-          };
         }}
       />
     </div>

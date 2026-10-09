@@ -2,10 +2,13 @@
  * Peças do molde único das listas de Monitoramento (Rodada 1, 08/10/2026): selo em duas camadas, faixa de contadores que filtra
  * e "última busca". Toda tela de Monitoramento que adotar o molde usa estas peças, para a equipe ler todas do mesmo jeito.
  */
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 
 import { DsBadge } from '@/components/ds';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUserRole } from '@/hooks/useUserRole';
 import { cicloAtual, useConsultasPagasPorCliente } from '@/hooks/useSerproConsumo';
@@ -132,12 +135,69 @@ function ConsultasNoMes({ contactId }: { contactId: string }) {
   );
 }
 
-/** Rodapé das listas: quantos aparecem e quantas filiais ficaram de fora (seguem a matriz, como no painel). */
-export function RodapeLista({ mostrando, total, unidade, filiais = 0 }: { mostrando: number; total: number; unidade: string; filiais?: number }) {
+/**
+ * Rodapé das listas: quantos aparecem e quantas filiais ficaram de fora (seguem a matriz, como no painel).
+ * Com `faixa` (lista paginada) diz "Mostrando 31–60 de 120": `mostrando` continua sendo o total depois dos filtros.
+ */
+export function RodapeLista({ mostrando, total, unidade, filiais = 0, faixa }: { mostrando: number; total: number; unidade: string; filiais?: number; faixa?: { de: number; ate: number } }) {
+  const filiaisTxt = filiais > 0 ? ` · ${filiais} ${filiais === 1 ? 'filial segue a matriz e fica' : 'filiais seguem a matriz e ficam'} de fora` : '';
+  if (faixa) {
+    return (
+      <p className="text-meta text-muted-ink-2">
+        Mostrando {faixa.de}–{faixa.ate} de {mostrando}{mostrando === total ? ` ${unidade}` : ` (${total} ${unidade} no total)`}{filiaisTxt}.
+      </p>
+    );
+  }
   return (
     <p className="text-meta text-muted-ink-2">
-      Mostrando {mostrando} de {total} {unidade}
-      {filiais > 0 ? ` · ${filiais} ${filiais === 1 ? 'filial segue a matriz e fica' : 'filiais seguem a matriz e ficam'} de fora` : ''}.
+      Mostrando {mostrando} de {total} {unidade}{filiaisTxt}.
     </p>
+  );
+}
+
+export const POR_PAGINA = [30, 50, 100] as const;
+
+/**
+ * Paginação de lista: recorta a lista já filtrada. Os contadores do topo (FaixaEstados) continuam vindo da lista inteira.
+ * `chaveReset` volta para a página 1 quando a busca ou um filtro muda.
+ */
+export function usePaginacao<T>(itens: T[], chaveReset: string, padrao: number = POR_PAGINA[0]) {
+  const [pagina, setPagina] = useState(1);
+  const [porPagina, setPorPagina] = useState<number>(padrao);
+  useEffect(() => { setPagina(1); }, [chaveReset, porPagina]);
+  const totalPaginas = Math.max(1, Math.ceil(itens.length / porPagina));
+  const atual = Math.min(pagina, totalPaginas);
+  const inicio = (atual - 1) * porPagina;
+  return {
+    pagina: atual, setPagina, porPagina, setPorPagina, totalPaginas,
+    recorte: itens.slice(inicio, inicio + porPagina),
+    faixa: { de: itens.length ? inicio + 1 : 0, ate: Math.min(inicio + porPagina, itens.length) },
+  };
+}
+
+/** Controles da paginação: quantos por página (30, 50 ou 100) e anterior/próxima. Some quando a lista cabe numa página do menor tamanho. */
+export function PaginacaoLista({ pagina, totalPaginas, porPagina, total, onPagina, onPorPagina, unidade = 'clientes' }: {
+  pagina: number; totalPaginas: number; porPagina: number; total: number; unidade?: string;
+  onPagina: (p: number) => void; onPorPagina: (n: number) => void;
+}) {
+  if (total <= POR_PAGINA[0]) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <label className="flex items-center gap-2 text-meta text-muted-ink">
+        Mostrar
+        <Select value={String(porPagina)} onValueChange={(v) => { if (v) onPorPagina(Number(v)); }}>
+          <SelectTrigger className="h-9 w-[76px]" aria-label={`${unidade} por página`}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {POR_PAGINA.map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        por página
+      </label>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" disabled={pagina <= 1} onClick={() => onPagina(pagina - 1)}>Anterior</Button>
+        <span className="whitespace-nowrap text-meta text-muted-ink">Página {pagina} de {totalPaginas}</span>
+        <Button variant="outline" size="sm" disabled={pagina >= totalPaginas} onClick={() => onPagina(pagina + 1)}>Próxima</Button>
+      </div>
+    </div>
   );
 }

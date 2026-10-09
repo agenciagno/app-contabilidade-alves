@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { CheckCircle2, ChevronDown, ChevronRight, CircleDot, Clock, FileText, MailOpen, MinusCircle, NotebookPen, Send, type LucideIcon } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, CircleDot, Clock, FileText, Mail, MailOpen, MessageCircle, MinusCircle, NotebookPen, type LucideIcon } from 'lucide-react';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, SearchField, StatCardRow } from '@/components/ds';
@@ -11,7 +11,7 @@ import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AvisarClienteDialog } from '@/components/serpro/AvisarClienteDialog';
+import { AvisarClienteDialog, foneDoCliente, formatarFone, type AlvoAviso, type CanalTela } from '@/components/serpro/AvisarClienteDialog';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { NotaDialog, type NotaAlvo } from '@/components/serpro/NotaDialog';
 import { useAbrirMensagemFlow } from '@/components/serpro/AbrirMensagemFlow';
@@ -51,7 +51,7 @@ export function IntimacoesAba() {
   const acompanharCliente = useAcompanharClienteCaixa();
   const { solicitar, dialogs } = useAbrirMensagemFlow();
   const { data: avisos } = useAvisosCaixa();
-  const [avisando, setAvisando] = useState<MensagemComCliente | null>(null);
+  const [avisando, setAvisando] = useState<AlvoAviso | null>(null);
   const [nota, setNota] = useState<NotaAlvo | null>(null);
   const [abertos, setAbertos] = useState<Record<string, boolean>>({});
   const buscaInicial = useBuscaInicial();
@@ -133,12 +133,39 @@ export function IntimacoesAba() {
 
   const BotaoNota = ({ tem, onClick, dica }: { tem: boolean; onClick: () => void; dica: string }) => (
     <DicaBotao texto={dica}>
-      <Button size="icon" variant="ghost" className="relative h-9 w-9" aria-label={dica} onClick={onClick}>
+      <Button size="icon" variant="ghost" className="relative h-8 w-8" aria-label={dica} onClick={onClick}>
         <NotebookPen className={tem ? 'h-4 w-4 text-brand' : 'h-4 w-4 text-muted-ink-2'} />
         {tem && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-pill bg-brand" aria-hidden />}
       </Button>
     </DicaBotao>
   );
+
+  /** Ícone de WhatsApp ou e-mail: abre a prévia do aviso. Fica apagado quando o cliente não tem o contato; ponto = já avisado por esse canal. */
+  const BotaoAviso = ({ msgs, canal }: { msgs: MensagemComCliente[]; canal: CanalTela }) => {
+    const contato = msgs[0].contacts;
+    const destino = canal === 'email' ? contato?.email : foneDoCliente(contato);
+    const jaAvisou = msgs.some((m) => avisos?.get(m.id)?.canal === canal);
+    const Icone = canal === 'email' ? Mail : MessageCircle;
+    const rotulo = canal === 'email' ? 'e-mail' : 'WhatsApp';
+    const dica = destino
+      ? `Mostra o aviso pronto para enviar por ${rotulo} a ${canal === 'email' ? destino : formatarFone(destino)}. Você confere antes de mandar.${jaAvisou ? ' Este cliente já foi avisado por aqui.' : ''}`
+      : `Este cliente não tem ${canal === 'email' ? 'e-mail' : 'WhatsApp nem telefone'} cadastrado.`;
+    return (
+      <DicaBotao texto={dica}>
+        <Button size="icon" variant="ghost" className="relative h-8 w-8" aria-label={`Avisar por ${rotulo}`} disabled={!destino}
+          onClick={() => setAvisando({ mensagens: msgs, canal })}>
+          <Icone className={jaAvisou ? 'h-4 w-4 text-brand' : 'h-4 w-4 text-muted-ink-2'} />
+          {jaAvisou && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-pill bg-brand" aria-hidden />}
+        </Button>
+      </DicaBotao>
+    );
+  };
+
+  /** Mensagens do cliente que entram no aviso: as em aberto (o que ainda pede ação); se não houver, as que estão na lista. */
+  const paraAvisar = (g: GrupoCliente) => {
+    const abertas = g.msgs.filter((m) => m.situacao === 'nova' || m.situacao === 'em_tratamento');
+    return abertas.length ? abertas : g.msgs;
+  };
 
   return (
     <div className="space-y-5">
@@ -190,8 +217,8 @@ export function IntimacoesAba() {
                 <TableHead>Razão Social</TableHead>
                 <TableHead>CNPJ</TableHead>
                 <TableHead>Lida</TableHead>
-                <TableHead>Acompanhamento</TableHead>
                 <TableHead>Situação</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -220,21 +247,26 @@ export function IntimacoesAba() {
                       </TableCell>
                       <TableCell className="whitespace-nowrap font-mono text-ui">{cliente.contacts?.document ?? '—'}</TableCell>
                       <TableCell><DsBadge tone={g.todasLidas ? 'ok' : 'warn'}>{g.todasLidas ? 'Lida' : 'Não Lida'}</DsBadge></TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <BotaoNota tem={!!notaCliente} onClick={() => abrirNotaCliente(g)} dica={notaCliente ? 'Abre o bloco de notas deste cliente (já tem anotação).' : 'Abre o bloco de notas deste cliente para escrever uma observação.'} />
-                      </TableCell>
                       <TableCell>
                         <DicaBotao texto={`Situação do cliente = a da mensagem que mais pede atenção. ${g.resumoSituacao}.`}>
                           <DsBadge tone={SITUACOES[g.situacao].tone} dot={false}><Icone className="h-3.5 w-3.5" aria-hidden />{SITUACOES[g.situacao].label}</DsBadge>
                         </DicaBotao>
                       </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <BotaoNota tem={!!notaCliente} onClick={() => abrirNotaCliente(g)} dica={notaCliente ? 'Abre o bloco de notas deste cliente (já tem anotação).' : 'Abre o bloco de notas deste cliente para escrever uma observação.'} />
+                          <BotaoAviso msgs={paraAvisar(g)} canal="whatsapp" />
+                          <BotaoAviso msgs={paraAvisar(g)} canal="email" />
+                        </div>
+                      </TableCell>
                     </TableRow>
 
                     {aberto && (
                       <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={6} className="bg-bg-2 p-4">
-                          <div className="overflow-hidden rounded-lg border border-line bg-paper">
-                            <Table>
+                        <TableCell colSpan={6} className="bg-bg-2 p-3">
+                          {/* w-0 + min-w-full: a tabela de dentro não alarga a de fora; se faltar espaço, ela rola sozinha */}
+                          <div className="w-0 min-w-full overflow-hidden rounded-lg border border-line bg-paper">
+                            <Table className="[&_td]:px-2 [&_th]:px-2">
                               <TableHeader>
                                 <TableRow>
                                   <TableHead>Tipo</TableHead>
@@ -243,8 +275,7 @@ export function IntimacoesAba() {
                                   <TableHead>Envio</TableHead>
                                   <TableHead>Validade</TableHead>
                                   <TableHead>Situação</TableHead>
-                                  <TableHead>Observação</TableHead>
-                                  <TableHead className="text-right">Ação</TableHead>
+                                  <TableHead className="text-right">Ações</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -254,7 +285,7 @@ export function IntimacoesAba() {
                                   return (
                                     <TableRow key={m.id}>
                                       <TableCell><DsBadge tone={cat.tone}>{cat.label}</DsBadge></TableCell>
-                                      <TableCell className="max-w-[280px] text-ui text-ink">{m.assunto}</TableCell>
+                                      <TableCell className="text-ui text-ink"><div className="max-w-[140px]">{m.assunto}</div></TableCell>
                                       <TableCell><DsBadge tone={m.lida ? 'ok' : 'warn'}>{m.lida ? 'Sim' : 'Não'}</DsBadge></TableCell>
                                       <TableCell className="whitespace-nowrap font-mono text-ui">{m.data_envio ? format(new Date(m.data_envio), 'dd/MM/yyyy') : '—'}</TableCell>
                                       <TableCell className="whitespace-nowrap text-ui text-muted-ink">
@@ -262,22 +293,14 @@ export function IntimacoesAba() {
                                       </TableCell>
                                       <TableCell>
                                         <Select value={m.situacao} onValueChange={(v) => salvar(m, { situacao: v as SituacaoMsg })}>
-                                          <SelectTrigger className="h-9 w-[150px]"><SelectValue /></SelectTrigger>
+                                          <SelectTrigger className="h-9 w-[128px]"><SelectValue /></SelectTrigger>
                                           <SelectContent>
                                             {(Object.keys(SITUACOES) as SituacaoMsg[]).map((k) => <SelectItem key={k} value={k}>{SITUACOES[k].label}</SelectItem>)}
                                           </SelectContent>
                                         </Select>
                                       </TableCell>
-                                      <TableCell>
-                                        <BotaoNota tem={!!m.observacoes} onClick={() => abrirNotaMensagem(m)} dica={m.observacoes ? 'Abre o bloco de notas desta mensagem (já tem anotação).' : 'Abre o bloco de notas desta mensagem para escrever uma observação.'} />
-                                      </TableCell>
                                       <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
-                                          <DicaBotao texto="Abre o texto pronto para avisar o cliente desta mensagem por WhatsApp ou e-mail, ou copiar. Não abre a mensagem na Receita.">
-                                            <Button size="sm" variant="outline" onClick={() => setAvisando(m)}>
-                                              <Send className="mr-1.5 h-4 w-4" /> Avisar cliente
-                                            </Button>
-                                          </DicaBotao>
+                                        <div className="flex items-center justify-end gap-0.5">
                                           <DicaBotao custo={m.corpo ? undefined : 'Consultar'}
                                             texto={m.corpo ? 'Mostra o texto da mensagem que já foi aberto antes. Não consulta a Receita e não registra nova ciência.'
                                               : 'Abre o corpo da mensagem na Receita. Antes, pede sua confirmação: abrir registra a ciência do contribuinte.'}>
@@ -286,6 +309,9 @@ export function IntimacoesAba() {
                                               {m.corpo ? 'Ver' : 'Abrir'}{!m.corpo && <Preco tipo="Consultar" />}
                                             </Button>
                                           </DicaBotao>
+                                          <BotaoNota tem={!!m.observacoes} onClick={() => abrirNotaMensagem(m)} dica={m.observacoes ? 'Abre o bloco de notas desta mensagem (já tem anotação).' : 'Abre o bloco de notas desta mensagem para escrever uma observação.'} />
+                                          <BotaoAviso msgs={[m]} canal="whatsapp" />
+                                          <BotaoAviso msgs={[m]} canal="email" />
                                         </div>
                                         {avisos?.get(m.id) && (
                                           <p className="mt-1 text-meta text-muted-ink-2">Avisado em {format(new Date(avisos.get(m.id)!.enviado_em), 'dd/MM')}</p>
@@ -309,7 +335,7 @@ export function IntimacoesAba() {
       </div>
 
       {dialogs}
-      <AvisarClienteDialog mensagem={avisando} onClose={() => setAvisando(null)} />
+      <AvisarClienteDialog alvo={avisando} onClose={() => setAvisando(null)} />
       <NotaDialog alvo={nota} onClose={() => setNota(null)} />
     </div>
   );
