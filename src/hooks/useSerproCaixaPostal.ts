@@ -126,7 +126,7 @@ export function useClientesCaixa(enabled = true) {
     queryFn: async (): Promise<ClienteCaixa[]> => {
       const { data: resumo, error } = await supabase
         .from('serpro_caixa_postal_resumo')
-        .select('*, contacts:contact_id (name, display_name, document, tax_regime, status_cliente)')
+        .select('*, contacts:contact_id (name, razao_social, display_name, document, tax_regime, status_cliente)')
         .limit(1000);
       if (error) throw error;
       const { data: procs, error: e2 } = await supabase
@@ -139,7 +139,7 @@ export function useClientesCaixa(enabled = true) {
       return (resumo ?? [])
         .map((r): ClienteCaixa => ({
           contact_id: r.contact_id,
-          nome: r.contacts?.display_name || r.contacts?.name || 'Cliente',
+          nome: r.contacts?.razao_social || r.contacts?.name || 'Cliente',
           documento: r.contacts?.document ?? '',
           regime: r.contacts?.tax_regime ?? null,
           status_cliente: r.contacts?.status_cliente ?? null,
@@ -213,13 +213,13 @@ export function useUltimasMensagensCaixa(quantas = 3) {
     queryFn: async (): Promise<UltimaMensagemCaixa[]> => {
       const { data, error } = await supabase
         .from('serpro_caixa_postal_mensagens')
-        .select('id, contact_id, assunto, data_envio, lida, categoria, contacts:contact_id!inner (name, display_name, document, status_cliente)')
+        .select('id, contact_id, assunto, data_envio, lida, categoria, contacts:contact_id!inner (name, razao_social, display_name, document, status_cliente)')
         .eq('contacts.status_cliente', STATUS_MONITORADO)
         .order('data_envio', { ascending: false, nullsFirst: false })
         .limit(quantas);
       if (error) throw error;
-      return ((data ?? []) as unknown as (Omit<UltimaMensagemCaixa, 'nome' | 'documento'> & { contacts: { name: string; display_name: string | null; document: string | null } })[])
-        .map(({ contacts, ...m }) => ({ ...m, nome: contacts.display_name || contacts.name || 'Cliente', documento: contacts.document ?? '' }));
+      return ((data ?? []) as unknown as (Omit<UltimaMensagemCaixa, 'nome' | 'documento'> & { contacts: { name: string; razao_social: string | null; display_name: string | null; document: string | null } })[])
+        .map(({ contacts, ...m }) => ({ ...m, nome: contacts.razao_social || contacts.name || 'Cliente', documento: contacts.document ?? '' }));
     },
   });
 }

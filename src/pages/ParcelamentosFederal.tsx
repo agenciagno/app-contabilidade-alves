@@ -166,7 +166,7 @@ export default function ParcelamentosFederal() {
                   <TableHead>Parcelamentos ativos</TableHead>
                   <TableHead>Atrasadas</TableHead>
                   <TableHead>Do mês</TableHead>
-                  <TableHead>Cliente</TableHead>
+                  <TableHead>Cliente / Razão Social</TableHead>
                   <TableHead>Última busca</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>

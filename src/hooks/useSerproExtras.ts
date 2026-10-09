@@ -67,8 +67,8 @@ export function useMatrizEProcesso() {
     queryFn: async (): Promise<LinhaEProcesso[]> => {
       const companyId = company!.id;
       const [contatos, consultas, processos] = await Promise.all([
-        fetchAllPages<{ id: string; name: string | null; display_name: string | null; document: string | null; tax_regime: string | null }>(
-          () => supabase.from('contacts').select('id, name, display_name, document, tax_regime').eq('company_id', companyId).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true).order('name').order('id')),
+        fetchAllPages<{ id: string; name: string | null; razao_social: string | null; display_name: string | null; document: string | null; tax_regime: string | null }>(
+          () => supabase.from('contacts').select('id, name, razao_social, display_name, document, tax_regime').eq('company_id', companyId).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true).order('name').order('id')),
         fetchAllPages<EProcessoConsulta>(() => supabase.from('serpro_eprocesso_consultas').select('contact_id, consultado_em, total').eq('company_id', companyId).order('contact_id')),
         fetchAllPages<EProcessoRow>(() => supabase.from('serpro_eprocessos').select('id, contact_id, numero, relacao, data_protocolo, tipo, subtipo, localizacao, situacao, ultimo_encaminhamento').eq('company_id', companyId).order('data_protocolo', { ascending: false }).order('id')),
       ]);
@@ -79,7 +79,7 @@ export function useMatrizEProcesso() {
       return contatos
         .filter((c) => { const d = dig(c.document); return d.length === 14 && !['26764962000100', '08801596000130'].includes(d); })
         .map((c) => ({
-          contact_id: c.id, nome: c.display_name || c.name || 'Cliente', documento: c.document ?? '', regime: c.tax_regime ?? null,
+          contact_id: c.id, nome: c.razao_social || c.name || 'Cliente', documento: c.document ?? '', regime: c.tax_regime ?? null,
           filial: dig(c.document).slice(8, 12) !== '0001', consulta: cPor.get(c.id) ?? null, processos: pPor.get(c.id) ?? [],
         }));
     },

@@ -19,7 +19,7 @@ import { useAbrirArquivo, useConsultaPgdasd } from '@/components/serpro/pgdasdUi
 import { useAbrirDefis, useConsultaDefis } from '@/components/serpro/defisUi';
 import { useLeituraFaturamento } from '@/components/serpro/useLeituraFaturamento';
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
-import { FaixaEstados, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, FiltroSelo, SeloMini, SeloMonitor, UltimaBusca, passaFiltroSelo, useEstadoUrl } from '@/components/monitor/MonitorUi';
 import { AbaMei } from '@/components/monitor/AbaMei';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
 import { useGuiasEnviadas, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
@@ -40,6 +40,8 @@ type Aba = 'mensal' | 'defis' | 'mei';
 
 const ROTULO_FONTE: Record<Exclude<FonteSimples, 'situacao'>, string> = { declaracao: 'Declaração', das: 'DAS', limite: 'Limite do Simples' };
 const moeda = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
+const EM_CONSULTA: Selo = { estado: 'processando', motivo: 'Consultando…' };
+const motivoDoSelo = (s: Selo | null) => s?.motivo ?? '';
 const pct = (v: number | null) => (v === null ? '' : `${v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`);
 
 function bate(busca: string, nome: string, documento: string) {
@@ -50,8 +52,8 @@ function bate(busca: string, nome: string, documento: string) {
 }
 
 /**
- * Simples Nacional (Rodada 2, 08/10/2026): junta as telas PGDAS, Faturamento e DEFIS no molde único do Monitoramento.
- * Aba Mensal: uma linha por cliente com declaração, DAS e limite da competência. Aba DEFIS: a declaração anual.
+ * Simples Nacional | MEI (Rodada 2, 08/10/2026): junta as telas PGDAS, Faturamento e DEFIS no molde único do Monitoramento.
+ * Aba Mensal: uma linha por cliente com a situação do PGDAS, a do DAS e o sublimite (RBA) da competência. Aba DEFIS: a declaração anual.
  * Pagamentos (DARF e DAE de todos os regimes) continua na tela própria.
  */
 export default function SimplesNacionalFederal() {
@@ -71,7 +73,7 @@ export default function SimplesNacionalFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · simples nacional" title="Simples Nacional." />
+      <PageHeader kicker="~/dashboard fiscal · simples nacional" title="Simples Nacional | MEI." />
 
       <div className="flex gap-1 border-b border-line">
         <DsTab active={aba === 'mensal'} onClick={() => irPara('mensal')}>Mensal</DsTab>
@@ -115,6 +117,8 @@ function AbaMensal({
   const { ocupado, abrirDeclaracao } = useAbrirArquivo();
   const [aberto, setAberto] = useState<string | null>(null);
   const [verLeitura, setVerLeitura] = useState(false);
+  const [filtroPgdas, setFiltroPgdas] = useState<string | null>(null);
+  const [filtroDas, setFiltroDas] = useState<string | null>(null);
   // Rodada 5: lote de DAS pela tela e envio com conferência.
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const [loteAberto, setLoteAberto] = useState(false);
@@ -150,6 +154,7 @@ function AbaMensal({
   const contagem = contarEstados(base.map(seloDe));
   const filtradas = base
     .filter((l) => !estado || seloDe(l)?.estado === estado)
+    .filter((l) => passaFiltroSelo(l.declaracao, filtroPgdas) && passaFiltroSelo(l.dasSelo, filtroDas))
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
   // DAS guardado e ainda pagável (vale até a data limite de acolhimento): o servidor devolve esse arquivo sem emitir outro.
@@ -186,10 +191,10 @@ function AbaMensal({
   const tabelaExport = (): TabelaExport => ({
     arquivo: `simples-nacional-${pa}`,
     titulo: `Simples Nacional — competência ${siglaCompetencia(pa)}`,
-    colunas: ['Razão social', 'CNPJ', 'Responsável', 'Situação', 'Estado', 'Declaração', 'Nº da declaração', 'DAS', 'Vencimento do DAS', 'Valor do DAS', 'Últimos 12 meses', '% do limite', 'Limite', 'Última busca'],
+    colunas: ['Razão social', 'CNPJ', 'Responsável', 'Situação geral', 'Estado', 'Situação PGDAS', 'Nº da declaração', 'Situação DAS', 'Vencimento do DAS', 'Valor do DAS', 'Sublimite (RBA)', '% do limite', 'Limite', 'Última busca'],
     linhas: filtradas.map((l) => [
       l.nome, formatarCnpj(l.documento), l.responsavel?.nome ?? '', l.situacao?.motivo ?? '', l.situacao ? ROTULO_ESTADO[l.situacao.estado] : '',
-      l.declMes?.motivo ?? '', l.declaracaoRow?.numero_declaracao ?? '', l.dasSelo?.motivo ?? '',
+      l.declaracao?.motivo ?? '', l.declaracaoRow?.numero_declaracao ?? '', l.dasSelo?.motivo ?? '',
       l.das.vencimento ? format(new Date(`${l.das.vencimento}T00:00:00`), 'dd/MM/yyyy') : '', l.das.valor != null ? moeda(l.das.valor) : '',
       l.fat ? moeda(l.fat.rbt12_total) : '', l.fat ? pct(percentualLimite(l.fat)) : '', l.limite?.motivo ?? '',
       l.ultimaBusca ? format(new Date(l.ultimaBusca), 'dd/MM/yyyy HH:mm') : '',
@@ -246,7 +251,11 @@ function AbaMensal({
 
       {carregando ? <Skeleton className="h-[88px] w-full" /> : <FaixaEstados contagem={contagem} ativo={estado} onChange={setEstado} />}
 
-      <SearchField placeholder="Buscar por razão social ou CNPJ..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px]" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <SearchField placeholder="Buscar por razão social ou CNPJ..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px] flex-1" />
+        <FiltroSelo rotulo="PGDAS" selos={base.map((l) => l.declaracao)} valor={filtroPgdas} onChange={setFiltroPgdas} semSelo="Sem informação" />
+        <FiltroSelo rotulo="DAS" selos={base.map((l) => l.dasSelo)} valor={filtroDas} onChange={setFiltroDas} semSelo="Sem DAS (sem declaração)" />
+      </div>
 
       <div className="overflow-x-auto rounded-lg border border-line bg-paper">
         {carregando ? (
@@ -257,14 +266,16 @@ function AbaMensal({
           <Table className="[&_td]:px-3 [&_th]:px-3">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-8">
-                  <Checkbox aria-label="Marcar todos da lista" checked={todasMarcadas}
-                    onCheckedChange={(v) => setMarcados(v ? new Set([...marcados, ...filtradas.map((l) => l.contact_id)]) : new Set())} />
+                <TableHead>
+                  <div className="flex items-center gap-3">
+                    <Checkbox aria-label="Marcar todos da lista" checked={todasMarcadas}
+                      onCheckedChange={(v) => setMarcados(v ? new Set([...marcados, ...filtradas.map((l) => l.contact_id)]) : new Set())} />
+                    Cliente / Razão Social
+                  </div>
                 </TableHead>
-                <TableHead>Situação</TableHead>
-                <TableHead>Declaração e DAS</TableHead>
-                <TableHead>Últimos 12 meses</TableHead>
-                <TableHead>Cliente</TableHead>
+                <TableHead>Situação PGDAS</TableHead>
+                <TableHead>Situação DAS</TableHead>
+                <TableHead>Sublimite (RBA)</TableHead>
                 <TableHead>Última busca</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -277,17 +288,24 @@ function AbaMensal({
                 const p = l.fat ? percentualLimite(l.fat) : null;
                 return (
                   <TableRow key={l.contact_id} className="cursor-pointer" onClick={() => setAberto(l.contact_id)}>
-                    <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox aria-label={`Marcar ${l.nome}`} checked={marcados.has(l.contact_id)} onCheckedChange={() => alternarMarcado(l.contact_id)} />
-                    </TableCell>
-                    <TableCell className="min-w-[160px]"><SeloMonitor selo={seloDe(l)} outros={fonte === 'situacao' ? l.outros : []} /></TableCell>
-                    <TableCell>
-                      <div className="flex flex-col items-start gap-1">
-                        <SeloMini selo={l.declMes} />
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <SeloMini selo={l.dasSelo} vazio="" />
-                          {l.das.valor != null && <span className="text-meta text-muted-ink-2">{moeda(l.das.valor)}</span>}
+                    <TableCell className="min-w-[240px] max-w-[360px]">
+                      <div className="flex items-start gap-3">
+                        <span className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox aria-label={`Marcar ${l.nome}`} checked={marcados.has(l.contact_id)} onCheckedChange={() => alternarMarcado(l.contact_id)} />
                         </span>
+                        <div className="min-w-0">
+                          <p className="text-ui text-ink">{l.nome}</p>
+                          <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
+                          {rotuloRegime(regimes?.get(l.contact_id)?.regime) && <p className="text-meta text-muted-ink-2">{rotuloRegime(regimes?.get(l.contact_id)?.regime)} ({ano})</p>}
+                          {recebeDas(l.contact_id) && <p className="text-meta text-muted-ink-2">Recebe DAS da CA</p>}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="min-w-[160px]"><SeloMonitor selo={consultando || lendo ? EM_CONSULTA : l.declaracao} /></TableCell>
+                    <TableCell className="min-w-[150px]">
+                      <div className="space-y-1">
+                        <SeloMonitor selo={consultando || lendo ? EM_CONSULTA : l.dasSelo} />
+                        {l.das.valor != null && <p className="text-meta text-muted-ink-2">{moeda(l.das.valor)}</p>}
                       </div>
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
@@ -299,13 +317,7 @@ function AbaMensal({
                       ) : <span className="text-meta text-muted-ink-2">Não lido</span>}
                       {p !== null && <span className="sr-only">{pct(p)} do limite</span>}
                     </TableCell>
-                    <TableCell className="min-w-[180px] max-w-[260px]">
-                      <p className="text-ui text-ink">{l.nome}</p>
-                      <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
-                      {rotuloRegime(regimes?.get(l.contact_id)?.regime) && <p className="text-meta text-muted-ink-2">{rotuloRegime(regimes?.get(l.contact_id)?.regime)} ({ano})</p>}
-                      {recebeDas(l.contact_id) && <p className="text-meta text-muted-ink-2">Recebe DAS da CA</p>}
-                    </TableCell>
-                    <TableCell><UltimaBusca iso={l.ultimaBusca} contactId={l.contact_id} /></TableCell>
+                    <TableCell><UltimaBusca iso={l.ultimaBusca} /></TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <DicaBotao texto="Abre a ficha do cliente: mês a mês, documentos, faturamento e envios. Não consulta a Receita.">
@@ -487,6 +499,7 @@ function AbaDefis({
   const consultarDefis = useConsultarDefis();
   const [consultaLote, setConsultaLote] = useState(false);
   const [baixarAberto, setBaixarAberto] = useState(false);
+  const [filtroSituacao, setFiltroSituacao] = useState<string | null>(null);
   const hojeIso = hojeBR();
 
   const seloDe = (l: LinhaDefis): Selo | null => (consulta.emAndamento === l.contact_id
@@ -499,7 +512,10 @@ function AbaDefis({
     [linhas, ano, busca],
   );
   const contagem = contarEstados(base.map(seloDe));
-  const filtradas = base.filter((l) => !estado || seloDe(l)?.estado === estado).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  const filtradas = base
+    .filter((l) => !estado || seloDe(l)?.estado === estado)
+    .filter((l) => passaFiltroSelo(seloDe(l), filtroSituacao, motivoDoSelo))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
   const tabelaExport = (): TabelaExport => ({
     arquivo: `defis-${ano}`,
@@ -536,7 +552,10 @@ function AbaDefis({
 
       {isLoading || carregandoCadastro ? <Skeleton className="h-[88px] w-full" /> : <FaixaEstados contagem={contagem} ativo={estado} onChange={setEstado} />}
 
-      <SearchField placeholder="Buscar por razão social ou CNPJ..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px]" />
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <SearchField placeholder="Buscar por razão social ou CNPJ..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px] flex-1" />
+        <FiltroSelo rotulo="Situação" selos={base.map(seloDe)} valor={filtroSituacao} onChange={setFiltroSituacao} chave={motivoDoSelo} semSelo="Sem informação" />
+      </div>
 
       <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
         <DicaBotao custo="Consultar" texto="Consulta na Receita as DEFIS de cada cliente marcado (todos os anos numa chamada). Quem já foi consultado hoje fica de fora.">
@@ -556,14 +575,16 @@ function AbaDefis({
           <Table className="[&_td]:px-3 [&_th]:px-3">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-8">
-                  <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtradas.map((l) => l.contact_id))}
-                    onCheckedChange={(v) => (v ? sel.somar(filtradas.map((l) => l.contact_id)) : sel.limpar())} />
+                <TableHead>
+                  <div className="flex items-center gap-3">
+                    <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtradas.map((l) => l.contact_id))}
+                      onCheckedChange={(v) => (v ? sel.somar(filtradas.map((l) => l.contact_id)) : sel.limpar())} />
+                    Cliente / Razão Social
+                  </div>
                 </TableHead>
                 <TableHead>Situação</TableHead>
                 <TableHead>Nº da DEFIS</TableHead>
                 <TableHead>Transmissão</TableHead>
-                <TableHead>Cliente</TableHead>
                 <TableHead>Última busca</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -574,15 +595,19 @@ function AbaDefis({
                 const consultando = consulta.emAndamento === l.contact_id;
                 return (
                   <TableRow key={l.contact_id}>
-                    <TableCell className="w-8"><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></TableCell>
+                    <TableCell className="min-w-[240px] max-w-[360px]">
+                      <div className="flex items-start gap-3">
+                        <span className="pt-0.5"><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></span>
+                        <div className="min-w-0">
+                          <p className="text-ui text-ink">{l.nome}</p>
+                          <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}{l.anoAbertura ? ` · aberta em ${l.anoAbertura}` : ''}</p>
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell className="min-w-[170px]"><SeloMonitor selo={seloDe(l)} /></TableCell>
                     <TableCell className="font-mono text-ui">{d?.id_defis ?? '—'}{d && d.tipo >= 3 && <span className="ml-1 text-meta text-muted-ink-2">(situação especial)</span>}</TableCell>
                     <TableCell className="whitespace-nowrap text-ui text-muted-ink">{d?.transmitida_em ? format(new Date(d.transmitida_em), 'dd/MM/yyyy HH:mm') : '—'}</TableCell>
-                    <TableCell className="min-w-[220px]">
-                      <p className="text-ui text-ink">{l.nome}</p>
-                      <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}{l.anoAbertura ? ` · aberta em ${l.anoAbertura}` : ''}</p>
-                    </TableCell>
-                    <TableCell><UltimaBusca iso={l.consultadoEm} contactId={l.contact_id} /></TableCell>
+                    <TableCell><UltimaBusca iso={l.consultadoEm} /></TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         {d && (

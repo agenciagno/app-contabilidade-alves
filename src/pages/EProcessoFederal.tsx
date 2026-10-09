@@ -110,7 +110,7 @@ export default function EProcessoFederal() {
                   <TableHead className="w-8" />
                   <TableHead>Situação</TableHead>
                   <TableHead>Mais recente</TableHead>
-                  <TableHead>Cliente</TableHead>
+                  <TableHead>Cliente / Razão Social</TableHead>
                   <TableHead>Última busca</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>

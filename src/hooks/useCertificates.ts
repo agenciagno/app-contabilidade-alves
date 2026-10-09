@@ -24,7 +24,7 @@ export interface CertificateRow {
   renewed_from_id: string | null;
   created_at: string;
   updated_at: string;
-  contacts: { name: string; display_name: string | null; document: string | null; email: string | null; whatsapp: string | null; phone: string | null } | null;
+  contacts: { name: string; razao_social: string | null; display_name: string | null; document: string | null; email: string | null; whatsapp: string | null; phone: string | null } | null;
   contact_partners: { id: string; name: string; cpf: string | null } | null;
 }
 
@@ -72,7 +72,7 @@ export function statusVisual(cert: Pick<CertificateRow, 'status' | 'data_validad
 }
 
 export function titularLabel(cert: CertificateRow): string {
-  const empresa = cert.contacts?.display_name || cert.contacts?.name || 'Cliente';
+  const empresa = cert.contacts?.razao_social || cert.contacts?.name || 'Cliente';
   if (cert.tipo_pessoa === 'PF' && cert.contact_partners?.name) {
     return `${empresa} — ${cert.contact_partners.name}`;
   }
@@ -90,7 +90,7 @@ export function useCertificates() {
     queryFn: async (): Promise<CertificateRow[]> => {
       const { data, error } = await supabase
         .from('certificates')
-        .select('*, contacts:contact_id (name, display_name, document, email, whatsapp, phone), contact_partners:partner_id (id, name, cpf)')
+        .select('*, contacts:contact_id (name, razao_social, display_name, document, email, whatsapp, phone), contact_partners:partner_id (id, name, cpf)')
         .eq('status', 'ativo')
         .order('data_validade', { ascending: true });
       if (error) throw error;

@@ -68,7 +68,7 @@ export function AvisarClienteDialog({ alvo, onClose }: { alvo: AlvoAviso | null;
   if (!alvo || !alvo.mensagens.length) return null;
   const { mensagens, canal } = alvo;
   const contato = mensagens[0].contacts;
-  const nome = contato?.display_name || contato?.name || 'Cliente';
+  const nome = contato?.razao_social || contato?.name || 'Cliente';
   const email = contato?.email ?? null;
   const fone = foneDoCliente(contato);
   const destino = canal === 'email' ? email : fone;

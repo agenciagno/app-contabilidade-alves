@@ -35,8 +35,8 @@ export function useMatrizMei(ano: number) {
     enabled: !!company?.id,
     queryFn: async (): Promise<LinhaMei[]> => {
       const companyId = company!.id;
-      const contatos = await fetchAllPages<{ id: string; name: string | null; display_name: string | null; document: string | null }>(
-        () => supabase.from('contacts').select('id, name, display_name, document')
+      const contatos = await fetchAllPages<{ id: string; name: string | null; razao_social: string | null; display_name: string | null; document: string | null }>(
+        () => supabase.from('contacts').select('id, name, razao_social, display_name, document')
           .eq('company_id', companyId).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true).eq('tax_regime', 'mei').order('name').order('id'));
       const ids = contatos.map((c) => c.id);
       if (!ids.length) return [];
@@ -55,7 +55,7 @@ export function useMatrizMei(ano: number) {
       return contatos
         .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
         .map((c): LinhaMei => ({
-          contact_id: c.id, nome: c.display_name || c.name || 'Cliente', documento: c.document ?? '',
+          contact_id: c.id, nome: c.razao_social || c.name || 'Cliente', documento: c.document ?? '',
           das: dPor.get(c.id) ?? [], divida: dvPor.get(c.id) ?? null, ccmei: cPor.get(c.id)?.[0] ?? null, situacao: sPor.get(c.id) ?? null,
         }));
     },

@@ -193,7 +193,7 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
                 <TableHead>Situação</TableHead>
                 <TableHead>Procuração e-CAC</TableHead>
                 {veCertificados && <TableHead>Certificado digital</TableHead>}
-                <TableHead>Cliente</TableHead>
+                <TableHead>Cliente / Razão Social</TableHead>
                 <TableHead>Última busca</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>

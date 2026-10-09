@@ -80,8 +80,8 @@ export function useProcuracoes() {
     enabled: !!company?.id,
     queryFn: async (): Promise<LinhaProcuracao[]> => {
       const companyId = company!.id;
-      const contatos = await fetchAllPages<{ id: string; name: string | null; display_name: string | null; document: string | null; tax_regime: string | null }>(
-        () => supabase.from('contacts').select('id, name, display_name, document, tax_regime')
+      const contatos = await fetchAllPages<{ id: string; name: string | null; razao_social: string | null; display_name: string | null; document: string | null; tax_regime: string | null }>(
+        () => supabase.from('contacts').select('id, name, razao_social, display_name, document, tax_regime')
           .eq('company_id', companyId).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true).order('name').order('id'));
       const linhas = await fetchAllPages<ProcuracaoRow>(
         () => supabase.from('serpro_procuracoes').select('contact_id, codigo_procuracao, status, data_fim, verificado_em')
@@ -99,7 +99,7 @@ export function useProcuracoes() {
           const d = derivarProcuracao(porCliente.get(c.id) ?? []);
           return {
             contact_id: c.id,
-            nome: c.display_name || c.name || 'Cliente',
+            nome: c.razao_social || c.name || 'Cliente',
             documento: c.document ?? '',
             regime: c.tax_regime ?? null,
             filial: digitos(c.document).slice(8, 12) !== '0001',

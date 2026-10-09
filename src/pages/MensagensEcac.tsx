@@ -181,7 +181,7 @@ function AbaClientes() {
                   <div className="flex items-center gap-3">
                     <Checkbox aria-label="Marcar todos desta página" checked={sel.todos(idsDaPagina)}
                       onCheckedChange={(v) => (v ? sel.somar(idsDaPagina) : sel.limpar())} />
-                    Cliente
+                    Cliente / Razão Social
                   </div>
                 </TableHead>
                 <TableHead>Situação</TableHead>

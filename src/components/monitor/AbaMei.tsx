@@ -181,7 +181,7 @@ export function AbaMei() {
                 <TableHead>DAS {siglaCompetencia(pa)}</TableHead>
                 <TableHead>Dívida ativa {ano}</TableHead>
                 <TableHead>No MEI</TableHead>
-                <TableHead>Cliente</TableHead>
+                <TableHead>Cliente / Razão Social</TableHead>
                 <TableHead>Última busca</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>

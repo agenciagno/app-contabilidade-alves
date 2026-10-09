@@ -212,7 +212,7 @@ export default function DctfwebMitFederal() {
                   <TableHead>Situação</TableHead>
                   <TableHead>DCTFWeb</TableHead>
                   <TableHead>MIT</TableHead>
-                  <TableHead>Cliente</TableHead>
+                  <TableHead>Cliente / Razão Social</TableHead>
                   <TableHead>Última busca</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>

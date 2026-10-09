@@ -123,7 +123,7 @@ export function useMatrizPgdasd(ano: number) {
       };
 
       const contatos = await todos((de, ate) => supabase.from('contacts')
-        .select('id, name, display_name, document, tax_regime')
+        .select('id, name, razao_social, display_name, document, tax_regime')
         .eq('company_id', companyId).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true).eq('tax_regime', 'simples_nacional')
         .order('name').range(de, ate));
       const consultas = await todos((de, ate) => supabase.from('serpro_pgdasd_consultas')
@@ -154,7 +154,7 @@ export function useMatrizPgdasd(ano: number) {
         .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
         .map((c): LinhaPgdasd => ({
           contact_id: c.id,
-          nome: c.display_name || c.name || 'Cliente',
+          nome: c.razao_social || c.name || 'Cliente',
           documento: c.document ?? '',
           regime: c.tax_regime ?? null,
           filial: digitos(c.document).slice(8, 12) !== '0001',

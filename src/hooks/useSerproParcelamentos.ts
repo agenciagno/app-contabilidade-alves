@@ -83,8 +83,8 @@ export function useMatrizParcelamentos() {
     enabled: !!company?.id,
     queryFn: async (): Promise<LinhaParcelamentos[]> => {
       const companyId = company!.id;
-      const contatos = await fetchAllPages<{ id: string; name: string | null; display_name: string | null; document: string | null; tax_regime: string | null }>(
-        () => supabase.from('contacts').select('id, name, display_name, document, tax_regime')
+      const contatos = await fetchAllPages<{ id: string; name: string | null; razao_social: string | null; display_name: string | null; document: string | null; tax_regime: string | null }>(
+        () => supabase.from('contacts').select('id, name, razao_social, display_name, document, tax_regime')
           .eq('company_id', companyId).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true).in('tax_regime', ['simples_nacional', 'mei']).order('name').order('id'));
       const consultas = await fetchAllPages<ConsultaRow>(
         () => supabase.from('serpro_parcelamentos_consultas').select('contact_id, modalidade, consultado_em, pedidos, ativos, sem_procuracao, erro').eq('company_id', companyId).order('contact_id').order('modalidade'));
@@ -106,7 +106,7 @@ export function useMatrizParcelamentos() {
         .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
         .map((c): LinhaParcelamentos => ({
           contact_id: c.id,
-          nome: c.display_name || c.name || 'Cliente',
+          nome: c.razao_social || c.name || 'Cliente',
           documento: c.document ?? '',
           regime: c.tax_regime ?? null,
           filial: digitos(c.document).slice(8, 12) !== '0001',

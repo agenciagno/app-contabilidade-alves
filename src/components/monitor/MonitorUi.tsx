@@ -2,7 +2,7 @@
  * Peças do molde único das listas de Monitoramento (Rodada 1, 08/10/2026): selo em duas camadas, faixa de contadores que filtra
  * e "última busca". Toda tela de Monitoramento que adotar o molde usa estas peças, para a equipe ler todas do mesmo jeito.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 
@@ -201,3 +201,57 @@ export function PaginacaoLista({ pagina, totalPaginas, porPagina, total, onPagin
     </div>
   );
 }
+
+/**
+ * Tipo da situação, sem datas e números: "DAS vence 20/10" e "DAS vence 22/10" são o mesmo tipo ("DAS vence"),
+ * "Em falta: 07/2026" vira "Em falta". É o que o filtro por situação enumera.
+ */
+export const tipoDoSelo = (s: Selo | null): string =>
+  (s ? s.motivo.replace(/:.*$/, '').replace(/\s+(até\s+)?\d{1,2}\/\d{2}.*$/, '').trim() : '');
+
+const GRAVIDADE: EstadoMonitor[] = ['atencao', 'pendencia', 'processando', 'nao_verificado', 'em_dia'];
+const SEM_SELO = '__sem__';
+
+/**
+ * Filtro por situação de UMA coluna: lista só os tipos de situação que existem na lista, com quantos clientes tem cada um
+ * (do mais grave ao menos grave). `selos` é o selo de cada cliente da lista antes deste filtro; `valor` null = todos.
+ * `chave` troca o que conta como "mesmo tipo" (padrão: `tipoDoSelo`).
+ */
+export function FiltroSelo({ rotulo, selos, valor, onChange, chave = tipoDoSelo, semSelo = 'Sem informação' }: {
+  rotulo: string;
+  selos: (Selo | null)[];
+  valor: string | null;
+  onChange: (v: string | null) => void;
+  chave?: (s: Selo | null) => string;
+  semSelo?: string;
+}) {
+  const opcoes = useMemo(() => {
+    const m = new Map<string, { n: number; estado: EstadoMonitor | null }>();
+    for (const s of selos) {
+      const k = s ? chave(s) : SEM_SELO;
+      const atual = m.get(k);
+      m.set(k, { n: (atual?.n ?? 0) + 1, estado: s?.estado ?? null });
+    }
+    return [...m.entries()]
+      .map(([k, v]) => ({ k, n: v.n, estado: v.estado, texto: k === SEM_SELO ? semSelo : k }))
+      .sort((a, b) => (a.estado ? GRAVIDADE.indexOf(a.estado) : 99) - (b.estado ? GRAVIDADE.indexOf(b.estado) : 99) || a.texto.localeCompare(b.texto, 'pt-BR'));
+  }, [selos, chave, semSelo]);
+  // Se o tipo escolhido sumiu da lista (ex.: mudou a competência), o filtro volta para "todas" sozinho.
+  useEffect(() => { if (valor !== null && !opcoes.some((o) => o.k === valor)) onChange(null); }, [opcoes, valor, onChange]);
+  return (
+    <Select value={valor ?? 'todas'} onValueChange={(v) => { if (v) onChange(v === 'todas' ? null : v); }}>
+      <SelectTrigger className="w-[230px]" aria-label={`Filtrar por ${rotulo}`}>
+        <span className="mr-1.5 shrink-0 text-muted-ink">{rotulo}:</span>
+        <span className="min-w-0 flex-1 truncate text-left"><SelectValue /></span>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="todas">Todas ({selos.length})</SelectItem>
+        {opcoes.map((o) => <SelectItem key={o.k} value={o.k}>{o.texto} ({o.n})</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** Aplica o valor de um `FiltroSelo` a um selo. */
+export const passaFiltroSelo = (s: Selo | null, valor: string | null, chave: (s: Selo | null) => string = tipoDoSelo) =>
+  valor === null || (s ? chave(s) === valor : valor === SEM_SELO);

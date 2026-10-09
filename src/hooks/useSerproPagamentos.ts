@@ -109,7 +109,7 @@ export function useMatrizPagamentos(competencia: string) {
       const companyId = company!.id;
 
       const contatos = await lerTodos((de, ate) => supabase.from('contacts')
-        .select('id, name, display_name, document, tax_regime')
+        .select('id, name, razao_social, display_name, document, tax_regime')
         .eq('company_id', companyId).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true)
         .order('name').range(de, ate));
       const consultas = await lerTodos((de, ate) => supabase.from('serpro_pagamentos_consultas')
@@ -146,7 +146,7 @@ export function useMatrizPagamentos(competencia: string) {
           const novo = !!s?.mudou_em && (!s.ultima_consulta_em || Date.parse(s.mudou_em) > Date.parse(s.ultima_consulta_em));
           return {
             contact_id: c.id,
-            nome: c.display_name || c.name || 'Cliente',
+            nome: c.razao_social || c.name || 'Cliente',
             documento: c.document ?? '',
             regime: c.tax_regime ?? null,
             consultadoEm: consultaPor.get(c.id) ?? null,

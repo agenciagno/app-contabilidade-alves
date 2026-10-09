@@ -29,7 +29,7 @@ const formatarCnpj = (d: string | null) => {
 };
 const dataBR = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—');
 const moeda = (v: number | null) => (v === null ? '—' : brl(v));
-const nomeDe = (d: DarfRow) => d.contacts?.display_name || d.contacts?.name || 'Cliente';
+const nomeDe = (d: DarfRow) => d.contacts?.razao_social || d.contacts?.name || 'Cliente';
 
 function abrir(url: string) {
   const a = document.createElement('a');
@@ -241,7 +241,7 @@ export default function DarfFederal() {
             <TableHeader>
               <TableRow>
                 <TableHead>Gerado em</TableHead>
-                <TableHead>Cliente</TableHead>
+                <TableHead>Cliente / Razão Social</TableHead>
                 <TableHead>Receita · período</TableHead>
                 <TableHead className="text-right">Imposto</TableHead>
                 <TableHead className="text-right">Multa + juros</TableHead>

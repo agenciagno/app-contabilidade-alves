@@ -118,7 +118,7 @@ export default function SituacaoFiscalFederal() {
                   <TableHead>Situação</TableHead>
                   <TableHead>Pendências</TableHead>
                   <TableHead>Última certidão</TableHead>
-                  <TableHead>Cliente</TableHead>
+                  <TableHead>Cliente / Razão Social</TableHead>
                   <TableHead>Última busca</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>

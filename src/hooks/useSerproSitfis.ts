@@ -63,8 +63,8 @@ export function useMatrizSitfis() {
     enabled: !!company?.id,
     queryFn: async (): Promise<LinhaSitfis[]> => {
       const companyId = company!.id;
-      const contatos = await fetchAllPages<{ id: string; name: string | null; display_name: string | null; document: string | null; tax_regime: string | null }>(
-        () => supabase.from('contacts').select('id, name, display_name, document, tax_regime')
+      const contatos = await fetchAllPages<{ id: string; name: string | null; razao_social: string | null; display_name: string | null; document: string | null; tax_regime: string | null }>(
+        () => supabase.from('contacts').select('id, name, razao_social, display_name, document, tax_regime')
           .eq('company_id', companyId).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true).order('name').order('id'));
       // Colunas explícitas: o protocolo da solicitação nunca vai para a tela.
       const relatorios = await fetchAllPages<SitfisRow>(
@@ -86,7 +86,7 @@ export function useMatrizSitfis() {
         .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
         .map((c): LinhaSitfis => ({
           contact_id: c.id,
-          nome: c.display_name || c.name || 'Cliente',
+          nome: c.razao_social || c.name || 'Cliente',
           documento: c.document ?? '',
           regime: c.tax_regime ?? null,
           filial: digitos(c.document).slice(8, 12) !== '0001',

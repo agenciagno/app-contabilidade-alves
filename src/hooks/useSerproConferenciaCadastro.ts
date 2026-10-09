@@ -36,7 +36,7 @@ export interface LinhaConferencia {
 export interface ContatoCadastro {
   id: string;
   name: string | null;
-  display_name: string | null;
+  razao_social: string | null; display_name: string | null;
   document: string | null;
   tax_regime: string | null;
   status_cliente: string | null;
@@ -127,7 +127,7 @@ export function montarConferencia(contatos: ContatoCadastro[], simples: LinhaPgd
   for (const c of ativos) {
     const problemas = porContato.get(c.id);
     if (!problemas?.length) continue;
-    linhas.push({ contact_id: c.id, nome: c.display_name || c.name || 'Cliente', documento: c.document ?? '', regime: c.tax_regime, problemas });
+    linhas.push({ contact_id: c.id, nome: c.razao_social || c.name || 'Cliente', documento: c.document ?? '', regime: c.tax_regime, problemas });
   }
   const peso = (l: LinhaConferencia) => Math.max(...l.problemas.map((p) => (p.tom === 'danger' ? 3 : 2)));
   linhas.sort((a, b) => peso(b) - peso(a) || a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -142,7 +142,7 @@ export function useConferenciaCadastro(): ResumoConferencia {
     queryKey: ['serpro-conferencia-contatos', company?.id],
     enabled: !!company?.id,
     queryFn: () => fetchAllPages<ContatoCadastro>(() => supabase.from('contacts')
-      .select('id, name, display_name, document, tax_regime, status_cliente, data_saida_cliente')
+      .select('id, name, razao_social, display_name, document, tax_regime, status_cliente, data_saida_cliente')
       .eq('company_id', company!.id).eq('status_cliente', STATUS_MONITORADO).order('name').order('id')),
   });
   const declaracoes = useQuery({

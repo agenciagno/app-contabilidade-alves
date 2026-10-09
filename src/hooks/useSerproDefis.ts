@@ -68,8 +68,8 @@ export function useMatrizDefis() {
     enabled: !!company?.id,
     queryFn: async (): Promise<LinhaDefis[]> => {
       const companyId = company!.id;
-      const contatos = await fetchAllPages<{ id: string; name: string | null; display_name: string | null; document: string | null; data_abertura_receita: string | null; data_abertura_rf: string | null }>(
-        () => supabase.from('contacts').select('id, name, display_name, document, data_abertura_receita, data_abertura_rf')
+      const contatos = await fetchAllPages<{ id: string; name: string | null; razao_social: string | null; display_name: string | null; document: string | null; data_abertura_receita: string | null; data_abertura_rf: string | null }>(
+        () => supabase.from('contacts').select('id, name, razao_social, display_name, document, data_abertura_receita, data_abertura_rf')
           .eq('company_id', companyId).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true).eq('tax_regime', 'simples_nacional').order('name').order('id'));
       const consultas = await fetchAllPages<{ contact_id: string; consultado_em: string }>(
         () => supabase.from('serpro_defis_consultas').select('contact_id, consultado_em').eq('company_id', companyId).order('contact_id'));
@@ -87,7 +87,7 @@ export function useMatrizDefis() {
           const ano = abertura ? Number(String(abertura).slice(0, 4)) : NaN;
           return {
             contact_id: c.id,
-            nome: c.display_name || c.name || 'Cliente',
+            nome: c.razao_social || c.name || 'Cliente',
             documento: c.document ?? '',
             filial: digitos(c.document).slice(8, 12) !== '0001',
             anoAbertura: Number.isInteger(ano) && ano > 1900 ? ano : null,

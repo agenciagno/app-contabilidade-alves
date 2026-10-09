@@ -28,7 +28,7 @@ export interface DarfRow {
   numero_documento: string | null;
   codigo_barras: string | null;
   created_at: string;
-  contacts: { name: string | null; display_name: string | null; document: string | null } | null;
+  contacts: { name: string | null; razao_social: string | null; display_name: string | null; document: string | null } | null;
 }
 
 export interface ClienteDarf { id: string; nome: string; documento: string }
@@ -43,12 +43,12 @@ export function useClientesDarf() {
     queryKey: ['serpro-darf-clientes', company?.id],
     enabled: !!company?.id,
     queryFn: async (): Promise<ClienteDarf[]> => {
-      const contatos = await fetchAllPages<{ id: string; name: string | null; display_name: string | null; document: string | null }>(
-        () => supabase.from('contacts').select('id, name, display_name, document')
+      const contatos = await fetchAllPages<{ id: string; name: string | null; razao_social: string | null; display_name: string | null; document: string | null }>(
+        () => supabase.from('contacts').select('id, name, razao_social, display_name, document')
           .eq('company_id', company!.id).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true).order('name').order('id'));
       return contatos
         .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
-        .map((c) => ({ id: c.id, nome: c.display_name || c.name || 'Cliente', documento: c.document ?? '' }));
+        .map((c) => ({ id: c.id, nome: c.razao_social || c.name || 'Cliente', documento: c.document ?? '' }));
     },
   });
 }
@@ -61,7 +61,7 @@ export function useDarfsGerados() {
     enabled: !!company?.id,
     queryFn: async (): Promise<DarfRow[]> =>
       fetchAllPages<DarfRow>(() => supabase.from('serpro_darfs')
-        .select('id, contact_id, codigo_receita, extensao, tipo_pa, data_pa, vencimento, valor_imposto, data_consolidacao, valor_principal, valor_multa, percentual_multa, valor_juros, percentual_juros, valor_total, valido_ate, numero_documento, codigo_barras, created_at, contacts(name, display_name, document)')
+        .select('id, contact_id, codigo_receita, extensao, tipo_pa, data_pa, vencimento, valor_imposto, data_consolidacao, valor_principal, valor_multa, percentual_multa, valor_juros, percentual_juros, valor_total, valido_ate, numero_documento, codigo_barras, created_at, contacts(name, razao_social, display_name, document)')
         .eq('company_id', company!.id).order('created_at', { ascending: false }).order('id')),
   });
 }

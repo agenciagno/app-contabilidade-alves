@@ -286,7 +286,7 @@ export const menuEntries: MenuEntry[] = [
   // Simples Nacional virou item próprio em 09/10/2026 (pedido de Gabriel); a permissão segue a do Dashboard Fiscal, como a rota.
   {
     kind: 'simple',
-    title: 'Simples Nacional',
+    title: 'Simples Nacional | MEI',
     url: '/dashboard-federal/simples-nacional',
     icon: Receipt,
     iconName: 'receipt',

@@ -63,8 +63,8 @@ export function useMatrizDctfwebMit(competencia: string) {
     queryFn: async (): Promise<LinhaDctfwebMit[]> => {
       const companyId = company!.id;
       const ano = Number(competencia.slice(0, 4));
-      const contatos = await fetchAllPages<{ id: string; name: string | null; display_name: string | null; document: string | null; tax_regime: string | null }>(
-        () => supabase.from('contacts').select('id, name, display_name, document, tax_regime')
+      const contatos = await fetchAllPages<{ id: string; name: string | null; razao_social: string | null; display_name: string | null; document: string | null; tax_regime: string | null }>(
+        () => supabase.from('contacts').select('id, name, razao_social, display_name, document, tax_regime')
           .eq('company_id', companyId).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true).in('tax_regime', ['lucro_presumido', 'lucro_real']).order('name').order('id'));
       // Colunas explícitas: o caminho do recibo nunca sai do servidor.
       const dctf = await fetchAllPages<DctfwebRow>(
@@ -88,7 +88,7 @@ export function useMatrizDctfwebMit(competencia: string) {
           const sn = sPor.get(c.id);
           return {
             contact_id: c.id,
-            nome: c.display_name || c.name || 'Cliente',
+            nome: c.razao_social || c.name || 'Cliente',
             documento: c.document ?? '',
             regime: c.tax_regime ?? null,
             filial: digitos(c.document).slice(8, 12) !== '0001',
