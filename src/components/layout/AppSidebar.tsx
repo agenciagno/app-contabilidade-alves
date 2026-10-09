@@ -185,6 +185,29 @@ interface CollapsibleModule extends RoleGated {
 
 export type MenuEntry = SectionDivider | SimpleModule | CollapsibleModule;
 
+/** Itens do grupo "Monitoramento" (da seção até o próximo divisor): o menu fixo no topo das telas do Monitoramento Fiscal usa esta mesma lista. */
+export function itensDoMonitoramento(): SimpleModule[] {
+  const inicio = menuEntries.findIndex((e) => e.kind === 'section' && e.label === 'Monitoramento');
+  const itens: SimpleModule[] = [];
+  for (let i = inicio + 1; i < menuEntries.length; i++) {
+    const e = menuEntries[i];
+    if (e.kind === 'section') break;
+    if (e.kind === 'simple') itens.push(e);
+  }
+  return itens;
+}
+
+/** Permissão de um item simples do menu: papel, módulo e submódulo. Vale para a sidebar e para o menu do topo. */
+export function itemSimplesVisivel(
+  entry: SimpleModule,
+  acesso: Pick<ReturnType<typeof useModuleAccess>, 'passesRoleGate' | 'isModuleVisible' | 'isSubItemVisible'>,
+): boolean {
+  if (!acesso.passesRoleGate(entry)) return false;
+  if (!entry.moduleKey) return true;
+  if (!acesso.isModuleVisible(entry.moduleKey)) return false;
+  return entry.subKey ? acesso.isSubItemVisible(entry.moduleKey, entry.subKey) : true;
+}
+
 /** Fonte única do menu. A busca do header também consome esta lista. */
 export const menuEntries: MenuEntry[] = [
   {
@@ -429,12 +452,8 @@ export function AppSidebar() {
 
   const isEntryVisible = (entry: MenuEntry): boolean => {
     if (entry.kind === 'section') return false; // resolvido na montagem da lista
+    if (entry.kind === 'simple') return itemSimplesVisivel(entry, { passesRoleGate, isModuleVisible, isSubItemVisible });
     if (!passesRoleGate(entry)) return false;
-    if (entry.kind === 'simple') {
-      if (!entry.moduleKey) return true;
-      if (!isModuleVisible(entry.moduleKey)) return false;
-      return entry.subKey ? isSubItemVisible(entry.moduleKey, entry.subKey) : true;
-    }
     // Grupo sem moduleKey (Cadastros) depende só dos itens.
     if (entry.moduleKey && !isModuleVisible(entry.moduleKey)) return false;
     return visibleItems(entry).length > 0;

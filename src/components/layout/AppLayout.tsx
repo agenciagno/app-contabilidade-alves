@@ -8,6 +8,7 @@ import { AppHeader } from './AppHeader';
 import { DevEnvironmentBanner } from './DevEnvironmentBanner';
 import { ViewAsClientBanner } from './ViewAsClientBanner';
 import { MobileBottomNav } from './MobileBottomNav';
+import { MenuMonitoramento } from './MenuMonitoramento';
 
 import { ForcePasswordChange } from '@/components/auth/ForcePasswordChange';
 import { Loader2 } from 'lucide-react';
@@ -164,6 +165,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <SidebarInset className="flex-1 min-w-0 rounded-tl-[20px] md:h-full md:min-h-0 md:overflow-y-auto md:overflow-x-hidden">
             <DevEnvironmentBanner />
             <ViewAsClientBanner />
+            <MenuMonitoramento />
             {/* pb extra no mobile: a bottom nav é fixa e cobriria o fim da página */}
             <main className="min-w-0 max-w-full flex-1 p-3 pb-24 sm:p-4 sm:pb-24 md:p-6 md:pb-6 lg:p-8 lg:pb-8">
               {/* Fallback de navegação: se uma página lazy suspender aqui, só o
