@@ -4,11 +4,14 @@
  */
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { format } from 'date-fns';
 import {
   AlertTriangle, ArrowRight, CalendarX, CheckCircle2, ChevronRight, Gavel, FileWarning, MinusCircle, Receipt, Scale, UserX,
 } from 'lucide-react';
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from 'recharts';
 
+import { DsBadge } from '@/components/ds';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { COR_ESTADO, ESTADOS, ROTULO_ESTADO, type ContagemEstados, type EstadoMonitor } from '@/lib/monitorEstados';
 import {
@@ -16,6 +19,7 @@ import {
 } from '@/lib/painelFiscal';
 import type { LinhaSimples } from '@/lib/simplesNacionalLinhas';
 import { LIMITE_SIMPLES } from '@/hooks/useSerproFaturamento';
+import { CATEGORIAS, type UltimaMensagemCaixa } from '@/hooks/useSerproCaixaPostal';
 import { cn } from '@/lib/utils';
 
 const SIMPLES = '/dashboard-federal/simples-nacional';
@@ -203,9 +207,9 @@ const DESTINO_DECLARACAO: Record<BarraDeclaracao['chave'], string> = {
   mit: '/dashboard-federal/dctfweb-mit',
 };
 
-export function DeclaracoesBox({ barras, competencia }: { barras: BarraDeclaracao[]; competencia: string }) {
+export function DeclaracoesBox({ barras, competencia, className }: { barras: BarraDeclaracao[]; competencia: string; className?: string }) {
   return (
-    <Caixa titulo="Declarações" subtitulo={`Declarações feitas entre os clientes já consultados (competência ${competencia}).`}>
+    <Caixa className={className} titulo="Declarações" subtitulo={`Declarações feitas entre os clientes já consultados (competência ${competencia}).`}>
       <div className="space-y-4">
         {barras.map((b) => {
           const pct = b.total > 0 ? (b.feitas / b.total) * 100 : 0;
@@ -233,7 +237,11 @@ export function DeclaracoesBox({ barras, competencia }: { barras: BarraDeclaraca
 // ---------------------------------------------------------------- Mensagens e-CAC
 const ICONE_CATEGORIA: Record<string, typeof Gavel> = { intimacao: Gavel, malha: FileWarning, maed: CalendarX, cobranca: Receipt, processo: Scale };
 
-export function MensagensEcacBox({ r }: { r: ResumoMensagens }) {
+const apenasDigitos = (v: string) => v.replace(/\D/g, '');
+
+export function MensagensEcacBox({ r, ultimas, carregandoUltimas, className }: {
+  r: ResumoMensagens; ultimas: UltimaMensagemCaixa[]; carregandoUltimas?: boolean; className?: string;
+}) {
   const linhas: { chave: EstadoMonitor; rotulo: string; dica: string; valor: number; icone: ReactNode }[] = [
     { chave: 'atencao', rotulo: 'Exclusão', dica: 'Termo de exclusão do Simples em aberto', valor: r.exclusao, icone: <UserX className="h-5 w-5 text-danger" /> },
     { chave: 'pendencia', rotulo: 'Importante', dica: 'Mensagem crítica em aberto ou mensagem não lida', valor: r.importante, icone: <AlertTriangle className="h-5 w-5 text-warn" /> },
@@ -245,6 +253,7 @@ export function MensagensEcacBox({ r }: { r: ResumoMensagens }) {
       titulo="Mensagens e-CAC"
       subtitulo="Caixa Postal da Receita: quantos clientes estão em cada situação. Um cliente conta uma vez, no mais grave."
       acao={<VerTudo to="/mensagens">Abrir mensagens</VerTudo>}
+      className={className}
     >
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <ul className="space-y-3">
@@ -278,6 +287,36 @@ export function MensagensEcacBox({ r }: { r: ResumoMensagens }) {
             })}
           </ul>
         </div>
+      </div>
+      <div className="space-y-2 border-t border-line pt-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <p className="text-ui-strong text-ink">Últimas mensagens recebidas</p>
+          <span className="text-meta text-muted-ink-2">só as já baixadas; dos demais clientes o sistema sabe apenas que há mensagem nova</span>
+        </div>
+        {carregandoUltimas ? (
+          <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+        ) : ultimas.length === 0 ? (
+          <p className="py-6 text-center text-ui text-muted-ink-2">Nenhuma mensagem baixada ainda. Use Consultar na tela Mensagens e-CAC.</p>
+        ) : (
+          <ul className="divide-y divide-line-2">
+            {ultimas.map((m) => {
+              const cat = CATEGORIAS[m.categoria];
+              const destino = `${cat.critica ? '/dashboard-federal/intimacoes' : '/mensagens'}?q=${apenasDigitos(m.documento)}`;
+              return (
+                <li key={m.id}>
+                  <Link to={destino} className="flex items-start gap-3 rounded-sm py-2.5 hover:bg-bg-2">
+                    <span className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-pill', m.lida ? 'bg-transparent' : 'bg-action')} aria-label={m.lida ? undefined : 'Não lida'} />
+                    <span className="min-w-0 flex-1">
+                      <span className={cn('block truncate text-ui', m.lida ? 'text-muted-ink' : 'text-ink')} title={m.assunto}>{m.assunto}</span>
+                      <span className="block truncate text-meta text-muted-ink-2">{m.nome}{m.data_envio ? ` · ${format(new Date(m.data_envio), 'dd/MM/yyyy')}` : ''}</span>
+                    </span>
+                    <DsBadge tone={cat.tone} dot={false} className="shrink-0">{cat.label}</DsBadge>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </Caixa>
   );

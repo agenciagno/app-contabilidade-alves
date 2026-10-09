@@ -192,6 +192,38 @@ export function useMensagensCriticas() {
   });
 }
 
+export interface UltimaMensagemCaixa {
+  id: string;
+  contact_id: string;
+  assunto: string;
+  data_envio: string | null;
+  lida: boolean;
+  categoria: CategoriaMsg;
+  nome: string;
+  documento: string;
+}
+
+/**
+ * As últimas mensagens da Caixa Postal já baixadas (de clientes monitorados), da mais nova para a mais antiga, de qualquer categoria.
+ * Só existe o que foi baixado pelo botão Consultar da tela Mensagens e-CAC: os demais clientes só têm o indicador de "mensagem nova".
+ */
+export function useUltimasMensagensCaixa(quantas = 3) {
+  return useQuery({
+    queryKey: ['serpro-cp-ultimas', quantas],
+    queryFn: async (): Promise<UltimaMensagemCaixa[]> => {
+      const { data, error } = await supabase
+        .from('serpro_caixa_postal_mensagens')
+        .select('id, contact_id, assunto, data_envio, lida, categoria, contacts:contact_id!inner (name, display_name, document, status_cliente)')
+        .eq('contacts.status_cliente', STATUS_MONITORADO)
+        .order('data_envio', { ascending: false, nullsFirst: false })
+        .limit(quantas);
+      if (error) throw error;
+      return ((data ?? []) as unknown as (Omit<UltimaMensagemCaixa, 'nome' | 'documento'> & { contacts: { name: string; display_name: string | null; document: string | null } })[])
+        .map(({ contacts, ...m }) => ({ ...m, nome: contacts.display_name || contacts.name || 'Cliente', documento: contacts.document ?? '' }));
+    },
+  });
+}
+
 // ---------------------------------------------------------------- ações (edge function serpro-caixa-postal)
 function chamarCaixa<T>(body: Record<string, unknown>): Promise<T> {
   return invocarSerpro<T>('serpro-caixa-postal', body);

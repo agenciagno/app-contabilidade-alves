@@ -17,6 +17,7 @@ import { useSituacaoCarteira, useCadastroMonitor } from '@/hooks/useSituacaoCart
 import { diasParaVencer, useCertificates } from '@/hooks/useCertificates';
 import { anoDe, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
 import { useConferenciaCadastro } from '@/hooks/useSerproConferenciaCadastro';
+import { useUltimasMensagensCaixa } from '@/hooks/useSerproCaixaPostal';
 import { rotuloCompetencia, siglaCompetencia, useMatrizPagamentos } from '@/hooks/useSerproPagamentos';
 import { montarLinhasSimples } from '@/lib/simplesNacionalLinhas';
 import {
@@ -60,6 +61,7 @@ export default function DashboardFederal() {
   const { data: pgdas = [], isLoading: carregandoPgdas } = useMatrizPgdasd(anoDe(competencia));
   const { data: pagamentos = [], isLoading: carregandoPag } = useMatrizPagamentos(competencia);
   const { data: certificados = [], isLoading: carregandoCert } = useCertificates();
+  const { data: ultimas = [], isLoading: carregandoUltimas } = useUltimasMensagensCaixa(3);
   const conferencia = useConferenciaCadastro();
   const [lista, setLista] = useState<EstadoMonitor | null>(null);
 
@@ -123,14 +125,29 @@ export default function DashboardFederal() {
         />
       )}
 
+      <div className="flex flex-col gap-3 rounded-lg border border-line bg-paper px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-x-5 gap-y-1">
+          <span className="text-kicker uppercase text-muted-ink-2">Última leitura</span>
+          {fontesAtualizadas.length === 0 && <span className="text-meta text-muted-ink-2">carregando…</span>}
+          {fontesAtualizadas.map((f) => (
+            <span key={f.rotulo} className="text-meta text-muted-ink">{f.rotulo}: <span className="text-ink">{f.em ? format(new Date(f.em), 'dd/MM HH:mm') : 'nunca'}</span></span>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-4">
+          <Link to="/dashboard-federal/pagamentos" className="text-ui-strong text-action hover:underline">Pagamentos (DARF e DAE)</Link>
+          <Link to="/gestao-360/ausencias" className="text-ui-strong text-action hover:underline">Ausências</Link>
+          <Link to="/gestao-360/diagnosticos?aba=oportunidades" className="text-ui-strong text-action hover:underline">Oportunidades</Link>
+        </div>
+      </div>
+
       {ocupado ? (
         <div className="grid gap-4 xl:grid-cols-[7fr_3fr]">
           <div className="space-y-4"><Skeleton className="h-[420px] w-full" /><Skeleton className="h-[300px] w-full" /></div>
           <div className="space-y-4"><Skeleton className="h-[320px] w-full" /><Skeleton className="h-[200px] w-full" /></div>
         </div>
       ) : (
-        <div className="grid items-start gap-4 xl:grid-cols-[7fr_3fr]">
-          <div className="min-w-0 space-y-4">
+        <div className="grid items-stretch gap-4 xl:grid-cols-[7fr_3fr]">
+          <div className="flex min-w-0 flex-col gap-4">
             <Caixa titulo="Pendências fiscais" subtitulo={`Situação dos clientes por processo, competência ${siglaCompetencia(competencia)}.`}>
               <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
                 <div className="space-y-3">
@@ -216,31 +233,17 @@ export default function DashboardFederal() {
             </Caixa>
 
             <LimiteSimplesBox simples={simples} />
-            <MensagensEcacBox r={mensagens} />
+            <MensagensEcacBox r={mensagens} ultimas={ultimas} carregandoUltimas={carregandoUltimas} className="flex-1" />
           </div>
 
-          <div className="min-w-0 space-y-4">
+          <div className="flex min-w-0 flex-col gap-4">
             <NotificacoesFiscais />
             <AusenciasBox simples={ausSimples} dctfwebMit={ausDctf} />
             <RelatoriosFiscaisBox contagem={sitfis} />
-            <DeclaracoesBox barras={declaracoes} competencia={rotuloCompetencia(competencia)} />
+            <DeclaracoesBox barras={declaracoes} competencia={rotuloCompetencia(competencia)} className="flex-1" />
           </div>
         </div>
       )}
-
-      <div className="flex flex-col gap-3 rounded-lg border border-line bg-paper p-5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-x-5 gap-y-1">
-          <span className="text-kicker uppercase text-muted-ink-2">Última leitura</span>
-          {fontesAtualizadas.map((f) => (
-            <span key={f.rotulo} className="text-meta text-muted-ink">{f.rotulo}: <span className="text-ink">{f.em ? format(new Date(f.em), 'dd/MM HH:mm') : 'nunca'}</span></span>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-4">
-          <Link to="/dashboard-federal/pagamentos" className="text-ui-strong text-action hover:underline">Pagamentos (DARF e DAE)</Link>
-          <Link to="/gestao-360/ausencias" className="text-ui-strong text-action hover:underline">Ausências</Link>
-          <Link to="/gestao-360/diagnosticos?aba=oportunidades" className="text-ui-strong text-action hover:underline">Oportunidades</Link>
-        </div>
-      </div>
 
       <Sheet open={!!lista} onOpenChange={(o) => !o && setLista(null)}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-[820px]">
