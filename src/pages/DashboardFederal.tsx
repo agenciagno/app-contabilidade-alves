@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowRight, ClipboardCheck } from 'lucide-react';
+import { ChevronRight, ClipboardCheck } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RTooltip } from 'recharts';
 
 import { DsAlert, PageHeader } from '@/components/ds';
@@ -9,35 +9,37 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ResponsavelFiltro } from '@/components/gestao360/ResponsavelFiltro';
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
 import { SeloMonitor } from '@/components/monitor/MonitorUi';
+import { NotificacoesFiscais } from '@/components/monitor/NotificacoesFiscais';
+import { AusenciasBox, Caixa, DeclaracoesBox, LimiteSimplesBox, MensagensEcacBox, RelatoriosFiscaisBox } from '@/components/monitor/PainelBoxes';
 import { useSituacaoCarteira, useCadastroMonitor } from '@/hooks/useSituacaoCarteira';
-import { useFiltroCarteira } from '@/hooks/useFiltroCarteira';
 import { diasParaVencer, useCertificates } from '@/hooks/useCertificates';
 import { anoDe, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
 import { useConferenciaCadastro } from '@/hooks/useSerproConferenciaCadastro';
-import { siglaCompetencia, useMatrizPagamentos } from '@/hooks/useSerproPagamentos';
+import { rotuloCompetencia, siglaCompetencia, useMatrizPagamentos } from '@/hooks/useSerproPagamentos';
 import { montarLinhasSimples } from '@/lib/simplesNacionalLinhas';
 import {
   COR_ESTADO, DICA_ESTADO, ESTADOS, FORA_DA_SITUACAO_DO_CLIENTE, ROTULO_ESTADO,
   contarEstados, outrosMotivos, seloDoCliente, selosDaCarteira,
   type EstadoMonitor, type ProcessoPainel, type Selo,
 } from '@/lib/monitorEstados';
+import {
+  ausenciasDctfwebMit, ausenciasSimples, barrasDeclaracoes, resumoMensagens,
+} from '@/lib/painelFiscal';
 import type { LinhaCarteira } from '@/lib/situacaoCarteira';
 
 const SIMPLES = '/dashboard-federal/simples-nacional';
 
-/** Uma barra por fonte. `filtra`: a tela de destino já abre filtrada no estado clicado (`?estado=`). */
-const PROCESSOS: { chave: ProcessoPainel; titulo: string; to: string; filtra: boolean; nota?: string }[] = [
-  { chave: 'caixa', titulo: 'Mensagens e-CAC', to: '/mensagens', filtra: false },
-  { chave: 'intimacoes', titulo: 'Termos de intimação', to: '/dashboard-federal/intimacoes', filtra: false },
+/** Uma barra por processo. `filtra`: a tela de destino já abre filtrada no estado clicado (`?estado=`). O Limite do Simples tem box próprio. */
+const PROCESSOS: { chave: ProcessoPainel; titulo: string; to: string; filtra: boolean }[] = [
   { chave: 'pgdas', titulo: 'PGDAS-D', to: `${SIMPLES}?fonte=declaracao`, filtra: true },
   { chave: 'das', titulo: 'DAS do Simples', to: `${SIMPLES}?fonte=das`, filtra: true },
   { chave: 'defis', titulo: 'DEFIS', to: `${SIMPLES}?aba=defis`, filtra: true },
-  { chave: 'limite', titulo: 'Limite do Simples', to: `${SIMPLES}?fonte=limite`, filtra: true, nota: 'Não entra na situação do cliente: sem leitura do faturamento é falta de leitura nossa, não obrigação dele.' },
   { chave: 'dctfweb_mit', titulo: 'DCTFWeb e MIT', to: '/dashboard-federal/dctfweb-mit', filtra: false },
   { chave: 'sitfis', titulo: 'Situação fiscal', to: '/dashboard-federal/situacao-fiscal', filtra: false },
+  { chave: 'caixa', titulo: 'Mensagens e-CAC', to: '/mensagens', filtra: false },
+  { chave: 'intimacoes', titulo: 'Termos de intimação', to: '/dashboard-federal/intimacoes', filtra: false },
   { chave: 'procuracao', titulo: 'Procurações', to: '/dashboard-federal/procuracoes', filtra: false },
   { chave: 'certificado', titulo: 'Certificados', to: '/cadastros/certificados', filtra: false },
 ];
@@ -46,6 +48,11 @@ const comEstado = (to: string, e: EstadoMonitor) => `${to}${to.includes('?') ? '
 
 interface LinhaPainel { l: LinhaCarteira; selos: Record<ProcessoPainel, Selo | null>; cliente: Selo }
 
+/**
+ * Dashboard Fiscal (ex-Dashboard Federal). Duas colunas, 70% e 30%, como no print de referência:
+ * à esquerda Pendências fiscais (clientes + por processo), Limite do Simples e Mensagens e-CAC;
+ * à direita Notificações, Ausências de Declarações, Relatórios Fiscais e Declarações.
+ */
 export default function DashboardFederal() {
   const navigate = useNavigate();
   const { linhas, carregando, competencia, hoje, fontesAtualizadas, faturamento } = useSituacaoCarteira();
@@ -54,7 +61,6 @@ export default function DashboardFederal() {
   const { data: pagamentos = [], isLoading: carregandoPag } = useMatrizPagamentos(competencia);
   const { data: certificados = [], isLoading: carregandoCert } = useCertificates();
   const conferencia = useConferenciaCadastro();
-  const { resp, doResponsavel, escolherResponsavel } = useFiltroCarteira(linhas);
   const [lista, setLista] = useState<EstadoMonitor | null>(null);
 
   // Certificado do próprio cliente (não do sócio): o mais novo entre os ativos ou vencidos.
@@ -68,11 +74,16 @@ export default function DashboardFederal() {
     return m;
   }, [certificados]);
 
+  // PGDAS-D, DAS e limite saem da mesma linha da tela Simples Nacional: o número da barra é o número da lista.
+  const simples = useMemo(
+    () => montarLinhasSimples({ pgdas, pagamentos, faturamento, responsaveis, aberturas, pa: competencia, hoje }),
+    [pgdas, pagamentos, faturamento, responsaveis, aberturas, competencia, hoje],
+  );
+
   const painel = useMemo<LinhaPainel[]>(() => {
-    // PGDAS-D, DAS e limite saem da mesma linha da tela Simples Nacional: o número da barra é o número da lista.
-    const simples = new Map(montarLinhasSimples({ pgdas, pagamentos, faturamento, responsaveis, aberturas, pa: competencia, hoje }).map((x) => [x.contact_id, x]));
-    return doResponsavel.map((l) => {
-      const ls = simples.get(l.contact_id);
+    const porId = new Map(simples.map((x) => [x.contact_id, x]));
+    return linhas.map((l) => {
+      const ls = porId.get(l.contact_id);
       const selos = selosDaCarteira(l, {
         // Fora da lista do Simples no mês (outro regime, filial, aberta depois): PGDAS-D, DAS e limite não se aplicam.
         ...(ls ? { pgdas: ls.declaracao, das: ls.dasSelo, limite: ls.limite } : { pgdas: null, das: null, limite: null }),
@@ -80,26 +91,27 @@ export default function DashboardFederal() {
       });
       return { l, selos, cliente: seloDoCliente(selos) };
     });
-  }, [doResponsavel, pgdas, pagamentos, faturamento, responsaveis, competencia, hoje, aberturas, diasCert]);
+  }, [linhas, simples, diasCert]);
 
   const porCliente = useMemo(() => contarEstados(painel.map((p) => p.cliente)), [painel]);
   const porProcesso = useMemo(
     () => PROCESSOS.map((p) => ({ ...p, contagem: contarEstados(painel.map((x) => x.selos[p.chave])) })),
     [painel],
   );
+  const sitfis = useMemo(() => contarEstados(painel.map((x) => x.selos.sitfis)), [painel]);
+  const declaracoes = useMemo(() => barrasDeclaracoes(linhas, simples), [linhas, simples]);
+  const ausSimples = useMemo(() => ausenciasSimples(linhas), [linhas]);
+  const ausDctf = useMemo(() => ausenciasDctfwebMit(linhas), [linhas]);
+  const mensagens = useMemo(() => resumoMensagens(linhas), [linhas]);
 
   const ocupado = carregando || carregandoCadastro || carregandoPgdas || carregandoPag || carregandoCert;
   const fatias = ESTADOS.map((e) => ({ chave: e, nome: ROTULO_ESTADO[e], valor: porCliente[e] })).filter((f) => f.valor > 0);
   const listaAberta = lista ? painel.filter((p) => p.cliente.estado === lista) : [];
+  const estadosVisiveis = ESTADOS.filter((e) => e !== 'processando' || porCliente.processando > 0);
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        kicker="~/dashboard federal"
-        title="Dashboard Federal."
-        subtitle={`Situação dos clientes monitorados na Receita Federal, competência ${siglaCompetencia(competencia)}. Mesmas cores em todas as telas: verde em dia, amarelo pendência, vermelho atenção, cinza não verificado. Clique numa barra para abrir a lista já filtrada.`}
-        actions={<ResponsavelFiltro linhas={linhas} valor={resp} onChange={escolherResponsavel} />}
-      />
+      <PageHeader kicker="~/dashboard fiscal" title="Dashboard Fiscal." />
 
       {!conferencia.carregando && conferencia.linhas.length > 0 && (
         <DsAlert
@@ -112,96 +124,107 @@ export default function DashboardFederal() {
       )}
 
       {ocupado ? (
-        <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
-          <Skeleton className="h-[380px] w-full" />
-          <Skeleton className="h-[380px] w-full" />
+        <div className="grid gap-4 xl:grid-cols-[7fr_3fr]">
+          <div className="space-y-4"><Skeleton className="h-[420px] w-full" /><Skeleton className="h-[300px] w-full" /></div>
+          <div className="space-y-4"><Skeleton className="h-[320px] w-full" /><Skeleton className="h-[200px] w-full" /></div>
         </div>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
-          <section className="space-y-4 rounded-lg border border-line bg-paper p-5">
-            <div>
-              <h2 className="text-h4-card text-ink">Clientes</h2>
-              <p className="text-meta text-muted-ink">Cada cliente fica com o pior estado entre as fontes que valem para ele.</p>
-            </div>
-            <div className="relative mx-auto h-[200px] w-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={fatias} dataKey="valor" nameKey="nome" innerRadius={64} outerRadius={92} paddingAngle={2} stroke="none"
-                    onClick={(f: { chave?: EstadoMonitor }) => f.chave && setLista(f.chave)} className="cursor-pointer">
-                    {fatias.map((f) => <Cell key={f.chave} fill={COR_ESTADO[f.chave]} />)}
-                  </Pie>
-                  <RTooltip formatter={(v: number, n: string) => [`${v} ${v === 1 ? 'cliente' : 'clientes'}`, n]} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-metric-xl text-ink">{porCliente.total}</span>
-                <span className="text-meta text-muted-ink">clientes</span>
-              </div>
-            </div>
-            <ul className="divide-y divide-line-2">
-              {ESTADOS.filter((e) => e !== 'processando').map((e) => (
-                <li key={e}>
-                  <button type="button" onClick={() => setLista(e)} className="flex w-full items-center gap-3 py-2 text-left hover:bg-bg-2">
-                    <span className="h-6 w-1 shrink-0 rounded-pill" style={{ background: COR_ESTADO[e] }} aria-hidden />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-ui-strong text-ink">{ROTULO_ESTADO[e]}</span>
-                      <span className="block text-meta text-muted-ink">{DICA_ESTADO[e]}</span>
-                    </span>
-                    <span className="text-ui-strong text-ink">{porCliente[e]}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+        <div className="grid items-start gap-4 xl:grid-cols-[7fr_3fr]">
+          <div className="min-w-0 space-y-4">
+            <Caixa titulo="Pendências fiscais" subtitulo={`Situação dos clientes por processo, competência ${siglaCompetencia(competencia)}.`}>
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+                <div className="space-y-3">
+                  <div>
+                    <h3 className="text-ui-strong text-ink">Clientes</h3>
+                    <p className="text-meta text-muted-ink">Cada cliente conta uma vez, pelo pior estado entre os processos ao lado. Clique numa cor para ver quem está nela.</p>
+                  </div>
+                  <div className="relative mx-auto h-[190px] w-[190px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={fatias} dataKey="valor" nameKey="nome" innerRadius={60} outerRadius={88} paddingAngle={2} stroke="none"
+                          onClick={(f: { chave?: EstadoMonitor }) => f.chave && setLista(f.chave)} className="cursor-pointer">
+                          {fatias.map((f) => <Cell key={f.chave} fill={COR_ESTADO[f.chave]} />)}
+                        </Pie>
+                        <RTooltip formatter={(v: number, n: string) => [`${v} ${v === 1 ? 'cliente' : 'clientes'}`, n]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-metric-xl text-ink">{porCliente.total}</span>
+                      <span className="text-meta text-muted-ink">clientes</span>
+                    </div>
+                  </div>
+                  <ul className="divide-y divide-line-2">
+                    {estadosVisiveis.map((e) => (
+                      <li key={e}>
+                        <button type="button" onClick={() => setLista(e)} className="flex w-full items-center gap-3 py-2 text-left hover:bg-bg-2">
+                          <span className="h-7 w-1 shrink-0 rounded-pill" style={{ background: COR_ESTADO[e] }} aria-hidden />
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-ui-strong text-ink">{ROTULO_ESTADO[e]}</span>
+                            <span className="block text-meta text-muted-ink">{DICA_ESTADO[e]}</span>
+                          </span>
+                          <span className="text-ui-strong text-ink">{porCliente[e]}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-          <section className="space-y-4 rounded-lg border border-line bg-paper p-5">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h2 className="text-h4-card text-ink">Por assunto</h2>
-                <p className="text-meta text-muted-ink">Quantos clientes em cada estado. Cada pedaço da barra leva à lista.</p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                {ESTADOS.filter((e) => e !== 'processando').map((e) => (
-                  <span key={e} className="flex items-center gap-1.5 text-meta text-muted-ink">
-                    <span className="h-2 w-2 rounded-pill" style={{ background: COR_ESTADO[e] }} aria-hidden />{ROTULO_ESTADO[e]}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2.5">
-              {porProcesso.map((p) => (
-                <div key={p.chave} className="grid grid-cols-[150px_1fr_48px] items-center gap-3">
-                  <Link to={p.to} className="group flex items-center gap-1 truncate text-ui text-ink hover:text-action">
-                    <span className="truncate">{p.titulo}</span>
-                    {FORA_DA_SITUACAO_DO_CLIENTE.includes(p.chave) && <span className="text-meta text-muted-ink-2">*</span>}
-                    <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-                  </Link>
-                  {p.contagem.total === 0 ? (
-                    <div className="h-6 rounded-sm bg-bg-2" />
-                  ) : (
-                    <div className="flex h-6 overflow-hidden rounded-sm bg-bg-2">
-                      {ESTADOS.map((e) => p.contagem[e] > 0 && (
-                        <Tooltip key={e}>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              aria-label={`${p.titulo}: ${p.contagem[e]} ${ROTULO_ESTADO[e]}`}
-                              onClick={() => navigate(p.filtra ? comEstado(p.to, e) : p.to)}
-                              className="h-full border-r border-paper transition-opacity last:border-r-0 hover:opacity-80"
-                              style={{ width: `${(p.contagem[e] / p.contagem.total) * 100}%`, background: COR_ESTADO[e] }}
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent>{ROTULO_ESTADO[e]}: {p.contagem[e]} {p.contagem[e] === 1 ? 'cliente' : 'clientes'}</TooltipContent>
-                        </Tooltip>
+                <div className="space-y-3 border-line lg:border-l lg:pl-6">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-ui-strong text-ink">Por Processo</h3>
+                    <div className="flex flex-wrap gap-3">
+                      {estadosVisiveis.map((e) => (
+                        <span key={e} className="flex items-center gap-1.5 text-meta text-muted-ink">
+                          <span className="h-2 w-2 rounded-pill" style={{ background: COR_ESTADO[e] }} aria-hidden />{ROTULO_ESTADO[e]}
+                        </span>
                       ))}
                     </div>
-                  )}
-                  <span className="text-right text-ui-strong text-ink">{p.contagem.total}</span>
+                  </div>
+                  <div className="space-y-2.5">
+                    {porProcesso.map((p) => (
+                      <div key={p.chave} className="grid grid-cols-[185px_1fr_36px] items-center gap-3">
+                        <Link to={p.to} className="flex h-9 items-center justify-between gap-1 rounded-sm border border-line bg-bg-2 px-3 text-ui text-ink transition-colors hover:border-ink/40">
+                          <span className="truncate">{p.titulo}</span>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-ink-2" />
+                        </Link>
+                        {p.contagem.total === 0 ? (
+                          <div className="h-6 rounded-sm bg-bg-2" />
+                        ) : (
+                          <div className="flex h-6 overflow-hidden rounded-sm bg-bg-2">
+                            {ESTADOS.map((e) => p.contagem[e] > 0 && (
+                              <Tooltip key={e}>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    aria-label={`${p.titulo}: ${p.contagem[e]} ${ROTULO_ESTADO[e]}`}
+                                    onClick={() => navigate(p.filtra ? comEstado(p.to, e) : p.to)}
+                                    className="h-full border-r border-paper transition-opacity last:border-r-0 hover:opacity-80"
+                                    style={{ width: `${(p.contagem[e] / p.contagem.total) * 100}%`, background: COR_ESTADO[e] }}
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>{ROTULO_ESTADO[e]}: {p.contagem[e]} {p.contagem[e] === 1 ? 'cliente' : 'clientes'}</TooltipContent>
+                              </Tooltip>
+                            ))}
+                          </div>
+                        )}
+                        <span className="text-right text-ui-strong text-ink">{p.contagem.total}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
-            <p className="text-meta text-muted-ink-2">* {PROCESSOS.find((p) => p.nota)?.nota}</p>
-          </section>
+              </div>
+            </Caixa>
+
+            <LimiteSimplesBox simples={simples} />
+            <MensagensEcacBox r={mensagens} />
+          </div>
+
+          <div className="min-w-0 space-y-4">
+            <NotificacoesFiscais />
+            <AusenciasBox simples={ausSimples} dctfwebMit={ausDctf} />
+            <RelatoriosFiscaisBox contagem={sitfis} />
+            <DeclaracoesBox barras={declaracoes} competencia={rotuloCompetencia(competencia)} />
+          </div>
         </div>
       )}
 

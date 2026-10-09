@@ -1,11 +1,10 @@
-import { Moon, Sun, LifeBuoy, Landmark, Mail, Wallet } from 'lucide-react';
+import { Moon, Sun, LifeBuoy, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { UserMenu } from './UserMenu';
 import { HeaderNotificacoesGerais } from './HeaderNotificacoesGerais';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
-import { Button } from '@/components/ui/button';
 import { AccountSwitcher } from './AccountSwitcher';
 import { Logo } from '@/components/brand/Logo';
 import { isDevEnvironment } from '@/lib/environment';
@@ -18,7 +17,7 @@ import { isDevEnvironment } from '@/lib/environment';
  * Fundo --nav-surface, sem canto arredondado próprio (o único raio do shell
  * agora vive no conteúdo, ver AppLayout.tsx). Logo + AccountSwitcher (o
  * cartão de conta, que morava na sidebar) ficam à esquerda; à direita:
- * tema, Mensagens e-CAC, notificações por categoria (e-CAC, Federais, Gerais, Financeiras), Suporte e Perfil (avatar só, mais perto da borda) —
+ * tema, notificações por categoria (Gerais, Financeiras), Suporte e Perfil (avatar só, mais perto da borda) —
  * Agente IA saiu daqui e voltou a existir só como sub-item de Tech no menu
  * (decisão Gabriel: não precisa de atalho dedicado no header).
  *
@@ -66,35 +65,10 @@ export function AppHeader() {
           </button>
 
           {/* Um ícone por categoria (pedido de Gabriel, 01/10 e 03/10/2026).
-              Quem vê: e-CAC e Federais por módulo (Mensagens e Dashboard Federal,
-              que Gabriel vai liberar aos internos); Gerais, todos; Financeiras,
-              admin/super admin e quem tem o módulo Financeiro (regra antiga).
-              - Mensagens e-CAC: só a Caixa Postal da Receita (serpro_mensagem).
-              - Federais: o resto que vem da Receita/Serpro (serpro_*, gestao360_*).
-              - Gerais: o que não tem sino próprio (cliente novo, cadastro,
-                certificado, tarefas). */}
-          {isModuleVisible('mensagens') && (
-            <NotificationBell
-              title="Mensagens e-CAC"
-              icon={Mail}
-              filter={{ types: ['serpro_mensagem'] }}
-              renderTop={(fechar) => (
-                <div className="flex items-center justify-between gap-3 border-b border-border/50 bg-muted/30 px-3 py-2">
-                  <p className="text-xs text-muted-foreground">Mensagens novas na Caixa Postal da Receita (e-CAC).</p>
-                  <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs" onClick={() => { fechar(); navigate('/mensagens'); }}>
-                    Abrir Mensagens
-                  </Button>
-                </div>
-              )}
-            />
-          )}
-          {isModuleVisible('dashboard_federal') && (
-            <NotificationBell
-              title="Notificações Federais"
-              icon={Landmark}
-              filter={{ typePrefixes: ['serpro_', 'gestao360_'], excludeTypes: ['serpro_mensagem'] }}
-            />
-          )}
+              Os sinos "Mensagens e-CAC" e "Notificações Federais" saíram em 09/10/2026: o box Notificações do
+              Dashboard Fiscal mostra as mesmas notificações (serpro_*, gestao360_*), com o mesmo "marcar lidas".
+              Quem vê: Gerais, todos; Financeiras, admin/super admin e quem tem o módulo Financeiro (regra antiga).
+              - Gerais: o que não tem sino próprio (cliente novo, cadastro, certificado, tarefas). */}
           <HeaderNotificacoesGerais />
           {isModuleVisible('financeiro') && isSubItemVisible('financeiro', 'financeiro_boletos') && (
             <NotificationBell title="Notificações Financeiras" icon={Wallet} filter={{ types: ['boleto_pago'] }} />

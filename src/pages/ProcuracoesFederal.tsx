@@ -117,7 +117,7 @@ export default function ProcuracoesFederal() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="~/dashboard federal · procurações"
+        kicker="~/dashboard fiscal · procurações"
         title="Procurações."
         subtitle={`Procurações eletrônicas que os clientes ativos deram à Contabilidade Alves no e-CAC. Sem procuração, o Serpro não entrega os dados do cliente. Quando o cliente outorgar, clique em Mapear para o sistema enxergar. Um aviso semanal chega no sino quando alguma vence em até ${DIAS_AVISO_PROCURACAO} dias.`}
         actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />}

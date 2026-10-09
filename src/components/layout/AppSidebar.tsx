@@ -168,7 +168,7 @@ interface SimpleModule extends RoleGated {
   subKey?: string;
   /**
    * Rotas filhas que têm item próprio no menu: dentro delas este item NÃO
-   * fica ativo (senão Dashboard Federal acende junto com Procurações).
+   * fica ativo (senão Dashboard Fiscal acende junto com Procurações).
    */
   activeExcept?: string[];
 }
@@ -239,7 +239,7 @@ export const menuEntries: MenuEntry[] = [
   { kind: 'section', label: 'Monitoramento' },
   {
     kind: 'simple',
-    title: 'Dashboard Federal',
+    title: 'Dashboard Fiscal',
     url: '/dashboard-federal',
     icon: Landmark,
     iconName: 'landmark',

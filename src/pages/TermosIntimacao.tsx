@@ -138,7 +138,7 @@ export default function TermosIntimacao() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="~/dashboard federal · termos de intimação"
+        kicker="~/dashboard fiscal · termos de intimação"
         title="Termos de intimação."
         subtitle="Mensagens da Receita que exigem ação (intimação, malha, exclusão do Simples, multa, cobrança e processo), já classificadas, por cliente. Abra o cliente para ver e tratar cada mensagem. Só aparecem clientes cuja lista foi baixada em Mensagens e-CAC."
         actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />}

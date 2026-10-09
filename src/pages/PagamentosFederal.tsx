@@ -143,7 +143,7 @@ export default function PagamentosFederal() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="~/dashboard federal · pagamentos e das"
+        kicker="~/dashboard fiscal · pagamentos e das"
         title="Pagamentos e DAS."
         subtitle="Documentos de arrecadação pagos na Receita (DARF e DAE) e o DAS do Simples (gerado, pago, a vencer ou vencido) por cliente ativo e competência. O aviso de pagamento novo vem da rotina diária das 07:35, sem custo. A situação do DAS é atualizada pela rotina do PGDAS (dia 16 e dia seguinte ao prazo) ou por Atualizar DAS no painel do cliente. Para ver valor, data e composição, abra o cliente e use Consultar pagamentos. A Receita só informa o que foi pago: zero em um mês consultado não prova que não havia o que pagar."
         actions={<ExportarMenu montar={() => tabelaExport(filtradas, competencia)} disabled={filtradas.length === 0} escolherColunas />}

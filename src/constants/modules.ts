@@ -65,10 +65,10 @@ export const MODULE_TREE: ModuleNode[] = [
       { key: 'fiscal_agenda', label: 'Agenda' },
     ],
   },
-  { key: 'dashboard_federal', label: 'Dashboard Federal' },
+  { key: 'dashboard_federal', label: 'Dashboard Fiscal' },
   { key: 'mensagens', label: 'Mensagens e-CAC' },
   // Situação Fiscal e Procurações já tiveram item de menu próprio (01/10/2026),
-  // mas seguiam a chave do Dashboard Federal. Agora cada um tem a sua.
+  // mas seguiam a chave do Dashboard Fiscal (antes Dashboard Federal; a chave `dashboard_federal` não mudou). Agora cada um tem a sua.
   { key: 'monitoramento_situacao_fiscal', label: 'Situação Fiscal' },
   { key: 'monitoramento_procuracoes', label: 'Procurações' },
   { key: 'parcelamentos', label: 'Parcelamentos' },
@@ -195,7 +195,7 @@ export const INTERNAL_PICKER_TREE: PickerNode[] = [
   {
     label: 'Monitoramento',
     children: [
-      { key: 'dashboard_federal', label: 'Dashboard Federal' },
+      { key: 'dashboard_federal', label: 'Dashboard Fiscal' },
       { key: 'mensagens', label: 'Mensagens e-CAC' },
       { key: 'monitoramento_situacao_fiscal', label: 'Situação Fiscal' },
       { key: 'monitoramento_procuracoes', label: 'Procurações' },

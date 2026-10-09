@@ -56,7 +56,7 @@ export default function ConferenciaCadastroFederal() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="~/dashboard federal · conferência do cadastro"
+        kicker="~/dashboard fiscal · conferência do cadastro"
         title="Conferência do cadastro."
         subtitle="Clientes ativos em que o cadastro e o que a Receita mostra (ou o próprio monitoramento) não batem: Simples sem declaração, declaração do Simples em cliente de outro regime, cliente ativo com data de saída e PJ sem regime. Só lê o que já está salvo: não consulta o Serpro e não gera custo. A Receita só é comparada onde a declaração já foi consultada."
         actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} />}

@@ -133,7 +133,7 @@ export default function DarfFederal() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="~/dashboard federal · darf atualizado"
+        kicker="~/dashboard fiscal · darf atualizado"
         title="DARF atualizado."
         subtitle="Calcula multa e juros de um débito e gera o DARF para pagar. O sistema não descobre a dívida: você informa a receita, o período, o vencimento original, o valor do imposto e a data em que o cliente vai pagar, e a Receita devolve o DARF atualizado até essa data. DAS do Simples tem tela própria, não use aqui."
         actions={<ExportarMenu montar={tabelaExport} disabled={darfs.length === 0} escolherColunas />}

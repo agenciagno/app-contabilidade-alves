@@ -102,7 +102,7 @@ export default function ParcelamentosFederal() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="~/dashboard federal · parcelamentos"
+        kicker="~/dashboard fiscal · parcelamentos"
         title="Parcelamentos."
         subtitle={`Parcelamentos do Simples Nacional (ordinário, especial, PERT-SN e RELP-SN) dos clientes ativos: parcelas em aberto, atrasadas, a do mês e a guia de cada uma. A primeira consulta de um cliente olha as quatro modalidades; as seguintes só o ordinário e as que o cliente já teve. "Em dia" quer dizer que a Receita não mostra parcela atrasada, não que o mês esteja pago. Filiais seguem a matriz.`}
         actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />}

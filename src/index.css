@@ -103,6 +103,13 @@
     --warn-soft: #fdf2ea;
     --danger-soft: #ffece9;
 
+    /* Monitoramento (09/10/2026): "Em dia" é azul, não verde — pedido de Gabriel. O verde (--ok) segue valendo no resto do sistema.
+       "Processando" é um azul claro, para não confundir com o "Em dia". */
+    --em-dia: #265aba;
+    --em-dia-soft: #e9eff9;
+    --processando: #5aa9f0;
+    --processando-soft: #e6f2fd;
+
     /* Estado de tarefa do Fiscal — extensão do DS, não vem do Figma.
        O DS tem 4 tons de status (ok/warn/danger) que dizem "está bom / atenção /
        ruim". Estado de tarefa é outra coisa: são 4 etapas de um fluxo, todas
@@ -279,6 +286,12 @@
     --ok-soft: #1f3126;
     --warn-soft: #3c2a1d;
     --danger-soft: #3e201d;
+
+    /* No escuro o #265aba some no fundo: mesmo azul, mais claro. */
+    --em-dia: #6f9bea;
+    --em-dia-soft: #1b2740;
+    --processando: #7fbcf5;
+    --processando-soft: #1d2c3d;
 
     /* Estado de tarefa — mais claros no escuro, senão somem no fundo escuro */
     --state-todo: #94a3b8;

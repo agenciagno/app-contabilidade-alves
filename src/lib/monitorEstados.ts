@@ -2,17 +2,17 @@
  * Vocabulário único do Monitoramento (Rodada 1, 08/10/2026; plano em reports/monitorhub-hubstrom-comparativo-plano-out2026.md).
  * Toda fonte (PGDAS-D, DAS, DEFIS, Caixa Postal...) vira o mesmo selo em duas camadas: a COR diz a gravidade, o TEXTO diz o motivo.
  *
- *  · Em dia (verde)          nada a fazer.
+ *  · Em dia (azul #265ABA)   nada a fazer.
  *  · Pendência (amarelo)     falta fazer, ainda no prazo, ou é preciso confirmar.
  *  · Atenção (vermelho)      atrasado, irregular ou com risco.
- *  · Processando (azul)      consulta em andamento agora.
+ *  · Processando (azul claro) consulta em andamento agora.
  *  · Não verificado (cinza)  ainda não consultado ou sem acesso. Nunca conta como em dia.
  *
  * O cliente fica com o PIOR selo entre as fontes que se aplicam a ele (Atenção > Pendência > Processando > Não verificado > Em dia).
  * As regras de cada fonte não são reescritas aqui: as funções só traduzem os estados que as telas e o Portal 360° já calculam.
  * Funções puras, sem chamada ao Serpro.
  */
-import type { BadgeTone } from '@/components/ds';
+import type { MonitorBadgeTone } from '@/components/ds';
 import type { SeloEstado } from '@/hooks/useSerproCaixaPostal';
 import { declaracaoVigente, type LinhaPgdasd } from '@/hooks/useSerproPgdasd';
 import type { DasUnificado, EstadoDas } from '@/hooks/useSerproDasUnificado';
@@ -45,14 +45,14 @@ export const DICA_ESTADO: Record<EstadoMonitor, string> = {
   nao_verificado: 'Ainda não consultado ou sem acesso. Não conta como em dia.',
 };
 
-/** Tom do DsBadge: os 5 estados usam os 5 tons do design system. */
-export const TOM_ESTADO: Record<EstadoMonitor, BadgeTone> = {
-  em_dia: 'ok', pendencia: 'warn', atencao: 'danger', processando: 'info', nao_verificado: 'neutral',
+/** Tom do DsBadge. "Em dia" e "Processando" têm tom próprio (azul): o verde do sistema não é usado no Monitoramento. */
+export const TOM_ESTADO: Record<EstadoMonitor, MonitorBadgeTone> = {
+  em_dia: 'emdia', pendencia: 'warn', atencao: 'danger', processando: 'processando', nao_verificado: 'neutral',
 };
 
 /** Cor sólida (variável CSS) para gráficos. Muda sozinha no modo escuro. */
 export const COR_ESTADO: Record<EstadoMonitor, string> = {
-  em_dia: 'var(--ok)', pendencia: 'var(--warn)', atencao: 'var(--danger)', processando: 'var(--action)', nao_verificado: 'var(--muted-ink-2)',
+  em_dia: 'var(--em-dia)', pendencia: 'var(--warn)', atencao: 'var(--danger)', processando: 'var(--processando)', nao_verificado: 'var(--muted-ink-2)',
 };
 
 const PESO: Record<EstadoMonitor, number> = { atencao: 4, pendencia: 3, processando: 2, nao_verificado: 1, em_dia: 0 };

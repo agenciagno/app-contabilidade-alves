@@ -100,7 +100,7 @@ export default function SituacaoFiscalFederal() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="~/dashboard federal · situação fiscal"
+        kicker="~/dashboard fiscal · situação fiscal"
         title="Situação fiscal."
         subtitle={`Relatório de situação fiscal da Receita Federal e da PGFN, um cliente por vez. A Receita leva alguns segundos para preparar cada relatório. O PDF fica guardado aqui. "Sem pendências" só aparece quando o relatório diz isso para as duas áreas; se o texto não for reconhecido, a tela pede para abrir o PDF. Relatórios com mais de ${DIAS_RELATORIO_VELHO} dias ficam marcados. Filiais seguem a matriz.`}
         actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />}

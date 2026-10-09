@@ -25,16 +25,23 @@ const badgeTone = {
   neutral: { wrap: 'bg-bg-2 text-muted-ink', dot: 'bg-muted-ink' },
 } as const;
 
+/** Só do Monitoramento: "Em dia" azul e "Processando" azul claro (src/lib/monitorEstados.ts). Ficam fora de `BadgeTone`, que o resto do sistema usa. */
+const badgeToneMonitor = {
+  emdia: { wrap: 'bg-em-dia-soft text-em-dia', dot: 'bg-em-dia' },
+  processando: { wrap: 'bg-processando-soft text-processando', dot: 'bg-processando' },
+} as const;
+
 export type BadgeTone = keyof typeof badgeTone;
+export type MonitorBadgeTone = BadgeTone | keyof typeof badgeToneMonitor;
 
 export interface DsBadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  tone?: BadgeTone;
+  tone?: MonitorBadgeTone;
   /** Ponto colorido à esquerda. Ligado por padrão, como no component set. */
   dot?: boolean;
 }
 
 export function DsBadge({ tone = 'neutral', dot = true, className, children, ...props }: DsBadgeProps) {
-  const t = badgeTone[tone];
+  const t = tone in badgeToneMonitor ? badgeToneMonitor[tone as keyof typeof badgeToneMonitor] : badgeTone[tone as BadgeTone];
   return (
     <span
       className={cn(

@@ -70,9 +70,9 @@ export default function SimplesNacionalFederal() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="~/dashboard federal · simples nacional"
+        kicker="~/dashboard fiscal · simples nacional"
         title="Simples Nacional."
-        subtitle="Declaração (PGDAS-D), DAS e limite de cada cliente do Simples numa linha só, e a DEFIS. Mesmas cores do painel: verde em dia, amarelo pendência, vermelho atenção, cinza não verificado. Abrir a ficha é grátis; consultar e gerar cobram, e o botão diz quanto. Filiais seguem a matriz e ficam de fora."
+        subtitle="Declaração (PGDAS-D), DAS e limite de cada cliente do Simples numa linha só, e a DEFIS. Mesmas cores do painel: azul em dia, amarelo pendência, vermelho atenção, cinza não verificado. Abrir a ficha é grátis; consultar e gerar cobram, e o botão diz quanto. Filiais seguem a matriz e ficam de fora."
         actions={<ResponsavelFiltro linhas={respLinhas} valor={resp} onChange={(r) => mudar((n) => { if (r) n.set('resp', r); else n.delete('resp'); })} />}
       />
 

@@ -159,6 +159,10 @@ export default {
         'ok-soft': 'var(--ok-soft)',
         'warn-soft': 'var(--warn-soft)',
         'danger-soft': 'var(--danger-soft)',
+        'em-dia': 'var(--em-dia)',
+        'em-dia-soft': 'var(--em-dia-soft)',
+        processando: 'var(--processando)',
+        'processando-soft': 'var(--processando-soft)',
       },
       backgroundImage: {
         // Gradiente do banner de marca, medido no Figma (linear brand-2 -> brand)
