@@ -159,6 +159,27 @@ export function seloDctfwebMit(dctf: EstadoDctfweb | 'nao_se_aplica', mit: Estad
   return { estado: 'em_dia', motivo: 'Transmitida' };
 }
 
+/** Só a DCTFWeb, para a coluna de detalhe da tela DCTFWeb e MIT. */
+export function seloDctfwebColuna(e: EstadoDctfweb): Selo | null {
+  switch (e) {
+    case 'transmitida': return { estado: 'em_dia', motivo: 'Com recibo' };
+    case 'sem_declaracao': return { estado: 'pendencia', motivo: 'Sem declaração' };
+    case 'nao_consultado': return { estado: 'nao_verificado', motivo: 'Não consultada' };
+    default: return null;
+  }
+}
+
+/** Só a MIT, para a coluna de detalhe da tela DCTFWeb e MIT. */
+export function seloMitColuna(e: EstadoMit): Selo | null {
+  switch (e) {
+    case 'encerrada': return { estado: 'em_dia', motivo: 'Encerrada' };
+    case 'outra_situacao': return { estado: 'pendencia', motivo: 'Situação a conferir' };
+    case 'sem_apuracao': return { estado: 'pendencia', motivo: 'Sem apuração' };
+    case 'nao_consultado': return { estado: 'nao_verificado', motivo: 'Não consultada' };
+    default: return null;
+  }
+}
+
 export function seloSitfis(estado: EstadoSitfis): Selo | null {
   switch (estado) {
     case 'sem_pendencias': return { estado: 'em_dia', motivo: 'Sem pendências' };

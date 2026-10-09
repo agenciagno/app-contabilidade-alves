@@ -277,7 +277,7 @@ export function MensagensEcacBox({ r, ultimas, carregandoUltimas, className }: {
               const Icone = ICONE_CATEGORIA[c.chave] ?? Gavel;
               return (
                 <li key={c.chave}>
-                  <Link to="/dashboard-federal/intimacoes" className="flex items-center gap-3 rounded-sm hover:bg-bg-2">
+                  <Link to="/mensagens?aba=intimacoes" className="flex items-center gap-3 rounded-sm hover:bg-bg-2">
                     <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-md', c.clientes > 0 ? 'bg-warn-soft text-warn' : 'bg-bg-2 text-muted-ink-2')}><Icone className="h-4 w-4" /></span>
                     <span className="min-w-0 flex-1 truncate text-ui text-muted-ink">{c.rotulo}</span>
                     <span className="text-ui-strong text-ink">{c.clientes}</span>
@@ -301,7 +301,7 @@ export function MensagensEcacBox({ r, ultimas, carregandoUltimas, className }: {
           <ul className="divide-y divide-line-2">
             {ultimas.map((m) => {
               const cat = CATEGORIAS[m.categoria];
-              const destino = `${cat.critica ? '/dashboard-federal/intimacoes' : '/mensagens'}?q=${apenasDigitos(m.documento)}`;
+              const destino = `${cat.critica ? '/mensagens?aba=intimacoes&' : '/mensagens?'}q=${apenasDigitos(m.documento)}`;
               return (
                 <li key={m.id}>
                   <Link to={destino} className="flex items-start gap-3 rounded-sm py-2.5 hover:bg-bg-2">

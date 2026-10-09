@@ -7,6 +7,8 @@ import { format } from 'date-fns';
 
 import { DsBadge } from '@/components/ds';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useUserRole } from '@/hooks/useUserRole';
+import { cicloAtual, useConsultasPagasPorCliente } from '@/hooks/useSerproConsumo';
 import { cn } from '@/lib/utils';
 import {
   COR_ESTADO, DICA_ESTADO, ESTADOS, ROTULO_ESTADO, TOM_ESTADO,
@@ -97,8 +99,45 @@ export function useEstadoUrl(): [EstadoMonitor | null, (e: EstadoMonitor | null)
   return [estado, mudar];
 }
 
-/** Data da última consulta do cliente; "Nunca" quando não houve. */
-export function UltimaBusca({ iso }: { iso: string | null }) {
-  if (!iso) return <span className="text-meta text-muted-ink-2">Nunca</span>;
-  return <span className="whitespace-nowrap rounded-sm bg-bg-2 px-2 py-1 font-mono text-meta text-ink">{format(new Date(iso), 'dd/MM/yyyy')}</span>;
+/**
+ * Data da última consulta do cliente; "Nunca" quando não houve. Com `contactId`, mostra embaixo quantas chamadas pagas o cliente
+ * já teve no ciclo de cobrança (só para admin), para ninguém consultar de novo sem precisar.
+ */
+export function UltimaBusca({ iso, contactId }: { iso: string | null; contactId?: string }) {
+  return (
+    <div className="space-y-1">
+      {iso
+        ? <span className="whitespace-nowrap rounded-sm bg-bg-2 px-2 py-1 font-mono text-meta text-ink">{format(new Date(iso), 'dd/MM/yyyy')}</span>
+        : <span className="text-meta text-muted-ink-2">Nunca</span>}
+      {contactId && <ConsultasNoMes contactId={contactId} />}
+    </div>
+  );
+}
+
+function ConsultasNoMes({ contactId }: { contactId: string }) {
+  const { isAdmin, isSuperAdmin } = useUserRole();
+  const { data } = useConsultasPagasPorCliente(isAdmin || isSuperAdmin);
+  const n = data?.get(contactId) ?? 0;
+  if (!n) return null;
+  const ciclo = cicloAtual();
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <p className="whitespace-nowrap text-meta text-muted-ink-2">{n} {n === 1 ? 'paga' : 'pagas'} no mês</p>
+      </TooltipTrigger>
+      <TooltipContent>
+        Chamadas pagas ao Serpro deste cliente no ciclo de cobrança ({ciclo.rotulo}), de qualquer tela ou rotina. Só admin vê.
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** Rodapé das listas: quantos aparecem e quantas filiais ficaram de fora (seguem a matriz, como no painel). */
+export function RodapeLista({ mostrando, total, unidade, filiais = 0 }: { mostrando: number; total: number; unidade: string; filiais?: number }) {
+  return (
+    <p className="text-meta text-muted-ink-2">
+      Mostrando {mostrando} de {total} {unidade}
+      {filiais > 0 ? ` · ${filiais} ${filiais === 1 ? 'filial segue a matriz e fica' : 'filiais seguem a matriz e ficam'} de fora` : ''}.
+    </p>
+  );
 }

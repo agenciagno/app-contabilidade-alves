@@ -30,6 +30,8 @@ export interface LinhaSitfis {
   filial: boolean;
   /** Último relatório pronto. */
   ultimo: SitfisRow | null;
+  /** Todos os relatórios prontos do cliente, do mais novo ao mais antigo (o PDF de cada um fica guardado). */
+  historico: SitfisRow[];
   /** Pedido feito há pouco que a Receita ainda não terminou (o próximo clique só repete a busca do PDF). */
   processando: boolean;
 }
@@ -70,16 +72,16 @@ export function useMatrizSitfis() {
           .select('id, contact_id, solicitado_em, status, gerado_em, pdf_path, resultado, categorias, certidao_tipo, certidao_emissao, certidao_validade, confiavel, avisos')
           .eq('company_id', companyId).in('status', ['pronto', 'aguardando']).order('solicitado_em', { ascending: false }).order('id'));
 
-      const ultimo = new Map<string, SitfisRow>();
+      const historico = new Map<string, SitfisRow[]>();
       const processando = new Set<string>();
       for (const r of relatorios) {
         if (r.status === 'pronto') {
-          const cur = ultimo.get(r.contact_id);
-          if (!cur || (r.gerado_em ?? '') > (cur.gerado_em ?? '')) ultimo.set(r.contact_id, r);
+          historico.set(r.contact_id, [...(historico.get(r.contact_id) ?? []), r]);
         } else if (Date.now() - Date.parse(r.solicitado_em) < PROTOCOLO_VALE_MIN * 60_000) {
           processando.add(r.contact_id);
         }
       }
+      for (const lista of historico.values()) lista.sort((a, b) => (b.gerado_em ?? '').localeCompare(a.gerado_em ?? ''));
       return contatos
         .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
         .map((c): LinhaSitfis => ({
@@ -88,7 +90,8 @@ export function useMatrizSitfis() {
           documento: c.document ?? '',
           regime: c.tax_regime ?? null,
           filial: digitos(c.document).slice(8, 12) !== '0001',
-          ultimo: ultimo.get(c.id) ?? null,
+          ultimo: historico.get(c.id)?.[0] ?? null,
+          historico: historico.get(c.id) ?? [],
           processando: processando.has(c.id),
         }));
     },

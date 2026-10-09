@@ -14,7 +14,7 @@ import { SeloMonitor } from '@/components/monitor/MonitorUi';
 import { NotificacoesFiscais } from '@/components/monitor/NotificacoesFiscais';
 import { AusenciasBox, Caixa, DeclaracoesBox, LimiteSimplesBox, MensagensEcacBox, RelatoriosFiscaisBox } from '@/components/monitor/PainelBoxes';
 import { useSituacaoCarteira, useCadastroMonitor } from '@/hooks/useSituacaoCarteira';
-import { diasParaVencer, useCertificates } from '@/hooks/useCertificates';
+import { certificadoPorCliente, useCertificates } from '@/hooks/useCertificates';
 import { anoDe, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
 import { useConferenciaCadastro } from '@/hooks/useSerproConferenciaCadastro';
 import { useUltimasMensagensCaixa } from '@/hooks/useSerproCaixaPostal';
@@ -31,18 +31,20 @@ import {
 import type { LinhaCarteira } from '@/lib/situacaoCarteira';
 
 const SIMPLES = '/dashboard-federal/simples-nacional';
+const PROCURACOES = '/dashboard-federal/procuracoes';
 
 /** Uma barra por processo. `filtra`: a tela de destino já abre filtrada no estado clicado (`?estado=`). O Limite do Simples tem box próprio. */
 const PROCESSOS: { chave: ProcessoPainel; titulo: string; to: string; filtra: boolean }[] = [
   { chave: 'pgdas', titulo: 'PGDAS-D', to: `${SIMPLES}?fonte=declaracao`, filtra: true },
   { chave: 'das', titulo: 'DAS do Simples', to: `${SIMPLES}?fonte=das`, filtra: true },
   { chave: 'defis', titulo: 'DEFIS', to: `${SIMPLES}?aba=defis`, filtra: true },
-  { chave: 'dctfweb_mit', titulo: 'DCTFWeb e MIT', to: '/dashboard-federal/dctfweb-mit', filtra: false },
-  { chave: 'sitfis', titulo: 'Situação fiscal', to: '/dashboard-federal/situacao-fiscal', filtra: false },
-  { chave: 'caixa', titulo: 'Caixa Postal e-CAC', to: '/mensagens', filtra: false },
-  { chave: 'intimacoes', titulo: 'Termos de intimação', to: '/dashboard-federal/intimacoes', filtra: false },
-  { chave: 'procuracao', titulo: 'Procurações', to: '/dashboard-federal/procuracoes', filtra: false },
-  { chave: 'certificado', titulo: 'Certificados', to: '/cadastros/certificados', filtra: false },
+  { chave: 'dctfweb_mit', titulo: 'DCTFWeb e MIT', to: '/dashboard-federal/dctfweb-mit', filtra: true },
+  { chave: 'sitfis', titulo: 'Situação fiscal', to: '/dashboard-federal/situacao-fiscal', filtra: true },
+  { chave: 'caixa', titulo: 'Caixa Postal e-CAC', to: '/mensagens', filtra: true },
+  // A aba Intimações agrupa por mensagem (nova, em tratamento...), não pelos 5 estados: abre sem filtro.
+  { chave: 'intimacoes', titulo: 'Termos de intimação', to: '/mensagens?aba=intimacoes', filtra: false },
+  { chave: 'procuracao', titulo: 'Procurações', to: `${PROCURACOES}?fonte=procuracao`, filtra: true },
+  { chave: 'certificado', titulo: 'Certificados', to: `${PROCURACOES}?fonte=certificado`, filtra: true },
 ];
 
 const comEstado = (to: string, e: EstadoMonitor) => `${to}${to.includes('?') ? '&' : '?'}estado=${e}`;
@@ -65,16 +67,7 @@ export default function DashboardFederal() {
   const conferencia = useConferenciaCadastro();
   const [lista, setLista] = useState<EstadoMonitor | null>(null);
 
-  // Certificado do próprio cliente (não do sócio): o mais novo entre os ativos ou vencidos.
-  const diasCert = useMemo(() => {
-    const m = new Map<string, { validade: string; dias: number }>();
-    for (const c of certificados) {
-      if (c.partner_id || (c.status !== 'ativo' && c.status !== 'vencido')) continue;
-      const atual = m.get(c.contact_id);
-      if (!atual || c.data_validade > atual.validade) m.set(c.contact_id, { validade: c.data_validade, dias: diasParaVencer(c.data_validade) });
-    }
-    return m;
-  }, [certificados]);
+  const diasCert = useMemo(() => certificadoPorCliente(certificados), [certificados]);
 
   // PGDAS-D, DAS e limite saem da mesma linha da tela Simples Nacional: o número da barra é o número da lista.
   const simples = useMemo(

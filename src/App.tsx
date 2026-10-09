@@ -56,13 +56,11 @@ const MinhaConta = lazy(() => import("@/pages/MinhaConta"));
 const Suporte = lazy(() => import("@/pages/Suporte"));
 const Faturas = lazy(() => import("@/pages/Faturas"));
 const Equipe = lazy(() => import("@/pages/Equipe"));
-const CadastroCertificados = lazy(() => import("@/pages/CadastroCertificados"));
 const DashboardFederal = lazy(() => import("@/pages/DashboardFederal"));
 const Portal360 = lazy(() => import("@/pages/Portal360"));
 const CaAusencias = lazy(() => import("@/pages/CaAusencias"));
 const CaDiagnosticos = lazy(() => import("@/pages/CaDiagnosticos"));
 const MensagensEcac = lazy(() => import("@/pages/MensagensEcac"));
-const TermosIntimacao = lazy(() => import("@/pages/TermosIntimacao"));
 const PagamentosFederal = lazy(() => import("@/pages/PagamentosFederal"));
 const SimplesNacionalFederal = lazy(() => import("@/pages/SimplesNacionalFederal"));
 const ProcuracoesFederal = lazy(() => import("@/pages/ProcuracoesFederal"));
@@ -188,7 +186,8 @@ const App = () => (
               <Route path="/dashboard-federal" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><DashboardFederal /></ModuleGuard></AppLayout>} />
               {/* Rota antiga: a tela mudou para /mensagens; atalho fixado e link salvo continuam funcionando. */}
               <Route path="/dashboard-federal/mensagens" element={<Navigate to="/mensagens" replace />} />
-              <Route path="/dashboard-federal/intimacoes" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><TermosIntimacao /></ModuleGuard></AppLayout>} />
+              {/* Termos de intimação virou aba da Caixa Postal e-CAC (09/10/2026). */}
+              <Route path="/dashboard-federal/intimacoes" element={<Redireciona para="/mensagens?aba=intimacoes" />} />
               <Route path="/dashboard-federal/pagamentos" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><PagamentosFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/simples-nacional" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><SimplesNacionalFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/pgdas" element={<Redireciona para="/dashboard-federal/simples-nacional" />} />
@@ -214,7 +213,8 @@ const App = () => (
 
               {/* Cadastro */}
               <Route path="/cadastros/procuracoes" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="cadastros_procuracoes"><EmBreve moduleKey="cadastros_procuracoes" /></ModuleGuard></AppLayout>} />
-              <Route path="/cadastros/certificados" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="cadastros_certificados"><CadastroCertificados /></ModuleGuard></AppLayout>} />
+              {/* Certificados virou aba de Procurações e Certificados (09/10/2026). */}
+              <Route path="/cadastros/certificados" element={<Redireciona para="/dashboard-federal/procuracoes?aba=certificados" />} />
               <Route path="/cadastros/alvaras" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="cadastros_alvaras"><EmBreve moduleKey="cadastros_alvaras" /></ModuleGuard></AppLayout>} />
               <Route path="/cadastros/equipe" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="equipe"><Equipe /></ModuleGuard></AppLayout>} />
 

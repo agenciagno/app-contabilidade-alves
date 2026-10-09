@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { CheckCircle2, ChevronDown, ChevronRight, CircleDot, Clock, FileText, MailOpen, MinusCircle, NotebookPen, Send, type LucideIcon } from 'lucide-react';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
-import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
+import { DsBadge, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
@@ -39,7 +39,12 @@ interface GrupoCliente {
   total: number;
 }
 
-export default function TermosIntimacao() {
+/**
+ * Aba Intimações da Caixa Postal e-CAC (era a tela Termos de intimação até 09/10/2026; `/dashboard-federal/intimacoes` redireciona para cá).
+ * Mensagens da Receita que exigem ação (intimação, malha, exclusão do Simples, multa, cobrança e processo), uma linha por cliente.
+ * Só aparecem clientes cuja lista foi baixada na aba Clientes.
+ */
+export function IntimacoesAba() {
   const { data: mensagens = [], isLoading } = useMensagensCriticas();
   const { data: notasClientes } = useNotasClientesCaixa();
   const acompanhar = useAcompanharMensagem();
@@ -136,14 +141,7 @@ export default function TermosIntimacao() {
   );
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        kicker="~/dashboard fiscal · termos de intimação"
-        title="Termos de intimação."
-        subtitle="Mensagens da Receita que exigem ação (intimação, malha, exclusão do Simples, multa, cobrança e processo), já classificadas, por cliente. Abra o cliente para ver e tratar cada mensagem. Só aparecem clientes cuja lista foi baixada na Caixa Postal e-CAC."
-        actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />}
-      />
-
+    <div className="space-y-5">
       <StatCardRow
         items={[
           { label: 'Em aberto', value: stats.abertas, hint: 'mensagens novas + em tratamento', emphasis: stats.abertas > 0 ? 'warm' : 'none' },
@@ -172,6 +170,7 @@ export default function TermosIntimacao() {
             {(Object.keys(SITUACOES) as SituacaoMsg[]).map((k) => <SelectItem key={k} value={k}>{SITUACOES[k].label}</SelectItem>)}
           </SelectContent>
         </Select>
+        <div className="sm:ml-auto"><ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas /></div>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
@@ -180,7 +179,7 @@ export default function TermosIntimacao() {
         ) : grupos.length === 0 ? (
           <div className="p-10 text-center text-ui text-muted-ink">
             {mensagens.length === 0
-              ? 'Nenhuma mensagem classificada ainda. Baixe a lista de um cliente na Caixa Postal e-CAC.'
+              ? 'Nenhuma mensagem classificada ainda. Baixe a lista de um cliente na aba Clientes.'
               : 'Nenhuma mensagem encontrada com esses filtros.'}
           </div>
         ) : (

@@ -205,7 +205,7 @@ export interface UltimaMensagemCaixa {
 
 /**
  * As últimas mensagens da Caixa Postal já baixadas (de clientes monitorados), da mais nova para a mais antiga, de qualquer categoria.
- * Só existe o que foi baixado pelo botão Consultar da tela Mensagens e-CAC: os demais clientes só têm o indicador de "mensagem nova".
+ * Só existe o que foi baixado pelo botão Consultar da tela Caixa Postal e-CAC: os demais clientes só têm o indicador de "mensagem nova".
  */
 export function useUltimasMensagensCaixa(quantas = 3) {
   return useQuery({
@@ -220,6 +220,31 @@ export function useUltimasMensagensCaixa(quantas = 3) {
       if (error) throw error;
       return ((data ?? []) as unknown as (Omit<UltimaMensagemCaixa, 'nome' | 'documento'> & { contacts: { name: string; display_name: string | null; document: string | null } })[])
         .map(({ contacts, ...m }) => ({ ...m, nome: contacts.display_name || contacts.name || 'Cliente', documento: contacts.document ?? '' }));
+    },
+  });
+}
+
+export interface AssuntoCaixa { contact_id: string; assunto: string; data_envio: string | null }
+
+/** Assunto de toda mensagem já baixada, para a busca "por assunto" da Caixa Postal (G10). Só o que foi baixado pelo Consultar. */
+export function useAssuntosCaixa(enabled: boolean) {
+  return useQuery({
+    queryKey: ['serpro-cp-assuntos'],
+    enabled,
+    queryFn: async (): Promise<AssuntoCaixa[]> => {
+      const linhas: AssuntoCaixa[] = [];
+      for (let de = 0; ; de += 1000) {
+        const { data, error } = await supabase
+          .from('serpro_caixa_postal_mensagens')
+          .select('contact_id, assunto, data_envio')
+          .order('data_envio', { ascending: false, nullsFirst: false })
+          .order('id')
+          .range(de, de + 999);
+        if (error) throw error;
+        linhas.push(...((data ?? []) as AssuntoCaixa[]));
+        if (!data || data.length < 1000) break; // PostgREST corta em 1000 linhas por página
+      }
+      return linhas;
     },
   });
 }
@@ -249,6 +274,8 @@ function useInvalidarCaixa() {
   return (contactId?: string) => {
     qc.invalidateQueries({ queryKey: ['serpro-cp-clientes'] });
     qc.invalidateQueries({ queryKey: ['serpro-cp-criticas'] });
+    qc.invalidateQueries({ queryKey: ['serpro-cp-assuntos'] });
+    qc.invalidateQueries({ queryKey: ['serpro-cp-ultimas'] });
     qc.invalidateQueries({ queryKey: ['serpro-consumo'] });
     if (contactId) qc.invalidateQueries({ queryKey: ['serpro-cp-mensagens', contactId] });
   };

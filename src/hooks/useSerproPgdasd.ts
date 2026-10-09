@@ -226,9 +226,12 @@ export function useExtratoDas() {
 export function useGerarDas() {
   const invalidar = useInvalidarPgdasd();
   return useMutation({
-    mutationFn: (v: { contactId: string; periodo: string; novo?: boolean }) =>
+    /** `dataPagamento` (AAAA-MM-DD): DAS recalculado para pagar nesse dia, com multa e juros até ela. Sempre emite um DAS novo. */
+    mutationFn: (v: { contactId: string; periodo: string; novo?: boolean; dataPagamento?: string }) =>
       invocarSerpro<ResultadoPgdasd>('serpro-pgdasd', {
-        action: 'gerar_das', contact_id: v.contactId, periodo: v.periodo, confirmar_emissao: true, novo: v.novo,
+        action: 'gerar_das', contact_id: v.contactId, periodo: v.periodo, confirmar_emissao: true,
+        novo: v.novo || !!v.dataPagamento,
+        ...(v.dataPagamento ? { dataConsolidacao: v.dataPagamento.replace(/-/g, '') } : {}),
       }),
     onSuccess: (d) => invalidar(d),
   });

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { format, lastDayOfMonth } from 'date-fns';
+import { DateField } from '@/components/ds';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DICA_RODAPE, DicaBotao } from '@/components/serpro/DicaBotao';
 import { toast } from 'sonner';
@@ -122,22 +124,32 @@ export function useAbrirArquivo() {
   return { ocupado, abrirDeclaracao, abrirExtrato, abrirDas };
 }
 
-/** Gerar DAS: pede confirmação (registra uma emissão na Receita) e abre o PDF. */
+/**
+ * Gerar DAS: pede confirmação (registra uma emissão na Receita) e abre o PDF.
+ * Opcional (G12, 09/10/2026): uma data de pagamento. O DAS sai recalculado para aquele dia (multa e juros até ela) e é sempre um DAS novo,
+ * mesmo que já exista um guardado. A data vai de hoje até o fim do mês; fora disso a Receita recusa e o aviso dela aparece.
+ */
 export function useGerarDasComConfirmacao() {
   const gerar = useGerarDas();
   const [alvo, setAlvo] = useState<{ contactId: string; periodo: string; nome: string; gratis: boolean } | null>(null);
   const [gerando, setGerando] = useState<string | null>(null);
+  const [dataPagamento, setDataPagamento] = useState('');
+  const hoje = format(new Date(), 'yyyy-MM-dd');
+  const fimDoMes = format(lastDayOfMonth(new Date()), 'yyyy-MM-dd');
+  const dataValida = !dataPagamento || (dataPagamento >= hoje && dataPagamento <= fimDoMes);
+  const gratis = !!alvo?.gratis && !dataPagamento;
 
   const confirmar = async () => {
-    if (!alvo) return;
+    if (!alvo || !dataValida) return;
     const a = alvo;
+    const data = dataPagamento || undefined;
     setAlvo(null);
     setGerando(a.contactId);
     try {
-      const r = await gerar.mutateAsync({ contactId: a.contactId, periodo: a.periodo });
+      const r = await gerar.mutateAsync({ contactId: a.contactId, periodo: a.periodo, dataPagamento: data });
       if (avisarFalha(r)) return;
       if (r.url) abrirPdf(r.url);
-      toast.success(r.jaGerado ? 'DAS já gerado: abrindo o arquivo guardado.' : 'DAS gerado.');
+      toast.success(r.jaGerado ? 'DAS já gerado: abrindo o arquivo guardado.' : data ? `DAS gerado para pagar em ${data.split('-').reverse().join('/')}.` : 'DAS gerado.');
     } catch (e) {
       toast.error(msg(e, 'Não foi possível gerar o DAS.'));
     } finally {
@@ -155,18 +167,31 @@ export function useGerarDasComConfirmacao() {
             Se já houver um DAS gerado por aqui e ainda dentro do prazo, o arquivo guardado é aberto, sem emitir outro.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <div className="space-y-1.5">
+          <label className="text-ui-strong text-ink">Data do pagamento (opcional)</label>
+          <DateField value={dataPagamento} onChange={setDataPagamento} min={hoje} max={fimDoMes} placeholder="Deixe em branco para o vencimento" />
+          <p className={dataValida ? 'text-meta text-muted-ink-2' : 'text-meta text-danger'}>
+            {dataValida
+              ? 'Para o cliente que vai pagar atrasado: o DAS sai com multa e juros calculados até essa data. Sempre emite um DAS novo.'
+              : `Escolha uma data entre hoje e ${fimDoMes.split('-').reverse().join('/')}.`}
+          </p>
+        </div>
         <AlertDialogFooter>
           <DicaBotao className={DICA_RODAPE} texto="Fecha sem gerar o DAS.">
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
           </DicaBotao>
-          <DicaBotao className={DICA_RODAPE} custo={alvo?.gratis ? undefined : 'Emitir'}
-            texto={alvo?.gratis ? 'Abre o DAS que já está guardado, sem emitir outro.' : 'Gera o DAS na Receita e abre o PDF. Fica registrada uma emissão.'}>
-            <AlertDialogAction onClick={confirmar}>Gerar DAS{!alvo?.gratis && <Preco tipo="Emitir" />}</AlertDialogAction>
+          <DicaBotao className={DICA_RODAPE} custo={gratis ? undefined : 'Emitir'}
+            texto={gratis ? 'Abre o DAS que já está guardado, sem emitir outro.' : 'Gera o DAS na Receita e abre o PDF. Fica registrada uma emissão.'}>
+            <AlertDialogAction onClick={confirmar} disabled={!dataValida}>Gerar DAS{!gratis && <Preco tipo="Emitir" />}</AlertDialogAction>
           </DicaBotao>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );
   /** `gratis` = já há DAS guardado e dentro do prazo: abrir o arquivo não emite nem cobra. */
-  return { pedir: (contactId: string, periodo: string, nome: string, gratis = false) => setAlvo({ contactId, periodo, nome, gratis }), gerando, dialog };
+  const pedir = (contactId: string, periodo: string, nome: string, gratisGuardado = false) => {
+    setDataPagamento('');
+    setAlvo({ contactId, periodo, nome, gratis: gratisGuardado });
+  };
+  return { pedir, gerando, dialog };
 }

@@ -298,9 +298,10 @@ export const menuEntries: MenuEntry[] = [
     iconName: 'shield-check',
     moduleKey: 'monitoramento_situacao_fiscal',
   },
+  // Procurações e Certificados viraram uma tela só em 09/10/2026 (Certificados é uma aba, com a permissão do Cadastro).
   {
     kind: 'simple',
-    title: 'Procurações',
+    title: 'Procurações e Certificados',
     url: '/dashboard-federal/procuracoes',
     icon: FileSignature,
     iconName: 'file-signature',
@@ -314,17 +315,8 @@ export const menuEntries: MenuEntry[] = [
     iconName: 'scroll-text',
     moduleKey: 'certidoes',
   },
-  // Certificados e Alvarás vieram do grupo Cadastro (01/10/2026): rota e
-  // permissão seguem as do Cadastro, só o lugar no menu mudou.
-  {
-    kind: 'simple',
-    title: 'Certificados',
-    url: '/cadastros/certificados',
-    icon: BadgeCheck,
-    iconName: 'badge-check',
-    moduleKey: 'cadastro',
-    subKey: 'cadastros_certificados',
-  },
+  // Alvarás veio do grupo Cadastro (01/10/2026): rota e permissão seguem as
+  // do Cadastro, só o lugar no menu mudou.
   {
     kind: 'simple',
     title: 'Alvarás',

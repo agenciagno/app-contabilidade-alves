@@ -109,6 +109,37 @@ export function useConsumoSerpro(enabled = true) {
   });
 }
 
+/**
+ * Chamadas pagas ao Serpro por cliente no ciclo de cobrança atual (dia 21 a 20), de qualquer origem (clique ou rotina).
+ * O registro de chamadas só é lido por admin (RLS), então o número só aparece para admin: para os demais o mapa vem vazio.
+ */
+export function useConsultasPagasPorCliente(enabled: boolean) {
+  const ciclo = cicloAtual();
+  return useQuery({
+    // Sob 'serpro-consumo': toda consulta já invalida esse prefixo, então o número sobe sozinho depois do clique.
+    queryKey: ['serpro-consumo', 'por-cliente', ciclo.inicio.toISOString()],
+    enabled,
+    staleTime: 60_000,
+    queryFn: async (): Promise<Map<string, number>> => {
+      const m = new Map<string, number>();
+      for (let de = 0; ; de += 1000) {
+        const { data, error } = await supabase
+          .from('serpro_call_log')
+          .select('contact_id')
+          .eq('cobravel', true)
+          .not('contact_id', 'is', null)
+          .gte('created_at', ciclo.inicio.toISOString())
+          .order('created_at', { ascending: false })
+          .range(de, de + 999);
+        if (error) throw error;
+        for (const r of data ?? []) if (r.contact_id) m.set(r.contact_id, (m.get(r.contact_id) ?? 0) + 1);
+        if (!data || data.length < 1000) break; // PostgREST corta em 1000 linhas por página
+      }
+      return m;
+    },
+  });
+}
+
 export function useSerproConfig() {
   const { company } = useCompany();
   return useQuery({

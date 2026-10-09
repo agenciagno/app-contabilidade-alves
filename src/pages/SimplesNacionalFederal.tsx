@@ -259,7 +259,7 @@ function AbaMensal({
 
       <p className="text-meta text-muted-ink-2">
         Mostrando {filtradas.length} de {linhas.length} clientes do Simples Nacional · {rotuloCompetencia(pa)}
-        {foraDaLista > 0 ? ` · ${foraDaLista} ${foraDaLista === 1 ? 'filial segue' : 'filiais seguem'} a matriz e ficam de fora` : ''}.
+        {foraDaLista > 0 ? ` · ${foraDaLista} ${foraDaLista === 1 ? 'filial segue a matriz e fica' : 'filiais seguem a matriz e ficam'} de fora` : ''}.
         O limite aparece na coluna, mas não entra na situação da linha.
       </p>
 

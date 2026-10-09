@@ -43,6 +43,22 @@ export function diasParaVencer(dataValidade: string): number {
   return differenceInCalendarDays(new Date(`${dataValidade}T00:00:00`), new Date());
 }
 
+export interface CertificadoDoCliente { validade: string; dias: number; modelo: Modelo }
+
+/**
+ * Certificado do próprio cliente (e-CNPJ, não o do sócio): o de validade mais longa entre os ativos ou vencidos.
+ * É o que o Dashboard Fiscal conta e o que a tela Procurações e Certificados mostra na linha do cliente.
+ */
+export function certificadoPorCliente(certs: CertificateRow[]): Map<string, CertificadoDoCliente> {
+  const m = new Map<string, CertificadoDoCliente>();
+  for (const c of certs) {
+    if (c.partner_id || (c.status !== 'ativo' && c.status !== 'vencido')) continue;
+    const atual = m.get(c.contact_id);
+    if (!atual || c.data_validade > atual.validade) m.set(c.contact_id, { validade: c.data_validade, dias: diasParaVencer(c.data_validade), modelo: c.modelo });
+  }
+  return m;
+}
+
 export type StatusVisual = 'ativo' | 'a_vencer' | 'vencido' | 'renovado';
 
 /** Status exibido na tela — computado da data, não do campo status salvo (que só marca o ciclo de vida ativo/renovado/cancelado). */

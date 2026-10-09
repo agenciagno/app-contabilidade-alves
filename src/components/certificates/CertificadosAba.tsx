@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { PageHeader, StatCardRow, DsBadge, SearchField, segmentedListClass, segmentedTriggerClass } from '@/components/ds';
+import { StatCardRow, DsBadge, SearchField, segmentedListClass, segmentedTriggerClass } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -39,7 +39,11 @@ import { NotificarClienteDialog } from '@/components/certificates/NotificarClien
 type FiltroTipo = 'todos' | 'PJ' | 'PF';
 type FiltroModelo = 'todos' | 'A1' | 'A3';
 
-export default function CadastroCertificados() {
+/**
+ * Aba Certificados da tela Procurações e Certificados (era a tela Cadastros > Certificados até 09/10/2026; `/cadastros/certificados`
+ * redireciona para cá). Cadastro e vencimento dos certificados digitais (e-CNPJ e e-CPF) dos clientes e sócios.
+ */
+export function CertificadosAba() {
   const { data: certificates = [], isLoading } = useCertificates();
   const excluir = useExcluirCertificado();
   const revelar = useRevelarSenhaCertificado();
@@ -132,17 +136,12 @@ export default function CadastroCertificados() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        kicker="~/cadastros · certificados"
-        title="Certificados."
-        subtitle="Vencimento de certificados digitais (e-CNPJ e e-CPF) dos clientes."
-        actions={(
-          <Button onClick={handleNovo}>
-            <Plus className="mr-1.5 h-4 w-4" /> Cadastrar
-          </Button>
-        )}
-      />
+    <div className="space-y-5">
+      <div className="flex justify-end">
+        <Button onClick={handleNovo}>
+          <Plus className="mr-1.5 h-4 w-4" /> Cadastrar
+        </Button>
+      </div>
 
       <StatCardRow
         items={[
