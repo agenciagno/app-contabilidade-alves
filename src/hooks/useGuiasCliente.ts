@@ -70,15 +70,26 @@ export interface ResultadoGuia { ok: boolean; jaGerado?: boolean; url?: string; 
 export function useGerarGuiaDctfweb() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { contactId: string; competencia: string; dataPagamento?: string; novo?: boolean }) =>
+    /** `andamento`: guia da declaração ainda em andamento (GERARGUIAANDAMENTO313). */
+    mutationFn: (v: { contactId: string; competencia: string; dataPagamento?: string; novo?: boolean; andamento?: boolean }) =>
       invocarSerpro<ResultadoGuia>('serpro-dctfweb', {
-        action: 'gerar_guia', contact_id: v.contactId, competencia: v.competencia, confirmar_emissao: true,
+        action: 'gerar_guia', contact_id: v.contactId, competencia: v.competencia, confirmar_emissao: true, andamento: v.andamento,
         ...(v.dataPagamento ? { data_pagamento: v.dataPagamento, novo: true } : {}), ...(v.novo ? { novo: true } : {}),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['dctfweb-guias'] });
       qc.invalidateQueries({ queryKey: ['serpro-consumo'] });
     },
+  });
+}
+
+/** Declaração completa (PDF) ou XML da DCTFWeb: consulta uma vez e guarda; depois abre sem consultar. */
+export function useDeclaracaoDctfweb() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { contactId: string; competencia: string; formato: 'pdf' | 'xml' }) =>
+      invocarSerpro<ResultadoGuia>('serpro-dctfweb', { action: 'declaracao', contact_id: v.contactId, competencia: v.competencia, formato: v.formato }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['serpro-consumo'] }); },
   });
 }
 

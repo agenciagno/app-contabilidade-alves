@@ -227,9 +227,10 @@ export function useGerarDas() {
   const invalidar = useInvalidarPgdasd();
   return useMutation({
     /** `dataPagamento` (AAAA-MM-DD): DAS recalculado para pagar nesse dia, com multa e juros até ela. Sempre emite um DAS novo. */
-    mutationFn: (v: { contactId: string; periodo: string; novo?: boolean; dataPagamento?: string }) =>
+    /** `cobranca`: DAS de período que já está no sistema de Cobrança da RFB (GERARDASCOBRANCA17). */
+    mutationFn: (v: { contactId: string; periodo: string; novo?: boolean; dataPagamento?: string; cobranca?: boolean }) =>
       invocarSerpro<ResultadoPgdasd>('serpro-pgdasd', {
-        action: 'gerar_das', contact_id: v.contactId, periodo: v.periodo, confirmar_emissao: true,
+        action: 'gerar_das', contact_id: v.contactId, periodo: v.periodo, confirmar_emissao: true, cobranca: v.cobranca,
         novo: v.novo || !!v.dataPagamento,
         ...(v.dataPagamento ? { dataConsolidacao: v.dataPagamento.replace(/-/g, '') } : {}),
       }),

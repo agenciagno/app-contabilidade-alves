@@ -23,6 +23,7 @@ import { FaixaEstados, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '
 import { AbaMei } from '@/components/monitor/AbaMei';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
 import { useGuiasEnviadas, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
+import { rotuloRegime, useConsultarRegime, useRegimeMapa } from '@/hooks/useSerproExtras';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { useCadastroMonitor } from '@/hooks/useSituacaoCarteira';
 import { competenciaPadrao, mesDeData, rotuloCompetencia, siglaCompetencia, useMatrizPagamentos } from '@/hooks/useSerproPagamentos';
@@ -120,7 +121,11 @@ function AbaMensal({
   const [envioAberto, setEnvioAberto] = useState(false);
   const [consultaLote, setConsultaLote] = useState(false);
   const [baixarAberto, setBaixarAberto] = useState(false);
+  const [cobrancaLote, setCobrancaLote] = useState(false);
+  const [regimeLote, setRegimeLote] = useState(false);
   const consultarPg = useConsultarPgdasd();
+  const { data: regimes } = useRegimeMapa(ano);
+  const consultarRegime = useConsultarRegime();
   const { data: marcacoes } = useMarcacoesGuia();
   const marcar = useMarcarGuia();
   const gerarDas = useGerarDas();
@@ -217,6 +222,12 @@ function AbaMensal({
         <DicaBotao custo="Consultar" texto={`Consulta na Receita as declarações e os DAS de ${ano} de cada cliente marcado. Quem já foi consultado hoje fica de fora.`}>
           <Button size="sm" variant="outline" onClick={() => setConsultaLote(true)}>Consultar PGDAS-D ({marcados.size})</Button>
         </DicaBotao>
+        <DicaBotao custo="Emitir" texto={`Gera o DAS de ${siglaCompetencia(pa)} pelo sistema de Cobrança da Receita (período que já foi para cobrança), para cada cliente marcado.`}>
+          <Button size="sm" variant="outline" onClick={() => setCobrancaLote(true)}>DAS de cobrança</Button>
+        </DicaBotao>
+        <DicaBotao custo="Consultar" texto={`Consulta se cada cliente marcado optou pelo regime de caixa ou de competência em ${ano}.`}>
+          <Button size="sm" variant="outline" onClick={() => setRegimeLote(true)}>Regime de apuração</Button>
+        </DicaBotao>
         <DicaBotao texto="Baixa num ZIP os DAS, recibos e declarações já guardados dos clientes marcados. Não consulta a Receita.">
           <Button size="sm" variant="outline" onClick={() => setBaixarAberto(true)}>Baixar</Button>
         </DicaBotao>
@@ -291,6 +302,7 @@ function AbaMensal({
                     <TableCell className="min-w-[180px] max-w-[260px]">
                       <p className="text-ui text-ink">{l.nome}</p>
                       <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
+                      {rotuloRegime(regimes?.get(l.contact_id)?.regime) && <p className="text-meta text-muted-ink-2">{rotuloRegime(regimes?.get(l.contact_id)?.regime)} ({ano})</p>}
                       {recebeDas(l.contact_id) && <p className="text-meta text-muted-ink-2">Recebe DAS da CA</p>}
                     </TableCell>
                     <TableCell><UltimaBusca iso={l.ultimaBusca} contactId={l.contact_id} /></TableCell>
@@ -319,6 +331,12 @@ function AbaMensal({
                             </DropdownMenuItem>
                             {d?.maed_notificacao_path && <DropdownMenuItem onSelect={() => abrirDeclaracao(d, 'maed_notificacao')}>Notificação da multa (MAED)</DropdownMenuItem>}
                             {d?.maed_darf_path && <DropdownMenuItem onSelect={() => abrirDeclaracao(d, 'maed_darf')}>DARF da multa (MAED)</DropdownMenuItem>}
+                            <DropdownMenuItem onSelect={() => { setMarcados(new Set([l.contact_id])); setCobrancaLote(true); }}>
+                              DAS de cobrança de {siglaCompetencia(pa)}<Preco tipo="Emitir" />
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => { setMarcados(new Set([l.contact_id])); setRegimeLote(true); }}>
+                              Regime de apuração de {ano}<Preco tipo="Consultar" />
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem disabled={!d || lendo} onSelect={() => leitura.executar(l.contact_id, pa)}>
                               {l.fat && l.fat.periodo_apuracao.slice(0, 7) === pa ? 'Reler faturamento' : 'Ler faturamento'}{d && !d.declaracao_path && <Preco tipo="Consultar" />}
@@ -393,6 +411,34 @@ function AbaMensal({
         executar={async (item) => {
           const r = await consultarPg.mutateAsync({ contactId: item.contactId, ano });
           return { ok: r.ok, recente: r.recente, error: r.semProcuracao ? 'Sem procuração para o PGDAS-D' : r.error };
+        }}
+      />
+      <GerarLoteDialog
+        aberto={cobrancaLote}
+        onClose={() => setCobrancaLote(false)}
+        titulo={`DAS de cobrança de ${siglaCompetencia(pa)}`}
+        descricao="Para período que já foi para o sistema de Cobrança da Receita (o DAS comum não sai mais). Um por cliente marcado, um de cada vez."
+        itens={linhas.filter((l) => marcados.has(l.contact_id)).map((l) => ({ contactId: l.contact_id, nome: l.nome, aviso: !l.declaracaoRow ? 'Sem PGDAS-D transmitido no mês: a Receita não gera o DAS.' : null }))}
+        comData={false}
+        executar={async (item) => {
+          const r = await gerarDas.mutateAsync({ contactId: item.contactId, periodo: pa, cobranca: true });
+          return { ok: r.ok, error: r.semProcuracao ? 'Sem procuração para o PGDAS-D' : r.error };
+        }}
+      />
+      <AcaoLoteDialog
+        aberto={regimeLote}
+        onClose={() => setRegimeLote(false)}
+        titulo={`Regime de apuração de ${ano}`}
+        descricao="Uma consulta por cliente marcado: se optou pelo regime de caixa ou de competência no ano."
+        itens={linhas.filter((l) => marcados.has(l.contact_id)).map((l) => ({
+          contactId: l.contact_id, nome: l.nome, pular: regimes?.get(l.contact_id)?.consultado_em?.slice(0, 10) === hoje ? 'Consultado hoje' : null,
+        }))}
+        tipo="Consultar"
+        rotuloAcao="Consultar"
+        rotuloFeito="Consultado"
+        executar={async (item) => {
+          const r = await consultarRegime.mutateAsync({ contactId: item.contactId, ano });
+          return { ok: r.ok && !r.foraDoMonitoramento, error: r.semProcuracao ? 'Sem procuração para o regime de apuração' : r.error, resumo: rotuloRegime(r.regime) ?? undefined };
         }}
       />
       <BaixarLoteDialog

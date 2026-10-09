@@ -19,7 +19,8 @@ import { perfilAtivo } from "../_shared/acesso.ts";
 //   documentos   { contact_id, periodo: "AAAA-MM", force? }  CONSULTIMADECREC14 (Consultar): PDFs do recibo e da declaração da última
 //                                                    transmissão do mês (e da MAED, se houve atraso), guardados no bucket privado.
 //   extrato      { das_id }                          CONSEXTRATO16 (Consultar): PDF do extrato do DAS, guardado.
-//   gerar_das    { contact_id, periodo, confirmar_emissao: true, dataConsolidacao?, novo? }  GERARDAS12 (Emitir): gera o DAS do mês.
+//   gerar_das    { contact_id, periodo, confirmar_emissao: true, dataConsolidacao?, novo?, cobranca? }  GERARDAS12 (Emitir): gera o DAS do mês.
+//                `cobranca: true` (09/10/2026) usa GERARDASCOBRANCA17: DAS de período que já foi para o sistema de Cobrança da RFB (o 1.2 não gera).
 //                                                    Só com confirmação explícita; se já há DAS gerado aqui e ainda no prazo, devolve o
 //                                                    arquivo guardado em vez de emitir outro.
 //   (conclusão automática) consultar conclui a tarefa fiscal "DAS - Simples Nacional" dos períodos com DAS pago; ler_faturamento conclui a de
@@ -396,8 +397,9 @@ async function gerarDas(payload: any, uid: string) {
   if (!aaaamm) return json({ error: "Informe o período (AAAA-MM)" }, 400);
   const periodo = `${aaaamm.slice(0, 4)}-${aaaamm.slice(4, 6)}-01`;
 
+  const cobranca = payload.cobranca === true;
   // Já existe DAS gerado aqui para o período e ainda no prazo: entrega o arquivo guardado (não emite outro).
-  if (!payload.novo) {
+  if (!payload.novo && !cobranca) {
     const { data: ja } = await supabase.from("serpro_pgdasd_das").select("id,numero_das,vencimento,limite_acolhimento,valor_total,das_path")
       .eq("contact_id", c.contato!.id).eq("periodo_apuracao", periodo).not("das_path", "is", null).order("emitido_em", { ascending: false }).limit(1).maybeSingle();
     // O documento serve enquanto puder ser pago: vale a data limite de acolhimento (DAS vencido é consolidado até ela); sem ela, o vencimento.
@@ -409,12 +411,12 @@ async function gerarDas(payload: any, uid: string) {
   }
 
   const dados: Record<string, string> = { periodoApuracao: aaaamm };
-  if (/^\d{8}$/.test(String(payload.dataConsolidacao ?? ""))) dados.dataConsolidacao = String(payload.dataConsolidacao);
+  if (!cobranca && /^\d{8}$/.test(String(payload.dataConsolidacao ?? ""))) dados.dataConsolidacao = String(payload.dataConsolidacao);
   const r = await serpro({
-    tipo: "Emitir", idSistema: "PGDASD", idServico: "GERARDAS12",
+    tipo: "Emitir", idSistema: "PGDASD", idServico: cobranca ? "GERARDASCOBRANCA17" : "GERARDAS12",
     contribuinte: { numero: c.cnpj!, tipo: 2 }, dados: JSON.stringify(dados),
     uid, contactId: c.contato!.id, origem: "manual",
-    finalidade: `Emissão do DAS do PGDAS-D (PA ${aaaamm.slice(4)}/${aaaamm.slice(0, 4)}) confirmada por usuário para o cliente`,
+    finalidade: `Emissão do DAS${cobranca ? " de cobrança" : ""} do PGDAS-D (PA ${aaaamm.slice(4)}/${aaaamm.slice(0, 4)}) confirmada por usuário para o cliente`,
   });
   if (r.status === 403) return json({ ok: false, semProcuracao: true, error: "Sem procuração eletrônica para o PGDAS-D deste cliente" });
   if (r.status !== 200) return json({ ok: false, status: r.status, error: msgErro(r) });
@@ -433,7 +435,7 @@ async function gerarDas(payload: any, uid: string) {
   const dataDe = (v: string) => (/^\d{8}$/.test(v) ? `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}` : null);
   const val = pega(det, "valores");
   const campos = {
-    tipo_operacao: "Geração de DAS", emitido_em: new Date().toISOString(),
+    tipo_operacao: cobranca ? "Geração de DAS de cobrança" : "Geração de DAS", emitido_em: new Date().toISOString(),
     vencimento: dataDe(venc), limite_acolhimento: dataDe(limite),
     valor_principal: num(pega(val, "principal")), valor_multa: num(pega(val, "multa")), valor_juros: num(pega(val, "juros")), valor_total: num(pega(val, "total")),
     composicao: Array.isArray(pega(det, "composicao")) ? pega(det, "composicao") : null, das_path: path, sincronizado_em: new Date().toISOString(),

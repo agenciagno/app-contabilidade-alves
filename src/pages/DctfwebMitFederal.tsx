@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { FileText, Loader2, Mail, Receipt, RefreshCw } from 'lucide-react';
+import { FileCode, FileText, Loader2, Mail, MoreHorizontal, Receipt, RefreshCw } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
 import { PageHeader, SearchField } from '@/components/ds';
@@ -15,7 +16,7 @@ import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { useAbrirRecibo, useConsultaDctfwebMit } from '@/components/serpro/dctfwebUi';
 import { FaixaEstados, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
-import { useGerarGuiaDctfweb, useGuiasDctfweb, useGuiasEnviadas, useLinkGuiaDctfweb, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
+import { useDeclaracaoDctfweb, useGerarGuiaDctfweb, useGuiasDctfweb, useGuiasEnviadas, useLinkGuiaDctfweb, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
 import { abrirPdf } from '@/hooks/useSerproPgdasd';
 import { hojeBR } from '@/lib/prazosFederais';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
@@ -59,6 +60,20 @@ export default function DctfwebMitFederal() {
   const linkGuia = useLinkGuiaDctfweb();
   const hoje = hojeBR();
   const consultarDm = useConsultarDctfwebMit();
+  const declaracao = useDeclaracaoDctfweb();
+  const [andamentoLote, setAndamentoLote] = useState(false);
+  const [baixandoDecl, setBaixandoDecl] = useState<string | null>(null);
+  const abrirDeclaracao = async (contactId: string, formato: 'pdf' | 'xml') => {
+    setBaixandoDecl(`${contactId}:${formato}`);
+    try {
+      const r = await declaracao.mutateAsync({ contactId, competencia, formato });
+      if (r.ok && r.url) abrirPdf(r.url); else toast.error(r.error ?? 'Não foi possível abrir a declaração.');
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Não foi possível abrir a declaração.');
+    } finally {
+      setBaixandoDecl(null);
+    }
+  };
   const [consultaLote, setConsultaLote] = useState(false);
   const [baixarAberto, setBaixarAberto] = useState(false);
 
@@ -158,6 +173,9 @@ export default function DctfwebMitFederal() {
           <DicaBotao custo="Consultar" vezes={2} texto={`Consulta na Receita o recibo da DCTFWeb de ${siglaCompetencia(competencia)} e a MIT do ano de cada cliente marcado. Quem já foi consultado hoje fica de fora.`}>
             <Button size="sm" variant="outline" onClick={() => setConsultaLote(true)}>Consultar ({marcados.size})</Button>
           </DicaBotao>
+          <DicaBotao custo="Emitir" texto="Gera a guia da declaração da DCTFWeb ainda EM ANDAMENTO (antes de transmitir) de cada cliente marcado.">
+            <Button size="sm" variant="outline" onClick={() => setAndamentoLote(true)}>Guia em andamento</Button>
+          </DicaBotao>
           <DicaBotao texto="Baixa num ZIP os recibos e as guias da DCTFWeb já guardados. Não consulta a Receita.">
             <Button size="sm" variant="outline" onClick={() => setBaixarAberto(true)}>Baixar</Button>
           </DicaBotao>
@@ -252,6 +270,18 @@ export default function DctfwebMitFederal() {
                               </Button>
                             </DicaBotao>
                           )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Mais ações">
+                                {baixandoDecl?.startsWith(l.contact_id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-[280px]">
+                              <DropdownMenuItem onSelect={() => abrirDeclaracao(l.contact_id, 'pdf')}><FileText className="mr-2 h-4 w-4" />Declaração completa (PDF)<Preco tipo="Consultar" /></DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => abrirDeclaracao(l.contact_id, 'xml')}><FileCode className="mr-2 h-4 w-4" />Declaração em XML<Preco tipo="Consultar" /></DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => { setMarcados(new Set([l.contact_id])); setAndamentoLote(true); }}><Receipt className="mr-2 h-4 w-4" />Guia da declaração em andamento<Preco tipo="Emitir" /></DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                           {l.dctfweb?.status === 'transmitida' && (
                             <DicaBotao texto="Abre o PDF do recibo da DCTFWeb deste mês, que já está guardado. Não consulta a Receita.">
                               <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Recibo da DCTFWeb" disabled={ocupado === l.dctfweb.id} onClick={() => abrir(l.dctfweb!.id)}>
@@ -314,7 +344,20 @@ export default function DctfwebMitFederal() {
         contactIds={[...marcados]}
         competencia={competencia}
         referencia={`competência ${siglaCompetencia(competencia)}`}
-        opcoes={[{ tipo: 'dctfweb_recibo', rotulo: 'Recibos da DCTFWeb' }, { tipo: 'dctfweb_guia', rotulo: 'Guias da DCTFWeb' }, { tipo: 'comprovante', rotulo: 'Comprovantes de pagamento' }]}
+        opcoes={[{ tipo: 'dctfweb_recibo', rotulo: 'Recibos da DCTFWeb' }, { tipo: 'dctfweb_declaracao', rotulo: 'Declarações completas da DCTFWeb' }, { tipo: 'dctfweb_guia', rotulo: 'Guias da DCTFWeb' }, { tipo: 'comprovante', rotulo: 'Comprovantes de pagamento' }]}
+      />
+      <GerarLoteDialog
+        aberto={andamentoLote}
+        onClose={() => setAndamentoLote(false)}
+        titulo={`Guia da DCTFWeb em andamento de ${siglaCompetencia(competencia)}`}
+        descricao="Guia da declaração que ainda não foi transmitida (em andamento), uma por cliente marcado, um de cada vez."
+        itens={matrizes.filter((l) => marcados.has(l.contact_id)).map((l) => ({
+          contactId: l.contact_id, nome: l.nome, aviso: estadoDctfweb(l) === 'transmitida' ? 'A declaração do mês já foi transmitida: use a guia comum.' : null,
+        }))}
+        executar={async (item, dataPagamento) => {
+          const r = await gerarGuia.mutateAsync({ contactId: item.contactId, competencia, dataPagamento, andamento: true });
+          return { ok: r.ok, jaGerado: r.jaGerado, error: r.semProcuracao ? 'Sem procuração para a DCTFWeb' : r.error };
+        }}
       />
       <EnviarGuiasDialog
         aberto={envioAberto}

@@ -273,7 +273,7 @@ export const menuEntries: MenuEntry[] = [
     moduleKey: 'dashboard_federal',
     // Situação Fiscal e Procurações viraram itens próprios (01/10/2026), e em
     // 08/10/2026 ganharam chave de permissão própria. Simples Nacional, em 09/10/2026.
-    activeExcept: ['/dashboard-federal/situacao-fiscal', '/dashboard-federal/procuracoes', '/dashboard-federal/simples-nacional', '/dashboard-federal/parcelamentos'],
+    activeExcept: ['/dashboard-federal/situacao-fiscal', '/dashboard-federal/procuracoes', '/dashboard-federal/simples-nacional', '/dashboard-federal/parcelamentos', '/dashboard-federal/eprocesso'],
   },
   {
     kind: 'simple',
@@ -317,6 +317,15 @@ export const menuEntries: MenuEntry[] = [
     icon: FileSignature,
     iconName: 'file-signature',
     moduleKey: 'monitoramento_procuracoes',
+  },
+  // e-Processo (09/10/2026): processos digitais da Receita; item próprio, separado de "Processos" (decisão de Gabriel).
+  {
+    kind: 'simple',
+    title: 'e-Processo',
+    url: '/dashboard-federal/eprocesso',
+    icon: Scale,
+    iconName: 'scale',
+    moduleKey: 'dashboard_federal',
   },
   {
     kind: 'simple',

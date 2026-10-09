@@ -5481,9 +5481,11 @@ export type Database = {
           consultado_em: string
           consultado_por: string | null
           contact_id: string
+          declaracao_path: string | null
           id: string
           recibo_path: string | null
           status: string
+          xml_path: string | null
         }
         Insert: {
           company_id: string
@@ -5491,9 +5493,11 @@ export type Database = {
           consultado_em?: string
           consultado_por?: string | null
           contact_id: string
+          declaracao_path?: string | null
           id?: string
           recibo_path?: string | null
           status: string
+          xml_path?: string | null
         }
         Update: {
           company_id?: string
@@ -5501,9 +5505,11 @@ export type Database = {
           consultado_em?: string
           consultado_por?: string | null
           contact_id?: string
+          declaracao_path?: string | null
           id?: string
           recibo_path?: string | null
           status?: string
+          xml_path?: string | null
         }
         Relationships: [
           {
@@ -5531,6 +5537,7 @@ export type Database = {
       }
       serpro_dctfweb_guias: {
         Row: {
+          andamento: boolean
           company_id: string
           competencia: string
           contact_id: string
@@ -5541,6 +5548,7 @@ export type Database = {
           pdf_path: string
         }
         Insert: {
+          andamento?: boolean
           company_id: string
           competencia: string
           contact_id: string
@@ -5551,6 +5559,7 @@ export type Database = {
           pdf_path: string
         }
         Update: {
+          andamento?: boolean
           company_id?: string
           competencia?: string
           contact_id?: string
@@ -5753,6 +5762,168 @@ export type Database = {
             foreignKeyName: "serpro_defis_consultas_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: true
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_dte: {
+        Row: {
+          company_id: string
+          consultado_em: string
+          consultado_por: string | null
+          contact_id: string
+          indicador: number | null
+          status: string | null
+        }
+        Insert: {
+          company_id: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id: string
+          indicador?: number | null
+          status?: string | null
+        }
+        Update: {
+          company_id?: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id?: string
+          indicador?: number | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_dte_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_dte_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_dte_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_eprocesso_consultas: {
+        Row: {
+          company_id: string
+          consultado_em: string
+          consultado_por: string | null
+          contact_id: string
+          total: number
+        }
+        Insert: {
+          company_id: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id: string
+          total?: number
+        }
+        Update: {
+          company_id?: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id?: string
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_eprocesso_consultas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_eprocesso_consultas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_eprocesso_consultas_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: true
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_eprocessos: {
+        Row: {
+          company_id: string
+          contact_id: string
+          data_protocolo: string | null
+          id: string
+          localizacao: string | null
+          numero: string
+          relacao: string | null
+          sincronizado_em: string
+          situacao: string | null
+          subtipo: string | null
+          tipo: string | null
+          ultimo_encaminhamento: string | null
+        }
+        Insert: {
+          company_id: string
+          contact_id: string
+          data_protocolo?: string | null
+          id?: string
+          localizacao?: string | null
+          numero: string
+          relacao?: string | null
+          sincronizado_em?: string
+          situacao?: string | null
+          subtipo?: string | null
+          tipo?: string | null
+          ultimo_encaminhamento?: string | null
+        }
+        Update: {
+          company_id?: string
+          contact_id?: string
+          data_protocolo?: string | null
+          id?: string
+          localizacao?: string | null
+          numero?: string
+          relacao?: string | null
+          sincronizado_em?: string
+          situacao?: string | null
+          subtipo?: string | null
+          tipo?: string | null
+          ultimo_encaminhamento?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_eprocessos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_eprocessos_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_eprocessos_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
             referencedRelation: "vw_cofre_global"
             referencedColumns: ["contact_id"]
           },
@@ -6940,6 +7111,113 @@ export type Database = {
           },
           {
             foreignKeyName: "serpro_procuracoes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_redesim_vinculos: {
+        Row: {
+          cnpj: string
+          company_id: string
+          consultado_em: string
+          contact_id: string | null
+          municipio: string | null
+          situacao: string | null
+          tipo_estabelecimento: string | null
+          uf: string | null
+        }
+        Insert: {
+          cnpj: string
+          company_id: string
+          consultado_em?: string
+          contact_id?: string | null
+          municipio?: string | null
+          situacao?: string | null
+          tipo_estabelecimento?: string | null
+          uf?: string | null
+        }
+        Update: {
+          cnpj?: string
+          company_id?: string
+          consultado_em?: string
+          contact_id?: string | null
+          municipio?: string | null
+          situacao?: string | null
+          tipo_estabelecimento?: string | null
+          uf?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_redesim_vinculos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_redesim_vinculos_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_redesim_vinculos_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_regime_apuracao: {
+        Row: {
+          ano: number
+          company_id: string
+          consultado_em: string
+          consultado_por: string | null
+          contact_id: string
+          data_opcao: string | null
+          regime: string | null
+        }
+        Insert: {
+          ano: number
+          company_id: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id: string
+          data_opcao?: string | null
+          regime?: string | null
+        }
+        Update: {
+          ano?: number
+          company_id?: string
+          consultado_em?: string
+          consultado_por?: string | null
+          contact_id?: string
+          data_opcao?: string | null
+          regime?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_regime_apuracao_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_regime_apuracao_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_regime_apuracao_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "vw_cofre_global"

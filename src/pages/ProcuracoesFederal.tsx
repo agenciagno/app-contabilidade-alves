@@ -22,6 +22,8 @@ import { CertificadosAba } from '@/components/certificates/CertificadosAba';
 import { FaixaEstados, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
 import { HORAS_MAPA_RECENTE, useMapearProcuracao, useProcuracoes, vencendo, type LinhaProcuracao } from '@/hooks/useSerproProcuracoes';
 import { certificadoPorCliente, useCertificates, type CertificadoDoCliente } from '@/hooks/useCertificates';
+import { useAtualizarVinculos, useVinculosRedesim } from '@/hooks/useSerproExtras';
+import { useCustoSerpro } from '@/hooks/useSerproConsumo';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { ROTULO_ESTADO, contarEstados, outrosMotivos, piorSelo, seloCertificado, seloProcuracao, type Selo } from '@/lib/monitorEstados';
 import type { TabelaExport } from '@/lib/exportarTabela';
@@ -35,7 +37,7 @@ const formatarCnpj = (d: string) => {
 };
 const dataBR = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
 
-type Aba = 'procuracoes' | 'certificados';
+type Aba = 'procuracoes' | 'certificados' | 'redesim';
 /** Qual coluna a faixa conta: a situação da linha (pior entre as duas) ou só uma delas (link de uma barra do painel). */
 type Fonte = 'situacao' | 'procuracao' | 'certificado';
 const ROTULO_FONTE: Record<Exclude<Fonte, 'situacao'>, string> = { procuracao: 'Procuração', certificado: 'Certificado' };
@@ -52,7 +54,8 @@ export default function ProcuracoesFederal() {
   const [params, setParams] = useSearchParams();
   const { isModuleVisible, isSubItemVisible } = useModuleAccess();
   const veCertificados = isModuleVisible('cadastro') && isSubItemVisible('cadastro', 'cadastros_certificados');
-  const aba: Aba = params.get('aba') === 'certificados' && veCertificados ? 'certificados' : 'procuracoes';
+  const abaParam = params.get('aba');
+  const aba: Aba = abaParam === 'certificados' && veCertificados ? 'certificados' : abaParam === 'redesim' ? 'redesim' : 'procuracoes';
   const irPara = (a: Aba) => {
     const n = new URLSearchParams(params);
     n.delete('estado'); n.delete('fonte');
@@ -64,14 +67,13 @@ export default function ProcuracoesFederal() {
     <div className="space-y-6">
       <PageHeader kicker="~/dashboard fiscal · procurações e certificados" title="Procurações e Certificados." />
 
-      {veCertificados && (
-        <div className="flex gap-1 border-b border-line">
-          <DsTab active={aba === 'procuracoes'} onClick={() => irPara('procuracoes')}>Procurações</DsTab>
-          <DsTab active={aba === 'certificados'} onClick={() => irPara('certificados')}>Certificados</DsTab>
-        </div>
-      )}
+      <div className="flex gap-1 border-b border-line">
+        <DsTab active={aba === 'procuracoes'} onClick={() => irPara('procuracoes')}>Procurações</DsTab>
+        {veCertificados && <DsTab active={aba === 'certificados'} onClick={() => irPara('certificados')}>Certificados</DsTab>}
+        <DsTab active={aba === 'redesim'} onClick={() => irPara('redesim')}>Vínculos Redesim</DsTab>
+      </div>
 
-      {aba === 'procuracoes' ? <AbaProcuracoes veCertificados={veCertificados} /> : <CertificadosAba />}
+      {aba === 'procuracoes' ? <AbaProcuracoes veCertificados={veCertificados} /> : aba === 'certificados' ? <CertificadosAba /> : <AbaRedesim />}
     </div>
   );
 }
@@ -294,6 +296,85 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- aba Vínculos Redesim (09/10/2026)
+
+/**
+ * Vínculos da CA como contador na Redesim (PNRCONTADOR.CONSVINCULOS261), cruzados com a carteira:
+ * cliente ativo sem vínculo (a CA não aparece como contador dele) e CNPJ vinculado que não é cliente ativo (pedir a renúncia).
+ */
+function AbaRedesim() {
+  const { data: vinculos = [], isLoading } = useVinculosRedesim();
+  const { data: linhas = [], isLoading: carregandoClientes } = useProcuracoes();
+  const atualizar = useAtualizarVinculos();
+  const { admin } = useCustoSerpro();
+  const [res, setRes] = useState<string | null>(null);
+
+  const matrizes = linhas.filter((l) => !l.filial);
+  const cnpjDe = (d: string) => d.replace(/\D/g, '');
+  const vinculados = new Set(vinculos.map((v) => v.cnpj));
+  const ativos = new Set(matrizes.map((l) => cnpjDe(l.documento)));
+  const semVinculo = matrizes.filter((l) => !vinculados.has(cnpjDe(l.documento))).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  const naoClientes = vinculos.filter((v) => !ativos.has(v.cnpj));
+  const ultima = vinculos.map((v) => v.consultado_em).sort().pop() ?? null;
+
+  const rodar = async () => {
+    setRes(null);
+    try {
+      const r = await atualizar.mutateAsync({});
+      setRes(r.ok ? `${r.vinculos} CNPJs vinculados à CA na Redesim.` : (r.error ?? 'Falha na consulta.'));
+    } catch (e) {
+      setRes((e as Error)?.message || 'Falha na consulta.');
+    }
+  };
+
+  if (isLoading || carregandoClientes) return <Skeleton className="h-[200px] w-full" />;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 rounded-lg border border-line bg-paper p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-ui-strong text-ink">{vinculos.length ? `${vinculos.length} CNPJs com a CA como contador na Redesim` : 'Vínculos ainda não consultados'}</p>
+          <p className="text-meta text-muted-ink-2">{ultima ? `Atualizado em ${dataBR(ultima)}` : 'Uma consulta por página de 100 CNPJs.'}{res ? ` · ${res}` : ''}</p>
+        </div>
+        <DicaBotao custo="Consultar" texto={admin ? 'Consulta na Receita todos os CNPJs vinculados à CA como contador (uma chamada por página de 100).' : 'Só administradores atualizam os vínculos.'}>
+          <Button size="sm" variant="outline" disabled={!admin || atualizar.isPending} onClick={rodar}>
+            {atualizar.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}Atualizar vínculos
+          </Button>
+        </DicaBotao>
+      </div>
+
+      {vinculos.length > 0 && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <section className="space-y-2 rounded-lg border border-line bg-paper p-4">
+            <h3 className="text-ui-strong text-ink">Clientes ativos sem vínculo ({semVinculo.length})</h3>
+            <p className="text-meta text-muted-ink-2">A CA não aparece como contadora deles na Redesim. Confira o cadastro na Junta ou na Receita.</p>
+            <ul className="max-h-[360px] divide-y divide-line-2 overflow-y-auto">
+              {semVinculo.map((l) => (
+                <li key={l.contact_id} className="py-2">
+                  <p className="text-ui text-ink">{l.nome}</p>
+                  <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section className="space-y-2 rounded-lg border border-line bg-paper p-4">
+            <h3 className="text-ui-strong text-ink">Vinculados que não são clientes ativos ({naoClientes.length})</h3>
+            <p className="text-meta text-muted-ink-2">A CA ainda aparece como contadora. Se a empresa saiu, avalie pedir a renúncia do vínculo.</p>
+            <ul className="max-h-[360px] divide-y divide-line-2 overflow-y-auto">
+              {naoClientes.map((v) => (
+                <li key={v.cnpj} className="py-2">
+                  <p className="font-mono text-ui text-ink">{formatarCnpj(v.cnpj)}</p>
+                  <p className="text-meta text-muted-ink-2">{[v.tipo_estabelecimento, v.situacao, v.uf].filter(Boolean).join(' · ')}{v.contact_id ? ' · no cadastro, mas fora dos ativos' : ' · fora do cadastro'}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

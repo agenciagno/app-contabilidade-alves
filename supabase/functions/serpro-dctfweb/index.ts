@@ -4,6 +4,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { criarSerpro, jwtRole, onlyDigits, sleep } from "../_shared/serpro-core.ts";
 import { assinar, guardarPdf } from "../_shared/serpro-arquivos.ts";
 import { lerApuracoesMit, pdfDoRecibo, semDeclaracaoDctfweb } from "../_shared/dctfweb-mit.ts";
+import { pega } from "../_shared/pgdasd-indice.ts";
 import { avisarConclusoes, concluirTarefaFiscal } from "../_shared/tarefas-fiscais.ts";
 import { lerTodas } from "../_shared/paginar.ts";
 import { loteTokenValido } from "../_shared/lote-token.ts";
@@ -22,6 +23,9 @@ import { perfilAtivo } from "../_shared/acesso.ts";
 //       `data_pagamento` vira DataAcolhimentoProposta (inteiro aaaammdd; a Receita só aceita dia útil do mês corrente, de hoje em diante).
 //       Sem `novo`, uma guia já emitida HOJE para a mesma competência e a mesma data é devolvida sem emitir outra (não cobra de novo).
 //   link_guia { id }   link assinado (10 min) de uma guia já emitida.
+//       `andamento: true` em gerar_guia (09/10/2026) usa GERARGUIAANDAMENTO313: guia da declaração ainda em andamento (antes de transmitir).
+//   declaracao { contact_id, competencia, formato: "pdf" | "xml" }   DCTFWEB.CONSDECCOMPLETA33 (PDF) ou CONSXMLDECLARACAO38 (XML), Consultar:
+//       guarda o arquivo da declaração e devolve um link. Já guardado: devolve sem consultar.
 //   rotina_eventos   rotina diária (cron 07:40 BRT): evento E0301 (grátis, /Monitorar), 1 solicitar + 1 obter para todos os clientes do escopo.
 //       O E0301 só diz que a DCTFWeb do CNPJ foi atualizada (eSocial/Reinf/SERO recebido ou declaração transmitida), sem dizer qual.
 //       Marca "movimento novo" quando a data avança e avisa a equipe; quem consulta é a equipe, por clique. { forcar?: true } ignora a trava de 12 h.
@@ -223,9 +227,10 @@ async function gerarGuia(payload: any, uid: string) {
   }
   if (await semProcuracaoNenhuma(contactId)) return json({ ok: false, semProcuracao: true, error: "Este cliente não tem procuração eletrônica ativa. Peça para outorgar no e-CAC e mapeie em Procurações." });
 
+  const andamento = payload.andamento === true;
   // Já emitida hoje, mesma competência e mesma data de pagamento: devolve a guardada (não emite nem cobra de novo).
   if (!payload.novo) {
-    let q = supabase.from("serpro_dctfweb_guias").select("id,pdf_path").eq("contact_id", contactId).eq("competencia", competencia)
+    let q = supabase.from("serpro_dctfweb_guias").select("id,pdf_path").eq("contact_id", contactId).eq("competencia", competencia).eq("andamento", andamento)
       .gte("emitido_em", `${hoje}T03:00:00Z`).order("emitido_em", { ascending: false }).limit(1);
     q = dataPagamento ? q.eq("data_pagamento", dataPagamento) : q.is("data_pagamento", null);
     const { data: ja } = await q.maybeSingle();
@@ -238,20 +243,71 @@ async function gerarGuia(payload: any, uid: string) {
   const dados: Record<string, unknown> = { categoria: "GERAL_MENSAL", anoPA: ano, mesPA: mes };
   if (dataPagamento) dados.DataAcolhimentoProposta = Number(dataPagamento.replace(/-/g, ""));
   const r = await serpro({
-    tipo: "Emitir", idSistema: "DCTFWEB", idServico: "GERARGUIA31",
+    tipo: "Emitir", idSistema: "DCTFWEB", idServico: andamento ? "GERARGUIAANDAMENTO313" : "GERARGUIA31",
     contribuinte: { numero: c.cnpj!, tipo: 2 }, dados: JSON.stringify(dados),
     uid, contactId, origem: "manual",
-    finalidade: `Emissão da guia (DARF) da DCTFWeb (PA ${mes}/${ano}) confirmada por usuário para o cliente`,
+    finalidade: `Emissão da guia (DARF) da DCTFWeb${andamento ? " em andamento" : ""} (PA ${mes}/${ano}) confirmada por usuário para o cliente`,
   });
   if (r.status === 403) return json({ ok: false, semProcuracao: true, error: "Sem procuração eletrônica para a DCTFWeb deste cliente" });
   if (r.status !== 200) return json({ ok: false, status: r.status, error: msgErro(r) });
   const path = await guardarPdf(supabase, BUCKET, `${COMPANY_ID}/${contactId}/guia-dctfweb-${comp}-${Date.now()}.pdf`, pdfDoRecibo(r.resposta?.dados));
   if (!path) return json({ ok: false, error: "A guia foi emitida, mas o PDF não veio em formato válido" }, 502);
   const { data: nova, error } = await supabase.from("serpro_dctfweb_guias")
-    .insert({ company_id: COMPANY_ID, contact_id: contactId, competencia, data_pagamento: dataPagamento, pdf_path: path, emitido_por: uid }).select("id").single();
+    .insert({ company_id: COMPANY_ID, contact_id: contactId, competencia, data_pagamento: dataPagamento, pdf_path: path, emitido_por: uid, andamento }).select("id").single();
   if (error || !nova) return json({ ok: false, error: "A guia foi emitida e guardada, mas o registro falhou" }, 500);
   const url = await assinar(supabase, BUCKET, path, `guia-dctfweb-${comp}.pdf`);
   return json({ ok: true, url, id: nova.id });
+}
+
+// ---------- declaração completa (PDF) e XML
+async function declaracao(payload: any, uid: string) {
+  const c = await carregarCliente(String(payload.contact_id ?? ""));
+  if (c.resp) return c.resp;
+  const contactId = c.contato!.id;
+  const comp = String(payload.competencia ?? "");
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(comp)) return json({ error: "Informe a competência (AAAA-MM)" }, 400);
+  const xml = payload.formato === "xml";
+  const [ano, mes] = comp.split("-");
+  const competencia = `${comp}-01`;
+  const coluna = xml ? "xml_path" : "declaracao_path";
+  const nome = `${xml ? "dctfweb-xml" : "dctfweb-declaracao"}-${comp}.${xml ? "xml" : "pdf"}`;
+  const { data: atual } = await supabase.from("serpro_dctfweb").select(`id,${coluna}`).eq("contact_id", contactId).eq("competencia", competencia).maybeSingle();
+  const guardado = (atual as Record<string, string | null> | null)?.[coluna];
+  if (guardado) {
+    const url = await assinar(supabase, BUCKET, guardado, nome);
+    if (url) return json({ ok: true, jaGerado: true, url });
+  }
+  if (await semProcuracaoNenhuma(contactId)) return json({ ok: false, semProcuracao: true, error: "Este cliente não tem procuração eletrônica ativa." });
+  const r = await serpro({
+    tipo: "Consultar", idSistema: "DCTFWEB", idServico: xml ? "CONSXMLDECLARACAO38" : "CONSDECCOMPLETA33",
+    // Mesmo formato do recibo (CONSRECIBO32), já validado em produção: categoria 40 = GERAL_MENSAL.
+    contribuinte: { numero: c.cnpj!, tipo: 2 }, dados: JSON.stringify({ categoria: 40, anoPA: ano, mesPA: mes }),
+    uid, contactId, origem: "manual",
+    finalidade: `Consulta da ${xml ? "declaração em XML" : "declaração completa"} da DCTFWeb (PA ${mes}/${ano}) acionada por usuário para o cliente`,
+  });
+  if (r.status === 403) return json({ ok: false, semProcuracao: true, error: "Sem procuração eletrônica para a DCTFWeb deste cliente" });
+  if (semDeclaracaoDctfweb(r.resposta)) return json({ ok: false, error: "Não há declaração transmitida para esta competência." });
+  if (r.status !== 200) return json({ ok: false, status: r.status, error: msgErro(r) });
+  const dados = typeof r.resposta?.dados === "string" ? (() => { try { return JSON.parse(r.resposta.dados); } catch { return r.resposta.dados; } })() : r.resposta?.dados;
+  let path: string | null = null;
+  if (xml) {
+    const b64 = pega(dados, "XMLStringBase64");
+    if (typeof b64 === "string" && b64.length > 20) {
+      const bin = atob(b64.replace(/\s/g, ""));
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const p = `${COMPANY_ID}/${contactId}/${nome.replace(/\.xml$/, "")}-${Date.now()}.xml`;
+      const up = await supabase.storage.from(BUCKET).upload(p, bytes, { contentType: "application/xml", upsert: true });
+      path = up.error ? null : p;
+    }
+  } else {
+    path = await guardarPdf(supabase, BUCKET, `${COMPANY_ID}/${contactId}/${nome.replace(/\.pdf$/, "")}-${Date.now()}.pdf`, pdfDoRecibo(dados));
+  }
+  if (!path) return json({ ok: false, error: `A Receita respondeu, mas o ${xml ? "XML" : "PDF"} não veio em formato válido` }, 502);
+  if (atual) await supabase.from("serpro_dctfweb").update({ [coluna]: path }).eq("id", (atual as { id: string }).id);
+  else await supabase.from("serpro_dctfweb").upsert({ company_id: COMPANY_ID, contact_id: contactId, competencia, status: "transmitida", [coluna]: path, consultado_em: new Date().toISOString(), consultado_por: uid }, { onConflict: "contact_id,competencia" });
+  const url = await assinar(supabase, BUCKET, path, nome);
+  return json({ ok: true, url });
 }
 
 async function linkGuia(payload: any) {
@@ -523,12 +579,13 @@ Deno.serve(async (req) => {
     case "link": return await link(payload);
     case "gerar_guia": return await gerarGuia(payload, uid);
     case "link_guia": return await linkGuia(payload);
+    case "declaracao": return await declaracao(payload, uid);
     case "rotina_eventos":
       if (!admin) return json({ error: "Só administradores rodam a rotina manualmente" }, 403);
       return await rotinaEventos(payload, uid, "manual");
     case "rotina_dctfweb":
       if (!admin) return json({ error: "Só administradores rodam a rotina manualmente" }, 403);
       return await rotinaDctfweb(payload, uid);
-    default: return json({ error: "action inválida (consultar | link | gerar_guia | link_guia | rotina_eventos | rotina_dctfweb)" }, 400);
+    default: return json({ error: "action inválida (consultar | link | gerar_guia | link_guia | declaracao | rotina_eventos | rotina_dctfweb)" }, 400);
   }
 });

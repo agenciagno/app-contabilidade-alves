@@ -17,7 +17,8 @@ import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { IntimacoesAba } from '@/components/serpro/IntimacoesAba';
 import { MensagensClienteSheet } from '@/components/serpro/MensagensClienteSheet';
 import { useConsultaCliente } from '@/components/serpro/useConsultaCliente';
-import { FaixaEstados, RodapeLista, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
+import { seloDte, useConsultarDte, useDteMapa } from '@/hooks/useSerproExtras';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { STATUS_MONITORADO, seloCaixa, useAssuntosCaixa, useClientesCaixa, useConsultarCaixa, type ClienteCaixa } from '@/hooks/useSerproCaixaPostal';
 import { ROTULO_ESTADO, contarEstados, seloCaixaPostal, type Selo } from '@/lib/monitorEstados';
@@ -83,6 +84,9 @@ function AbaClientes() {
   const sel = useSelecao();
   const consultarCaixa = useConsultarCaixa();
   const [loteAberto, setLoteAberto] = useState(false);
+  const { data: dtes } = useDteMapa();
+  const consultarDte = useConsultarDte();
+  const [dteLote, setDteLote] = useState(false);
   const hoje = hojeBR();
 
   const seloDe = (c: ClienteCaixa): Selo | null => (emAndamento === c.contact_id
@@ -162,6 +166,9 @@ function AbaClientes() {
         <DicaBotao custo="Consultar" texto="Baixa da Receita a lista de mensagens de cada cliente marcado, um de cada vez. Não registra ciência. Quem já foi consultado hoje fica de fora.">
           <Button size="sm" onClick={() => setLoteAberto(true)}>Baixar listas ({sel.marcados.size})</Button>
         </DicaBotao>
+        <DicaBotao custo="Consultar" texto="Consulta se cada cliente marcado aderiu ao Domicílio Tributário Eletrônico (DTE) da Receita e do Simples.">
+          <Button size="sm" variant="outline" onClick={() => setDteLote(true)}>Consultar DTE</Button>
+        </DicaBotao>
       </BarraSelecao>
 
       <div className="overflow-x-auto rounded-lg border border-line bg-paper">
@@ -181,6 +188,7 @@ function AbaClientes() {
                 </TableHead>
                 <TableHead>Situação</TableHead>
                 <TableHead>Mensagens baixadas</TableHead>
+                <TableHead>DTE</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Última busca</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -205,6 +213,7 @@ function AbaClientes() {
                         </>
                       ) : <span className="text-meta text-muted-ink-2">Lista não baixada</span>}
                     </TableCell>
+                    <TableCell><SeloMini selo={seloDte(dtes?.get(c.contact_id))} /></TableCell>
                     <TableCell className="min-w-[200px] max-w-[320px]">
                       <p className="text-ui text-ink">{c.nome}</p>
                       <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(c.documento)}</p>
@@ -244,6 +253,22 @@ function AbaClientes() {
 
       <MensagensClienteSheet cliente={clienteAberto} onClose={() => setAberto(null)} />
       {dialog}
+      <AcaoLoteDialog
+        aberto={dteLote}
+        onClose={() => setDteLote(false)}
+        titulo="Consultar adesão ao DTE"
+        descricao="Uma consulta por cliente marcado: se aderiu ao Domicílio Tributário Eletrônico da Receita (e-CAC) e ao do Simples."
+        itens={matrizes.filter((c) => sel.marcados.has(c.contact_id)).map((c) => ({
+          contactId: c.contact_id, nome: c.nome, pular: dtes?.get(c.contact_id)?.consultado_em?.slice(0, 10) === hoje ? 'Consultado hoje' : null,
+        }))}
+        tipo="Consultar"
+        rotuloAcao="Consultar"
+        rotuloFeito="Consultado"
+        executar={async (item) => {
+          const r = await consultarDte.mutateAsync({ contactId: item.contactId });
+          return { ok: r.ok && !r.foraDoMonitoramento, error: r.semProcuracao ? 'Sem procuração para o DTE' : r.error, resumo: seloDte({ contact_id: item.contactId, consultado_em: '', indicador: r.indicador ?? null, status: null })?.motivo };
+        }}
+      />
       <AcaoLoteDialog
         aberto={loteAberto}
         onClose={() => setLoteAberto(false)}
