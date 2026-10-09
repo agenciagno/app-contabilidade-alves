@@ -57,6 +57,8 @@ const DOCS: Record<string, Spec> = {
     rotulo: (r) => `DAS ${mesAno(r.periodo_apuracao)}`, data: (r) => String(r.periodo_apuracao ?? '') },
   dctfweb_recibo: { tabela: 'serpro_dctfweb', coluna: 'recibo_path', bucket: 'serpro-dctfweb', extra: 'competencia', ordem: 'competencia',
     rotulo: (r) => `Recibo da DCTFWeb ${mesAno(r.competencia)}`, data: (r) => String(r.competencia ?? '') },
+  dctfweb_guia: { tabela: 'serpro_dctfweb_guias', coluna: 'pdf_path', bucket: 'serpro-dctfweb', extra: 'competencia,emitido_em', ordem: 'emitido_em',
+    rotulo: (r) => `Guia da DCTFWeb ${mesAno(r.competencia)}`, data: (r) => String(r.emitido_em ?? '') },
   defis_recibo: { tabela: 'serpro_defis', coluna: 'recibo_path', bucket: 'serpro-pgdasd', extra: 'ano_calendario', ordem: 'ano_calendario',
     rotulo: (r) => `Recibo da DEFIS ${r.ano_calendario}`, data: (r) => `${r.ano_calendario}-12-31` },
   defis_declaracao: { tabela: 'serpro_defis', coluna: 'declaracao_path', bucket: 'serpro-pgdasd', extra: 'ano_calendario', ordem: 'ano_calendario',

@@ -64,8 +64,8 @@ export interface PedidoEnvio {
   documentos: { tipo: string; id: string }[];
   /** De onde o envio saiu: 'ausencia', 'ficha'. */
   origem: string;
-  /** Ex.: { obrigacao, competencia }: a função anota "cliente avisado" na ausência. */
-  referencia?: { obrigacao: string; competencia: string };
+  /** Ex.: { obrigacao, competencia }: a função anota "cliente avisado" na ausência. Guias mensais: { processo, competencia, id }. */
+  referencia?: Record<string, string>;
 }
 
 export interface ResultadoEnvio { ok: boolean; texto: string; whatsapp: string | null; destino: string | null; aviso?: string }
@@ -80,6 +80,7 @@ export function useEnviarCliente() {
     onSuccess: (_r, p) => {
       qc.invalidateQueries({ queryKey: ['envios-cliente', p.contactId] });
       qc.invalidateQueries({ queryKey: ['ausencia-acompanhamentos'] });
+      qc.invalidateQueries({ queryKey: ['guias-enviadas'] });
     },
   });
 }

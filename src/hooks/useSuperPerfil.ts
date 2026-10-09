@@ -23,6 +23,7 @@ const SUPER_PERFIL_COLUMNS = [
   'data_abertura_estado', 'data_encerramento_estado',
   'canal_entrega', 'email_cobranca', 'whatsapp_cobranca', 'enviar_cobranca_auto',
   'boleto_value', 'boleto_due_day',
+  'recebe_das_ca', 'recebe_guia_dctfweb_ca',
 ].join(',');
 
 export type SuperPerfil = Record<string, any>;

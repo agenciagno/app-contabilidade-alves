@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { FileText, Loader2, RefreshCw } from 'lucide-react';
+import { FileText, Loader2, Mail, Receipt, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { PageHeader, SearchField } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CompetenciaNav } from '@/components/serpro/CompetenciaNav';
@@ -12,6 +14,10 @@ import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { useAbrirRecibo, useConsultaDctfwebMit } from '@/components/serpro/dctfwebUi';
 import { FaixaEstados, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
+import { BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
+import { useGerarGuiaDctfweb, useGuiasDctfweb, useGuiasEnviadas, useLinkGuiaDctfweb, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
+import { abrirPdf } from '@/hooks/useSerproPgdasd';
+import { hojeBR } from '@/lib/prazosFederais';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { competenciaPadrao, mesDeData, siglaCompetencia } from '@/hooks/useSerproPagamentos';
 import { apuracaoVigente, estadoDctfweb, estadoMit, useMatrizDctfwebMit, type LinhaDctfwebMit } from '@/hooks/useSerproDctfweb';
@@ -40,6 +46,18 @@ export default function DctfwebMitFederal() {
   const buscaInicial = useBuscaInicial();
   const [busca, setBusca] = useState(buscaInicial);
   const [soNovos, setSoNovos] = useState(false);
+  // Rodada 5: guia da DCTFWeb em lote pela tela e envio com conferência.
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  const [loteAberto, setLoteAberto] = useState(false);
+  const [envioAberto, setEnvioAberto] = useState(false);
+  const [abrindoGuia, setAbrindoGuia] = useState<string | null>(null);
+  const { data: guias } = useGuiasDctfweb(competencia);
+  const { data: marcacoes } = useMarcacoesGuia();
+  const { data: enviadas } = useGuiasEnviadas('dctfweb', competencia);
+  const marcar = useMarcarGuia();
+  const gerarGuia = useGerarGuiaDctfweb();
+  const linkGuia = useLinkGuiaDctfweb();
+  const hoje = hojeBR();
 
   const seloDe = (l: LinhaDctfwebMit): Selo | null => (emAndamento === l.contact_id
     ? { estado: 'processando', motivo: 'Consultando…' }
@@ -56,6 +74,40 @@ export default function DctfwebMitFederal() {
   }, [matrizes, soNovos, busca]);
   const contagem = contarEstados(base.map(seloDe));
   const filtradas = base.filter((l) => !estado || seloDe(l)?.estado === estado).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+  const recebeGuia = (id: string) => !!marcacoes?.get(id)?.dctfweb;
+  const quemRecebe = matrizes.filter((l) => recebeGuia(l.contact_id));
+  // O servidor só reaproveita guia emitida HOJE, sem data de pagamento: é o que não cobra de novo.
+  const guiaDeHoje = (id: string) => { const g = guias?.get(id); return !!g && !g.data_pagamento && g.emitido_em.slice(0, 10) >= hoje; };
+  const itensLote: ItemLote[] = matrizes.filter((l) => marcados.has(l.contact_id)).map((l) => ({
+    contactId: l.contact_id, nome: l.nome, guardada: guiaDeHoje(l.contact_id),
+    aviso: estadoDctfweb(l) === 'sem_declaracao' ? 'Sem DCTFWeb transmitida no mês: não há guia a gerar.'
+      : estadoDctfweb(l) === 'nao_consultado' ? 'DCTFWeb do mês não consultada: a Receita usa a declaração mais recente, se houver.' : null,
+  }));
+  const itensEnvio: ItemEnvio[] = quemRecebe.flatMap((l) => {
+    const g = guias?.get(l.contact_id);
+    if (!g) return [];
+    return [{
+      contactId: l.contact_id, nome: l.nome, email: marcacoes?.get(l.contact_id)?.email ?? null,
+      documento: { tipo: 'dctfweb_guia', id: g.id },
+      rotulo: `Guia da DCTFWeb ${siglaCompetencia(competencia)} · gerada em ${format(new Date(g.emitido_em), 'dd/MM')}${g.data_pagamento ? ` · para pagar em ${dataBR(g.data_pagamento)}` : ''}`,
+      enviadoEm: enviadas?.get(g.id) ?? null,
+    }];
+  });
+  const aEnviar = itensEnvio.filter((i) => i.email && !i.enviadoEm).length;
+  const alternarMarcado = (id: string) => setMarcados((st) => { const n = new Set(st); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const todasMarcadas = filtradas.length > 0 && filtradas.every((l) => marcados.has(l.contact_id));
+  const abrirGuia = async (id: string) => {
+    setAbrindoGuia(id);
+    try {
+      const r = await linkGuia.mutateAsync({ id });
+      if (r.ok && r.url) abrirPdf(r.url); else toast.error(r.error ?? 'Não foi possível abrir a guia.');
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Não foi possível abrir a guia.');
+    } finally {
+      setAbrindoGuia(null);
+    }
+  };
 
   const tabelaExport = (): TabelaExport => ({
     arquivo: `dctfweb-mit-${competencia}`,
@@ -80,9 +132,31 @@ export default function DctfwebMitFederal() {
 
       <div className="space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <CompetenciaNav competencia={competencia} onChange={setCompetencia} limite={mesDeData(new Date())} />
-          <ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />
+          <CompetenciaNav competencia={competencia} onChange={(v) => { setCompetencia(v); setMarcados(new Set()); }} limite={mesDeData(new Date())} />
+          <div className="flex flex-wrap items-center gap-2">
+            <DicaBotao texto={`Marca na lista os clientes que recebem a guia da DCTFWeb pela CA (marcação do cadastro), para gerar em lote. ${quemRecebe.length} marcados no cadastro.`}>
+              <Button variant="outline" size="sm" className="h-10" disabled={!quemRecebe.length} onClick={() => setMarcados(new Set(quemRecebe.map((l) => l.contact_id)))}>
+                Selecionar quem recebe guia ({quemRecebe.length})
+              </Button>
+            </DicaBotao>
+            <DicaBotao texto="Lista as guias já geradas dos clientes que recebem guia pela CA, para conferir e mandar por e-mail. Nada sai sem você confirmar.">
+              <Button variant="outline" size="sm" className="h-10" onClick={() => setEnvioAberto(true)}>
+                <Mail className="mr-1.5 h-4 w-4" />Conferir e enviar{aEnviar ? ` (${aEnviar})` : ''}
+              </Button>
+            </DicaBotao>
+            <ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />
+          </div>
         </div>
+
+        <BarraSelecao quantos={marcados.size} onLimpar={() => setMarcados(new Set())}>
+          <DicaBotao custo="Emitir" texto="Gera a guia (DARF) da DCTFWeb de cada cliente marcado. Mostra o custo antes de confirmar.">
+            <Button size="sm" onClick={() => setLoteAberto(true)}>Gerar guia ({marcados.size})</Button>
+          </DicaBotao>
+          <Button size="sm" variant="outline" disabled={marcar.isPending}
+            onClick={() => marcar.mutate({ contactIds: [...marcados], processo: 'dctfweb', valor: true })}>Marcar "recebe guia da CA"</Button>
+          <Button size="sm" variant="ghost" disabled={marcar.isPending}
+            onClick={() => marcar.mutate({ contactIds: [...marcados], processo: 'dctfweb', valor: false })}>Desmarcar</Button>
+        </BarraSelecao>
 
         {isLoading ? <Skeleton className="h-[88px] w-full" /> : <FaixaEstados contagem={contagem} ativo={estado} onChange={setEstado} />}
 
@@ -104,6 +178,10 @@ export default function DctfwebMitFederal() {
             <Table className="[&_td]:px-3 [&_th]:px-3">
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8">
+                    <Checkbox aria-label="Marcar todos da lista" checked={todasMarcadas}
+                      onCheckedChange={(v) => setMarcados(v ? new Set([...marcados, ...filtradas.map((l) => l.contact_id)]) : new Set())} />
+                  </TableHead>
                   <TableHead>Situação</TableHead>
                   <TableHead>DCTFWeb</TableHead>
                   <TableHead>MIT</TableHead>
@@ -119,6 +197,9 @@ export default function DctfwebMitFederal() {
                   const outros = [l.novo ? 'Movimento novo' : null, l.semProcuracao ? 'Sem procuração' : null].filter((x): x is string => !!x);
                   return (
                     <TableRow key={l.contact_id}>
+                      <TableCell className="w-8">
+                        <Checkbox aria-label={`Marcar ${l.nome}`} checked={marcados.has(l.contact_id)} onCheckedChange={() => alternarMarcado(l.contact_id)} />
+                      </TableCell>
                       <TableCell className="min-w-[170px]"><SeloMonitor selo={seloDe(l)} outros={outros} /></TableCell>
                       <TableCell>
                         <div className="space-y-0.5">
@@ -128,6 +209,7 @@ export default function DctfwebMitFederal() {
                             </DicaBotao>
                           ) : <SeloMini selo={seloDctfwebColuna(estadoDctfweb(l))} />}
                           {l.novo && l.movimentoEm && <p className="text-meta text-muted-ink-2">Movimento em {dataBR(l.movimentoEm)}</p>}
+                          {guias?.get(l.contact_id) && <p className="text-meta text-muted-ink-2">Guia gerada em {format(new Date(guias.get(l.contact_id)!.emitido_em), 'dd/MM')}</p>}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -143,11 +225,24 @@ export default function DctfwebMitFederal() {
                       <TableCell className="min-w-[200px] max-w-[280px]">
                         <p className="text-ui text-ink">{l.nome}</p>
                         <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
-                        <p className="text-meta text-muted-ink-2">{REGIMES[l.regime ?? ''] ?? l.regime ?? 'Sem regime'}</p>
+                        <p className="text-meta text-muted-ink-2">{REGIMES[l.regime ?? ''] ?? l.regime ?? 'Sem regime'}{recebeGuia(l.contact_id) ? ' · recebe guia da CA' : ''}</p>
                       </TableCell>
                       <TableCell><UltimaBusca iso={ultimaConsulta(l)} contactId={l.contact_id} /></TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {guias?.get(l.contact_id) ? (
+                            <DicaBotao texto="Abre a guia (DARF) da DCTFWeb já gerada para esta competência. Não consulta a Receita.">
+                              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Abrir guia da DCTFWeb" disabled={abrindoGuia === guias.get(l.contact_id)!.id} onClick={() => abrirGuia(guias.get(l.contact_id)!.id)}>
+                                {abrindoGuia === guias.get(l.contact_id)!.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
+                              </Button>
+                            </DicaBotao>
+                          ) : l.dctfweb?.status === 'transmitida' && (
+                            <DicaBotao custo="Emitir" texto="Gera a guia (DARF) da DCTFWeb deste cliente. Pede confirmação e mostra o custo antes.">
+                              <Button size="icon" variant="outline" className="h-8 w-8" aria-label="Gerar guia da DCTFWeb" onClick={() => { setMarcados(new Set([l.contact_id])); setLoteAberto(true); }}>
+                                <Receipt className="h-4 w-4" />
+                              </Button>
+                            </DicaBotao>
+                          )}
                           {l.dctfweb?.status === 'transmitida' && (
                             <DicaBotao texto="Abre o PDF do recibo da DCTFWeb deste mês, que já está guardado. Não consulta a Receita.">
                               <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Recibo da DCTFWeb" disabled={ocupado === l.dctfweb.id} onClick={() => abrir(l.dctfweb!.id)}>
@@ -175,6 +270,28 @@ export default function DctfwebMitFederal() {
         <RodapeLista mostrando={filtradas.length} total={matrizes.length} unidade="clientes do Lucro Presumido e do Lucro Real" filiais={linhas.length - matrizes.length} />
       </div>
       {dialog}
+
+      <GerarLoteDialog
+        aberto={loteAberto}
+        onClose={() => setLoteAberto(false)}
+        titulo={`Gerar guia da DCTFWeb de ${siglaCompetencia(competencia)}`}
+        descricao="Uma guia (DARF) por cliente marcado, da declaração mais recente da competência, um de cada vez. Cada emissão fica registrada na Receita e é cobrada."
+        itens={itensLote}
+        executar={async (item, dataPagamento) => {
+          const r = await gerarGuia.mutateAsync({ contactId: item.contactId, competencia, dataPagamento });
+          return { ok: r.ok, jaGerado: r.jaGerado, error: r.error };
+        }}
+      />
+      <EnviarGuiasDialog
+        aberto={envioAberto}
+        onClose={() => setEnvioAberto(false)}
+        titulo={`Conferir e enviar guias da DCTFWeb de ${siglaCompetencia(competencia)}`}
+        processo="dctfweb"
+        competencia={competencia}
+        itens={itensEnvio}
+        assuntoPadrao={`Guia da DCTFWeb ${siglaCompetencia(competencia)} · {cliente}`}
+        mensagemPadrao={`Olá! Segue a guia (DARF) da DCTFWeb de ${siglaCompetencia(competencia)} da {cliente}. Qualquer dúvida, é só responder este e-mail.\n\nContabilidade Alves`}
+      />
     </div>
   );
 }

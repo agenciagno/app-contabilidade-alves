@@ -118,6 +118,190 @@ export type Database = {
         }
         Relationships: []
       }
+      agenda_receita_aprovacoes: {
+        Row: {
+          aprovado_em: string
+          aprovado_por: string | null
+          company_id: string
+          importacao_id: string
+          tarefas_criadas: number
+        }
+        Insert: {
+          aprovado_em?: string
+          aprovado_por?: string | null
+          company_id: string
+          importacao_id: string
+          tarefas_criadas?: number
+        }
+        Update: {
+          aprovado_em?: string
+          aprovado_por?: string | null
+          company_id?: string
+          importacao_id?: string
+          tarefas_criadas?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_receita_aprovacoes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_receita_aprovacoes_importacao_id_fkey"
+            columns: ["importacao_id"]
+            isOneToOne: false
+            referencedRelation: "agenda_receita_importacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agenda_receita_importacoes: {
+        Row: {
+          ade_titulo: string | null
+          ano: number
+          baixado_em: string | null
+          created_at: string
+          fonte: string
+          id: string
+          itens_declaracoes: number
+          itens_tributos: number
+          mes: number
+          pagina_url: string | null
+          resumo: Json
+          updated_at: string
+          xlsx_url: string | null
+        }
+        Insert: {
+          ade_titulo?: string | null
+          ano: number
+          baixado_em?: string | null
+          created_at?: string
+          fonte: string
+          id?: string
+          itens_declaracoes?: number
+          itens_tributos?: number
+          mes: number
+          pagina_url?: string | null
+          resumo?: Json
+          updated_at?: string
+          xlsx_url?: string | null
+        }
+        Update: {
+          ade_titulo?: string | null
+          ano?: number
+          baixado_em?: string | null
+          created_at?: string
+          fonte?: string
+          id?: string
+          itens_declaracoes?: number
+          itens_tributos?: number
+          mes?: number
+          pagina_url?: string | null
+          resumo?: Json
+          updated_at?: string
+          xlsx_url?: string | null
+        }
+        Relationships: []
+      }
+      agenda_receita_itens: {
+        Row: {
+          aba: string
+          base_legal: string | null
+          categoria_declaracao: string | null
+          codigo_receita: string | null
+          descricao: string | null
+          dia: number | null
+          dia_texto: string | null
+          documento: string | null
+          grupo: string | null
+          id: string
+          importacao_id: string
+          interessado: string | null
+          origem_escrituracao: string | null
+          periodicidade: string | null
+          periodo: string | null
+        }
+        Insert: {
+          aba: string
+          base_legal?: string | null
+          categoria_declaracao?: string | null
+          codigo_receita?: string | null
+          descricao?: string | null
+          dia?: number | null
+          dia_texto?: string | null
+          documento?: string | null
+          grupo?: string | null
+          id?: string
+          importacao_id: string
+          interessado?: string | null
+          origem_escrituracao?: string | null
+          periodicidade?: string | null
+          periodo?: string | null
+        }
+        Update: {
+          aba?: string
+          base_legal?: string | null
+          categoria_declaracao?: string | null
+          codigo_receita?: string | null
+          descricao?: string | null
+          dia?: number | null
+          dia_texto?: string | null
+          documento?: string | null
+          grupo?: string | null
+          id?: string
+          importacao_id?: string
+          interessado?: string | null
+          origem_escrituracao?: string | null
+          periodicidade?: string | null
+          periodo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_receita_itens_importacao_id_fkey"
+            columns: ["importacao_id"]
+            isOneToOne: false
+            referencedRelation: "agenda_receita_importacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agenda_receita_mapeamento: {
+        Row: {
+          aba: string
+          campo: string
+          codigos: string[] | null
+          obligation_id: string
+          observacao: string | null
+          padrao: string | null
+        }
+        Insert: {
+          aba: string
+          campo: string
+          codigos?: string[] | null
+          obligation_id: string
+          observacao?: string | null
+          padrao?: string | null
+        }
+        Update: {
+          aba?: string
+          campo?: string
+          codigos?: string[] | null
+          obligation_id?: string
+          observacao?: string | null
+          padrao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_receita_mapeamento_obligation_id_fkey"
+            columns: ["obligation_id"]
+            isOneToOne: true
+            referencedRelation: "fiscal_obligations_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agent_config: {
         Row: {
           company_id: string
@@ -357,55 +541,25 @@ export type Database = {
           },
         ]
       }
-      banks: {
+      alerta_enviados: {
         Row: {
-          account_number: string | null
-          agency: string | null
-          bank_code: string | null
-          color: string | null
+          chave: string
           company_id: string
-          created_at: string
-          current_balance: number
-          id: string
-          initial_balance: number
-          is_active: boolean
-          is_invisible: boolean | null
-          name: string
-          updated_at: string
+          enviado_em: string
         }
         Insert: {
-          account_number?: string | null
-          agency?: string | null
-          bank_code?: string | null
-          color?: string | null
+          chave: string
           company_id: string
-          created_at?: string
-          current_balance?: number
-          id?: string
-          initial_balance?: number
-          is_active?: boolean
-          is_invisible?: boolean | null
-          name: string
-          updated_at?: string
+          enviado_em?: string
         }
         Update: {
-          account_number?: string | null
-          agency?: string | null
-          bank_code?: string | null
-          color?: string | null
+          chave?: string
           company_id?: string
-          created_at?: string
-          current_balance?: number
-          id?: string
-          initial_balance?: number
-          is_active?: boolean
-          is_invisible?: boolean | null
-          name?: string
-          updated_at?: string
+          enviado_em?: string
         }
         Relationships: [
           {
-            foreignKeyName: "banks_company_id_fkey"
+            foreignKeyName: "alerta_enviados_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -477,6 +631,62 @@ export type Database = {
             columns: ["responsavel_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      banks: {
+        Row: {
+          account_number: string | null
+          agency: string | null
+          bank_code: string | null
+          color: string | null
+          company_id: string
+          created_at: string
+          current_balance: number
+          id: string
+          initial_balance: number
+          is_active: boolean
+          is_invisible: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          account_number?: string | null
+          agency?: string | null
+          bank_code?: string | null
+          color?: string | null
+          company_id: string
+          created_at?: string
+          current_balance?: number
+          id?: string
+          initial_balance?: number
+          is_active?: boolean
+          is_invisible?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          account_number?: string | null
+          agency?: string | null
+          bank_code?: string | null
+          color?: string | null
+          company_id?: string
+          created_at?: string
+          current_balance?: number
+          id?: string
+          initial_balance?: number
+          is_active?: boolean
+          is_invisible?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1467,6 +1677,73 @@ export type Database = {
           },
         ]
       }
+      cnpj_situacao_log: {
+        Row: {
+          company_id: string
+          consultado_em: string
+          contact_id: string
+          data_situacao: string | null
+          erro: string | null
+          fonte: string | null
+          id: string
+          motivo: string | null
+          mudou: boolean
+          ok: boolean
+          situacao: string | null
+          situacao_anterior: string | null
+        }
+        Insert: {
+          company_id: string
+          consultado_em?: string
+          contact_id: string
+          data_situacao?: string | null
+          erro?: string | null
+          fonte?: string | null
+          id?: string
+          motivo?: string | null
+          mudou?: boolean
+          ok: boolean
+          situacao?: string | null
+          situacao_anterior?: string | null
+        }
+        Update: {
+          company_id?: string
+          consultado_em?: string
+          contact_id?: string
+          data_situacao?: string | null
+          erro?: string | null
+          fonte?: string | null
+          id?: string
+          motivo?: string | null
+          mudou?: boolean
+          ok?: boolean
+          situacao?: string | null
+          situacao_anterior?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cnpj_situacao_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cnpj_situacao_log_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cnpj_situacao_log_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
       cofre_acessos_log: {
         Row: {
           acao: string | null
@@ -2048,6 +2325,8 @@ export type Database = {
           phone: string | null
           porte: string | null
           razao_social: string | null
+          recebe_das_ca: boolean
+          recebe_guia_dctfweb_ca: boolean
           regime_apuracao: string | null
           representative_legal: string | null
           responsible_id: string | null
@@ -2122,6 +2401,8 @@ export type Database = {
           phone?: string | null
           porte?: string | null
           razao_social?: string | null
+          recebe_das_ca?: boolean
+          recebe_guia_dctfweb_ca?: boolean
           regime_apuracao?: string | null
           representative_legal?: string | null
           responsible_id?: string | null
@@ -2196,6 +2477,8 @@ export type Database = {
           phone?: string | null
           porte?: string | null
           razao_social?: string | null
+          recebe_das_ca?: boolean
+          recebe_guia_dctfweb_ca?: boolean
           regime_apuracao?: string | null
           representative_legal?: string | null
           responsible_id?: string | null
@@ -2731,9 +3014,11 @@ export type Database = {
         Row: {
           adjusted_due_date: string
           adjusted_due_date_override: string | null
+          agenda_importacao_id: string | null
           competence_month: number | null
           competence_year: number | null
           created_at: string
+          fonte: string
           id: string
           internal_delivery_date: string
           internal_delivery_date_override: string | null
@@ -2749,9 +3034,11 @@ export type Database = {
         Insert: {
           adjusted_due_date: string
           adjusted_due_date_override?: string | null
+          agenda_importacao_id?: string | null
           competence_month?: number | null
           competence_year?: number | null
           created_at?: string
+          fonte?: string
           id?: string
           internal_delivery_date: string
           internal_delivery_date_override?: string | null
@@ -2767,9 +3054,11 @@ export type Database = {
         Update: {
           adjusted_due_date?: string
           adjusted_due_date_override?: string | null
+          agenda_importacao_id?: string | null
           competence_month?: number | null
           competence_year?: number | null
           created_at?: string
+          fonte?: string
           id?: string
           internal_delivery_date?: string
           internal_delivery_date_override?: string | null
@@ -4075,6 +4364,55 @@ export type Database = {
           },
         ]
       }
+      portal_acessos: {
+        Row: {
+          company_id: string
+          contact_id: string
+          created_at: string
+          id: string
+          status_active: boolean
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          contact_id: string
+          created_at?: string
+          id?: string
+          status_active?: boolean
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          contact_id?: string
+          created_at?: string
+          id?: string
+          status_active?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_acessos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_acessos_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_acessos_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
       portal_client_modules: {
         Row: {
           company_id: string
@@ -4190,6 +4528,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          acesso_padrao: boolean
           allowed_modules: string[]
           avatar_url: string | null
           chatwoot_agent_id: number | null
@@ -4214,6 +4553,7 @@ export type Database = {
           username: string | null
         }
         Insert: {
+          acesso_padrao?: boolean
           allowed_modules?: string[]
           avatar_url?: string | null
           chatwoot_agent_id?: number | null
@@ -4238,6 +4578,7 @@ export type Database = {
           username?: string | null
         }
         Update: {
+          acesso_padrao?: boolean
           allowed_modules?: string[]
           avatar_url?: string | null
           chatwoot_agent_id?: number | null
@@ -4520,102 +4861,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      rt_simulations: {
-        Row: {
-          aliquota_cbs: number
-          aliquota_fonte: string
-          aliquota_ibs: number
-          aliquota_icms: number | null
-          aliquota_iss: number | null
-          anexo_simples: string | null
-          cnae_codigo: string | null
-          cnae_descricao: string | null
-          cnpj: string | null
-          company_id: string
-          contact_id: string | null
-          created_at: string
-          created_by: string | null
-          faturamento_12m: number
-          folha_12m: number | null
-          id: string
-          municipio: string | null
-          nome_referencia: string | null
-          pct_b2b: number | null
-          regime_atual: string
-          resultado: Json
-          setor: string
-          uf: string | null
-          updated_at: string
-        }
-        Insert: {
-          aliquota_cbs: number
-          aliquota_fonte: string
-          aliquota_ibs: number
-          aliquota_icms?: number | null
-          aliquota_iss?: number | null
-          anexo_simples?: string | null
-          cnae_codigo?: string | null
-          cnae_descricao?: string | null
-          cnpj?: string | null
-          company_id: string
-          contact_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          faturamento_12m: number
-          folha_12m?: number | null
-          id?: string
-          municipio?: string | null
-          nome_referencia?: string | null
-          pct_b2b?: number | null
-          regime_atual: string
-          resultado: Json
-          setor: string
-          uf?: string | null
-          updated_at?: string
-        }
-        Update: {
-          aliquota_cbs?: number
-          aliquota_fonte?: string
-          aliquota_ibs?: number
-          aliquota_icms?: number | null
-          aliquota_iss?: number | null
-          anexo_simples?: string | null
-          cnae_codigo?: string | null
-          cnae_descricao?: string | null
-          cnpj?: string | null
-          company_id?: string
-          contact_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          faturamento_12m?: number
-          folha_12m?: number | null
-          id?: string
-          municipio?: string | null
-          nome_referencia?: string | null
-          pct_b2b?: number | null
-          regime_atual?: string
-          resultado?: Json
-          setor?: string
-          uf?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "rt_simulations_contact_id_fkey"
-            columns: ["contact_id"]
-            isOneToOne: false
-            referencedRelation: "contacts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "rt_simulations_contact_id_fkey"
-            columns: ["contact_id"]
-            isOneToOne: false
-            referencedRelation: "vw_cofre_global"
-            referencedColumns: ["contact_id"]
-          },
-        ]
       }
       scheduled_notifications: {
         Row: {
@@ -5061,14 +5306,16 @@ export type Database = {
           alerta_sem_resposta: boolean
           auto_concluir_tarefas: boolean
           auto_criar_tarefas: boolean
-          auto_rotina_defis: boolean
           auto_leitura_faturamento: boolean
           auto_lote_pagamentos_presumido_real: boolean
           auto_lote_pagamentos_simples: boolean
           auto_rotina_dctfweb: boolean
+          auto_rotina_defis: boolean
           auto_rotina_pgdas: boolean
           auto_rotina_sitfis: boolean
           company_id: string
+          lote_token_expira: string | null
+          lote_token_hash: string | null
           updated_at: string
           volume_declarado_mes: number | null
         }
@@ -5080,14 +5327,16 @@ export type Database = {
           alerta_sem_resposta?: boolean
           auto_concluir_tarefas?: boolean
           auto_criar_tarefas?: boolean
-          auto_rotina_defis?: boolean
           auto_leitura_faturamento?: boolean
           auto_lote_pagamentos_presumido_real?: boolean
           auto_lote_pagamentos_simples?: boolean
           auto_rotina_dctfweb?: boolean
+          auto_rotina_defis?: boolean
           auto_rotina_pgdas?: boolean
           auto_rotina_sitfis?: boolean
           company_id: string
+          lote_token_expira?: string | null
+          lote_token_hash?: string | null
           updated_at?: string
           volume_declarado_mes?: number | null
         }
@@ -5099,14 +5348,16 @@ export type Database = {
           alerta_sem_resposta?: boolean
           auto_concluir_tarefas?: boolean
           auto_criar_tarefas?: boolean
-          auto_rotina_defis?: boolean
           auto_leitura_faturamento?: boolean
           auto_lote_pagamentos_presumido_real?: boolean
           auto_lote_pagamentos_simples?: boolean
           auto_rotina_dctfweb?: boolean
+          auto_rotina_defis?: boolean
           auto_rotina_pgdas?: boolean
           auto_rotina_sitfis?: boolean
           company_id?: string
+          lote_token_expira?: string | null
+          lote_token_hash?: string | null
           updated_at?: string
           volume_declarado_mes?: number | null
         }
@@ -5271,6 +5522,61 @@ export type Database = {
           },
           {
             foreignKeyName: "serpro_dctfweb_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cofre_global"
+            referencedColumns: ["contact_id"]
+          },
+        ]
+      }
+      serpro_dctfweb_guias: {
+        Row: {
+          company_id: string
+          competencia: string
+          contact_id: string
+          data_pagamento: string | null
+          emitido_em: string
+          emitido_por: string | null
+          id: string
+          pdf_path: string
+        }
+        Insert: {
+          company_id: string
+          competencia: string
+          contact_id: string
+          data_pagamento?: string | null
+          emitido_em?: string
+          emitido_por?: string | null
+          id?: string
+          pdf_path: string
+        }
+        Update: {
+          company_id?: string
+          competencia?: string
+          contact_id?: string
+          data_pagamento?: string | null
+          emitido_em?: string
+          emitido_por?: string | null
+          id?: string
+          pdf_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "serpro_dctfweb_guias_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_dctfweb_guias_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "serpro_dctfweb_guias_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "vw_cofre_global"
@@ -6503,6 +6809,35 @@ export type Database = {
           },
         ]
       }
+      sessao_conta: {
+        Row: {
+          company_id: string
+          session_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          session_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          session_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessao_conta_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_sessions: {
         Row: {
           ended_at: string | null
@@ -7016,12 +7351,14 @@ export type Database = {
         Row: {
           adjusted_due_date: string | null
           adjusted_due_date_override: string | null
+          agenda_importacao_id: string | null
           applies_to: string[] | null
           competence_month: number | null
           competence_year: number | null
           created_at: string | null
           effective_delivery_date: string | null
           effective_due_date: string | null
+          fonte: string | null
           frequency: string | null
           has_override: boolean | null
           holiday_adjustment: string | null
@@ -7107,8 +7444,21 @@ export type Database = {
       }
     }
     Functions: {
-      gestao360_indicadores_mensais: {
-        Args: { p_meses?: number }
+      active_company_id: { Args: never; Returns: string }
+      agenda_receita_aprovar: {
+        Args: { p_importacao_id: string; p_tarefas?: number }
+        Returns: Json
+      }
+      agenda_receita_aprovar_e_lancar: {
+        Args: { p_importacao_id: string }
+        Returns: Json
+      }
+      agenda_receita_desfazer: {
+        Args: { p_importacao_id: string }
+        Returns: Json
+      }
+      agenda_receita_mapeamento_salvar: {
+        Args: { p_obligation_id: string; p_tipo: string; p_valor?: string }
         Returns: Json
       }
       archive_old_logs: { Args: never; Returns: undefined }
@@ -7119,6 +7469,11 @@ export type Database = {
       }
       cofre_encrypt_internal: {
         Args: { p_key: string; p_plaintext: string }
+        Returns: string
+      }
+      contexto_sessao: { Args: never; Returns: Record<string, unknown> }
+      contraparte_busca: {
+        Args: { t: Database["public"]["Tables"]["transactions"]["Row"] }
         Returns: string
       }
       end_support_session: { Args: { _session_id: string }; Returns: undefined }
@@ -7183,6 +7538,61 @@ export type Database = {
           query_idx: number
         }[]
       }
+      fiscal_calendario_resumo: {
+        Args: { p_ano: number; p_mes: number }
+        Returns: Json
+      }
+      fiscal_cliente_obrigacao_alterar: {
+        Args: {
+          p_contact_id: string
+          p_marcar: boolean
+          p_obligation_id: string
+        }
+        Returns: Json
+      }
+      fiscal_cliente_tarefas: {
+        Args: { p_aplicar?: boolean; p_contact_id: string }
+        Returns: Json
+      }
+      fiscal_clientes_sem_tarefas: {
+        Args: { p_ano: number; p_mes: number }
+        Returns: Json
+      }
+      fiscal_divergencias_receita: {
+        Args: never
+        Returns: {
+          c_id: string
+          motivo: string
+          o_id: string
+          tipo: string
+        }[]
+      }
+      fiscal_lancamento_avisos: {
+        Args: { p_ano: number; p_mes: number }
+        Returns: Json
+      }
+      fiscal_lancar_candidatos: {
+        Args: { p_ano: number; p_mes: number }
+        Returns: Json
+      }
+      fiscal_lancar_tarefas_clientes: {
+        Args: {
+          p_ano: number
+          p_contact_ids: string[]
+          p_mes: number
+          p_obligation_ids: string[]
+        }
+        Returns: Json
+      }
+      fiscal_obrigacao_clientes: {
+        Args: { p_obligation_id: string }
+        Returns: Json
+      }
+      fiscal_obrigacoes_resumo: { Args: never; Returns: Json }
+      fiscal_resp_do_setor: {
+        Args: { c: Database["public"]["Tables"]["contacts"]["Row"]; d: string }
+        Returns: string
+      }
       fn_anonimizar_contato: {
         Args: { p_contact_id: string }
         Returns: undefined
@@ -7196,6 +7606,7 @@ export type Database = {
         Args: {
           p_contact_ids?: string[]
           p_month: number
+          p_obligation_ids?: string[]
           p_responsible_ids?: string[]
           p_tax_regimes?: string[]
           p_year: number
@@ -7210,6 +7621,27 @@ export type Database = {
       generate_tenant_invoices_admin: {
         Args: { p_company_id?: string }
         Returns: number
+      }
+      gestao360_alertas_equipe: { Args: { p_hoje?: string }; Returns: number }
+      gestao360_avisar_equipe: {
+        Args: {
+          p_company: string
+          p_corpo: string
+          p_resp: string
+          p_titulo: string
+          p_type: string
+          p_url: string
+        }
+        Returns: number
+      }
+      gestao360_foto_diaria: { Args: { p_hoje?: string }; Returns: number }
+      gestao360_indicadores_mensais: {
+        Args: { p_meses?: number }
+        Returns: Json
+      }
+      gestao360_lista_nomes: {
+        Args: { p_max?: number; p_nomes: string[] }
+        Returns: string
       }
       get_annual_metrics: {
         Args: {
@@ -7294,7 +7726,9 @@ export type Database = {
       }
       imm_unaccent: { Args: { "": string }; Returns: string }
       is_company_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_internal_user: { Args: never; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      jwt_session_id: { Args: never; Returns: string }
       log_data_access: {
         Args: {
           p_acao: string
@@ -7304,6 +7738,18 @@ export type Database = {
           p_titular_tipo: string
         }
         Returns: undefined
+      }
+      meus_acessos: {
+        Args: never
+        Returns: {
+          atual: boolean
+          company_id: string
+          contact_id: string
+          documento: string
+          nome: string
+          papel: string
+          tipo: string
+        }[]
       }
       refresh_ncm_descricao_hierarquica: { Args: never; Returns: undefined }
       resolve_cclasstrib_by_ncm: {
@@ -7389,6 +7835,7 @@ export type Database = {
           score: number
         }[]
       }
+      serpro_avisar_pgdas_prazo: { Args: { p_hoje?: string }; Returns: number }
       serpro_avisar_vencimento_das: {
         Args: { p_hoje?: string }
         Returns: number
@@ -7406,6 +7853,16 @@ export type Database = {
         }
         Returns: string
       }
+      serpro_pgdas_sem_procuracao: {
+        Args: { p_contact: string }
+        Returns: boolean
+      }
+      serpro_pgdas_situacao: {
+        Args: { p_contact: string; p_hoje: string; p_pa: string }
+        Returns: string
+      }
+      serpro_proximo_dia_util: { Args: { p_data: string }; Returns: string }
+      serpro_vencimento_mensal: { Args: { p_dia: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       start_support_session: {
@@ -7416,6 +7873,7 @@ export type Database = {
         Args: { p_from_profile_id: string; p_to_profile_id: string }
         Returns: Json
       }
+      trocar_conta: { Args: { p_company_id: string }; Returns: string }
       unaccent: { Args: { "": string }; Returns: string }
       validar_ncm_leaf_batch: {
         Args: { p_ncms: string[] }

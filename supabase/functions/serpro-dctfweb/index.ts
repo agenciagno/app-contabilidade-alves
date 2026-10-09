@@ -17,6 +17,11 @@ import { perfilAtivo } from "../_shared/acesso.ts";
 //       2) MIT.LISTAAPURACOES317 (Consultar): todas as apurações do ANO da competência numa chamada.
 //       São duas consultas cobradas por clique. Uma parte pode falhar sem derrubar a outra.
 //   link      { id }   link assinado (10 min) do recibo da DCTFWeb já guardado (sem chamada ao Serpro).
+//   gerar_guia { contact_id, competencia: "AAAA-MM", confirmar_emissao: true, data_pagamento?: "AAAA-MM-DD", novo? }
+//       DCTFWEB.GERARGUIA31 (Emitir, cobrado; Rodada 5, 09/10/2026): guia (DARF) da declaração mais recente da competência, categoria GERAL_MENSAL.
+//       `data_pagamento` vira DataAcolhimentoProposta (inteiro aaaammdd; a Receita só aceita dia útil do mês corrente, de hoje em diante).
+//       Sem `novo`, uma guia já emitida HOJE para a mesma competência e a mesma data é devolvida sem emitir outra (não cobra de novo).
+//   link_guia { id }   link assinado (10 min) de uma guia já emitida.
 //   rotina_eventos   rotina diária (cron 07:40 BRT): evento E0301 (grátis, /Monitorar), 1 solicitar + 1 obter para todos os clientes do escopo.
 //       O E0301 só diz que a DCTFWeb do CNPJ foi atualizada (eSocial/Reinf/SERO recebido ou declaração transmitida), sem dizer qual.
 //       Marca "movimento novo" quando a data avança e avisa a equipe; quem consulta é a equipe, por clique. { forcar?: true } ignora a trava de 12 h.
@@ -28,7 +33,7 @@ import { perfilAtivo } from "../_shared/acesso.ts";
 //       (padrão ligado). Admin simula com { dry_run: true, ignorar_data?: true, competencia? } (não cobra).
 //
 // Só clientes com status "Ativo". Filial é recusada (declarações da matriz). Procuração: 00103 (DCTFWeb).
-// Transmitir DCTFWeb/encerrar MIT NÃO existe aqui: escrita na Receita é fase final. A guia (GERARGUIA31) é a fase 2.
+// Transmitir DCTFWeb/encerrar MIT NÃO existe aqui: escrita na Receita é fase final. A guia (GERARGUIA31) entrou na Rodada 5 (gerar_guia).
 // ---------------------------------------------------------------------------
 
 const COMPANY_ID = "5cd08fcd-c095-4f08-b3a8-c02b9bf1034e";
@@ -197,6 +202,62 @@ async function link(payload: any) {
   const { data } = await supabase.from("serpro_dctfweb").select("recibo_path,competencia").eq("id", String(payload.id ?? "")).eq("company_id", COMPANY_ID).maybeSingle();
   if (!data?.recibo_path) return json({ ok: false, error: "Recibo não disponível" });
   const url = await assinar(supabase, BUCKET, data.recibo_path, `recibo-dctfweb-${String(data.competencia).slice(0, 7)}.pdf`);
+  return url ? json({ ok: true, url }) : json({ ok: false, error: "Não foi possível gerar o link" }, 500);
+}
+
+// ---------- guia (DARF) da DCTFWeb
+async function gerarGuia(payload: any, uid: string) {
+  if (payload.confirmar_emissao !== true) return json({ error: "Confirme a emissão (registra uma emissão na Receita e é cobrada)" }, 400);
+  const c = await carregarCliente(String(payload.contact_id ?? ""));
+  if (c.resp) return c.resp;
+  const contactId = c.contato!.id;
+  const comp = String(payload.competencia ?? "");
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(comp)) return json({ error: "Informe a competência (AAAA-MM)" }, 400);
+  const [ano, mes] = comp.split("-");
+  const competencia = `${comp}-01`;
+  const hoje = hojeBR();
+  if (competencia > hoje) return json({ error: "Competência inválida" }, 400);
+  const dataPagamento = payload.data_pagamento ? String(payload.data_pagamento) : null;
+  if (dataPagamento && (!/^\d{4}-\d{2}-\d{2}$/.test(dataPagamento) || dataPagamento < hoje || dataPagamento.slice(0, 7) !== hoje.slice(0, 7))) {
+    return json({ ok: false, error: "A data de pagamento precisa ser um dia útil do mês corrente, de hoje em diante." });
+  }
+  if (await semProcuracaoNenhuma(contactId)) return json({ ok: false, semProcuracao: true, error: "Este cliente não tem procuração eletrônica ativa. Peça para outorgar no e-CAC e mapeie em Procurações." });
+
+  // Já emitida hoje, mesma competência e mesma data de pagamento: devolve a guardada (não emite nem cobra de novo).
+  if (!payload.novo) {
+    let q = supabase.from("serpro_dctfweb_guias").select("id,pdf_path").eq("contact_id", contactId).eq("competencia", competencia)
+      .gte("emitido_em", `${hoje}T03:00:00Z`).order("emitido_em", { ascending: false }).limit(1);
+    q = dataPagamento ? q.eq("data_pagamento", dataPagamento) : q.is("data_pagamento", null);
+    const { data: ja } = await q.maybeSingle();
+    if (ja?.pdf_path) {
+      const url = await assinar(supabase, BUCKET, ja.pdf_path, `guia-dctfweb-${comp}.pdf`);
+      if (url) return json({ ok: true, jaGerado: true, url, id: ja.id });
+    }
+  }
+
+  const dados: Record<string, unknown> = { categoria: "GERAL_MENSAL", anoPA: ano, mesPA: mes };
+  if (dataPagamento) dados.DataAcolhimentoProposta = Number(dataPagamento.replace(/-/g, ""));
+  const r = await serpro({
+    tipo: "Emitir", idSistema: "DCTFWEB", idServico: "GERARGUIA31",
+    contribuinte: { numero: c.cnpj!, tipo: 2 }, dados: JSON.stringify(dados),
+    uid, contactId, origem: "manual",
+    finalidade: `Emissão da guia (DARF) da DCTFWeb (PA ${mes}/${ano}) confirmada por usuário para o cliente`,
+  });
+  if (r.status === 403) return json({ ok: false, semProcuracao: true, error: "Sem procuração eletrônica para a DCTFWeb deste cliente" });
+  if (r.status !== 200) return json({ ok: false, status: r.status, error: msgErro(r) });
+  const path = await guardarPdf(supabase, BUCKET, `${COMPANY_ID}/${contactId}/guia-dctfweb-${comp}-${Date.now()}.pdf`, pdfDoRecibo(r.resposta?.dados));
+  if (!path) return json({ ok: false, error: "A guia foi emitida, mas o PDF não veio em formato válido" }, 502);
+  const { data: nova, error } = await supabase.from("serpro_dctfweb_guias")
+    .insert({ company_id: COMPANY_ID, contact_id: contactId, competencia, data_pagamento: dataPagamento, pdf_path: path, emitido_por: uid }).select("id").single();
+  if (error || !nova) return json({ ok: false, error: "A guia foi emitida e guardada, mas o registro falhou" }, 500);
+  const url = await assinar(supabase, BUCKET, path, `guia-dctfweb-${comp}.pdf`);
+  return json({ ok: true, url, id: nova.id });
+}
+
+async function linkGuia(payload: any) {
+  const { data } = await supabase.from("serpro_dctfweb_guias").select("pdf_path,competencia").eq("id", String(payload.id ?? "")).eq("company_id", COMPANY_ID).maybeSingle();
+  if (!data?.pdf_path) return json({ ok: false, error: "Guia não disponível" });
+  const url = await assinar(supabase, BUCKET, data.pdf_path, `guia-dctfweb-${String(data.competencia).slice(0, 7)}.pdf`);
   return url ? json({ ok: true, url }) : json({ ok: false, error: "Não foi possível gerar o link" }, 500);
 }
 
@@ -460,12 +521,14 @@ Deno.serve(async (req) => {
   switch (payload.action) {
     case "consultar": return await consultar(payload, uid);
     case "link": return await link(payload);
+    case "gerar_guia": return await gerarGuia(payload, uid);
+    case "link_guia": return await linkGuia(payload);
     case "rotina_eventos":
       if (!admin) return json({ error: "Só administradores rodam a rotina manualmente" }, 403);
       return await rotinaEventos(payload, uid, "manual");
     case "rotina_dctfweb":
       if (!admin) return json({ error: "Só administradores rodam a rotina manualmente" }, 403);
       return await rotinaDctfweb(payload, uid);
-    default: return json({ error: "action inválida (consultar | link | rotina_eventos | rotina_dctfweb)" }, 400);
+    default: return json({ error: "action inválida (consultar | link | gerar_guia | link_guia | rotina_eventos | rotina_dctfweb)" }, 400);
   }
 });

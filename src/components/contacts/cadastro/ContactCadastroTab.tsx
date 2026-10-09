@@ -145,6 +145,8 @@ export function ContactCadastroTab({ contactId }: Props) {
         ie: form.ie ?? null,
         setor_atuacao: form.setor_atuacao ?? null,
         segmento_atuacao: form.segmento_atuacao ?? null,
+        recebe_das_ca: !!form.recebe_das_ca,
+        recebe_guia_dctfweb_ca: !!form.recebe_guia_dctfweb_ca,
       });
     } finally {
       setSavingFiscal(false);
@@ -479,6 +481,27 @@ export function ContactCadastroTab({ contactId }: Props) {
                   Sugerir pelo CNAE
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Rodada 5 do Monitoramento (09/10/2026): quem entra no lote de guias e na lista "Conferir e enviar". */}
+          <Card>
+            <CardHeader><CardTitle className="text-base">Guias mensais da CA</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <label className="flex items-center justify-between gap-4">
+                <span>
+                  <span className="block text-sm font-medium">Recebe o DAS do Simples pela CA</span>
+                  <span className="block text-xs text-muted-foreground">Entra no "Gerar DAS" em lote e na lista para conferir e enviar por e-mail.</span>
+                </span>
+                <Switch checked={!!form.recebe_das_ca} onCheckedChange={(v) => set('recebe_das_ca', v)} />
+              </label>
+              <label className="flex items-center justify-between gap-4">
+                <span>
+                  <span className="block text-sm font-medium">Recebe a guia da DCTFWeb pela CA</span>
+                  <span className="block text-xs text-muted-foreground">Entra no "Gerar guia" em lote e na lista para conferir e enviar por e-mail.</span>
+                </span>
+                <Switch checked={!!form.recebe_guia_dctfweb_ca} onCheckedChange={(v) => set('recebe_guia_dctfweb_ca', v)} />
+              </label>
             </CardContent>
           </Card>
 
