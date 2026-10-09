@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { COR_ESTADO, ESTADOS, ROTULO_ESTADO, type ContagemEstados, type EstadoMonitor } from '@/lib/monitorEstados';
 import {
-  maioresLimites, type BarraDeclaracao, type CartaoAusencia, type ResumoMensagens, type TipoLimite,
+  maioresLimites, type BarraDeclaracao, type CartaoAusencia, type ResumoMensagens, type ResumoParcelamentos, type TipoLimite,
 } from '@/lib/painelFiscal';
 import type { LinhaSimples } from '@/lib/simplesNacionalLinhas';
 import { LIMITE_SIMPLES } from '@/hooks/useSerproFaturamento';
@@ -319,6 +319,57 @@ export function MensagensEcacBox({ r, ultimas, carregandoUltimas, className }: {
           </ul>
         )}
       </div>
+    </Caixa>
+  );
+}
+
+// ---------------------------------------------------------------- Parcelamentos (09/10/2026)
+const PARCELAMENTOS = '/dashboard-federal/parcelamentos';
+const ROTULO_PARC: Record<EstadoMonitor, string> = {
+  atencao: 'Parcela em atraso', pendencia: 'Parcela do mês em aberto', em_dia: 'Em dia ou sem parcelamento', processando: 'Consultando', nao_verificado: 'Não consultados',
+};
+
+export function ParcelamentosBox({ r, carregando, className }: { r: ResumoParcelamentos; carregando?: boolean; className?: string }) {
+  const estados = ESTADOS.filter((e) => e !== 'processando');
+  return (
+    <Caixa
+      titulo="Parcelamentos"
+      subtitulo="Parcelamentos do Simples (ordinário, especial, PERT-SN e RELP-SN): quem tem parcela em atraso ou a do mês em aberto."
+      acao={<VerTudo to={PARCELAMENTOS}>Ver parcelamentos</VerTudo>}
+      className={className}
+    >
+      {carregando ? <Skeleton className="h-[140px] w-full" /> : (
+        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <ul className="space-y-3">
+            {estados.map((e) => (
+              <li key={e}>
+                <Link to={`${PARCELAMENTOS}?estado=${e}`} title={ROTULO_ESTADO[e]} className="group grid grid-cols-[150px_1fr_36px] items-center gap-2 rounded-sm hover:bg-bg-2">
+                  <span className="text-ui text-muted-ink group-hover:text-ink">{ROTULO_PARC[e]}</span>
+                  <span className="h-2.5 overflow-hidden rounded-pill bg-bg-3">
+                    <span className="block h-full rounded-pill" style={{ width: `${r.contagem.total ? (r.contagem[e] / r.contagem.total) * 100 : 0}%`, background: COR_ESTADO[e] }} />
+                  </span>
+                  <span className="text-right text-ui-strong text-ink">{r.contagem[e]}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-md border border-line p-3">
+              <p className="text-kicker uppercase text-muted-ink">Com parcelamento</p>
+              <p className="text-metric-xl text-ink">{r.comAtivo}</p>
+            </div>
+            <div className="rounded-md border border-line p-3">
+              <p className="text-kicker uppercase text-muted-ink">Em atraso</p>
+              <p className={cn('text-ui-strong', r.valorAtrasado > 0 ? 'text-danger' : 'text-ink')}>{moeda(r.valorAtrasado)}</p>
+            </div>
+            <div className="col-span-2 rounded-md border border-line p-3">
+              <p className="text-kicker uppercase text-muted-ink">Parcelas do mês</p>
+              <p className="text-ui-strong text-ink">{moeda(r.valorDoMes)}</p>
+              {r.naoConsultados > 0 && <p className="text-meta text-muted-ink-2">{r.naoConsultados} clientes ainda não consultados</p>}
+            </div>
+          </div>
+        </div>
+      )}
     </Caixa>
   );
 }

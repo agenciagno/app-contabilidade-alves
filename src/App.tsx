@@ -63,6 +63,7 @@ const CaDiagnosticos = lazy(() => import("@/pages/CaDiagnosticos"));
 const MensagensEcac = lazy(() => import("@/pages/MensagensEcac"));
 const PagamentosFederal = lazy(() => import("@/pages/PagamentosFederal"));
 const SimplesNacionalFederal = lazy(() => import("@/pages/SimplesNacionalFederal"));
+const ParcelamentosFederal = lazy(() => import("@/pages/ParcelamentosFederal"));
 const ProcuracoesFederal = lazy(() => import("@/pages/ProcuracoesFederal"));
 const SituacaoFiscalFederal = lazy(() => import("@/pages/SituacaoFiscalFederal"));
 const DctfwebMitFederal = lazy(() => import("@/pages/DctfwebMitFederal"));
@@ -196,11 +197,11 @@ const App = () => (
               <Route path="/dashboard-federal/defis" element={<Redireciona para="/dashboard-federal/simples-nacional?aba=defis" />} />
               <Route path="/dashboard-federal/procuracoes" element={<AppLayout><ModuleGuard moduleName="monitoramento_procuracoes"><ProcuracoesFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/situacao-fiscal" element={<AppLayout><ModuleGuard moduleName="monitoramento_situacao_fiscal"><SituacaoFiscalFederal /></ModuleGuard></AppLayout>} />
-              <Route path="/dashboard-federal/parcelamentos" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><EmBreve moduleKey="parcelamentos" /></ModuleGuard></AppLayout>} />
+              <Route path="/dashboard-federal/parcelamentos" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><ParcelamentosFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/darf" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><EmBreve moduleKey="darf_atualizado" /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/dctfweb-mit" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><DctfwebMitFederal /></ModuleGuard></AppLayout>} />
               <Route path="/dashboard-federal/conferencia-cadastro" element={<AppLayout><ModuleGuard moduleName="dashboard_federal"><ConferenciaCadastroFederal /></ModuleGuard></AppLayout>} />
-              <Route path="/parcelamentos" element={<AppLayout><ModuleGuard moduleName="parcelamentos"><EmBreve moduleKey="parcelamentos" /></ModuleGuard></AppLayout>} />
+              <Route path="/parcelamentos" element={<Redireciona para="/dashboard-federal/parcelamentos" />} />
               <Route path="/certidoes" element={<AppLayout><ModuleGuard moduleName="certidoes"><EmBreve moduleKey="certidoes" /></ModuleGuard></AppLayout>} />
               <Route path="/processos" element={<AppLayout><ModuleGuard moduleName="processos"><EmBreve moduleKey="processos" /></ModuleGuard></AppLayout>} />
 

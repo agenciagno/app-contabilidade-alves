@@ -180,6 +180,17 @@ export function seloMitColuna(e: EstadoMit): Selo | null {
   }
 }
 
+/** Parcelamentos do Simples (09/10/2026): atraso = atenção; parcela do mês em aberto = pendência; sem parcelamento ou em dia = em dia. */
+export function seloParcelamento(estado: 'filial' | 'nao_consultado' | 'sem_parcelamento' | 'em_dia' | 'atrasado', atrasadas: number, doMes: number): Selo | null {
+  switch (estado) {
+    case 'filial': return null;
+    case 'nao_consultado': return { estado: 'nao_verificado', motivo: 'Não consultado' };
+    case 'sem_parcelamento': return { estado: 'em_dia', motivo: 'Sem parcelamento' };
+    case 'atrasado': return { estado: 'atencao', motivo: `${atrasadas} ${atrasadas === 1 ? 'parcela' : 'parcelas'} em atraso` };
+    default: return doMes > 0 ? { estado: 'pendencia', motivo: 'Parcela do mês em aberto' } : { estado: 'em_dia', motivo: 'Em dia' };
+  }
+}
+
 export function seloSitfis(estado: EstadoSitfis): Selo | null {
   switch (estado) {
     case 'sem_pendencias': return { estado: 'em_dia', motivo: 'Sem pendências' };

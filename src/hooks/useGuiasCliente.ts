@@ -11,8 +11,8 @@ import { useCompany } from '@/hooks/useCompany';
 import { invocarSerpro } from '@/lib/invocarSerpro';
 import { fetchAllPages } from '@/lib/fetch-all';
 
-export type ProcessoGuia = 'das' | 'dctfweb';
-export const ORIGEM_ENVIO: Record<ProcessoGuia, string> = { das: 'guia_das', dctfweb: 'guia_dctfweb' };
+export type ProcessoGuia = 'das' | 'dctfweb' | 'parcela' | 'das_mei';
+export const ORIGEM_ENVIO: Record<ProcessoGuia, string> = { das: 'guia_das', dctfweb: 'guia_dctfweb', parcela: 'guia_parcela', das_mei: 'guia_das_mei' };
 
 export interface MarcacaoGuia { das: boolean; dctfweb: boolean; email: string | null }
 

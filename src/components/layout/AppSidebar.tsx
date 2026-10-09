@@ -43,6 +43,7 @@ import {
   FileText,
   BookOpen,
   Receipt,
+  Layers,
   Users,
   LifeBuoy,
   type LucideIcon,
@@ -120,6 +121,7 @@ const iconMap: Record<string, LucideIcon> = {
   'badge-check': BadgeCheck,
   'file-text': FileText,
   'receipt': Receipt,
+  'layers': Layers,
   'lock-keyhole': LockKeyhole,
   'settings': Settings,
   'wallet': Wallet,
@@ -271,7 +273,7 @@ export const menuEntries: MenuEntry[] = [
     moduleKey: 'dashboard_federal',
     // Situação Fiscal e Procurações viraram itens próprios (01/10/2026), e em
     // 08/10/2026 ganharam chave de permissão própria. Simples Nacional, em 09/10/2026.
-    activeExcept: ['/dashboard-federal/situacao-fiscal', '/dashboard-federal/procuracoes', '/dashboard-federal/simples-nacional'],
+    activeExcept: ['/dashboard-federal/situacao-fiscal', '/dashboard-federal/procuracoes', '/dashboard-federal/simples-nacional', '/dashboard-federal/parcelamentos'],
   },
   {
     kind: 'simple',
@@ -288,6 +290,15 @@ export const menuEntries: MenuEntry[] = [
     url: '/dashboard-federal/simples-nacional',
     icon: Receipt,
     iconName: 'receipt',
+    moduleKey: 'dashboard_federal',
+  },
+  // Parcelamentos do Simples ativado em 09/10/2026 (pronto desde 30/09, sem rota); mesma permissão do Dashboard Fiscal.
+  {
+    kind: 'simple',
+    title: 'Parcelamentos',
+    url: '/dashboard-federal/parcelamentos',
+    icon: Layers,
+    iconName: 'layers',
     moduleKey: 'dashboard_federal',
   },
   {

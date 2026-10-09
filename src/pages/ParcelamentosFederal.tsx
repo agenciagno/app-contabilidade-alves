@@ -1,22 +1,29 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Eye, Loader2, RefreshCw } from 'lucide-react';
+import { Eye, Loader2, Mail, RefreshCw } from 'lucide-react';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
-import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
+import { PageHeader, SearchField } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { ParcelamentosClienteSheet } from '@/components/serpro/ParcelamentosClienteSheet';
 import { useConsultaParcelamentos } from '@/components/serpro/parcelamentosUi';
+import { FaixaEstados, RodapeLista, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
+import {
+  AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote,
+} from '@/components/monitor/GuiasLote';
 import {
   ROTULO_MOD, chamadasDaConsulta, competenciaAtual, consultadoEm, estadoParcelamento, modalidadesAtivas, parcelasAtrasadas, parcelasDoMes,
-  somaValor, useMatrizParcelamentos, type EstadoParcelamento, type LinhaParcelamentos,
+  rotuloParcela, somaValor, useConsultarParcelamentos, useGerarGuiaParcela, useMatrizParcelamentos, type LinhaParcelamentos, type Modalidade,
 } from '@/hooks/useSerproParcelamentos';
+import { useGuiasEnviadas, useMarcacoesGuia } from '@/hooks/useGuiasCliente';
+import { ROTULO_ESTADO, contarEstados, seloParcelamento, type Selo } from '@/lib/monitorEstados';
+import { hojeBR } from '@/lib/prazosFederais';
 import type { TabelaExport } from '@/lib/exportarTabela';
 
 const formatarCnpj = (d: string) => {
@@ -25,74 +32,81 @@ const formatarCnpj = (d: string) => {
 };
 const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-type Situacao = 'todos' | 'ativos' | 'atrasados' | 'sem_parcelamento' | 'nao_consultados';
-const SITUACOES: { value: Situacao; label: string }[] = [
-  { value: 'todos', label: 'Todos os clientes' },
-  { value: 'ativos', label: 'Com parcelamento ativo' },
-  { value: 'atrasados', label: 'Com parcela em atraso' },
-  { value: 'sem_parcelamento', label: 'Sem parcelamento' },
-  { value: 'nao_consultados', label: 'Não consultados' },
-];
-
-function rotulo(e: EstadoParcelamento): { label: string; tone: 'ok' | 'warn' | 'danger' | 'info' | 'neutral' } {
-  switch (e) {
-    case 'atrasado': return { label: 'Parcela em atraso', tone: 'danger' };
-    case 'em_dia': return { label: 'Em dia', tone: 'ok' };
-    case 'sem_parcelamento': return { label: 'Sem parcelamento', tone: 'neutral' };
-    case 'filial': return { label: 'Filial (matriz)', tone: 'neutral' };
-    default: return { label: 'Não consultado', tone: 'neutral' };
-  }
+/** Selo da linha, o mesmo que o box Parcelamentos do Dashboard Fiscal conta. */
+export function seloDaLinha(l: LinhaParcelamentos, atual = competenciaAtual()): Selo | null {
+  return seloParcelamento(estadoParcelamento(l, atual), parcelasAtrasadas(l, atual).length, parcelasDoMes(l, atual).length);
 }
 
+/**
+ * Parcelamentos do Simples Nacional (ordinário, especial, PERT-SN e RELP-SN). Ativado em 09/10/2026 (estava pronto desde 30/09, sem rota),
+ * no molde do Monitoramento: faixa de estados, selo, lote de consulta e de guias da parcela, envio com conferência e ZIP das guias.
+ */
 export default function ParcelamentosFederal() {
   const { data: linhas = [], isLoading } = useMatrizParcelamentos();
   const { executar, emAndamento, dialog } = useConsultaParcelamentos();
+  const consultar = useConsultarParcelamentos();
+  const gerarGuia = useGerarGuiaParcela();
+  const { data: marcacoes } = useMarcacoesGuia();
+  const atual = competenciaAtual();
+  const compAtual = `${String(atual).slice(0, 4)}-${String(atual).slice(4)}`;
+  const { data: enviadas } = useGuiasEnviadas('parcela', compAtual);
+  const [estado, setEstado] = useEstadoUrl();
   const buscaInicial = useBuscaInicial();
   const [busca, setBusca] = useState(buscaInicial);
-  const [situacao, setSituacao] = useState<Situacao>('todos');
   const [aberto, setAberto] = useState<string | null>(null);
-  const atual = competenciaAtual();
+  const sel = useSelecao();
+  const [lote, setLote] = useState<'consultar' | 'guias' | null>(null);
+  const [envioAberto, setEnvioAberto] = useState(false);
+  const [baixarAberto, setBaixarAberto] = useState(false);
+  const hoje = hojeBR();
 
-  const stats = useMemo(() => {
-    const ativos = linhas.filter((l) => !l.filial);
-    const est = ativos.map((l) => estadoParcelamento(l, atual));
-    const consultados = ativos.filter((l) => l.consultas.length);
-    return {
-      total: ativos.length,
-      consultados: consultados.length,
-      comParcelamento: est.filter((e) => e === 'em_dia' || e === 'atrasado').length,
-      atrasados: est.filter((e) => e === 'atrasado').length,
-      doMes: consultados.reduce((s, l) => s + somaValor(parcelasDoMes(l, atual)), 0),
-    };
-  }, [linhas, atual]);
+  const seloDe = (l: LinhaParcelamentos): Selo | null => (emAndamento === l.contact_id
+    ? { estado: 'processando', motivo: 'Consultando…' }
+    : seloDaLinha(l, atual));
 
-  const filtradas = useMemo(() => {
+  const matrizes = useMemo(() => linhas.filter((l) => !l.filial), [linhas]);
+  const base = useMemo(() => {
     const q = busca.trim().toLowerCase();
     const qDigitos = q.replace(/\D/g, '');
-    return linhas
-      .filter((l) => {
-        const e = estadoParcelamento(l, atual);
-        switch (situacao) {
-          case 'ativos': return e === 'em_dia' || e === 'atrasado';
-          case 'atrasados': return e === 'atrasado';
-          case 'sem_parcelamento': return e === 'sem_parcelamento';
-          case 'nao_consultados': return e === 'nao_consultado';
-          default: return true;
-        }
-      })
-      .filter((l) => !q || l.nome.toLowerCase().includes(q) || (qDigitos && l.documento.replace(/\D/g, '').includes(qDigitos)));
-  }, [linhas, busca, situacao, atual]);
+    return matrizes.filter((l) => !q || l.nome.toLowerCase().includes(q) || (!!qDigitos && l.documento.replace(/\D/g, '').includes(qDigitos)));
+  }, [matrizes, busca]);
+  const contagem = contarEstados(base.map(seloDe));
+  const filtradas = base.filter((l) => !estado || seloDe(l)?.estado === estado).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+  const marcadas = matrizes.filter((l) => sel.marcados.has(l.contact_id));
+  const comAtivos = matrizes.filter((l) => modalidadesAtivas(l).length > 0);
+  // Guias: uma por parcela em aberto (atrasadas e a do mês). Guia da mesma parcela nas últimas 24 h é reaproveitada pelo servidor.
+  const parcelasLote = marcadas.flatMap((l) => [...parcelasAtrasadas(l, atual), ...parcelasDoMes(l, atual)].map((p) => ({ l, p })));
+  const itensGuias: ItemLote[] = parcelasLote.map(({ l, p }) => {
+    const g = l.guias.find((x) => x.modalidade === p.modalidade && x.parcela === p.parcela);
+    return {
+      contactId: `${l.contact_id}|${p.modalidade}|${p.parcela}`,
+      nome: `${l.nome} · ${ROTULO_MOD[p.modalidade]} ${rotuloParcela(p.parcela)}${p.valor != null ? ` · ${moeda(p.valor)}` : ''}`,
+      guardada: !!g && Date.now() - Date.parse(g.gerado_em) < 24 * 3600_000,
+    };
+  });
+  const itensEnvio: ItemEnvio[] = matrizes.filter((l) => marcacoes?.get(l.contact_id)?.das).flatMap((l) => l.guias
+    .filter((g) => g.gerado_em.slice(0, 7) === hoje.slice(0, 7))
+    .map((g) => ({
+      contactId: l.contact_id, chave: `${l.contact_id}|${g.id}`, nome: l.nome, email: marcacoes?.get(l.contact_id)?.email ?? null,
+      documento: { tipo: 'parcela_guia', id: g.id },
+      rotulo: `Guia da parcela ${rotuloParcela(g.parcela)} · ${ROTULO_MOD[g.modalidade]} · gerada em ${format(new Date(g.gerado_em), 'dd/MM')}`,
+      enviadoEm: enviadas?.get(g.id) ?? null,
+    })));
+  const aEnviar = itensEnvio.filter((i) => i.email && !i.enviadoEm).length;
 
   const tabelaExport = (): TabelaExport => ({
     arquivo: 'parcelamentos',
     titulo: 'Parcelamentos do Simples Nacional dos clientes ativos',
-    colunas: ['Razão social', 'CNPJ', 'Situação', 'Modalidades ativas', 'Parcelas em aberto', 'Valor em aberto', 'Parcelas atrasadas', 'Valor atrasado', 'Parcela do mês', 'Consultado em'],
+    colunas: ['Razão social', 'CNPJ', 'Situação', 'Estado', 'Modalidades ativas', 'Parcelas em aberto', 'Valor em aberto', 'Parcelas atrasadas', 'Valor atrasado', 'Parcela do mês', 'Consultado em'],
     linhas: filtradas.map((l) => {
       const atr = parcelasAtrasadas(l, atual);
+      const s = seloDe(l);
+      const em = consultadoEm(l);
       return [
-        l.nome, formatarCnpj(l.documento), rotulo(estadoParcelamento(l, atual)).label, modalidadesAtivas(l).map((m) => ROTULO_MOD[m]).join(', '),
+        l.nome, formatarCnpj(l.documento), s?.motivo ?? '', s ? ROTULO_ESTADO[s.estado] : '', modalidadesAtivas(l).map((m) => ROTULO_MOD[m]).join(', '),
         String(l.parcelas.length), l.parcelas.length ? moeda(somaValor(l.parcelas)) : '', String(atr.length), atr.length ? moeda(somaValor(atr)) : '',
-        parcelasDoMes(l, atual).length ? moeda(somaValor(parcelasDoMes(l, atual))) : '', consultadoEm(l) ? format(new Date(consultadoEm(l)!), 'dd/MM/yyyy HH:mm') : '',
+        parcelasDoMes(l, atual).length ? moeda(somaValor(parcelasDoMes(l, atual))) : '', em ? format(new Date(em), 'dd/MM/yyyy HH:mm') : '',
       ];
     }),
   });
@@ -101,108 +115,176 @@ export default function ParcelamentosFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        kicker="~/dashboard fiscal · parcelamentos"
-        title="Parcelamentos."
-        subtitle={`Parcelamentos do Simples Nacional (ordinário, especial, PERT-SN e RELP-SN) dos clientes ativos: parcelas em aberto, atrasadas, a do mês e a guia de cada uma. A primeira consulta de um cliente olha as quatro modalidades; as seguintes só o ordinário e as que o cliente já teve. "Em dia" quer dizer que a Receita não mostra parcela atrasada, não que o mês esteja pago. Filiais seguem a matriz.`}
-        actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />}
-      />
+      <PageHeader kicker="~/dashboard fiscal · parcelamentos" title="Parcelamentos." />
 
-      <StatCardRow
-        items={[
-          { label: 'Consultados', value: `${stats.consultados} de ${stats.total}`, hint: 'clientes do Simples, um por vez' },
-          { label: 'Com parcelamento ativo', value: stats.comParcelamento, hint: 'entre os consultados' },
-          { label: 'Com parcela em atraso', value: stats.atrasados, hint: 'confira e avise o cliente', emphasis: stats.atrasados > 0 ? 'warm' : 'none' },
-          { label: 'Parcelas do mês', value: moeda(stats.doMes), hint: 'soma entre os consultados' },
-        ]}
-      />
+      <div className="space-y-5">
+        {isLoading ? <Skeleton className="h-[88px] w-full" /> : <FaixaEstados contagem={contagem} ativo={estado} onChange={setEstado} />}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <SearchField placeholder="Buscar por razão social ou CNPJ..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px] flex-1" />
-        <Select value={situacao} onValueChange={(v) => setSituacao(v as Situacao)}>
-          <SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger>
-          <SelectContent>{SITUACOES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
-        </Select>
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <SearchField placeholder="Buscar por razão social ou CNPJ..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px] flex-1" />
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            <DicaBotao texto={`Marca na lista quem tem parcelamento ativo (${comAtivos.length}).`}>
+              <Button variant="outline" size="sm" className="h-10" disabled={!comAtivos.length} onClick={() => sel.definir(comAtivos.map((l) => l.contact_id))}>
+                Selecionar com parcelamento ({comAtivos.length})
+              </Button>
+            </DicaBotao>
+            <DicaBotao texto="Lista as guias de parcela geradas neste mês dos clientes que recebem DAS pela CA, para conferir e mandar por e-mail.">
+              <Button variant="outline" size="sm" className="h-10" onClick={() => setEnvioAberto(true)}>
+                <Mail className="mr-1.5 h-4 w-4" />Conferir e enviar{aEnviar ? ` (${aEnviar})` : ''}
+              </Button>
+            </DicaBotao>
+            <ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />
+          </div>
+        </div>
+
+        <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
+          <DicaBotao custo="Consultar" texto="Consulta na Receita os parcelamentos de cada cliente marcado (pedidos e parcelas em aberto). Quem já foi consultado hoje fica de fora.">
+            <Button size="sm" onClick={() => setLote('consultar')}>Consultar ({sel.marcados.size})</Button>
+          </DicaBotao>
+          <DicaBotao custo="Emitir" texto="Gera a guia de cada parcela em aberto (atrasadas e a do mês) dos clientes marcados.">
+            <Button size="sm" variant="outline" disabled={!itensGuias.length} onClick={() => setLote('guias')}>Gerar guias ({itensGuias.length})</Button>
+          </DicaBotao>
+          <DicaBotao texto="Baixa num ZIP as guias de parcela já guardadas. Não consulta a Receita.">
+            <Button size="sm" variant="outline" onClick={() => setBaixarAberto(true)}>Baixar</Button>
+          </DicaBotao>
+        </BarraSelecao>
+
+        <div className="overflow-x-auto rounded-lg border border-line bg-paper">
+          {isLoading ? (
+            <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+          ) : filtradas.length === 0 ? (
+            <div className="p-10 text-center text-ui text-muted-ink">Nenhum cliente nesta situação.</div>
+          ) : (
+            <Table className="[&_td]:px-3 [&_th]:px-3">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-8">
+                    <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtradas.map((l) => l.contact_id))}
+                      onCheckedChange={(v) => (v ? sel.somar(filtradas.map((l) => l.contact_id)) : sel.limpar())} />
+                  </TableHead>
+                  <TableHead>Situação</TableHead>
+                  <TableHead>Parcelamentos ativos</TableHead>
+                  <TableHead>Atrasadas</TableHead>
+                  <TableHead>Do mês</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Última busca</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtradas.map((l) => {
+                  const atr = parcelasAtrasadas(l, atual);
+                  const mes = parcelasDoMes(l, atual);
+                  const consultando = emAndamento === l.contact_id;
+                  const chamadas = chamadasDaConsulta(l);
+                  const ativas = modalidadesAtivas(l);
+                  const temDados = l.consultas.length > 0;
+                  const guiaMes = mes.some((p) => l.guias.some((g) => g.modalidade === p.modalidade && g.parcela === p.parcela));
+                  const outros = [
+                    l.consultas.some((c) => c.sem_procuracao) ? 'Sem procuração em alguma modalidade' : null,
+                    l.consultas.some((c) => c.erro) ? 'Falha em alguma modalidade' : null,
+                  ].filter((x): x is string => !!x);
+                  return (
+                    <TableRow key={l.contact_id} className={temDados ? 'cursor-pointer' : undefined} onClick={() => temDados && setAberto(l.contact_id)}>
+                      <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} />
+                      </TableCell>
+                      <TableCell className="min-w-[170px]"><SeloMonitor selo={seloDe(l)} outros={outros} /></TableCell>
+                      <TableCell className="text-meta text-muted-ink">
+                        {ativas.length ? ativas.map((m) => ROTULO_MOD[m]).join(', ') : '—'}
+                        {l.parcelas.length > 0 && <p className="text-meta text-muted-ink-2">{l.parcelas.length} em aberto · {moeda(somaValor(l.parcelas))}</p>}
+                      </TableCell>
+                      <TableCell className={`whitespace-nowrap text-ui ${atr.length ? 'text-danger' : 'text-muted-ink-2'}`}>{atr.length ? `${atr.length} · ${moeda(somaValor(atr))}` : '—'}</TableCell>
+                      <TableCell className="whitespace-nowrap text-ui">
+                        {mes.length ? moeda(somaValor(mes)) : <span className="text-muted-ink-2">—</span>}
+                        {guiaMes && <p className="text-meta text-muted-ink-2">Guia gerada</p>}
+                      </TableCell>
+                      <TableCell className="min-w-[200px] max-w-[280px]">
+                        <p className="text-ui text-ink">{l.nome}</p>
+                        <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
+                      </TableCell>
+                      <TableCell><UltimaBusca iso={consultadoEm(l)} contactId={l.contact_id} /></TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <DicaBotao texto={temDados ? 'Abre o painel do cliente com os parcelamentos, as parcelas em aberto e a guia de cada uma. Não consulta a Receita.' : 'Consulte o cliente primeiro para ter o que ver.'}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Ver parcelamentos" disabled={!temDados} onClick={() => setAberto(l.contact_id)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </DicaBotao>
+                          <DicaBotao custo="Consultar" vezes={chamadas}
+                            texto={temDados ? 'Consulta na Receita os pedidos de parcelamento do ordinário e das modalidades que o cliente já teve, e as parcelas em aberto dos ativos.'
+                              : 'Primeira consulta: olha as quatro modalidades (ordinário, especial, PERT-SN e RELP-SN) e, onde houver parcelamento ativo, as parcelas em aberto.'}>
+                            <Button size="sm" variant="outline" disabled={consultando} onClick={() => executar(l.contact_id, chamadas)}>
+                              {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+                              Consultar<Preco tipo="Consultar" vezes={chamadas} />
+                            </Button>
+                          </DicaBotao>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+
+        <RodapeLista mostrando={filtradas.length} total={matrizes.length} unidade="clientes do Simples Nacional" filiais={linhas.length - matrizes.length} />
       </div>
-
-      <div className="overflow-hidden rounded-lg border border-line bg-paper">
-        {isLoading ? (
-          <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-        ) : filtradas.length === 0 ? (
-          <div className="p-10 text-center text-ui text-muted-ink">Nenhum cliente encontrado.</div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Razão social</TableHead>
-                <TableHead>CNPJ</TableHead>
-                <TableHead>Parcelamentos ativos</TableHead>
-                <TableHead className="text-right">Em aberto</TableHead>
-                <TableHead className="text-right">Atrasadas</TableHead>
-                <TableHead className="text-right">Do mês</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-center">Ver</TableHead>
-                <TableHead className="text-right">Atualizar</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtradas.map((l) => {
-                const e = estadoParcelamento(l, atual);
-                const r = rotulo(e);
-                const atr = parcelasAtrasadas(l, atual);
-                const mes = parcelasDoMes(l, atual);
-                const consultando = emAndamento === l.contact_id;
-                const chamadas = chamadasDaConsulta(l);
-                const ativas = modalidadesAtivas(l);
-                const temDados = l.consultas.length > 0;
-                return (
-                  <TableRow key={l.contact_id} className={temDados ? 'cursor-pointer' : undefined} onClick={() => temDados && setAberto(l.contact_id)}>
-                    <TableCell>
-                      <p className="text-ui text-ink">{l.nome}</p>
-                      <p className="text-meta text-muted-ink-2">Simples Nacional</p>
-                    </TableCell>
-                    <TableCell className="font-mono text-ui">{formatarCnpj(l.documento)}</TableCell>
-                    <TableCell className="text-meta text-muted-ink">{ativas.length ? ativas.map((m) => ROTULO_MOD[m]).join(', ') : '—'}</TableCell>
-                    <TableCell className="whitespace-nowrap text-right text-ui">{l.parcelas.length ? `${l.parcelas.length} · ${moeda(somaValor(l.parcelas))}` : '—'}</TableCell>
-                    <TableCell className={`whitespace-nowrap text-right text-ui ${atr.length ? 'text-danger' : ''}`}>{atr.length ? `${atr.length} · ${moeda(somaValor(atr))}` : '—'}</TableCell>
-                    <TableCell className="whitespace-nowrap text-right text-ui">{mes.length ? moeda(somaValor(mes)) : '—'}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        <DsBadge tone={r.tone}>{r.label}</DsBadge>
-                        {l.consultas.some((c) => c.sem_procuracao) && <DsBadge tone="warn" dot={false}>Sem procuração em alguma modalidade</DsBadge>}
-                        {l.consultas.some((c) => c.erro) && <DsBadge tone="warn" dot={false}>Falha em alguma modalidade</DsBadge>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <DicaBotao texto={temDados ? 'Abre o painel do cliente com os parcelamentos, as parcelas em aberto e a guia de cada uma. Não consulta a Receita.' : 'Consulte o cliente primeiro para ter o que ver.'}>
-                        <Button size="icon" variant="ghost" className="h-8 w-8" disabled={!temDados} onClick={(ev) => { ev.stopPropagation(); setAberto(l.contact_id); }}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </DicaBotao>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DicaBotao custo={l.filial ? undefined : 'Consultar'} vezes={chamadas}
-                        texto={l.filial ? 'Filial: o parcelamento é do CNPJ da matriz. Consulte a matriz.'
-                          : temDados ? 'Consulta na Receita os pedidos de parcelamento do ordinário e das modalidades que o cliente já teve, e as parcelas em aberto dos ativos.'
-                            : 'Primeira consulta: olha as quatro modalidades (ordinário, especial, PERT-SN e RELP-SN) e, onde houver parcelamento ativo, as parcelas em aberto.'}>
-                        <Button size="sm" variant="outline" disabled={consultando || l.filial} onClick={(ev) => { ev.stopPropagation(); executar(l.contact_id, chamadas); }}>
-                          {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-                          Consultar{!l.filial && <Preco tipo="Consultar" vezes={chamadas} />}
-                        </Button>
-                      </DicaBotao>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </div>
-
-      <p className="text-meta text-muted-ink-2">Mostrando {filtradas.length} de {linhas.length} clientes do Simples Nacional.</p>
 
       <ParcelamentosClienteSheet linha={linhaAberta} onClose={() => setAberto(null)} />
       {dialog}
+
+      <AcaoLoteDialog
+        aberto={lote === 'consultar'}
+        onClose={() => setLote(null)}
+        titulo="Consultar parcelamentos"
+        descricao="Por cliente marcado: os pedidos de parcelamento e as parcelas em aberto dos ativos, um de cada vez. A primeira consulta de um cliente olha as quatro modalidades."
+        itens={marcadas.map((l) => ({
+          contactId: l.contact_id, nome: l.nome, vezes: chamadasDaConsulta(l),
+          pular: (consultadoEm(l) ?? '').slice(0, 10) === hoje ? 'Consultado hoje' : null,
+        }))}
+        tipo="Consultar"
+        rotuloAcao="Consultar"
+        rotuloFeito="Consultado"
+        executar={async (item) => {
+          const r = await consultar.mutateAsync({ contactId: item.contactId });
+          return {
+            ok: r.ok && !r.foraDoMonitoramento, recente: r.recente, error: r.semProcuracao ? 'Sem procuração para parcelamentos' : r.error,
+            resumo: r.ativos ? `${r.ativos} ${r.ativos === 1 ? 'parcelamento ativo' : 'parcelamentos ativos'}` : 'Sem parcelamento ativo',
+          };
+        }}
+      />
+      <GerarLoteDialog
+        aberto={lote === 'guias'}
+        onClose={() => setLote(null)}
+        titulo="Gerar guias de parcela"
+        descricao="Uma guia por parcela em aberto (atrasadas e a do mês) dos clientes marcados, uma de cada vez. Guia da mesma parcela gerada nas últimas 24 horas não é emitida de novo."
+        itens={itensGuias}
+        comData={false}
+        executar={async (item) => {
+          const [contactId, modalidade, parcela] = item.contactId.split('|');
+          const r = await gerarGuia.mutateAsync({ contactId, modalidade: modalidade as Modalidade, parcela: Number(parcela) });
+          return { ok: r.ok, jaGerado: r.jaGerado, error: r.semProcuracao ? 'Sem procuração para parcelamentos' : r.error };
+        }}
+      />
+      <EnviarGuiasDialog
+        aberto={envioAberto}
+        onClose={() => setEnvioAberto(false)}
+        titulo="Conferir e enviar guias de parcela"
+        processo="parcela"
+        competencia={compAtual}
+        itens={itensEnvio}
+        assuntoPadrao="Guia da parcela do parcelamento · {cliente}"
+        mensagemPadrao={'Olá! Segue a guia da parcela do parcelamento do Simples Nacional da {cliente}. Qualquer dúvida, é só responder este e-mail.\n\nContabilidade Alves'}
+      />
+      <BaixarLoteDialog
+        aberto={baixarAberto}
+        onClose={() => setBaixarAberto(false)}
+        contactIds={[...sel.marcados]}
+        referencia="todas as guias de parcela guardadas"
+        opcoes={[{ tipo: 'parcela_guia', rotulo: 'Guias de parcela' }]}
+      />
     </div>
   );
 }

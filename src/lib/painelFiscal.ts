@@ -3,7 +3,10 @@
  * Funções puras, calculadas só com o que já está salvo (sem chamada ao Serpro). Usam as mesmas linhas das telas
  * (`LinhaCarteira` do Portal 360° e `LinhaSimples` da tela Simples Nacional), então o número do box é o número da lista.
  */
-import { seloDefis, piorSelo, type EstadoMonitor, type Selo } from '@/lib/monitorEstados';
+import { contarEstados, seloDefis, seloParcelamento, piorSelo, type ContagemEstados, type EstadoMonitor, type Selo } from '@/lib/monitorEstados';
+import {
+  competenciaAtual, estadoParcelamento, modalidadesAtivas, parcelasAtrasadas, parcelasDoMes, somaValor, type LinhaParcelamentos,
+} from '@/hooks/useSerproParcelamentos';
 import type { LinhaCarteira } from '@/lib/situacaoCarteira';
 import type { LinhaSimples } from '@/lib/simplesNacionalLinhas';
 import { nivelLimite, percentualLimite, limiteDe, type NivelLimite } from '@/hooks/useSerproFaturamento';
@@ -176,4 +179,26 @@ export function maioresLimites(simples: LinhaSimples[], tipo: TipoLimite, quanto
     .sort((a, b) => b.valor - a.valor)
     .slice(0, quantos);
   return { itens, lidos: lidos.length, total: simples.length };
+}
+
+// ---------------------------------------------------------------- Parcelamentos (09/10/2026)
+export interface ResumoParcelamentos {
+  /** Clientes por selo (o mesmo da tela Parcelamentos, então o número do box é o número da lista). */
+  contagem: ContagemEstados;
+  comAtivo: number;
+  valorAtrasado: number;
+  valorDoMes: number;
+  naoConsultados: number;
+}
+
+export function resumoParcelamentos(linhas: LinhaParcelamentos[], atual = competenciaAtual()): ResumoParcelamentos {
+  const matrizes = linhas.filter((l) => !l.filial);
+  const selos = matrizes.map((l) => seloParcelamento(estadoParcelamento(l, atual), parcelasAtrasadas(l, atual).length, parcelasDoMes(l, atual).length));
+  return {
+    contagem: contarEstados(selos),
+    comAtivo: matrizes.filter((l) => modalidadesAtivas(l).length > 0).length,
+    valorAtrasado: matrizes.reduce((s, l) => s + somaValor(parcelasAtrasadas(l, atual)), 0),
+    valorDoMes: matrizes.reduce((s, l) => s + somaValor(parcelasDoMes(l, atual)), 0),
+    naoConsultados: matrizes.filter((l) => !l.consultas.length).length,
+  };
 }

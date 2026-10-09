@@ -67,6 +67,8 @@ export interface ItemLote {
   pular?: string | null;
   /** Algo que deve impedir a Receita de responder (ex.: sem declaração no mês). */
   aviso?: string | null;
+  /** Chamadas cobradas deste cliente, quando variam (ex.: parcelamentos). Sem isso vale o `vezes` da janela. */
+  vezes?: number;
 }
 
 export type ResultadoLote = { ok: boolean; jaGerado?: boolean; recente?: boolean; error?: string; resumo?: string };
@@ -110,7 +112,7 @@ export function AcaoLoteDialog({
   const vaiRodar = (i: ItemLote) => incluirPulados || !i.pular;
   const alvo = itens.filter(vaiRodar);
   const pulados = itens.length - alvo.length;
-  const chamadas = alvo.filter((i) => !!dataPagamento || !i.guardada).length * vezes;
+  const chamadas = alvo.filter((i) => !!dataPagamento || !i.guardada).reduce((s, i) => s + (i.vezes ?? vezes), 0);
   const custo = custoLote(tipo, chamadas);
   const passaAlerta = admin && custo !== null && gastoCiclo !== null && alerta !== null && gastoCiclo + custo > alerta;
   const terminou = resultados.size > 0 && !rodando;
@@ -239,6 +241,8 @@ export function GerarLoteDialog(props: {
 // ---------------------------------------------------------------- conferir e enviar
 export interface ItemEnvio {
   contactId: string;
+  /** Chave única da linha quando o mesmo cliente tem mais de uma guia (ex.: parcelas). Sem ela, vale o contactId. */
+  chave?: string;
   nome: string;
   email: string | null;
   documento: { tipo: string; id: string };
@@ -246,6 +250,8 @@ export interface ItemEnvio {
   rotulo: string;
   enviadoEm: string | null;
 }
+
+const chaveDe = (i: ItemEnvio) => i.chave ?? i.contactId;
 
 export function EnviarGuiasDialog({
   aberto, onClose, titulo, processo, competencia, itens, assuntoPadrao, mensagemPadrao,
@@ -272,12 +278,12 @@ export function EnviarGuiasDialog({
 
   useEffect(() => {
     if (!aberto) return;
-    setMarcados(new Set(itens.filter((i) => i.email && !i.enviadoEm).map((i) => i.contactId)));
+    setMarcados(new Set(itens.filter((i) => i.email && !i.enviadoEm).map(chaveDe)));
     setAssunto(assuntoPadrao); setMensagem(mensagemPadrao); setResultados(new Map()); setAtual(null); setRodando(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aberto]);
 
-  const alvo = itens.filter((i) => marcados.has(i.contactId) && i.email);
+  const alvo = itens.filter((i) => marcados.has(chaveDe(i)) && i.email);
   const terminou = resultados.size > 0 && !rodando;
   const ok = [...resultados.values()].filter((r) => r.estado === 'ok').length;
   const erros = [...resultados.values()].filter((r) => r.estado === 'erro').length;
@@ -288,8 +294,8 @@ export function EnviarGuiasDialog({
     setRodando(true);
     for (const item of alvo) {
       if (parar.current) break;
-      if (resultados.get(item.contactId)?.estado === 'ok') continue;
-      setAtual(item.contactId);
+      if (resultados.get(chaveDe(item))?.estado === 'ok') continue;
+      setAtual(chaveDe(item));
       let r: Resultado;
       try {
         await enviar.mutateAsync({
@@ -301,7 +307,7 @@ export function EnviarGuiasDialog({
       } catch (e) {
         r = { estado: 'erro', msg: msgErro(e) };
       }
-      setResultados((m) => new Map(m).set(item.contactId, r));
+      setResultados((m) => new Map(m).set(chaveDe(item), r));
     }
     setAtual(null);
     setRodando(false);
@@ -324,12 +330,13 @@ export function EnviarGuiasDialog({
         ) : (
           <div className="max-h-[32vh] space-y-1 overflow-y-auto rounded-md border border-line p-2">
             {itens.map((i) => {
-              const r = resultados.get(i.contactId);
+              const k = chaveDe(i);
+              const r = resultados.get(k);
               return (
-                <label key={i.contactId} className={cn('flex items-start gap-2 rounded-sm px-2 py-1.5', i.email ? 'cursor-pointer hover:bg-bg-2' : 'opacity-60')}>
-                  {r || atual === i.contactId
-                    ? <IconeResultado r={r} rodando={atual === i.contactId} />
-                    : <Checkbox checked={marcados.has(i.contactId)} disabled={!i.email || rodando} onCheckedChange={() => alternar(i.contactId)} className="mt-0.5" />}
+                <label key={k} className={cn('flex items-start gap-2 rounded-sm px-2 py-1.5', i.email ? 'cursor-pointer hover:bg-bg-2' : 'opacity-60')}>
+                  {r || atual === k
+                    ? <IconeResultado r={r} rodando={atual === k} />
+                    : <Checkbox checked={marcados.has(k)} disabled={!i.email || rodando} onCheckedChange={() => alternar(k)} className="mt-0.5" />}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-ui text-ink">{i.nome}</p>
                     <p className="text-meta text-muted-ink-2">{i.rotulo}</p>

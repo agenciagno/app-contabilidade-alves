@@ -12,7 +12,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
 import { SeloMonitor } from '@/components/monitor/MonitorUi';
 import { NotificacoesFiscais } from '@/components/monitor/NotificacoesFiscais';
-import { AusenciasBox, Caixa, DeclaracoesBox, LimiteSimplesBox, MensagensEcacBox, RelatoriosFiscaisBox } from '@/components/monitor/PainelBoxes';
+import { AusenciasBox, Caixa, DeclaracoesBox, LimiteSimplesBox, MensagensEcacBox, ParcelamentosBox, RelatoriosFiscaisBox } from '@/components/monitor/PainelBoxes';
+import { useMatrizParcelamentos } from '@/hooks/useSerproParcelamentos';
 import { useSituacaoCarteira, useCadastroMonitor } from '@/hooks/useSituacaoCarteira';
 import { certificadoPorCliente, useCertificates } from '@/hooks/useCertificates';
 import { anoDe, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
@@ -26,7 +27,7 @@ import {
   type EstadoMonitor, type ProcessoPainel, type Selo,
 } from '@/lib/monitorEstados';
 import {
-  ausenciasDctfwebMit, ausenciasSimples, barrasDeclaracoes, resumoMensagens,
+  ausenciasDctfwebMit, ausenciasSimples, barrasDeclaracoes, resumoMensagens, resumoParcelamentos,
 } from '@/lib/painelFiscal';
 import type { LinhaCarteira } from '@/lib/situacaoCarteira';
 
@@ -64,6 +65,8 @@ export default function DashboardFederal() {
   const { data: pagamentos = [], isLoading: carregandoPag } = useMatrizPagamentos(competencia);
   const { data: certificados = [], isLoading: carregandoCert } = useCertificates();
   const { data: ultimas = [], isLoading: carregandoUltimas } = useUltimasMensagensCaixa(3);
+  const { data: parcelamentos = [], isLoading: carregandoParc } = useMatrizParcelamentos();
+  const resumoParc = useMemo(() => resumoParcelamentos(parcelamentos), [parcelamentos]);
   const conferencia = useConferenciaCadastro();
   const [lista, setLista] = useState<EstadoMonitor | null>(null);
 
@@ -226,6 +229,7 @@ export default function DashboardFederal() {
             </Caixa>
 
             <LimiteSimplesBox simples={simples} />
+            <ParcelamentosBox r={resumoParc} carregando={carregandoParc} />
             <MensagensEcacBox r={mensagens} ultimas={ultimas} carregandoUltimas={carregandoUltimas} className="flex-1" />
           </div>
 
