@@ -20,14 +20,14 @@ import { useAbrirDefis, useConsultaDefis } from '@/components/serpro/defisUi';
 import { useLeituraFaturamento } from '@/components/serpro/useLeituraFaturamento';
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
 import { FaixaEstados, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
-import { BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
+import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
 import { useGuiasEnviadas, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { useCadastroMonitor } from '@/hooks/useSituacaoCarteira';
 import { competenciaPadrao, mesDeData, rotuloCompetencia, siglaCompetencia, useMatrizPagamentos } from '@/hooks/useSerproPagamentos';
-import { anoDe, useGerarDas, useMatrizPgdasd, type DasRow } from '@/hooks/useSerproPgdasd';
+import { anoDe, useConsultarPgdasd, useGerarDas, useMatrizPgdasd, type DasRow } from '@/hooks/useSerproPgdasd';
 import { percentualLimite, useFaturamentoAno } from '@/hooks/useSerproFaturamento';
-import { TIPO_DEFIS, defisDoAno, prazoDefis, statusDefis, useMatrizDefis, type LinhaDefis } from '@/hooks/useSerproDefis';
+import { TIPO_DEFIS, defisDoAno, prazoDefis, statusDefis, useConsultarDefis, useMatrizDefis, type LinhaDefis } from '@/hooks/useSerproDefis';
 import { ROTULO_ESTADO, contarEstados, seloDefis, type Selo } from '@/lib/monitorEstados';
 import { montarLinhasSimples, seloDaFonte, type FonteSimples, type LinhaSimples } from '@/lib/simplesNacionalLinhas';
 import { digitos, type ResponsavelCliente } from '@/lib/situacaoCarteira';
@@ -113,6 +113,9 @@ function AbaMensal({
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const [loteAberto, setLoteAberto] = useState(false);
   const [envioAberto, setEnvioAberto] = useState(false);
+  const [consultaLote, setConsultaLote] = useState(false);
+  const [baixarAberto, setBaixarAberto] = useState(false);
+  const consultarPg = useConsultarPgdasd();
   const { data: marcacoes } = useMarcacoesGuia();
   const marcar = useMarcarGuia();
   const gerarDas = useGerarDas();
@@ -159,6 +162,9 @@ function AbaMensal({
     }];
   });
   const aEnviar = itensEnvio.filter((i) => i.email && !i.enviadoEm).length;
+  const itensConsulta: ItemLote[] = linhas.filter((l) => marcados.has(l.contact_id)).map((l) => ({
+    contactId: l.contact_id, nome: l.nome, pular: l.pg.consultadoEm && l.pg.consultadoEm.slice(0, 10) === hoje ? 'Consultado hoje' : null,
+  }));
   const alternarMarcado = (id: string) => setMarcados((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const todasMarcadas = filtradas.length > 0 && filtradas.every((l) => marcados.has(l.contact_id));
 
@@ -202,6 +208,12 @@ function AbaMensal({
       <BarraSelecao quantos={marcados.size} onLimpar={() => setMarcados(new Set())}>
         <DicaBotao custo="Emitir" texto="Gera o DAS de cada cliente marcado. Quem já tem DAS guardado e válido não é emitido de novo. Pede confirmação antes.">
           <Button size="sm" onClick={() => setLoteAberto(true)}>Gerar DAS ({marcados.size})</Button>
+        </DicaBotao>
+        <DicaBotao custo="Consultar" texto={`Consulta na Receita as declarações e os DAS de ${ano} de cada cliente marcado. Quem já foi consultado hoje fica de fora.`}>
+          <Button size="sm" variant="outline" onClick={() => setConsultaLote(true)}>Consultar PGDAS-D ({marcados.size})</Button>
+        </DicaBotao>
+        <DicaBotao texto="Baixa num ZIP os DAS, recibos e declarações já guardados dos clientes marcados. Não consulta a Receita.">
+          <Button size="sm" variant="outline" onClick={() => setBaixarAberto(true)}>Baixar</Button>
         </DicaBotao>
         <Button size="sm" variant="outline" disabled={marcar.isPending}
           onClick={() => marcar.mutate({ contactIds: [...marcados], processo: 'das', valor: true })}>Marcar "recebe DAS da CA"</Button>
@@ -364,6 +376,33 @@ function AbaMensal({
           return { ok: r.ok, jaGerado: r.jaGerado, error: r.semProcuracao ? 'Sem procuração para o PGDAS-D' : r.error };
         }}
       />
+      <AcaoLoteDialog
+        aberto={consultaLote}
+        onClose={() => setConsultaLote(false)}
+        titulo={`Consultar PGDAS-D de ${ano}`}
+        descricao="Uma consulta por cliente marcado, um de cada vez: traz as declarações e os DAS do ano."
+        itens={itensConsulta}
+        tipo="Consultar"
+        rotuloAcao="Consultar"
+        rotuloFeito="Consultado"
+        executar={async (item) => {
+          const r = await consultarPg.mutateAsync({ contactId: item.contactId, ano });
+          return { ok: r.ok, recente: r.recente, error: r.semProcuracao ? 'Sem procuração para o PGDAS-D' : r.error };
+        }}
+      />
+      <BaixarLoteDialog
+        aberto={baixarAberto}
+        onClose={() => setBaixarAberto(false)}
+        contactIds={[...marcados]}
+        competencia={pa}
+        referencia={`competência ${siglaCompetencia(pa)}`}
+        opcoes={[
+          { tipo: 'pgdasd_das', rotulo: 'DAS gerados' },
+          { tipo: 'pgdasd_recibo', rotulo: 'Recibos do PGDAS-D' },
+          { tipo: 'pgdasd_declaracao', rotulo: 'Declarações do PGDAS-D' },
+          { tipo: 'comprovante', rotulo: 'Comprovantes de pagamento' },
+        ]}
+      />
       <EnviarGuiasDialog
         aberto={envioAberto}
         onClose={() => setEnvioAberto(false)}
@@ -393,6 +432,11 @@ function AbaDefis({
   const consulta = useConsultaDefis();
   const { ocupado, abrir } = useAbrirDefis();
   const prazo = prazoDefis(ano);
+  const sel = useSelecao();
+  const consultarDefis = useConsultarDefis();
+  const [consultaLote, setConsultaLote] = useState(false);
+  const [baixarAberto, setBaixarAberto] = useState(false);
+  const hojeIso = hojeBR();
 
   const seloDe = (l: LinhaDefis): Selo | null => (consulta.emAndamento === l.contact_id
     ? { estado: 'processando', motivo: 'Consultando…' }
@@ -443,6 +487,15 @@ function AbaDefis({
 
       <SearchField placeholder="Buscar por razão social ou CNPJ..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px]" />
 
+      <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
+        <DicaBotao custo="Consultar" texto="Consulta na Receita as DEFIS de cada cliente marcado (todos os anos numa chamada). Quem já foi consultado hoje fica de fora.">
+          <Button size="sm" onClick={() => setConsultaLote(true)}>Consultar DEFIS ({sel.marcados.size})</Button>
+        </DicaBotao>
+        <DicaBotao texto="Baixa num ZIP as declarações e os recibos da DEFIS já guardados. Não consulta a Receita.">
+          <Button size="sm" variant="outline" onClick={() => setBaixarAberto(true)}>Baixar</Button>
+        </DicaBotao>
+      </BarraSelecao>
+
       <div className="overflow-x-auto rounded-lg border border-line bg-paper">
         {isLoading || carregandoCadastro ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
@@ -452,6 +505,10 @@ function AbaDefis({
           <Table className="[&_td]:px-3 [&_th]:px-3">
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8">
+                  <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtradas.map((l) => l.contact_id))}
+                    onCheckedChange={(v) => (v ? sel.somar(filtradas.map((l) => l.contact_id)) : sel.limpar())} />
+                </TableHead>
                 <TableHead>Situação</TableHead>
                 <TableHead>Nº da DEFIS</TableHead>
                 <TableHead>Transmissão</TableHead>
@@ -466,6 +523,7 @@ function AbaDefis({
                 const consultando = consulta.emAndamento === l.contact_id;
                 return (
                   <TableRow key={l.contact_id}>
+                    <TableCell className="w-8"><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></TableCell>
                     <TableCell className="min-w-[170px]"><SeloMonitor selo={seloDe(l)} /></TableCell>
                     <TableCell className="font-mono text-ui">{d?.id_defis ?? '—'}{d && d.tipo >= 3 && <span className="ml-1 text-meta text-muted-ink-2">(situação especial)</span>}</TableCell>
                     <TableCell className="whitespace-nowrap text-ui text-muted-ink">{d?.transmitida_em ? format(new Date(d.transmitida_em), 'dd/MM/yyyy HH:mm') : '—'}</TableCell>
@@ -509,6 +567,30 @@ function AbaDefis({
         Mostrando {filtradas.length} de {base.length} clientes do Simples Nacional · ano-calendário {ano}. "Não entregue" não considera se o cliente estava no Simples naquele ano: confira antes de cobrar.
       </p>
       {consulta.dialog}
+      <AcaoLoteDialog
+        aberto={consultaLote}
+        onClose={() => setConsultaLote(false)}
+        titulo="Consultar DEFIS"
+        descricao="Uma consulta por cliente marcado, um de cada vez: traz as DEFIS de todos os anos."
+        itens={linhas.filter((l) => sel.marcados.has(l.contact_id)).map((l) => ({
+          contactId: l.contact_id, nome: l.nome, pular: l.consultadoEm && l.consultadoEm.slice(0, 10) === hojeIso ? 'Consultado hoje' : null,
+        }))}
+        tipo="Consultar"
+        rotuloAcao="Consultar"
+        rotuloFeito="Consultado"
+        executar={async (item) => {
+          const r = await consultarDefis.mutateAsync({ contactId: item.contactId });
+          return { ok: r.ok, recente: r.recente, error: r.semProcuracao ? 'Sem procuração para a DEFIS' : r.error };
+        }}
+      />
+      <BaixarLoteDialog
+        aberto={baixarAberto}
+        onClose={() => setBaixarAberto(false)}
+        contactIds={[...sel.marcados]}
+        ano={ano}
+        referencia={`ano-calendário ${ano}`}
+        opcoes={[{ tipo: 'defis_declaracao', rotulo: 'Declarações da DEFIS' }, { tipo: 'defis_recibo', rotulo: 'Recibos da DEFIS' }]}
+      />
     </div>
   );
 }

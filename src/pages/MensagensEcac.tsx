@@ -5,6 +5,9 @@ import { Eye, Loader2, RefreshCw } from 'lucide-react';
 
 import { DsTab, PageHeader, SearchField, segmentedListClass, segmentedTriggerClass } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { AcaoLoteDialog, BarraSelecao, useSelecao } from '@/components/monitor/GuiasLote';
+import { hojeBR } from '@/lib/prazosFederais';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,7 +19,7 @@ import { MensagensClienteSheet } from '@/components/serpro/MensagensClienteSheet
 import { useConsultaCliente } from '@/components/serpro/useConsultaCliente';
 import { FaixaEstados, RodapeLista, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
-import { STATUS_MONITORADO, seloCaixa, useAssuntosCaixa, useClientesCaixa, type ClienteCaixa } from '@/hooks/useSerproCaixaPostal';
+import { STATUS_MONITORADO, seloCaixa, useAssuntosCaixa, useClientesCaixa, useConsultarCaixa, type ClienteCaixa } from '@/hooks/useSerproCaixaPostal';
 import { ROTULO_ESTADO, contarEstados, seloCaixaPostal, type Selo } from '@/lib/monitorEstados';
 import type { TabelaExport } from '@/lib/exportarTabela';
 
@@ -77,6 +80,10 @@ function AbaClientes() {
   const [buscarPor, setBuscarPor] = useState<BuscarPor>('cliente');
   const [aberto, setAberto] = useState<string | null>(null);
   const { data: assuntos = [], isLoading: carregandoAssuntos } = useAssuntosCaixa(buscarPor === 'assunto');
+  const sel = useSelecao();
+  const consultarCaixa = useConsultarCaixa();
+  const [loteAberto, setLoteAberto] = useState(false);
+  const hoje = hojeBR();
 
   const seloDe = (c: ClienteCaixa): Selo | null => (emAndamento === c.contact_id
     ? { estado: 'processando', motivo: 'Consultando…' }
@@ -106,6 +113,7 @@ function AbaClientes() {
   const filtrados = base.filter((c) => !estado || seloDe(c)?.estado === estado);
 
   const clienteAberto = clientes.find((c) => c.contact_id === aberto) ?? null;
+  const comNovidade = matrizes.filter((c) => { const e = seloCaixa(c).estado; return (e === 'nova' || e === 'nao_lida') && c.procuracao !== 'ausente'; });
 
   const tabelaExport = (): TabelaExport => ({
     arquivo: 'caixa-postal-ecac',
@@ -140,8 +148,21 @@ function AbaClientes() {
         {buscarPor === 'assunto' && (
           <p className="text-meta text-muted-ink-2">Procura só nas mensagens já baixadas pelo Consultar.</p>
         )}
-        <div className="sm:ml-auto"><ExportarMenu montar={tabelaExport} disabled={filtrados.length === 0} escolherColunas /></div>
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <DicaBotao texto={`Marca na lista quem tem mensagem nova ou não lida (${comNovidade.length}), para baixar as listas de uma vez.`}>
+            <Button variant="outline" size="sm" className="h-10" disabled={!comNovidade.length} onClick={() => sel.definir(comNovidade.map((c) => c.contact_id))}>
+              Selecionar com mensagem nova ({comNovidade.length})
+            </Button>
+          </DicaBotao>
+          <ExportarMenu montar={tabelaExport} disabled={filtrados.length === 0} escolherColunas />
+        </div>
       </div>
+
+      <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
+        <DicaBotao custo="Consultar" texto="Baixa da Receita a lista de mensagens de cada cliente marcado, um de cada vez. Não registra ciência. Quem já foi consultado hoje fica de fora.">
+          <Button size="sm" onClick={() => setLoteAberto(true)}>Baixar listas ({sel.marcados.size})</Button>
+        </DicaBotao>
+      </BarraSelecao>
 
       <div className="overflow-x-auto rounded-lg border border-line bg-paper">
         {isLoading || (buscarPor === 'assunto' && carregandoAssuntos) ? (
@@ -154,6 +175,10 @@ function AbaClientes() {
           <Table className="[&_td]:px-3 [&_th]:px-3">
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8">
+                  <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtrados.map((c) => c.contact_id))}
+                    onCheckedChange={(v) => (v ? sel.somar(filtrados.map((c) => c.contact_id)) : sel.limpar())} />
+                </TableHead>
                 <TableHead>Situação</TableHead>
                 <TableHead>Mensagens baixadas</TableHead>
                 <TableHead>Cliente</TableHead>
@@ -168,6 +193,9 @@ function AbaClientes() {
                 const achados = achadosPorAssunto?.get(c.contact_id) ?? [];
                 return (
                   <TableRow key={c.contact_id} className="cursor-pointer" onClick={() => setAberto(c.contact_id)}>
+                    <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox aria-label={`Marcar ${c.nome}`} checked={sel.marcados.has(c.contact_id)} onCheckedChange={() => sel.alternar(c.contact_id)} />
+                    </TableCell>
                     <TableCell className="min-w-[170px]"><SeloMonitor selo={seloDe(c)} /></TableCell>
                     <TableCell className="whitespace-nowrap text-ui text-muted-ink">
                       {c.consultado_em ? (
@@ -216,6 +244,26 @@ function AbaClientes() {
 
       <MensagensClienteSheet cliente={clienteAberto} onClose={() => setAberto(null)} />
       {dialog}
+      <AcaoLoteDialog
+        aberto={loteAberto}
+        onClose={() => setLoteAberto(false)}
+        titulo="Baixar listas da Caixa Postal"
+        descricao="Baixa da Receita a lista de mensagens de cada cliente marcado, um de cada vez. Não abre as mensagens nem registra ciência."
+        itens={matrizes.filter((c) => sel.marcados.has(c.contact_id)).map((c) => ({
+          contactId: c.contact_id, nome: c.nome,
+          pular: c.procuracao === 'ausente' ? 'Sem procuração' : c.consultado_em?.slice(0, 10) === hoje ? 'Consultado hoje' : null,
+        }))}
+        tipo="Consultar"
+        rotuloAcao="Baixar"
+        rotuloFeito="Lista baixada"
+        executar={async (item) => {
+          const r = await consultarCaixa.mutateAsync({ contactId: item.contactId });
+          return {
+            ok: r.ok, recente: r.recente, error: r.semProcuracao ? 'Sem procuração para a Caixa Postal' : r.error,
+            resumo: r.novas ? `${r.novas} ${r.novas === 1 ? 'mensagem nova' : 'mensagens novas'}` : 'Lista baixada, sem mensagem nova',
+          };
+        }}
+      />
     </div>
   );
 }

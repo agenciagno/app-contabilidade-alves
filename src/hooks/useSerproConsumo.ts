@@ -205,5 +205,16 @@ export function useCustoSerpro() {
     }
     return n;
   }, [chamadas]);
-  return { admin, preco: (tipo: 'Consultar' | 'Emitir'): number | null => (admin ? precoProxima(tipo, cobradas[tipo]) : null) };
+  const { data: config } = useSerproConfig();
+  const gastoCiclo = custoEstimado('Consultar', cobradas.Consultar) + custoEstimado('Emitir', cobradas.Emitir);
+  return {
+    admin,
+    preco: (tipo: 'Consultar' | 'Emitir'): number | null => (admin ? precoProxima(tipo, cobradas[tipo]) : null),
+    /** Gasto estimado do ciclo (21 a 20) e o alerta configurado em Tech; só para admin (null para os demais). */
+    gastoCiclo: admin ? gastoCiclo : null,
+    alerta: admin ? (config?.alerta_gasto_mensal ?? null) : null,
+    /** Quanto um lote de `n` chamadas soma ao ciclo, pelas faixas da tabela. */
+    custoLote: (tipo: 'Consultar' | 'Emitir', n: number): number | null =>
+      (admin ? custoEstimado(tipo, cobradas[tipo] + n) - custoEstimado(tipo, cobradas[tipo]) : null),
+  };
 }

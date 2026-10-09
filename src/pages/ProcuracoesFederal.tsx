@@ -6,6 +6,9 @@ import { toast } from 'sonner';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, DsTab, PageHeader, SearchField } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { AcaoLoteDialog, BarraSelecao, useSelecao } from '@/components/monitor/GuiasLote';
+import { hojeBR } from '@/lib/prazosFederais';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -90,6 +93,9 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
   const [estado, setEstado] = useEstadoUrl();
   const buscaInicial = useBuscaInicial();
   const [busca, setBusca] = useState(buscaInicial);
+  const sel = useSelecao();
+  const [loteAberto, setLoteAberto] = useState(false);
+  const hoje = hojeBR();
 
   const certDe = (l: LinhaProcuracao): CertificadoDoCliente | null => certPor.get(l.contact_id) ?? null;
   const seloCertDe = (l: LinhaProcuracao): Selo | null => (veCertificados ? seloCertificado(certDe(l)?.dias ?? null) : null);
@@ -163,6 +169,12 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
         <ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />
       </div>
 
+      <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
+        <DicaBotao custo="Consultar" texto="Consulta na Receita as procurações de cada cliente marcado, um de cada vez. Quem já foi mapeado hoje fica de fora.">
+          <Button size="sm" onClick={() => setLoteAberto(true)}>Mapear ({sel.marcados.size})</Button>
+        </DicaBotao>
+      </BarraSelecao>
+
       <div className="overflow-x-auto rounded-lg border border-line bg-paper">
         {carregando ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
@@ -172,6 +184,10 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
           <Table className="[&_td]:px-3 [&_th]:px-3">
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8">
+                  <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtradas.map((l) => l.contact_id))}
+                    onCheckedChange={(v) => (v ? sel.somar(filtradas.map((l) => l.contact_id)) : sel.limpar())} />
+                </TableHead>
                 <TableHead>Situação</TableHead>
                 <TableHead>Procuração e-CAC</TableHead>
                 {veCertificados && <TableHead>Certificado digital</TableHead>}
@@ -190,6 +206,7 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
                 const principal = fonte === 'situacao' && !consultando ? piorSelo(selos) : seloDe(l);
                 return (
                   <TableRow key={l.contact_id}>
+                    <TableCell className="w-8"><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></TableCell>
                     <TableCell className="min-w-[170px]">
                       <SeloMonitor selo={principal} outros={fonte === 'situacao' ? outrosMotivos(selos, principal) : []} />
                     </TableCell>
@@ -241,6 +258,22 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
 
       <RodapeLista mostrando={filtradas.length} total={matrizes.length} unidade="clientes ativos" filiais={linhas.length - matrizes.length} />
 
+      <AcaoLoteDialog
+        aberto={loteAberto}
+        onClose={() => setLoteAberto(false)}
+        titulo="Mapear procurações"
+        descricao="Consulta na Receita quais procurações cada cliente marcado deu à Contabilidade Alves e até quando valem, um de cada vez."
+        itens={matrizes.filter((l) => sel.marcados.has(l.contact_id)).map((l) => ({
+          contactId: l.contact_id, nome: l.nome, pular: l.mapeadoEm?.slice(0, 10) === hoje ? 'Mapeado hoje' : null,
+        }))}
+        tipo="Consultar"
+        rotuloAcao="Mapear"
+        rotuloFeito="Mapeado"
+        executar={async (item) => {
+          const r = await mapear.mutateAsync({ contactId: item.contactId });
+          return { ok: !!r.ok && !r.foraDoMonitoramento, error: r.error };
+        }}
+      />
       <AlertDialog open={!!aConfirmar} onOpenChange={(o) => !o && setAConfirmar(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -106,3 +106,13 @@ export function useGuiasEnviadas(processo: ProcessoGuia, competencia: string) {
     },
   });
 }
+
+// ---------------------------------------------------------------- baixar em lote (ZIP do que já está guardado; não chama o Serpro)
+export interface ResultadoZip { ok: boolean; url?: string; arquivos?: number; clientes?: number; semDocumento?: number; falhas?: number; error?: string }
+
+export function useBaixarZip() {
+  return useMutation({
+    mutationFn: (v: { contactIds: string[]; tipos: string[]; competencia?: string; ano?: number }) =>
+      invocarSerpro<ResultadoZip>('client-enviar', { action: 'zip', contact_ids: v.contactIds, tipos: v.tipos, competencia: v.competencia, ano: v.ano }),
+  });
+}

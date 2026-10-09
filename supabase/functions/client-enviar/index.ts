@@ -3,6 +3,9 @@
 //
 //   listar   { contact_id }   documentos já guardados do cliente (só PDF que existe de fato no bucket privado)
 //   guardar_relatorio { contact_id, tipo: situacao|faturamento, periodo?, pdf_base64, resumo? }  guarda o PDF gerado pela tela (relatório para o cliente)
+//   zip      { contact_ids: [...], tipos: [...], competencia?: "AAAA-MM", ano?: AAAA }   (Monitoramento, 09/10/2026)
+//            junta num ZIP os PDFs JÁ GUARDADOS dos clientes (pasta por cliente) e devolve um link de 10 min. Não chama o Serpro.
+//            Documento com período (DAS, recibos, guias, comprovantes) filtra pela competência ou ano; Situação Fiscal leva o último.
 //   enviar   { contact_id, canal: email|whatsapp|copiar, mensagem, assunto?, documentos?: [{tipo, id}], origem, referencia? }
 //            monta os links assinados (7 dias), manda o e-mail por aqui (API de e-mail da Hostinger) ou devolve o texto
 //            final para a tela abrir o WhatsApp / copiar. O cliente nunca recebe caminho de bucket, só o link com validade.
@@ -10,6 +13,7 @@
 // A tela nunca manda caminho de arquivo: manda (tipo, id do registro) e a função confere que o registro é do cliente.
 // Não chama o Serpro e não custa nada: só lê o que já foi guardado.
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { zipSync } from 'npm:fflate@0.8.2';
 import { perfilAtivo } from "../_shared/acesso.ts";
 
 const cors = {
@@ -43,6 +47,8 @@ interface Spec {
   ordem: string;
   rotulo: (r: Record<string, unknown>) => string;
   data: (r: Record<string, unknown>) => string;
+  /** Coluna de período para o ZIP em lote: data do 1º dia do mês, ano inteiro ou texto AAAAMM. Sem ela, vai o mais recente. */
+  periodo?: { coluna: string; formato: 'mes' | 'ano' | 'aaaamm' };
 }
 
 // Um tipo por coluna de PDF que o sistema já guarda. Bucket = o mesmo da função que gravou.
@@ -50,25 +56,28 @@ const DOCS: Record<string, Spec> = {
   sitfis: { tabela: 'serpro_sitfis', coluna: 'pdf_path', bucket: 'serpro-sitfis', extra: 'gerado_em', ordem: 'gerado_em',
     rotulo: (r) => `Situação fiscal (relatório de ${dataBR(r.gerado_em)})`, data: (r) => String(r.gerado_em ?? '') },
   pgdasd_recibo: { tabela: 'serpro_pgdasd_declaracoes', coluna: 'recibo_path', bucket: 'serpro-pgdasd', extra: 'periodo_apuracao', ordem: 'periodo_apuracao',
-    rotulo: (r) => `Recibo do PGDAS-D ${mesAno(r.periodo_apuracao)}`, data: (r) => String(r.periodo_apuracao ?? '') },
+    rotulo: (r) => `Recibo do PGDAS-D ${mesAno(r.periodo_apuracao)}`, data: (r) => String(r.periodo_apuracao ?? ''), periodo: { coluna: 'periodo_apuracao', formato: 'mes' } },
   pgdasd_declaracao: { tabela: 'serpro_pgdasd_declaracoes', coluna: 'declaracao_path', bucket: 'serpro-pgdasd', extra: 'periodo_apuracao', ordem: 'periodo_apuracao',
-    rotulo: (r) => `Declaração do PGDAS-D ${mesAno(r.periodo_apuracao)}`, data: (r) => String(r.periodo_apuracao ?? '') },
+    rotulo: (r) => `Declaração do PGDAS-D ${mesAno(r.periodo_apuracao)}`, data: (r) => String(r.periodo_apuracao ?? ''), periodo: { coluna: 'periodo_apuracao', formato: 'mes' } },
   pgdasd_das: { tabela: 'serpro_pgdasd_das', coluna: 'das_path', bucket: 'serpro-pgdasd', extra: 'periodo_apuracao', ordem: 'periodo_apuracao',
-    rotulo: (r) => `DAS ${mesAno(r.periodo_apuracao)}`, data: (r) => String(r.periodo_apuracao ?? '') },
+    rotulo: (r) => `DAS ${mesAno(r.periodo_apuracao)}`, data: (r) => String(r.periodo_apuracao ?? ''), periodo: { coluna: 'periodo_apuracao', formato: 'mes' } },
   dctfweb_recibo: { tabela: 'serpro_dctfweb', coluna: 'recibo_path', bucket: 'serpro-dctfweb', extra: 'competencia', ordem: 'competencia',
-    rotulo: (r) => `Recibo da DCTFWeb ${mesAno(r.competencia)}`, data: (r) => String(r.competencia ?? '') },
+    rotulo: (r) => `Recibo da DCTFWeb ${mesAno(r.competencia)}`, data: (r) => String(r.competencia ?? ''), periodo: { coluna: 'competencia', formato: 'mes' } },
   dctfweb_guia: { tabela: 'serpro_dctfweb_guias', coluna: 'pdf_path', bucket: 'serpro-dctfweb', extra: 'competencia,emitido_em', ordem: 'emitido_em',
-    rotulo: (r) => `Guia da DCTFWeb ${mesAno(r.competencia)}`, data: (r) => String(r.emitido_em ?? '') },
+    rotulo: (r) => `Guia da DCTFWeb ${mesAno(r.competencia)}`, data: (r) => String(r.emitido_em ?? ''), periodo: { coluna: 'competencia', formato: 'mes' } },
   defis_recibo: { tabela: 'serpro_defis', coluna: 'recibo_path', bucket: 'serpro-pgdasd', extra: 'ano_calendario', ordem: 'ano_calendario',
-    rotulo: (r) => `Recibo da DEFIS ${r.ano_calendario}`, data: (r) => `${r.ano_calendario}-12-31` },
+    rotulo: (r) => `Recibo da DEFIS ${r.ano_calendario}`, data: (r) => `${r.ano_calendario}-12-31`, periodo: { coluna: 'ano_calendario', formato: 'ano' } },
   defis_declaracao: { tabela: 'serpro_defis', coluna: 'declaracao_path', bucket: 'serpro-pgdasd', extra: 'ano_calendario', ordem: 'ano_calendario',
-    rotulo: (r) => `Declaração da DEFIS ${r.ano_calendario}`, data: (r) => `${r.ano_calendario}-12-31` },
+    rotulo: (r) => `Declaração da DEFIS ${r.ano_calendario}`, data: (r) => `${r.ano_calendario}-12-31`, periodo: { coluna: 'ano_calendario', formato: 'ano' } },
   comprovante: { tabela: 'serpro_pagamentos', coluna: 'comprovante_path', bucket: 'serpro-comprovantes', extra: 'periodo_apuracao,tipo_sigla,comprovante_emitido_em', ordem: 'comprovante_emitido_em',
-    rotulo: (r) => `Comprovante de pagamento ${r.tipo_sigla ? `${r.tipo_sigla} ` : ''}${mesAno(r.periodo_apuracao)}`.trim(), data: (r) => String(r.comprovante_emitido_em ?? r.periodo_apuracao ?? '') },
+    rotulo: (r) => `Comprovante de pagamento ${r.tipo_sigla ? `${r.tipo_sigla} ` : ''}${mesAno(r.periodo_apuracao)}`.trim(), data: (r) => String(r.comprovante_emitido_em ?? r.periodo_apuracao ?? ''), periodo: { coluna: 'periodo_apuracao', formato: 'mes' } },
   relatorio_situacao: { tabela: 'client_relatorios', coluna: 'path', bucket: 'client-relatorios', extra: 'tipo,gerado_em', ordem: 'gerado_em', onde: ['tipo', 'situacao'],
     rotulo: (r) => `Relatório de Situação Fiscal (gerado em ${dataBR(r.gerado_em)})`, data: (r) => String(r.gerado_em ?? '') },
   relatorio_faturamento: { tabela: 'client_relatorios', coluna: 'path', bucket: 'client-relatorios', extra: 'tipo,gerado_em,periodo', ordem: 'gerado_em', onde: ['tipo', 'faturamento'],
     rotulo: (r) => `Relatório de Faturamento dos últimos 12 meses (até ${mesAno(r.periodo ? `${r.periodo}-01` : r.gerado_em)})`, data: (r) => String(r.gerado_em ?? '') },
+  parcela_guia: { tabela: 'serpro_parcelas_guias', coluna: 'pdf_path', bucket: 'serpro-parcelamentos', extra: 'modalidade,parcela,gerado_em', ordem: 'gerado_em',
+    rotulo: (r) => `Guia da parcela ${String(r.parcela ?? '').replace(/^(\d{4})(\d{2})$/, '$2/$1')} (${r.modalidade ?? ''})`, data: (r) => String(r.gerado_em ?? ''),
+    periodo: { coluna: 'parcela', formato: 'aaaamm' } },
   darf: { tabela: 'serpro_darfs', coluna: 'pdf_path', bucket: 'serpro-darf', extra: 'codigo_receita,data_pa,created_at', ordem: 'created_at',
     rotulo: (r) => `DARF ${r.codigo_receita ?? ''} ${r.data_pa ?? ''}`.trim(), data: (r) => String(r.created_at ?? '') },
 };
@@ -183,6 +192,76 @@ async function enviar(payload: Record<string, unknown>, perfil: { id: string }, 
   return json({ ok: true, texto: final, whatsapp, destino, aviso: logErr ? 'Enviado, mas o histórico não foi gravado.' : undefined });
 }
 
+// ---------- ZIP em lote (só o que já está guardado; não chama o Serpro)
+const ZIP_MAX_CLIENTES = 300;
+const ZIP_MAX_ARQUIVOS = 600;
+const ZIP_MAX_BYTES = 90 * 1024 * 1024;
+
+async function zipLote(payload: Record<string, unknown>, perfil: { company_id: string; is_super_admin: boolean }) {
+  const ids = Array.isArray(payload.contact_ids) ? [...new Set((payload.contact_ids as unknown[]).map(String))].slice(0, ZIP_MAX_CLIENTES) : [];
+  const tipos = Array.isArray(payload.tipos) ? (payload.tipos as unknown[]).map(String).filter((t) => DOCS[t]) : [];
+  if (!ids.length || !tipos.length) return json({ error: 'Escolha clientes e tipos de documento' }, 400);
+  const competencia = typeof payload.competencia === 'string' && /^\d{4}-\d{2}$/.test(payload.competencia) ? payload.competencia : null;
+  const ano = Number(payload.ano) || (competencia ? Number(competencia.slice(0, 4)) : null);
+
+  const { data: contatos } = await admin.from('contacts').select('id, company_id, name, display_name, document').in('id', ids);
+  const meus = (contatos ?? []).filter((c) => perfil.is_super_admin || c.company_id === perfil.company_id);
+  if (!meus.length) return json({ error: 'Clientes não encontrados' }, 404);
+  const companyId = meus[0].company_id as string;
+  const pasta = new Map(meus.map((c) => [c.id as string, `${slug(String(c.display_name || c.name || 'Cliente'))} - ${String(c.document ?? '').replace(/\D/g, '')}`]));
+
+  const arquivos: { contactId: string; tipo: string; bucket: string; path: string; nome: string }[] = [];
+  for (const tipo of tipos) {
+    if (tipo === 'relatorio_faturamento' && !(await faturamentoLiberado(companyId))) continue;
+    const s = DOCS[tipo];
+    let q = admin.from(s.tabela).select(`id, contact_id, ${s.coluna}, ${s.extra}`).in('contact_id', [...pasta.keys()]).eq('company_id', companyId).not(s.coluna, 'is', null);
+    if (s.onde) q = q.eq(s.onde[0], s.onde[1]);
+    if (s.periodo && competencia && s.periodo.formato === 'mes') q = q.eq(s.periodo.coluna, `${competencia}-01`);
+    if (s.periodo && competencia && s.periodo.formato === 'aaaamm') q = q.eq(s.periodo.coluna, competencia.replace('-', ''));
+    if (s.periodo && ano && s.periodo.formato === 'ano') q = q.eq(s.periodo.coluna, ano);
+    const { data } = await q.order(s.ordem, { ascending: false }).limit(2000);
+    const vistos = new Set<string>();
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      const cid = String(r.contact_id);
+      // Sem período (Situação Fiscal): só o mais recente de cada cliente.
+      if (!s.periodo && vistos.has(cid)) continue;
+      vistos.add(cid);
+      arquivos.push({ contactId: cid, tipo, bucket: s.bucket, path: String(r[s.coluna]), nome: `${slug(s.rotulo(r))}.pdf` });
+    }
+  }
+  if (!arquivos.length) return json({ ok: false, error: 'Nenhum documento guardado para os clientes e tipos escolhidos.' });
+  if (arquivos.length > ZIP_MAX_ARQUIVOS) return json({ ok: false, error: `São ${arquivos.length} arquivos; o limite é ${ZIP_MAX_ARQUIVOS} por ZIP. Escolha menos clientes ou tipos.` });
+
+  const conteudo: Record<string, Uint8Array> = {};
+  let bytes = 0;
+  let falhas = 0;
+  for (let i = 0; i < arquivos.length; i += 8) {
+    const parte = arquivos.slice(i, i + 8);
+    const baixados = await Promise.all(parte.map(async (a) => {
+      const { data, error } = await admin.storage.from(a.bucket).download(a.path);
+      return error || !data ? null : new Uint8Array(await data.arrayBuffer());
+    }));
+    parte.forEach((a, k) => {
+      const b = baixados[k];
+      if (!b) { falhas++; return; }
+      let nome = `${pasta.get(a.contactId)}/${a.nome}`;
+      for (let n = 2; conteudo[nome]; n++) nome = `${pasta.get(a.contactId)}/${a.nome.replace(/\.pdf$/, '')} (${n}).pdf`;
+      conteudo[nome] = b;
+      bytes += b.length;
+    });
+    if (bytes > ZIP_MAX_BYTES) return json({ ok: false, error: 'O ZIP passou de 90 MB. Escolha menos clientes ou tipos.' });
+  }
+  const zip = zipSync(conteudo, { level: 0 });
+  const path = `${companyId}/lotes/documentos-${Date.now()}.zip`;
+  const up = await admin.storage.from('client-relatorios').upload(path, zip, { contentType: 'application/zip', upsert: false });
+  if (up.error) return json({ error: 'Não foi possível montar o ZIP' }, 500);
+  const nomeZip = `documentos${competencia ? `-${competencia}` : ano ? `-${ano}` : ''}.zip`;
+  const { data: ass } = await admin.storage.from('client-relatorios').createSignedUrl(path, 600, { download: nomeZip });
+  if (!ass?.signedUrl) return json({ error: 'Não foi possível gerar o link do ZIP' }, 500);
+  const comArquivo = new Set(arquivos.map((a) => a.contactId));
+  return json({ ok: true, url: ass.signedUrl, arquivos: Object.keys(conteudo).length, clientes: comArquivo.size, semDocumento: pasta.size - comArquivo.size, falhas });
+}
+
 const RELATORIOS = ['situacao', 'faturamento'];
 const MAX_PDF_BYTES = 4 * 1024 * 1024;
 
@@ -215,6 +294,7 @@ Deno.serve(async (req) => {
     const perfil = await equipeDe(req);
     if (!perfil) return json({ error: 'Sem permissão' }, 403);
     const payload = await req.json().catch(() => ({})) as Record<string, unknown>;
+    if (payload.action === 'zip') return await zipLote(payload, perfil);
     const contato = await contatoDaEquipe(perfil, payload.contact_id);
     if (!contato) return json({ error: 'Cliente não encontrado' }, 404);
     switch (payload.action) {

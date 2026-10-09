@@ -5,6 +5,9 @@ import { Eye } from 'lucide-react';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, useSelecao } from '@/components/monitor/GuiasLote';
+import { hojeBR } from '@/lib/prazosFederais';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,7 +17,7 @@ import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { PagamentosClienteSheet } from '@/components/serpro/PagamentosClienteSheet';
 import { useConsultaPagamentos } from '@/components/serpro/useConsultaPagamentos';
 import { useConsultaPgdasd } from '@/components/serpro/pgdasdUi';
-import { competenciaPadrao, mesDeData, siglaCompetencia, useMatrizPagamentos, type TipoDoc } from '@/hooks/useSerproPagamentos';
+import { competenciaPadrao, mesDeData, siglaCompetencia, useComprovantePagamento, useConsultarPagamentos, useMatrizPagamentos, type TipoDoc } from '@/hooks/useSerproPagamentos';
 import { anoDe, duplicidadeDas, useMatrizPgdasd } from '@/hooks/useSerproPgdasd';
 import { unificarLinhas, type DasUnificado, type LinhaUnificada } from '@/hooks/useSerproDasUnificado';
 import type { TabelaExport } from '@/lib/exportarTabela';
@@ -95,6 +98,13 @@ export default function PagamentosFederal() {
   const [regime, setRegime] = useState('todos');
   const [situacao, setSituacao] = useState<Situacao>('todos');
   const [aberto, setAberto] = useState<string | null>(null);
+  // Lotes (09/10/2026): consultar, emitir comprovantes que faltam e baixar.
+  const sel = useSelecao();
+  const consultarPag = useConsultarPagamentos();
+  const comprovante = useComprovantePagamento();
+  const [lote, setLote] = useState<'consultar' | 'comprovantes' | null>(null);
+  const [baixarAberto, setBaixarAberto] = useState(false);
+  const hoje = hojeBR();
 
   const isLoading = carregandoPag || carregandoSn;
   const linhas = useMemo(() => unificarLinhas(pagamentos, simples, competencia), [pagamentos, simples, competencia]);
@@ -133,6 +143,9 @@ export default function PagamentosFederal() {
   }, [linhas, busca, situacao, regime, competencia]);
 
   const linhaAberta = linhas.find((l) => l.contact_id === aberto) ?? null;
+  const marcadas = linhas.filter((l) => sel.marcados.has(l.contact_id));
+  // Comprovante é por documento pago: um item por documento sem comprovante guardado.
+  const semComprovante = marcadas.flatMap((l) => l.docs.filter((d) => !d.comprovante_path).map((d) => ({ l, d })));
 
   const chip = (l: LinhaUnificada, tipo: TipoDoc) => {
     if (!l.consultadoEm) return <span className="text-muted-ink-2">—</span>;
@@ -176,6 +189,18 @@ export default function PagamentosFederal() {
         </Select>
       </div>
 
+      <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
+        <DicaBotao custo="Consultar" texto={`Consulta na Receita os pagamentos de ${siglaCompetencia(competencia)} de cada cliente marcado. Quem já foi consultado hoje fica de fora.`}>
+          <Button size="sm" onClick={() => setLote('consultar')}>Consultar pagamentos ({sel.marcados.size})</Button>
+        </DicaBotao>
+        <DicaBotao custo="Emitir" texto="Emite o comprovante de cada pagamento já consultado que ainda não tem comprovante guardado.">
+          <Button size="sm" variant="outline" disabled={!semComprovante.length} onClick={() => setLote('comprovantes')}>Emitir comprovantes ({semComprovante.length})</Button>
+        </DicaBotao>
+        <DicaBotao texto="Baixa num ZIP os comprovantes e os DAS já guardados da competência. Não consulta a Receita.">
+          <Button size="sm" variant="outline" onClick={() => setBaixarAberto(true)}>Baixar</Button>
+        </DicaBotao>
+      </BarraSelecao>
+
       <div className="overflow-hidden rounded-lg border border-line bg-paper">
         {isLoading ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
@@ -185,6 +210,10 @@ export default function PagamentosFederal() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8">
+                  <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtradas.map((l) => l.contact_id))}
+                    onCheckedChange={(v) => (v ? sel.somar(filtradas.map((l) => l.contact_id)) : sel.limpar())} />
+                </TableHead>
                 <TableHead>Razão social</TableHead>
                 <TableHead>CNPJ</TableHead>
                 <TableHead>DAS</TableHead>
@@ -198,6 +227,9 @@ export default function PagamentosFederal() {
                 const r = rotuloDas(l.das);
                 return (
                   <TableRow key={l.contact_id} className="cursor-pointer" onClick={() => setAberto(l.contact_id)}>
+                    <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} />
+                    </TableCell>
                     <TableCell>
                       <p className="text-ui text-ink">{l.nome}</p>
                       <p className="text-meta text-muted-ink-2">{REGIMES[l.regime ?? ''] ?? l.regime ?? 'Sem regime'}</p>
@@ -253,6 +285,52 @@ export default function PagamentosFederal() {
       />
       {consultaPag.dialog}
       {consultaDas.dialog}
+      <AcaoLoteDialog
+        aberto={lote === 'consultar'}
+        onClose={() => setLote(null)}
+        titulo={`Consultar pagamentos de ${siglaCompetencia(competencia)}`}
+        descricao="Uma consulta por cliente marcado, um de cada vez: traz os documentos pagos da competência (DARF, DAE e DAS)."
+        itens={marcadas.map((l) => ({
+          contactId: l.contact_id, nome: l.nome,
+          pular: l.semProcuracao ? 'Sem procuração' : l.consultadoEm?.slice(0, 10) === hoje ? 'Consultado hoje' : null,
+        }))}
+        tipo="Consultar"
+        rotuloAcao="Consultar"
+        rotuloFeito="Consultado"
+        executar={async (item) => {
+          const r = await consultarPag.mutateAsync({ contactId: item.contactId, competencia });
+          return {
+            ok: r.ok && !r.foraDoMonitoramento, recente: r.recente, error: r.semProcuracao ? 'Sem procuração para Pagamentos' : r.error,
+            resumo: r.do_mes != null ? `${r.do_mes} ${r.do_mes === 1 ? 'documento' : 'documentos'} no mês` : undefined,
+          };
+        }}
+      />
+      <AcaoLoteDialog
+        aberto={lote === 'comprovantes'}
+        onClose={() => setLote(null)}
+        titulo="Emitir comprovantes de pagamento"
+        descricao="Um comprovante por documento pago que ainda não tem PDF guardado, um de cada vez."
+        itens={semComprovante.map(({ l, d }) => ({
+          contactId: d.id, nome: `${l.nome} · ${d.tipo_sigla}${d.valor_total != null ? ` ${moeda(d.valor_total)}` : ''}${d.data_arrecadacao ? ` · pago em ${ddmm(d.data_arrecadacao)}` : ''}`,
+        }))}
+        tipo="Emitir"
+        rotuloAcao="Emitir"
+        rotuloFeito="Comprovante guardado"
+        executar={async (item) => {
+          const doc = semComprovante.find((x) => x.d.id === item.contactId);
+          if (!doc) return { ok: false, error: 'Documento não encontrado' };
+          const r = await comprovante.mutateAsync({ pagamentoId: doc.d.id, contactId: doc.l.contact_id });
+          return { ok: r.ok, jaGerado: r.jaEmitido, error: r.semProcuracao ? 'Sem procuração para Pagamentos' : r.error };
+        }}
+      />
+      <BaixarLoteDialog
+        aberto={baixarAberto}
+        onClose={() => setBaixarAberto(false)}
+        contactIds={[...sel.marcados]}
+        competencia={competencia}
+        referencia={`competência ${siglaCompetencia(competencia)}`}
+        opcoes={[{ tipo: 'comprovante', rotulo: 'Comprovantes de pagamento' }, { tipo: 'pgdasd_das', rotulo: 'DAS gerados' }]}
+      />
     </div>
   );
 }

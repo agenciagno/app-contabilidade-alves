@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { format, lastDayOfMonth } from 'date-fns';
-import { CheckCircle2, Loader2, Mail, MinusCircle, XCircle } from 'lucide-react';
+import { CheckCircle2, Download, Loader2, Mail, MinusCircle, XCircle } from 'lucide-react';
 
 import { DateField } from '@/components/ds';
 import { ehDiaUtil } from '@/lib/prazosFederais';
@@ -14,10 +14,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Preco } from '@/components/serpro/CustoSerpro';
+import { Preco, brl } from '@/components/serpro/CustoSerpro';
 import { useCustoSerpro } from '@/hooks/useSerproConsumo';
 import { useEnviarCliente } from '@/hooks/useEnvioCliente';
-import { ORIGEM_ENVIO, type ProcessoGuia } from '@/hooks/useGuiasCliente';
+import { ORIGEM_ENVIO, useBaixarZip, type ProcessoGuia, type ResultadoZip } from '@/hooks/useGuiasCliente';
+import { abrirPdf } from '@/hooks/useSerproPgdasd';
 import { cn } from '@/lib/utils';
 
 type Resultado = { estado: 'ok' | 'ja' | 'erro'; msg: string };
@@ -31,7 +32,20 @@ function IconeResultado({ r, rodando }: { r?: Resultado; rodando: boolean }) {
   return <XCircle className="h-4 w-4 shrink-0 text-danger" />;
 }
 
-// ---------------------------------------------------------------- barra de seleção
+// ---------------------------------------------------------------- seleção na lista
+/** Clientes marcados na lista (caixa de marcar por linha). */
+export function useSelecao() {
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  return {
+    marcados,
+    alternar: (id: string) => setMarcados((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; }),
+    definir: (ids: string[]) => setMarcados(new Set(ids)),
+    somar: (ids: string[]) => setMarcados((s) => new Set([...s, ...ids])),
+    limpar: () => setMarcados(new Set()),
+    todos: (ids: string[]) => ids.length > 0 && ids.every((id) => marcados.has(id)),
+  };
+}
+
 export function BarraSelecao({ quantos, onLimpar, children }: { quantos: number; onLimpar: () => void; children: React.ReactNode }) {
   if (!quantos) return null;
   return (
@@ -43,39 +57,62 @@ export function BarraSelecao({ quantos, onLimpar, children }: { quantos: number;
   );
 }
 
-// ---------------------------------------------------------------- gerar em lote
+// ---------------------------------------------------------------- ação em lote (gerar, consultar, mapear)
 export interface ItemLote {
   contactId: string;
   nome: string;
-  /** Já há guia guardada e válida: sem data de pagamento, abre a guardada e não emite (não cobra). */
-  guardada: boolean;
-  /** Algo que deve impedir a Receita de gerar (ex.: sem declaração no mês). */
+  /** Guia: já há guia guardada e válida (sem data de pagamento, o servidor devolve a guardada e não emite). */
+  guardada?: boolean;
+  /** Consulta: motivo para pular sem chamar a Receita (ex.: "Consultado hoje"). Dá para incluir mesmo assim. */
+  pular?: string | null;
+  /** Algo que deve impedir a Receita de responder (ex.: sem declaração no mês). */
   aviso?: string | null;
 }
 
-export function GerarLoteDialog({
-  aberto, onClose, titulo, descricao, itens, executar,
+export type ResultadoLote = { ok: boolean; jaGerado?: boolean; recente?: boolean; error?: string; resumo?: string };
+
+/**
+ * Janela de lote: um cliente por vez, parar no meio, resumo no fim e "tentar de novo os com erro".
+ * O valor (R$) e o aviso de gasto aparecem só para admin; o lote só AVISA quando passa do alerta de gasto (decisão de Gabriel, 09/10/2026).
+ */
+export function AcaoLoteDialog({
+  aberto, onClose, titulo, descricao, itens, executar, tipo, vezes = 1, rotuloAcao, comData = false, rotuloFeito = 'Feito', aposConcluir,
 }: {
   aberto: boolean;
   onClose: () => void;
   titulo: string;
   descricao: string;
   itens: ItemLote[];
-  executar: (item: ItemLote, dataPagamento?: string) => Promise<{ ok: boolean; jaGerado?: boolean; error?: string }>;
+  executar: (item: ItemLote, dataPagamento?: string) => Promise<ResultadoLote>;
+  tipo: 'Consultar' | 'Emitir';
+  /** Chamadas cobradas por cliente (ex.: DCTFWeb e MIT = 2). */
+  vezes?: number;
+  /** Verbo do botão: "Gerar", "Consultar", "Mapear"... */
+  rotuloAcao: string;
+  /** Guias: campo de data de pagamento. */
+  comData?: boolean;
+  rotuloFeito?: string;
+  aposConcluir?: string;
 }) {
   const [dataPagamento, setDataPagamento] = useState('');
+  const [incluirPulados, setIncluirPulados] = useState(false);
   const [resultados, setResultados] = useState<Map<string, Resultado>>(new Map());
   const [atual, setAtual] = useState<string | null>(null);
   const [rodando, setRodando] = useState(false);
   const parar = useRef(false);
-  const { admin } = useCustoSerpro();
+  const { admin, custoLote, gastoCiclo, alerta } = useCustoSerpro();
 
-  useEffect(() => { if (aberto) { setDataPagamento(''); setResultados(new Map()); setAtual(null); setRodando(false); } }, [aberto]);
+  useEffect(() => { if (aberto) { setDataPagamento(''); setIncluirPulados(false); setResultados(new Map()); setAtual(null); setRodando(false); } }, [aberto]);
 
   const hoje = format(new Date(), 'yyyy-MM-dd');
   const fimDoMes = format(lastDayOfMonth(new Date()), 'yyyy-MM-dd');
   const dataValida = !dataPagamento || (dataPagamento >= hoje && dataPagamento <= fimDoMes && ehDiaUtil(dataPagamento));
-  const emissoes = itens.filter((i) => !!dataPagamento || !i.guardada).length;
+  const vaiRodar = (i: ItemLote) => incluirPulados || !i.pular;
+  const alvo = itens.filter(vaiRodar);
+  const pulados = itens.length - alvo.length;
+  const chamadas = alvo.filter((i) => !!dataPagamento || !i.guardada).length * vezes;
+  const custo = custoLote(tipo, chamadas);
+  const passaAlerta = admin && custo !== null && gastoCiclo !== null && alerta !== null && gastoCiclo + custo > alerta;
   const terminou = resultados.size > 0 && !rodando;
   const ok = [...resultados.values()].filter((r) => r.estado === 'ok').length;
   const ja = [...resultados.values()].filter((r) => r.estado === 'ja').length;
@@ -84,14 +121,17 @@ export function GerarLoteDialog({
   const iniciar = async () => {
     parar.current = false;
     setRodando(true);
-    for (const item of itens) {
+    for (const item of alvo) {
       if (parar.current) break;
       if (resultados.get(item.contactId)?.estado === 'ok') continue;
       setAtual(item.contactId);
       let r: Resultado;
       try {
         const res = await executar(item, dataPagamento || undefined);
-        r = res.ok ? (res.jaGerado ? { estado: 'ja', msg: 'Já estava gerada: nada foi emitido' } : { estado: 'ok', msg: 'Gerada' }) : { estado: 'erro', msg: res.error ?? 'A Receita recusou' };
+        if (!res.ok) r = { estado: 'erro', msg: res.error ?? 'A Receita recusou' };
+        else if (res.jaGerado) r = { estado: 'ja', msg: 'Já estava gerada: nada foi emitido' };
+        else if (res.recente) r = { estado: 'ja', msg: 'Feito há poucos minutos: não chamou de novo' };
+        else r = { estado: 'ok', msg: res.resumo ?? rotuloFeito };
       } catch (e) {
         r = { estado: 'erro', msg: msgErro(e) };
       }
@@ -106,14 +146,15 @@ export function GerarLoteDialog({
       <DialogContent className="max-w-[640px]">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
-          <DialogDescription>{descricao}{admin ? ' Cada emissão é cobrada pelo Serpro; o total aparece no botão.' : ''}</DialogDescription>
+          <DialogDescription>{descricao}{admin ? ' Cada chamada é cobrada pelo Serpro; o total aparece no botão.' : ''}</DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[40vh] space-y-1 overflow-y-auto rounded-md border border-line p-2">
           {itens.map((i) => {
             const r = resultados.get(i.contactId);
+            const fora = !vaiRodar(i);
             return (
-              <div key={i.contactId} className="flex items-start gap-2 rounded-sm px-2 py-1.5">
+              <div key={i.contactId} className={cn('flex items-start gap-2 rounded-sm px-2 py-1.5', fora && 'opacity-60')}>
                 <IconeResultado r={r} rodando={atual === i.contactId} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-ui text-ink">{i.nome}</p>
@@ -121,6 +162,7 @@ export function GerarLoteDialog({
                     <p className={cn('text-meta', r.estado === 'erro' ? 'text-danger' : 'text-muted-ink-2')}>{r.msg}</p>
                   ) : (
                     <>
+                      {fora && <p className="text-meta text-muted-ink-2">{i.pular}: fica de fora.</p>}
                       {i.guardada && !dataPagamento && <p className="text-meta text-muted-ink-2">Já tem guia guardada e válida: não emite de novo.</p>}
                       {i.aviso && <p className="text-meta text-warn">{i.aviso}</p>}
                     </>
@@ -131,7 +173,14 @@ export function GerarLoteDialog({
           })}
         </div>
 
-        {!terminou && (
+        {!terminou && pulados > 0 && (
+          <label className="flex items-center gap-2 text-ui text-ink">
+            <Checkbox checked={incluirPulados} onCheckedChange={(v) => setIncluirPulados(!!v)} disabled={rodando} />
+            Incluir {pulados === 1 ? 'o cliente que ficou' : `os ${pulados} que ficaram`} de fora
+          </label>
+        )}
+
+        {!terminou && comData && (
           <div className="space-y-1.5">
             <label className="text-ui-strong text-ink">Data do pagamento (opcional)</label>
             <DateField value={dataPagamento} onChange={setDataPagamento} min={hoje} max={fimDoMes} desabilitar={(d) => !ehDiaUtil(d)} placeholder="Em branco: guia pelo vencimento" disabled={rodando} />
@@ -143,10 +192,16 @@ export function GerarLoteDialog({
           </div>
         )}
 
+        {!terminou && passaAlerta && (
+          <p className="rounded-md border border-warn bg-warn-soft px-3 py-2 text-meta text-ink">
+            Este lote leva o gasto estimado do ciclo para cerca de {brl((gastoCiclo ?? 0) + (custo ?? 0))}, acima do alerta de {brl(alerta ?? 0)}. Dá para seguir.
+          </p>
+        )}
+
         {terminou && (
           <p className="text-ui text-ink">
-            {ok} {ok === 1 ? 'gerada' : 'geradas'}{ja ? ` · ${ja} já existiam` : ''}{erros ? ` · ${erros} com erro` : ''}.
-            {ok > 0 && ' Para mandar ao cliente, use "Conferir e enviar".'}
+            {ok} {ok === 1 ? 'feito' : 'feitos'}{ja ? ` · ${ja} sem nova chamada` : ''}{erros ? ` · ${erros} com erro` : ''}.
+            {ok > 0 && aposConcluir ? ` ${aposConcluir}` : ''}
           </p>
         )}
 
@@ -157,9 +212,9 @@ export function GerarLoteDialog({
             <>
               <Button variant="outline" onClick={onClose}>{terminou ? 'Fechar' : 'Cancelar'}</Button>
               {(!terminou || erros > 0) && (
-                <Button onClick={iniciar} disabled={!itens.length || !dataValida}>
-                  {terminou ? 'Tentar de novo os com erro' : `Gerar ${itens.length}`}
-                  {!terminou && emissoes > 0 && <Preco tipo="Emitir" vezes={emissoes} />}
+                <Button onClick={iniciar} disabled={!alvo.length || !dataValida}>
+                  {terminou ? 'Tentar de novo os com erro' : `${rotuloAcao} ${alvo.length}`}
+                  {!terminou && chamadas > 0 && <Preco tipo={tipo} vezes={chamadas} />}
                 </Button>
               )}
             </>
@@ -167,6 +222,17 @@ export function GerarLoteDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Guias (DAS, DCTFWeb, parcela, MEI): a janela de lote com data de pagamento. */
+export function GerarLoteDialog(props: {
+  aberto: boolean; onClose: () => void; titulo: string; descricao: string; itens: ItemLote[];
+  executar: (item: ItemLote, dataPagamento?: string) => Promise<ResultadoLote>; comData?: boolean;
+}) {
+  return (
+    <AcaoLoteDialog {...props} tipo="Emitir" rotuloAcao="Gerar" comData={props.comData ?? true} rotuloFeito="Gerada"
+      aposConcluir='Para mandar ao cliente, use "Conferir e enviar".' />
   );
 }
 
@@ -312,6 +378,79 @@ export function EnviarGuiasDialog({
               )}
             </>
           )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------- baixar em lote
+export interface OpcaoDocumento { tipo: string; rotulo: string }
+
+/** ZIP com os PDFs já guardados dos clientes marcados, uma pasta por cliente. Grátis: não consulta a Receita. */
+export function BaixarLoteDialog({
+  aberto, onClose, contactIds, opcoes, competencia, ano, referencia,
+}: {
+  aberto: boolean;
+  onClose: () => void;
+  contactIds: string[];
+  opcoes: OpcaoDocumento[];
+  /** AAAA-MM (documentos do mês) ou ano (DEFIS). */
+  competencia?: string;
+  ano?: number;
+  /** Ex.: "competência 09/2026". */
+  referencia: string;
+}) {
+  const baixar = useBaixarZip();
+  const [tipos, setTipos] = useState<Set<string>>(new Set());
+  const [res, setRes] = useState<ResultadoZip | null>(null);
+
+  useEffect(() => { if (aberto) { setTipos(new Set(opcoes.map((o) => o.tipo))); setRes(null); } }, [aberto]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const iniciar = async () => {
+    setRes(null);
+    try {
+      const r = await baixar.mutateAsync({ contactIds, tipos: [...tipos], competencia, ano });
+      setRes(r);
+      if (r.ok && r.url) abrirPdf(r.url);
+    } catch (e) {
+      setRes({ ok: false, error: msgErro(e) });
+    }
+  };
+
+  return (
+    <Dialog open={aberto} onOpenChange={(o) => { if (!o && !baixar.isPending) onClose(); }}>
+      <DialogContent className="max-w-[520px]">
+        <DialogHeader>
+          <DialogTitle>Baixar documentos em lote</DialogTitle>
+          <DialogDescription>
+            {contactIds.length} {contactIds.length === 1 ? 'cliente' : 'clientes'} · {referencia}. Vai num ZIP, uma pasta por cliente, só o que já está guardado no sistema: não consulta a Receita.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          {opcoes.map((o) => (
+            <label key={o.tipo} className="flex items-center gap-2 text-ui text-ink">
+              <Checkbox checked={tipos.has(o.tipo)} disabled={baixar.isPending}
+                onCheckedChange={() => setTipos((s) => { const n = new Set(s); if (n.has(o.tipo)) n.delete(o.tipo); else n.add(o.tipo); return n; })} />
+              {o.rotulo}
+            </label>
+          ))}
+        </div>
+        {res && (
+          <p className={cn('text-ui', res.ok ? 'text-ink' : 'text-danger')}>
+            {res.ok
+              ? `${res.arquivos} ${res.arquivos === 1 ? 'arquivo' : 'arquivos'} de ${res.clientes} ${res.clientes === 1 ? 'cliente' : 'clientes'}.`
+                + (res.semDocumento ? ` ${res.semDocumento} sem documento guardado.` : '') + (res.falhas ? ` ${res.falhas} não abriram.` : '')
+                + ' Se o download não começou, clique de novo.'
+              : res.error}
+          </p>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={baixar.isPending}>Fechar</Button>
+          <Button onClick={iniciar} disabled={!tipos.size || !contactIds.length || baixar.isPending}>
+            {baixar.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
+            {baixar.isPending ? 'Montando o ZIP…' : 'Baixar ZIP'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

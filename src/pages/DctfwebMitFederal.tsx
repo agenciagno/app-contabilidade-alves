@@ -14,13 +14,13 @@ import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { useAbrirRecibo, useConsultaDctfwebMit } from '@/components/serpro/dctfwebUi';
 import { FaixaEstados, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
-import { BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
+import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
 import { useGerarGuiaDctfweb, useGuiasDctfweb, useGuiasEnviadas, useLinkGuiaDctfweb, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
 import { abrirPdf } from '@/hooks/useSerproPgdasd';
 import { hojeBR } from '@/lib/prazosFederais';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { competenciaPadrao, mesDeData, siglaCompetencia } from '@/hooks/useSerproPagamentos';
-import { apuracaoVigente, estadoDctfweb, estadoMit, useMatrizDctfwebMit, type LinhaDctfwebMit } from '@/hooks/useSerproDctfweb';
+import { apuracaoVigente, estadoDctfweb, estadoMit, useConsultarDctfwebMit, useMatrizDctfwebMit, type LinhaDctfwebMit } from '@/hooks/useSerproDctfweb';
 import { ROTULO_ESTADO, contarEstados, seloDctfwebColuna, seloDctfwebMit, seloMitColuna, type Selo } from '@/lib/monitorEstados';
 import type { TabelaExport } from '@/lib/exportarTabela';
 
@@ -58,6 +58,9 @@ export default function DctfwebMitFederal() {
   const gerarGuia = useGerarGuiaDctfweb();
   const linkGuia = useLinkGuiaDctfweb();
   const hoje = hojeBR();
+  const consultarDm = useConsultarDctfwebMit();
+  const [consultaLote, setConsultaLote] = useState(false);
+  const [baixarAberto, setBaixarAberto] = useState(false);
 
   const seloDe = (l: LinhaDctfwebMit): Selo | null => (emAndamento === l.contact_id
     ? { estado: 'processando', motivo: 'Consultando…' }
@@ -151,6 +154,12 @@ export default function DctfwebMitFederal() {
         <BarraSelecao quantos={marcados.size} onLimpar={() => setMarcados(new Set())}>
           <DicaBotao custo="Emitir" texto="Gera a guia (DARF) da DCTFWeb de cada cliente marcado. Pede confirmação antes.">
             <Button size="sm" onClick={() => setLoteAberto(true)}>Gerar guia ({marcados.size})</Button>
+          </DicaBotao>
+          <DicaBotao custo="Consultar" vezes={2} texto={`Consulta na Receita o recibo da DCTFWeb de ${siglaCompetencia(competencia)} e a MIT do ano de cada cliente marcado. Quem já foi consultado hoje fica de fora.`}>
+            <Button size="sm" variant="outline" onClick={() => setConsultaLote(true)}>Consultar ({marcados.size})</Button>
+          </DicaBotao>
+          <DicaBotao texto="Baixa num ZIP os recibos e as guias da DCTFWeb já guardados. Não consulta a Receita.">
+            <Button size="sm" variant="outline" onClick={() => setBaixarAberto(true)}>Baixar</Button>
           </DicaBotao>
           <Button size="sm" variant="outline" disabled={marcar.isPending}
             onClick={() => marcar.mutate({ contactIds: [...marcados], processo: 'dctfweb', valor: true })}>Marcar "recebe guia da CA"</Button>
@@ -281,6 +290,31 @@ export default function DctfwebMitFederal() {
           const r = await gerarGuia.mutateAsync({ contactId: item.contactId, competencia, dataPagamento });
           return { ok: r.ok, jaGerado: r.jaGerado, error: r.error };
         }}
+      />
+      <AcaoLoteDialog
+        aberto={consultaLote}
+        onClose={() => setConsultaLote(false)}
+        titulo={`Consultar DCTFWeb e MIT de ${siglaCompetencia(competencia)}`}
+        descricao="Duas consultas por cliente marcado (recibo da DCTFWeb do mês e MIT do ano), um de cada vez."
+        itens={matrizes.filter((l) => marcados.has(l.contact_id)).map((l) => ({
+          contactId: l.contact_id, nome: l.nome, pular: (ultimaConsulta(l) ?? '').slice(0, 10) === hoje ? 'Consultado hoje' : null,
+        }))}
+        tipo="Consultar"
+        vezes={2}
+        rotuloAcao="Consultar"
+        rotuloFeito="Consultado"
+        executar={async (item) => {
+          const r = await consultarDm.mutateAsync({ contactId: item.contactId, competencia });
+          return { ok: r.ok, recente: r.recente, error: r.semProcuracao ? 'Sem procuração para a DCTFWeb' : r.error };
+        }}
+      />
+      <BaixarLoteDialog
+        aberto={baixarAberto}
+        onClose={() => setBaixarAberto(false)}
+        contactIds={[...marcados]}
+        competencia={competencia}
+        referencia={`competência ${siglaCompetencia(competencia)}`}
+        opcoes={[{ tipo: 'dctfweb_recibo', rotulo: 'Recibos da DCTFWeb' }, { tipo: 'dctfweb_guia', rotulo: 'Guias da DCTFWeb' }, { tipo: 'comprovante', rotulo: 'Comprovantes de pagamento' }]}
       />
       <EnviarGuiasDialog
         aberto={envioAberto}
