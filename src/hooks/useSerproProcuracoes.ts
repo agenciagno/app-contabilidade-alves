@@ -46,7 +46,6 @@ export interface LinhaProcuracao {
   perdidaEm: string | null;
 }
 
-const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
 const digitos = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
 const hojeISO = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 const diasEntre = (de: string, ate: string) => Math.round((Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${de}T00:00:00Z`)) / 86_400_000);
@@ -94,7 +93,7 @@ export function useProcuracoes() {
       for (const r of linhas) { const a = porCliente.get(r.contact_id) ?? []; a.push(r); porCliente.set(r.contact_id, a); }
 
       return contatos
-        .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
+        .filter((c) => { const d = digitos(c.document); return d.length === 14; })
         .map((c): LinhaProcuracao => {
           const d = derivarProcuracao(porCliente.get(c.id) ?? []);
           return {

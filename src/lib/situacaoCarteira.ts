@@ -30,7 +30,6 @@ import { vencendo as procuracaoVencendo, type LinhaProcuracao, type SituacaoProc
 import type { LinhaPagamentos } from '@/hooks/useSerproPagamentos';
 import { vencimentoDoPeriodo } from '@/lib/prazosFederais';
 
-const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
 export const digitos = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
 
 export const REGIME_ROTULO: Record<string, string> = {
@@ -185,7 +184,7 @@ export function montarCarteira(e: EntradaCarteira): LinhaCarteira[] {
 
   const universo = e.clientes.filter((c) => {
     const d = digitos(c.documento);
-    return c.status_cliente === STATUS_MONITORADO && d.length === 14 && d.slice(8, 12) === '0001' && !CNPJS_DA_CA.has(d);
+    return c.status_cliente === STATUS_MONITORADO && d.length === 14 && d.slice(8, 12) === '0001';
   });
 
   const porId = <T extends { contact_id: string }>(xs: T[]) => new Map(xs.map((x) => [x.contact_id, x]));

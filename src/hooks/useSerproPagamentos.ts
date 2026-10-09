@@ -60,7 +60,6 @@ export interface LinhaPagamentos {
   semProcuracao: boolean;
 }
 
-const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
 const digitos = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
 
 // ---------------------------------------------------------------- competência (AAAA-MM)
@@ -132,7 +131,7 @@ export function useMatrizPagamentos(competencia: string) {
       return contatos
         .filter((c) => {
           const d = digitos(c.document);
-          return d.length === 14 && !CNPJS_DA_CA.has(d);
+          return d.length === 14;
         })
         .map((c): LinhaPagamentos => {
           const docs = docsPor.get(c.id) ?? [];

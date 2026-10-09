@@ -33,7 +33,6 @@ export interface LinhaDctfwebMit {
   semProcuracao: boolean;
 }
 
-const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
 const digitos = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
 /** A MIT só aparece aqui como "encerrada" com situação 3 (a documentação não traz a tabela de situações). */
 export const SITUACAO_MIT_ENCERRADA = 3;
@@ -83,7 +82,7 @@ export function useMatrizDctfwebMit(competencia: string) {
       for (const m of mit) { const a = mPor.get(m.contact_id) ?? []; a.push(m); mPor.set(m.contact_id, a); }
 
       return contatos
-        .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
+        .filter((c) => { const d = digitos(c.document); return d.length === 14; })
         .map((c): LinhaDctfwebMit => {
           const sn = sPor.get(c.id);
           return {

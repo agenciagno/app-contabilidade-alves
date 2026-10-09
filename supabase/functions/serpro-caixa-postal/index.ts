@@ -41,7 +41,6 @@ const json = (body: unknown, status = 200) =>
 
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const { serpro, eventosPJ, CONTRATANTE_NI, AUTOR_NI } = criarSerpro(supabase, COMPANY_ID);
-const CNPJS_DA_CA = new Set([CONTRATANTE_NI, AUTOR_NI]);
 
 // ---------- helpers de mensagem ----------
 function dataBR(yyyymmdd: unknown): string | null {
@@ -209,7 +208,7 @@ async function rotinaEventos(payload: any, uid: string | null, origem: "manual" 
   const { data: contatos } = await supabase.from("contacts").select("id,document")
     .eq("company_id", COMPANY_ID).eq("is_active", true).eq("status_cliente", STATUS_MONITORADO);
   let alvo = (contatos ?? []).map((c: any) => ({ id: c.id as string, cnpj: onlyDigits(c.document) }))
-    .filter((c) => c.cnpj.length === 14 && !CNPJS_DA_CA.has(c.cnpj));
+    .filter((c) => c.cnpj.length === 14);
   if (payload.limite) alvo = alvo.slice(0, Math.min(Number(payload.limite), 1000));
   alvo = alvo.slice(0, 1000);
   if (!alvo.length) return json({ ok: true, ignorado: "Nenhum cliente com CNPJ" });

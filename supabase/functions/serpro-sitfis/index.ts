@@ -43,7 +43,6 @@ const json = (body: unknown, status = 200) =>
 
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const { serpro, CONTRATANTE_NI, AUTOR_NI } = criarSerpro(supabase, COMPANY_ID);
-const CNPJS_DA_CA = new Set([CONTRATANTE_NI, AUTOR_NI]);
 
 const msgErro = (r: { resposta: any }) => r.resposta?.mensagens?.[0]?.texto ?? r.resposta?.error ?? "Falha na consulta ao Serpro";
 const codigo = (r: { resposta: any }) => String(r.resposta?.mensagens?.[0]?.codigo ?? "");
@@ -217,7 +216,7 @@ async function clientesDaRodada() {
   for (const r of procs) comMapa.set(r.contact_id, (comMapa.get(r.contact_id) ?? false) || (r.status === "ativa" && (!r.data_fim || r.data_fim >= hoje)));
   const elegiveis = (contatos ?? []).filter((c: any) => {
     const cnpj = onlyDigits(c.document);
-    return cnpj.length === 14 && cnpj.slice(8, 12) === "0001" && !CNPJS_DA_CA.has(cnpj);
+    return cnpj.length === 14 && cnpj.slice(8, 12) === "0001";
   });
   const semProcuracao = elegiveis.filter((c: any) => comMapa.has(c.id) && comMapa.get(c.id) === false);
   const fora = new Set(semProcuracao.map((c: any) => c.id));

@@ -51,7 +51,6 @@ const json = (body: unknown, status = 200) =>
 
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const { serpro, eventosPJ, CONTRATANTE_NI, AUTOR_NI } = criarSerpro(supabase, COMPANY_ID);
-const CNPJS_DA_CA = new Set([CONTRATANTE_NI, AUTOR_NI]);
 const REGIMES_DO_ESCOPO = ["lucro_presumido", "lucro_real"];
 
 const hojeBR = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
@@ -329,7 +328,7 @@ async function rotinaEventos(payload: any, uid: string | null, origem: "manual" 
   const { data: contatos } = await supabase.from("contacts").select("id,document")
     .eq("company_id", COMPANY_ID).eq("is_active", true).eq("status_cliente", STATUS_MONITORADO).in("tax_regime", REGIMES_DO_ESCOPO);
   let alvo = (contatos ?? []).map((c: any) => ({ id: c.id as string, cnpj: onlyDigits(c.document) }))
-    .filter((c) => c.cnpj.length === 14 && c.cnpj.slice(8, 12) === "0001" && !CNPJS_DA_CA.has(c.cnpj));
+    .filter((c) => c.cnpj.length === 14 && c.cnpj.slice(8, 12) === "0001");
   if (payload.limite) alvo = alvo.slice(0, Math.min(Number(payload.limite), 1000));
   alvo = alvo.slice(0, 1000);
   if (!alvo.length) return json({ ok: true, ignorado: "Nenhum cliente ativo do Presumido ou do Real com CNPJ de matriz" });
@@ -431,7 +430,7 @@ async function carteiraDaRodada() {
 
   const elegiveis = ((contatos ?? []) as { id: string; name: string | null; display_name: string | null; document: string | null }[]).filter((c) => {
     const cnpj = onlyDigits(c.document);
-    return cnpj.length === 14 && cnpj.slice(8, 12) === "0001" && !CNPJS_DA_CA.has(cnpj);
+    return cnpj.length === 14 && cnpj.slice(8, 12) === "0001";
   });
   const semProcuracao = elegiveis.filter((c) => comMapa.get(c.id) === false);
   const fora = new Set(semProcuracao.map((c) => c.id));

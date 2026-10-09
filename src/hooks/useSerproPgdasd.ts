@@ -52,7 +52,6 @@ export interface LinhaPgdasd {
   pagamentosPorDocumento: Map<string, number>;
 }
 
-const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
 const digitos = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
 
 /** Período de apuração no formato AAAA-MM. */
@@ -151,7 +150,7 @@ export function useMatrizPgdasd(ano: number) {
       }
 
       return contatos
-        .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
+        .filter((c) => { const d = digitos(c.document); return d.length === 14; })
         .map((c): LinhaPgdasd => ({
           contact_id: c.id,
           nome: c.razao_social || c.name || 'Cliente',

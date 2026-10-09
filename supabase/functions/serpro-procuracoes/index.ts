@@ -34,7 +34,8 @@ const json = (body: unknown, status = 200) =>
 
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const { serpro, AUTOR_NI, CONTRATANTE_NI } = criarSerpro(supabase, COMPANY_ID);
-const CNPJS_DA_CA = new Set([CONTRATANTE_NI, AUTOR_NI]);
+// O autor (procurador) consulta os próprios dados sem procuração: não há o que mapear. O contratante é cliente como os outros e precisa da procuração do autor.
+const CNPJS_DA_CA = new Set([AUTOR_NI]);
 
 // Nome do serviço no cadastro de procuração do e-CAC → código (documentação "Serviços x Procurações").
 const PADROES: { codigo: string; rotulo: string; re: RegExp }[] = [

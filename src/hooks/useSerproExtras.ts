@@ -77,7 +77,7 @@ export function useMatrizEProcesso() {
       for (const p of processos) pPor.set(p.contact_id, [...(pPor.get(p.contact_id) ?? []), p]);
       const dig = (v: string | null) => (v ?? '').replace(/\D/g, '');
       return contatos
-        .filter((c) => { const d = dig(c.document); return d.length === 14 && !['26764962000100', '08801596000130'].includes(d); })
+        .filter((c) => { const d = dig(c.document); return d.length === 14; })
         .map((c) => ({
           contact_id: c.id, nome: c.razao_social || c.name || 'Cliente', documento: c.document ?? '', regime: c.tax_regime ?? null,
           filial: dig(c.document).slice(8, 12) !== '0001', consulta: cPor.get(c.id) ?? null, processos: pPor.get(c.id) ?? [],

@@ -40,7 +40,6 @@ export interface LinhaSitfis {
 export const DIAS_RELATORIO_VELHO = 30;
 const PROTOCOLO_VALE_MIN = 10;
 
-const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
 const digitos = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
 
 export type EstadoSitfis = 'filial' | 'sem_relatorio' | 'sem_pendencias' | 'com_pendencias' | 'a_conferir';
@@ -83,7 +82,7 @@ export function useMatrizSitfis() {
       }
       for (const lista of historico.values()) lista.sort((a, b) => (b.gerado_em ?? '').localeCompare(a.gerado_em ?? ''));
       return contatos
-        .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
+        .filter((c) => { const d = digitos(c.document); return d.length === 14; })
         .map((c): LinhaSitfis => ({
           contact_id: c.id,
           nome: c.razao_social || c.name || 'Cliente',

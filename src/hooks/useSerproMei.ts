@@ -24,7 +24,6 @@ export interface LinhaMei {
   situacao: SituacaoMeiRow | null;
 }
 
-const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
 const digitos = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
 
 /** Clientes ativos com regime MEI, com o que já foi guardado de cada serviço (ano corrente para a dívida ativa). */
@@ -53,7 +52,7 @@ export function useMatrizMei(ano: number) {
       const dvPor = new Map(divida.map((d) => [d.contact_id, d]));
       const sPor = new Map(situacao.map((s) => [s.contact_id, s]));
       return contatos
-        .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
+        .filter((c) => { const d = digitos(c.document); return d.length === 14; })
         .map((c): LinhaMei => ({
           contact_id: c.id, nome: c.razao_social || c.name || 'Cliente', documento: c.document ?? '',
           das: dPor.get(c.id) ?? [], divida: dvPor.get(c.id) ?? null, ccmei: cPor.get(c.id)?.[0] ?? null, situacao: sPor.get(c.id) ?? null,

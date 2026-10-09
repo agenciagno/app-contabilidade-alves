@@ -51,7 +51,6 @@ export interface ResumoConferencia {
   carregando: boolean;
 }
 
-const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
 const digitos = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
 const dataBR = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
 const indiceMes = (ym: string) => Number(ym.slice(0, 4)) * 12 + Number(ym.slice(5, 7)) - 1;
@@ -60,7 +59,7 @@ const REGIMES: Record<string, string> = { simples_nacional: 'Simples Nacional', 
 
 /** Função pura: a mesma entrada dá sempre a mesma conferência. */
 export function montarConferencia(contatos: ContatoCadastro[], simples: LinhaPgdasd[], declaracoes: DeclaracaoResumo[]): Omit<ResumoConferencia, 'carregando'> {
-  const ativos = contatos.filter((c) => c.status_cliente === STATUS_MONITORADO && !CNPJS_DA_CA.has(digitos(c.document)));
+  const ativos = contatos.filter((c) => c.status_cliente === STATUS_MONITORADO);
   const porContato = new Map<string, Problema[]>();
   const somar = (id: string, p: Problema) => porContato.set(id, [...(porContato.get(id) ?? []), p]);
   const simplesPor = new Map(simples.map((l) => [l.contact_id, l]));

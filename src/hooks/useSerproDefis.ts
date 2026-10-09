@@ -36,7 +36,6 @@ export const TIPO_DEFIS: Record<number, string> = {
   1: 'Original', 2: 'Retificadora', 3: 'Original (situação especial)', 4: 'Retificadora (situação especial)',
 };
 
-const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
 const digitos = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
 
 /** Prazo da DEFIS do ano-calendário: 31 de março do ano seguinte; fim de semana ou feriado nacional passa ao próximo dia útil (até 23:59). */
@@ -81,7 +80,7 @@ export function useMatrizDefis() {
       for (const d of declaracoes) { const a = declPor.get(d.contact_id) ?? []; a.push(d); declPor.set(d.contact_id, a); }
 
       return contatos
-        .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
+        .filter((c) => { const d = digitos(c.document); return d.length === 14; })
         .map((c): LinhaDefis => {
           const abertura = c.data_abertura_receita || c.data_abertura_rf;
           const ano = abertura ? Number(String(abertura).slice(0, 4)) : NaN;

@@ -33,7 +33,6 @@ export interface DarfRow {
 
 export interface ClienteDarf { id: string; nome: string; documento: string }
 
-const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
 const digitos = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
 
 /** Clientes ativos com CNPJ: os que podem ter DARF gerado. */
@@ -47,7 +46,7 @@ export function useClientesDarf() {
         () => supabase.from('contacts').select('id, name, razao_social, display_name, document')
           .eq('company_id', company!.id).eq('status_cliente', STATUS_MONITORADO).eq('is_active', true).order('name').order('id'));
       return contatos
-        .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
+        .filter((c) => { const d = digitos(c.document); return d.length === 14; })
         .map((c) => ({ id: c.id, nome: c.razao_social || c.name || 'Cliente', documento: c.document ?? '' }));
     },
   });

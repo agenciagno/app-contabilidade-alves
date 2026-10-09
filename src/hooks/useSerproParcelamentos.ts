@@ -39,7 +39,6 @@ export interface LinhaParcelamentos {
   guias: GuiaRow[];
 }
 
-const CNPJS_DA_CA = new Set(['26764962000100', '08801596000130']);
 const digitos = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '');
 
 /** Mês corrente no formato AAAAMM, pelo horário de Brasília. */
@@ -103,7 +102,7 @@ export function useMatrizParcelamentos() {
       };
       const cPor = agrupar(consultas), pPor = agrupar(pedidos), aPor = agrupar(parcelas), gPor = agrupar(guias);
       return contatos
-        .filter((c) => { const d = digitos(c.document); return d.length === 14 && !CNPJS_DA_CA.has(d); })
+        .filter((c) => { const d = digitos(c.document); return d.length === 14; })
         .map((c): LinhaParcelamentos => ({
           contact_id: c.id,
           nome: c.razao_social || c.name || 'Cliente',

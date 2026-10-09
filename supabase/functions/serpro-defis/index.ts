@@ -42,7 +42,6 @@ const json = (body: unknown, status = 200) =>
 
 const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const { serpro, CONTRATANTE_NI, AUTOR_NI } = criarSerpro(supabase, COMPANY_ID);
-const CNPJS_DA_CA = new Set([CONTRATANTE_NI, AUTOR_NI]);
 const CODIGOS_PROCURACAO = ["00146", "00006", "00004", "00060", "00002", "00103", "00050", "00051"]; // mesmos do mapa de procurações
 const hojeBR = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 const dataBRde = (iso: string) => new Date(Date.parse(iso) - 3 * 3600_000).toISOString().slice(0, 10);
@@ -153,7 +152,7 @@ async function carteiraDefis(ano: number) {
 
   const elegiveis = (contatos ?? []).filter((c: any) => {
     const cnpj = onlyDigits(c.document);
-    return cnpj.length === 14 && cnpj.slice(8, 12) === "0001" && !CNPJS_DA_CA.has(cnpj);
+    return cnpj.length === 14 && cnpj.slice(8, 12) === "0001";
   });
   const anoAbertura = (c: any) => Number(String(c.data_abertura_receita ?? c.data_abertura_rf ?? "").slice(0, 4)) || null;
   const abertosDepois = elegiveis.filter((c: any) => (anoAbertura(c) ?? 0) > ano);
