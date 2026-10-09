@@ -13,6 +13,12 @@ const FERIADOS_NACIONAIS = new Set([
   '2027-01-01', '2027-03-01', '2027-03-02', '2027-03-26', '2027-04-21', '2027-05-01', '2027-05-27', '2027-09-07', '2027-10-12', '2027-11-02', '2027-11-15', '2027-11-20', '2027-12-25',
 ]);
 
+/** Sábado, domingo e feriado nacional não são dia útil (mesma regra do vencimento). Usado para a data de pagamento das guias. */
+export function ehDiaUtil(iso: string): boolean {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return d.getUTCDay() !== 0 && d.getUTCDay() !== 6 && !FERIADOS_NACIONAIS.has(iso);
+}
+
 /** Mesma data se for dia útil; senão, o próximo dia útil (fim de semana ou feriado nacional). Espelho da função serpro_proximo_dia_util do banco. */
 export function proximoDiaUtil(iso: string): string {
   const d = new Date(`${iso}T00:00:00Z`);

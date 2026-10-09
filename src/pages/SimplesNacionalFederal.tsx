@@ -200,7 +200,7 @@ function AbaMensal({
       </div>
 
       <BarraSelecao quantos={marcados.size} onLimpar={() => setMarcados(new Set())}>
-        <DicaBotao custo="Emitir" texto="Gera o DAS de cada cliente marcado. Quem já tem DAS guardado e válido não é emitido de novo. Mostra o custo antes de confirmar.">
+        <DicaBotao custo="Emitir" texto="Gera o DAS de cada cliente marcado. Quem já tem DAS guardado e válido não é emitido de novo. Pede confirmação antes.">
           <Button size="sm" onClick={() => setLoteAberto(true)}>Gerar DAS ({marcados.size})</Button>
         </DicaBotao>
         <Button size="sm" variant="outline" disabled={marcar.isPending}
@@ -357,7 +357,7 @@ function AbaMensal({
         aberto={loteAberto}
         onClose={() => setLoteAberto(false)}
         titulo={`Gerar DAS de ${siglaCompetencia(pa)}`}
-        descricao="Um DAS por cliente marcado, um de cada vez. Cada emissão fica registrada na Receita e é cobrada; quem já tem DAS guardado e válido não é emitido de novo."
+        descricao="Um DAS por cliente marcado, um de cada vez. Cada emissão fica registrada na Receita; quem já tem DAS guardado e válido não é emitido de novo."
         itens={itensLote}
         executar={async (item, dataPagamento) => {
           const r = await gerarDas.mutateAsync({ contactId: item.contactId, periodo: pa, dataPagamento });

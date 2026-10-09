@@ -169,10 +169,12 @@ export interface DateFieldProps {
   /** ISO yyyy-mm-dd — desabilita dias fora do intervalo no seletor visual. */
   min?: string;
   max?: string;
+  /** Desabilita outros dias no seletor visual (ex.: fim de semana e feriado). Quem digita a data valida por conta própria. */
+  desabilitar?: (iso: string) => boolean;
   className?: string;
 }
 
-export function DateField({ value, onChange, placeholder = 'dd/mm/aaaa', disabled, min, max, className }: DateFieldProps) {
+export function DateField({ value, onChange, placeholder = 'dd/mm/aaaa', disabled, min, max, desabilitar, className }: DateFieldProps) {
   const [text, setText] = React.useState(() => isoToDisplayDate(value));
   const [open, setOpen] = React.useState(false);
 
@@ -221,7 +223,7 @@ export function DateField({ value, onChange, placeholder = 'dd/mm/aaaa', disable
             onSelect={(d) => { if (d) { onChange(format(d, 'yyyy-MM-dd')); setOpen(false); } }}
             disabled={(d) => {
               const iso = format(d, 'yyyy-MM-dd');
-              return (!!min && iso < min) || (!!max && iso > max);
+              return (!!min && iso < min) || (!!max && iso > max) || (!!desabilitar && desabilitar(iso));
             }}
             initialFocus
           />

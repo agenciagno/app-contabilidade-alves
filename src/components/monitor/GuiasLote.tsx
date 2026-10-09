@@ -8,12 +8,14 @@ import { format, lastDayOfMonth } from 'date-fns';
 import { CheckCircle2, Loader2, Mail, MinusCircle, XCircle } from 'lucide-react';
 
 import { DateField } from '@/components/ds';
+import { ehDiaUtil } from '@/lib/prazosFederais';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Preco } from '@/components/serpro/CustoSerpro';
+import { useCustoSerpro } from '@/hooks/useSerproConsumo';
 import { useEnviarCliente } from '@/hooks/useEnvioCliente';
 import { ORIGEM_ENVIO, type ProcessoGuia } from '@/hooks/useGuiasCliente';
 import { cn } from '@/lib/utils';
@@ -66,12 +68,13 @@ export function GerarLoteDialog({
   const [atual, setAtual] = useState<string | null>(null);
   const [rodando, setRodando] = useState(false);
   const parar = useRef(false);
+  const { admin } = useCustoSerpro();
 
   useEffect(() => { if (aberto) { setDataPagamento(''); setResultados(new Map()); setAtual(null); setRodando(false); } }, [aberto]);
 
   const hoje = format(new Date(), 'yyyy-MM-dd');
   const fimDoMes = format(lastDayOfMonth(new Date()), 'yyyy-MM-dd');
-  const dataValida = !dataPagamento || (dataPagamento >= hoje && dataPagamento <= fimDoMes);
+  const dataValida = !dataPagamento || (dataPagamento >= hoje && dataPagamento <= fimDoMes && ehDiaUtil(dataPagamento));
   const emissoes = itens.filter((i) => !!dataPagamento || !i.guardada).length;
   const terminou = resultados.size > 0 && !rodando;
   const ok = [...resultados.values()].filter((r) => r.estado === 'ok').length;
@@ -103,7 +106,7 @@ export function GerarLoteDialog({
       <DialogContent className="max-w-[640px]">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
-          <DialogDescription>{descricao}</DialogDescription>
+          <DialogDescription>{descricao}{admin ? ' Cada emissão é cobrada pelo Serpro; o total aparece no botão.' : ''}</DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[40vh] space-y-1 overflow-y-auto rounded-md border border-line p-2">
@@ -131,11 +134,11 @@ export function GerarLoteDialog({
         {!terminou && (
           <div className="space-y-1.5">
             <label className="text-ui-strong text-ink">Data do pagamento (opcional)</label>
-            <DateField value={dataPagamento} onChange={setDataPagamento} min={hoje} max={fimDoMes} placeholder="Em branco: guia pelo vencimento" disabled={rodando} />
+            <DateField value={dataPagamento} onChange={setDataPagamento} min={hoje} max={fimDoMes} desabilitar={(d) => !ehDiaUtil(d)} placeholder="Em branco: guia pelo vencimento" disabled={rodando} />
             <p className={dataValida ? 'text-meta text-muted-ink-2' : 'text-meta text-danger'}>
               {dataValida
                 ? 'Para quem vai pagar atrasado: a guia sai com multa e juros até essa data (dia útil do mês corrente). Com data, sempre emite uma guia nova.'
-                : `Escolha um dia útil entre hoje e ${fimDoMes.split('-').reverse().join('/')}.`}
+                : `Escolha um dia útil (sem sábado, domingo ou feriado) entre hoje e ${fimDoMes.split('-').reverse().join('/')}.`}
             </p>
           </div>
         )}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { format, lastDayOfMonth } from 'date-fns';
 import { DateField } from '@/components/ds';
+import { ehDiaUtil } from '@/lib/prazosFederais';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DICA_RODAPE, DicaBotao } from '@/components/serpro/DicaBotao';
 import { toast } from 'sonner';
@@ -136,7 +137,7 @@ export function useGerarDasComConfirmacao() {
   const [dataPagamento, setDataPagamento] = useState('');
   const hoje = format(new Date(), 'yyyy-MM-dd');
   const fimDoMes = format(lastDayOfMonth(new Date()), 'yyyy-MM-dd');
-  const dataValida = !dataPagamento || (dataPagamento >= hoje && dataPagamento <= fimDoMes);
+  const dataValida = !dataPagamento || (dataPagamento >= hoje && dataPagamento <= fimDoMes && ehDiaUtil(dataPagamento));
   const gratis = !!alvo?.gratis && !dataPagamento;
 
   const confirmar = async () => {
@@ -169,11 +170,11 @@ export function useGerarDasComConfirmacao() {
         </AlertDialogHeader>
         <div className="space-y-1.5">
           <label className="text-ui-strong text-ink">Data do pagamento (opcional)</label>
-          <DateField value={dataPagamento} onChange={setDataPagamento} min={hoje} max={fimDoMes} placeholder="Deixe em branco para o vencimento" />
+          <DateField value={dataPagamento} onChange={setDataPagamento} min={hoje} max={fimDoMes} desabilitar={(d) => !ehDiaUtil(d)} placeholder="Deixe em branco para o vencimento" />
           <p className={dataValida ? 'text-meta text-muted-ink-2' : 'text-meta text-danger'}>
             {dataValida
               ? 'Para o cliente que vai pagar atrasado: o DAS sai com multa e juros calculados até essa data. Sempre emite um DAS novo.'
-              : `Escolha uma data entre hoje e ${fimDoMes.split('-').reverse().join('/')}.`}
+              : `Escolha um dia útil (sem sábado, domingo ou feriado) entre hoje e ${fimDoMes.split('-').reverse().join('/')}.`}
           </p>
         </div>
         <AlertDialogFooter>

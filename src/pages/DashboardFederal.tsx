@@ -42,7 +42,7 @@ const PROCESSOS: { chave: ProcessoPainel; titulo: string; to: string; filtra: bo
   { chave: 'sitfis', titulo: 'Situação fiscal', to: '/dashboard-federal/situacao-fiscal', filtra: true },
   { chave: 'caixa', titulo: 'Caixa Postal e-CAC', to: '/mensagens', filtra: true },
   // A aba Intimações agrupa por mensagem (nova, em tratamento...), não pelos 5 estados: abre sem filtro.
-  { chave: 'intimacoes', titulo: 'Termos de intimação', to: '/mensagens?aba=intimacoes', filtra: false },
+  { chave: 'intimacoes', titulo: 'Intimações', to: '/mensagens?aba=intimacoes', filtra: false },
   { chave: 'procuracao', titulo: 'Procurações', to: `${PROCURACOES}?fonte=procuracao`, filtra: true },
   { chave: 'certificado', titulo: 'Certificados', to: `${PROCURACOES}?fonte=certificado`, filtra: true },
 ];
@@ -94,7 +94,7 @@ export default function DashboardFederal() {
     [painel],
   );
   const sitfis = useMemo(() => contarEstados(painel.map((x) => x.selos.sitfis)), [painel]);
-  const declaracoes = useMemo(() => barrasDeclaracoes(linhas, simples), [linhas, simples]);
+  const declaracoes = useMemo(() => barrasDeclaracoes(linhas, simples, competencia), [linhas, simples, competencia]);
   const ausSimples = useMemo(() => ausenciasSimples(linhas), [linhas]);
   const ausDctf = useMemo(() => ausenciasDctfwebMit(linhas), [linhas]);
   const mensagens = useMemo(() => resumoMensagens(linhas), [linhas]);

@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useCustoSerpro } from '@/hooks/useSerproConsumo';
 import {
   custoEstimado, useConsumoSerpro, useSalvarSerproConfig, useSerproConfig,
 } from '@/hooks/useSerproConsumo';
@@ -55,7 +56,21 @@ function useNomesUsuarios() {
   });
 }
 
+/** Valores do Serpro são só de administrador (decisão de Gabriel, 09/10/2026): o menu já esconde a tela; aqui trava o endereço digitado. */
 export default function TechConsumoSerpro() {
+  const { admin } = useCustoSerpro();
+  if (!admin) {
+    return (
+      <div className="space-y-6">
+        <PageHeader kicker="~/tech · consumo serpro" title="Consumo Serpro." />
+        <DsAlert tone="info" title="Só administradores" description="O consumo e os valores do Serpro aparecem só para administradores." />
+      </div>
+    );
+  }
+  return <ConsumoSerproAdmin />;
+}
+
+function ConsumoSerproAdmin() {
   const { data: chamadas = [], isLoading } = useConsumoSerpro();
   const { data: config } = useSerproConfig();
   const { data: nomes } = useNomesUsuarios();

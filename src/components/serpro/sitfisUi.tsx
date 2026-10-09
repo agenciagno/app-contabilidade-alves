@@ -52,7 +52,7 @@ export function useGerarRelatorioSitfis() {
         <AlertDialogHeader>
           <AlertDialogTitle>Este cliente teve relatório há pouco</AlertDialogTitle>
           <AlertDialogDescription>
-            Só vale a pena gerar de novo se algo mudou na Receita depois do último relatório. Cada relatório emitido é cobrado.
+            Só vale a pena gerar de novo se algo mudou na Receita depois do último relatório.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

@@ -149,7 +149,7 @@ export default function DctfwebMitFederal() {
         </div>
 
         <BarraSelecao quantos={marcados.size} onLimpar={() => setMarcados(new Set())}>
-          <DicaBotao custo="Emitir" texto="Gera a guia (DARF) da DCTFWeb de cada cliente marcado. Mostra o custo antes de confirmar.">
+          <DicaBotao custo="Emitir" texto="Gera a guia (DARF) da DCTFWeb de cada cliente marcado. Pede confirmação antes.">
             <Button size="sm" onClick={() => setLoteAberto(true)}>Gerar guia ({marcados.size})</Button>
           </DicaBotao>
           <Button size="sm" variant="outline" disabled={marcar.isPending}
@@ -237,7 +237,7 @@ export default function DctfwebMitFederal() {
                               </Button>
                             </DicaBotao>
                           ) : l.dctfweb?.status === 'transmitida' && (
-                            <DicaBotao custo="Emitir" texto="Gera a guia (DARF) da DCTFWeb deste cliente. Pede confirmação e mostra o custo antes.">
+                            <DicaBotao custo="Emitir" texto="Gera a guia (DARF) da DCTFWeb deste cliente. Pede confirmação antes.">
                               <Button size="icon" variant="outline" className="h-8 w-8" aria-label="Gerar guia da DCTFWeb" onClick={() => { setMarcados(new Set([l.contact_id])); setLoteAberto(true); }}>
                                 <Receipt className="h-4 w-4" />
                               </Button>
@@ -275,7 +275,7 @@ export default function DctfwebMitFederal() {
         aberto={loteAberto}
         onClose={() => setLoteAberto(false)}
         titulo={`Gerar guia da DCTFWeb de ${siglaCompetencia(competencia)}`}
-        descricao="Uma guia (DARF) por cliente marcado, da declaração mais recente da competência, um de cada vez. Cada emissão fica registrada na Receita e é cobrada."
+        descricao="Uma guia (DARF) por cliente marcado, da declaração mais recente da competência, um de cada vez. Cada emissão fica registrada na Receita."
         itens={itensLote}
         executar={async (item, dataPagamento) => {
           const r = await gerarGuia.mutateAsync({ contactId: item.contactId, competencia, dataPagamento });

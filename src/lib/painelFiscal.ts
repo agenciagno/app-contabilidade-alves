@@ -7,6 +7,7 @@ import { seloDefis, piorSelo, type EstadoMonitor, type Selo } from '@/lib/monito
 import type { LinhaCarteira } from '@/lib/situacaoCarteira';
 import type { LinhaSimples } from '@/lib/simplesNacionalLinhas';
 import { nivelLimite, percentualLimite, limiteDe, type NivelLimite } from '@/hooks/useSerproFaturamento';
+import { vencimentoDoPeriodo } from '@/lib/prazosFederais';
 
 // ---------------------------------------------------------------- Declarações (x de y feitas)
 export interface BarraDeclaracao {
@@ -20,6 +21,8 @@ export interface BarraDeclaracao {
   /** Pior estado entre os consultados: define o ícone da barra (vermelho só quando a Receita confirma a falta). */
   pior: EstadoMonitor;
   nota?: string;
+  /** Linha curta embaixo da barra (ex.: "Prazo de 09/2026: 20/10"). */
+  prazo?: string;
 }
 
 const piorDe = (selos: (Selo | null)[]): EstadoMonitor => piorSelo(selos)?.estado ?? 'nao_verificado';
@@ -27,14 +30,18 @@ const piorDe = (selos: (Selo | null)[]): EstadoMonitor => piorSelo(selos)?.estad
 /**
  * PGDAS-D vem da lista do Simples Nacional (mês da competência); DEFIS, DCTFWeb e MIT vêm da carteira.
  * DCTFWeb e MIT só existem para Presumido e Real; "sem DCTFWeb" nunca passa de pendência (não prova atraso).
+ * O ícone do PGDAS-D olha só o mês da competência (09/10/2026): o atraso de meses anteriores já aparece em Ausências e
+ * na barra do Por Processo, e aqui deixava a barra vermelha com "0 / 145" mesmo com o mês ainda no prazo.
  */
-export function barrasDeclaracoes(carteira: LinhaCarteira[], simples: LinhaSimples[]): BarraDeclaracao[] {
+export function barrasDeclaracoes(carteira: LinhaCarteira[], simples: LinhaSimples[], pa?: string): BarraDeclaracao[] {
   const consultadosPg = simples.filter((l) => !!l.pg.consultadoEm);
+  const venc = pa ? vencimentoDoPeriodo(pa) : null;
   const pgdas: BarraDeclaracao = {
     chave: 'pgdas', titulo: 'PGDAS-D',
     feitas: consultadosPg.filter((l) => !!l.declaracaoRow).length, total: consultadosPg.length,
     naoConsultados: simples.length - consultadosPg.length,
-    pior: piorDe(consultadosPg.map((l) => l.declaracao)),
+    pior: piorDe(consultadosPg.map((l) => l.declMes)),
+    prazo: pa && venc ? `Prazo de ${pa.slice(5, 7)}/${pa.slice(0, 4)}: ${venc.slice(8, 10)}/${venc.slice(5, 7)}` : undefined,
   };
 
   const defisAplica = carteira.filter((l) => l.defis.estado !== 'nao_se_aplica' && l.defis.estado !== 'filial');

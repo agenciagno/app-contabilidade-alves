@@ -225,6 +225,7 @@ export function DeclaracoesBox({ barras, competencia, className }: { barras: Bar
                 </div>
                 <IconeEstado estado={b.pior} className="h-8 w-8" />
               </div>
+              {b.prazo && <p className="mt-1 text-meta text-muted-ink-2">{b.prazo}</p>}
               {b.naoConsultados > 0 && <p className="mt-1 text-meta text-muted-ink-2">{b.naoConsultados} {b.naoConsultados === 1 ? 'cliente' : 'clientes'} ainda não consultados</p>}
             </Link>
           );
