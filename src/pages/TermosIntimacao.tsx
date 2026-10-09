@@ -140,7 +140,7 @@ export default function TermosIntimacao() {
       <PageHeader
         kicker="~/dashboard fiscal · termos de intimação"
         title="Termos de intimação."
-        subtitle="Mensagens da Receita que exigem ação (intimação, malha, exclusão do Simples, multa, cobrança e processo), já classificadas, por cliente. Abra o cliente para ver e tratar cada mensagem. Só aparecem clientes cuja lista foi baixada em Mensagens e-CAC."
+        subtitle="Mensagens da Receita que exigem ação (intimação, malha, exclusão do Simples, multa, cobrança e processo), já classificadas, por cliente. Abra o cliente para ver e tratar cada mensagem. Só aparecem clientes cuja lista foi baixada na Caixa Postal e-CAC."
         actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />}
       />
 
@@ -180,7 +180,7 @@ export default function TermosIntimacao() {
         ) : grupos.length === 0 ? (
           <div className="p-10 text-center text-ui text-muted-ink">
             {mensagens.length === 0
-              ? 'Nenhuma mensagem classificada ainda. Baixe a lista de um cliente em Mensagens e-CAC.'
+              ? 'Nenhuma mensagem classificada ainda. Baixe a lista de um cliente na Caixa Postal e-CAC.'
               : 'Nenhuma mensagem encontrada com esses filtros.'}
           </div>
         ) : (

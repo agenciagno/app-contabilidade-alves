@@ -39,7 +39,7 @@ const PROCESSOS: { chave: ProcessoPainel; titulo: string; to: string; filtra: bo
   { chave: 'defis', titulo: 'DEFIS', to: `${SIMPLES}?aba=defis`, filtra: true },
   { chave: 'dctfweb_mit', titulo: 'DCTFWeb e MIT', to: '/dashboard-federal/dctfweb-mit', filtra: false },
   { chave: 'sitfis', titulo: 'Situação fiscal', to: '/dashboard-federal/situacao-fiscal', filtra: false },
-  { chave: 'caixa', titulo: 'Mensagens e-CAC', to: '/mensagens', filtra: false },
+  { chave: 'caixa', titulo: 'Caixa Postal e-CAC', to: '/mensagens', filtra: false },
   { chave: 'intimacoes', titulo: 'Termos de intimação', to: '/dashboard-federal/intimacoes', filtra: false },
   { chave: 'procuracao', titulo: 'Procurações', to: '/dashboard-federal/procuracoes', filtra: false },
   { chave: 'certificado', titulo: 'Certificados', to: '/cadastros/certificados', filtra: false },

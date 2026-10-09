@@ -250,7 +250,7 @@ export function MensagensEcacBox({ r, ultimas, carregandoUltimas, className }: {
   ];
   return (
     <Caixa
-      titulo="Mensagens e-CAC"
+      titulo="Caixa Postal e-CAC"
       subtitulo="Caixa Postal da Receita: quantos clientes estão em cada situação. Um cliente conta uma vez, no mais grave."
       acao={<VerTudo to="/mensagens">Abrir mensagens</VerTudo>}
       className={className}
@@ -296,7 +296,7 @@ export function MensagensEcacBox({ r, ultimas, carregandoUltimas, className }: {
         {carregandoUltimas ? (
           <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : ultimas.length === 0 ? (
-          <p className="py-6 text-center text-ui text-muted-ink-2">Nenhuma mensagem baixada ainda. Use Consultar na tela Mensagens e-CAC.</p>
+          <p className="py-6 text-center text-ui text-muted-ink-2">Nenhuma mensagem baixada ainda. Use Consultar na tela Caixa Postal e-CAC.</p>
         ) : (
           <ul className="divide-y divide-line-2">
             {ultimas.map((m) => {

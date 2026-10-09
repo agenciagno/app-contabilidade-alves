@@ -43,7 +43,7 @@ const FILTROS_SELO: { value: 'todos' | SeloEstado; label: string }[] = [
 function tabelaExport(linhas: ClienteCaixa[]): TabelaExport {
   return {
     arquivo: 'mensagens-ecac',
-    titulo: 'Mensagens e-CAC — Caixa Postal por cliente',
+    titulo: 'Caixa Postal e-CAC — por cliente',
     colunas: ['Razão social', 'CNPJ', 'Regime', 'Mensagens e-CAC', 'Última consulta', 'Mensagens salvas', 'Não lidas (salvas)'],
     linhas: linhas.map((c) => [
       c.nome, formatarCnpj(c.documento), REGIMES[c.regime ?? ''] ?? c.regime ?? '', seloCaixa(c).label,
@@ -88,8 +88,8 @@ export default function MensagensEcac() {
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="~/mensagens e-cac"
-        title="Mensagens e-CAC."
+        kicker="~/caixa postal e-cac"
+        title="Caixa Postal e-CAC."
         subtitle="Caixa Postal da Receita Federal dos clientes ativos. O selo é atualizado todo dia às 07:30; a lista completa só é baixada quando você clica em Consultar."
         actions={<ExportarMenu montar={() => tabelaExport(filtrados)} disabled={filtrados.length === 0} escolherColunas />}
       />
