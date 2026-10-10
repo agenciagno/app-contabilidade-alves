@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, FileText, Loader2, Mail, MoreHorizontal, Receipt, RefreshCw, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, Loader2, Mail, Receipt, RefreshCw, X } from 'lucide-react';
 
 import { DsTab, PageHeader, SearchField } from '@/components/ds';
 import { Button } from '@/components/ui/button';
