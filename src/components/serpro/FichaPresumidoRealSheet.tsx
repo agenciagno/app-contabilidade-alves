@@ -39,7 +39,7 @@ const REGIME: Record<string, string> = { lucro_presumido: 'Lucro Presumido', luc
  * "Apurado" (MIT) e "DARF pago" ficam lado a lado, sem comparação automática: IRPJ e CSLL são trimestrais e o mesmo período recebe DARF de outras origens.
  */
 export function FichaPresumidoRealSheet({
-  linha, competencia, selo, outros, responsavel, abertura, posicao, onAnterior, onProximo, onClose, consultando, onConsultar, onGerarGuia,
+  linha, competencia, selo, outros, responsavel, abertura, posicao, onAnterior, onProximo, onClose, consultando, onConsultar, onGerarGuia, onGerarGuiaAndamento,
 }: {
   linha: LinhaDctfwebMit;
   competencia: string;
@@ -54,6 +54,8 @@ export function FichaPresumidoRealSheet({
   consultando: boolean;
   onConsultar: () => void;
   onGerarGuia: () => void;
+  /** Guia da declaração ainda em andamento (antes de transmitir), do mês escolhido. */
+  onGerarGuiaAndamento: () => void;
 }) {
   const ano = Number(competencia.slice(0, 4));
   const mesAtual = mesDeData(new Date());
@@ -175,6 +177,11 @@ export function FichaPresumidoRealSheet({
           {podeGuia && (
             <DicaBotao custo="Emitir" texto="Gera a guia (DARF) da DCTFWeb deste mês. Pede confirmação antes.">
               <Button onClick={onGerarGuia}><Receipt className="mr-2 h-4 w-4" />Gerar guia de {siglaCompetencia(competencia)}<Preco tipo="Emitir" /></Button>
+            </DicaBotao>
+          )}
+          {doMesAberto?.estD !== 'transmitida' && (
+            <DicaBotao custo="Emitir" texto={`Gera a guia da declaração de ${siglaCompetencia(competencia)} ainda EM ANDAMENTO (antes de transmitir). Pede confirmação antes.`}>
+              <Button variant="outline" onClick={onGerarGuiaAndamento}><Receipt className="mr-2 h-4 w-4" />Guia em andamento de {siglaCompetencia(competencia)}<Preco tipo="Emitir" /></Button>
             </DicaBotao>
           )}
           <DicaBotao texto="Abre o envio ao cliente (e-mail ou WhatsApp) com os documentos já guardados para marcar.">
