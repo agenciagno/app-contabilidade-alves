@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, FileText, Loader2, Mail, MoreHorizontal, Receipt, RefreshCw, Search, X } from 'lucide-react';
@@ -19,7 +19,7 @@ import { useAbrirArquivo, useConsultaPgdasd } from '@/components/serpro/pgdasdUi
 import { useAbrirDefis, useConsultaDefis } from '@/components/serpro/defisUi';
 import { useLeituraFaturamento } from '@/components/serpro/useLeituraFaturamento';
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
-import { FaixaEstados, FiltroSelo, SeloMini, SeloMonitor, UltimaBusca, passaFiltroSelo, useEstadoUrl } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, FiltroSelo, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, passaFiltroSelo, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
 import { AbaMei } from '@/components/monitor/AbaMei';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
 import { useGuiasEnviadas, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
@@ -181,8 +181,14 @@ function AbaMensal({
     contactId: l.contact_id, nome: l.nome, pular: l.pg.consultadoEm && l.pg.consultadoEm.slice(0, 10) === hoje ? 'Consultado hoje' : null,
   }));
   const alternarMarcado = (id: string) => setMarcados((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const todasMarcadas = filtradas.length > 0 && filtradas.every((l) => marcados.has(l.contact_id));
 
+  const pag = usePaginacao(filtradas, `${busca}|${estado ?? ''}|${fonte}|${filtroPgdas ?? ''}|${filtroDas ?? ''}|${pa}`);
+  const topoTabela = useRef<HTMLDivElement>(null);
+  const irParaPagina = (n: number) => {
+    pag.setPagina(n);
+    requestAnimationFrame(() => topoTabela.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  const idsDaPagina = pag.recorte.map((l) => l.contact_id);
   const idx = filtradas.findIndex((l) => l.contact_id === aberto);
   const linhaAberta = idx >= 0 ? filtradas[idx] : linhas.find((l) => l.contact_id === aberto) ?? null;
   const carregando = carregandoPg || carregandoPag || carregandoFat || carregandoCadastro;
@@ -221,6 +227,13 @@ function AbaMensal({
       </div>
 
       <BarraSelecao quantos={marcados.size} onLimpar={() => setMarcados(new Set())}>
+        {filtradas.some((l) => !marcados.has(l.contact_id)) && filtradas.length > pag.recorte.length && (
+          <DicaBotao texto="Marca todos os clientes da lista com os filtros atuais, inclusive os das outras páginas.">
+            <Button size="sm" variant="outline" onClick={() => setMarcados(new Set([...marcados, ...filtradas.map((l) => l.contact_id)]))}>
+              Marcar os {filtradas.length} da lista
+            </Button>
+          </DicaBotao>
+        )}
         <DicaBotao custo="Emitir" texto="Gera o DAS de cada cliente marcado. Quem já tem DAS guardado e válido não é emitido de novo. Pede confirmação antes.">
           <Button size="sm" onClick={() => setLoteAberto(true)}>Gerar DAS ({marcados.size})</Button>
         </DicaBotao>
@@ -257,7 +270,7 @@ function AbaMensal({
         <FiltroSelo rotulo="DAS" selos={base.map((l) => l.dasSelo)} valor={filtroDas} onChange={setFiltroDas} semSelo="Sem DAS (sem declaração)" />
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
         {carregando ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : filtradas.length === 0 ? (
@@ -268,8 +281,8 @@ function AbaMensal({
               <TableRow>
                 <TableHead>
                   <div className="flex items-center gap-3">
-                    <Checkbox aria-label="Marcar todos da lista" checked={todasMarcadas}
-                      onCheckedChange={(v) => setMarcados(v ? new Set([...marcados, ...filtradas.map((l) => l.contact_id)]) : new Set())} />
+                    <Checkbox aria-label="Marcar todos desta página" checked={idsDaPagina.length > 0 && idsDaPagina.every((id) => marcados.has(id))}
+                      onCheckedChange={(v) => setMarcados((m) => { const n = new Set(m); idsDaPagina.forEach((id) => (v ? n.add(id) : n.delete(id))); return n; })} />
                     Cliente / Razão Social
                   </div>
                 </TableHead>
@@ -281,7 +294,7 @@ function AbaMensal({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtradas.map((l) => {
+              {pag.recorte.map((l) => {
                 const consultando = consulta.emAndamento === l.contact_id;
                 const lendo = leitura.emAndamento === l.contact_id;
                 const d = l.declaracaoRow;
@@ -368,11 +381,14 @@ function AbaMensal({
         )}
       </div>
 
-      <p className="text-meta text-muted-ink-2">
-        Mostrando {filtradas.length} de {linhas.length} clientes do Simples Nacional · {rotuloCompetencia(pa)}
-        {foraDaLista > 0 ? ` · ${foraDaLista} ${foraDaLista === 1 ? 'filial segue a matriz e fica' : 'filiais seguem a matriz e ficam'} de fora` : ''}.
-        O limite aparece na coluna, mas não entra na situação da linha.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="space-y-1">
+          <RodapeLista mostrando={filtradas.length} total={linhas.length} unidade="clientes do Simples Nacional" filiais={foraDaLista} faixa={pag.faixa} />
+          <p className="text-meta text-muted-ink-2">Competência {rotuloCompetencia(pa)}. O sublimite (RBA) aparece na coluna, mas não entra na situação do cliente.</p>
+        </div>
+        <PaginacaoLista pagina={pag.pagina} totalPaginas={pag.totalPaginas} porPagina={pag.porPagina} total={filtradas.length}
+          onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
+      </div>
 
       {linhaAberta && !verLeitura && (
         <FichaSimplesSheet
@@ -517,6 +533,14 @@ function AbaDefis({
     .filter((l) => passaFiltroSelo(seloDe(l), filtroSituacao, motivoDoSelo))
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
+  const pag = usePaginacao(filtradas, `${busca}|${estado ?? ''}|${filtroSituacao ?? ''}|${ano}`);
+  const topoTabela = useRef<HTMLDivElement>(null);
+  const irParaPagina = (n: number) => {
+    pag.setPagina(n);
+    requestAnimationFrame(() => topoTabela.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  const idsDaPagina = pag.recorte.map((l) => l.contact_id);
+
   const tabelaExport = (): TabelaExport => ({
     arquivo: `defis-${ano}`,
     titulo: `DEFIS — ano-calendário ${ano} (prazo ${format(prazo, 'dd/MM/yyyy')})`,
@@ -558,6 +582,11 @@ function AbaDefis({
       </div>
 
       <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
+        {filtradas.some((l) => !sel.marcados.has(l.contact_id)) && filtradas.length > pag.recorte.length && (
+          <DicaBotao texto="Marca todos os clientes da lista com os filtros atuais, inclusive os das outras páginas.">
+            <Button size="sm" variant="outline" onClick={() => sel.somar(filtradas.map((l) => l.contact_id))}>Marcar os {filtradas.length} da lista</Button>
+          </DicaBotao>
+        )}
         <DicaBotao custo="Consultar" texto="Consulta na Receita as DEFIS de cada cliente marcado (todos os anos numa chamada). Quem já foi consultado hoje fica de fora.">
           <Button size="sm" onClick={() => setConsultaLote(true)}>Consultar DEFIS ({sel.marcados.size})</Button>
         </DicaBotao>
@@ -566,7 +595,7 @@ function AbaDefis({
         </DicaBotao>
       </BarraSelecao>
 
-      <div className="overflow-x-auto rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
         {isLoading || carregandoCadastro ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : filtradas.length === 0 ? (
@@ -577,8 +606,8 @@ function AbaDefis({
               <TableRow>
                 <TableHead>
                   <div className="flex items-center gap-3">
-                    <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtradas.map((l) => l.contact_id))}
-                      onCheckedChange={(v) => (v ? sel.somar(filtradas.map((l) => l.contact_id)) : sel.limpar())} />
+                    <Checkbox aria-label="Marcar todos desta página" checked={sel.todos(idsDaPagina)}
+                      onCheckedChange={(v) => (v ? sel.somar(idsDaPagina) : sel.quitar(idsDaPagina))} />
                     Cliente / Razão Social
                   </div>
                 </TableHead>
@@ -590,7 +619,7 @@ function AbaDefis({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtradas.map((l) => {
+              {pag.recorte.map((l) => {
                 const d = defisDoAno(l, ano);
                 const consultando = consulta.emAndamento === l.contact_id;
                 return (
@@ -639,9 +668,14 @@ function AbaDefis({
         )}
       </div>
 
-      <p className="text-meta text-muted-ink-2">
-        Mostrando {filtradas.length} de {base.length} clientes do Simples Nacional · ano-calendário {ano}. "Não entregue" não considera se o cliente estava no Simples naquele ano: confira antes de cobrar.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="space-y-1">
+          <RodapeLista mostrando={filtradas.length} total={base.length} unidade="clientes do Simples Nacional" faixa={pag.faixa} />
+          <p className="text-meta text-muted-ink-2">Ano-calendário {ano}. "Não entregue" não considera se o cliente estava no Simples naquele ano: confira antes de cobrar.</p>
+        </div>
+        <PaginacaoLista pagina={pag.pagina} totalPaginas={pag.totalPaginas} porPagina={pag.porPagina} total={filtradas.length}
+          onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
+      </div>
       {consulta.dialog}
       <AcaoLoteDialog
         aberto={consultaLote}

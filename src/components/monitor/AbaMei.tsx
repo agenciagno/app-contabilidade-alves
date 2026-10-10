@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { FileBadge, Loader2, Mail, MoreHorizontal, Receipt } from 'lucide-react';
@@ -13,7 +13,7 @@ import { CompetenciaNav } from '@/components/serpro/CompetenciaNav';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
-import { FaixaEstados, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
 import {
   AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote,
 } from '@/components/monitor/GuiasLote';
@@ -81,6 +81,13 @@ export function AbaMei() {
   }, [linhas, busca]);
   const contagem = contarEstados(base.map(seloDe));
   const filtradas = base.filter((l) => !estado || seloDe(l)?.estado === estado).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  const pag = usePaginacao(filtradas, `${busca}|${estado ?? ''}|${pa}`);
+  const topoTabela = useRef<HTMLDivElement>(null);
+  const irParaPagina = (n: number) => {
+    pag.setPagina(n);
+    requestAnimationFrame(() => topoTabela.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  const idsDaPagina = pag.recorte.map((l) => l.contact_id);
   const marcadas = linhas.filter((l) => sel.marcados.has(l.contact_id));
   const quemRecebe = linhas.filter((l) => !!marcacoes?.get(l.contact_id)?.das);
   const hojeDe = (iso?: string | null) => (iso ?? '').slice(0, 10) === hoje;
@@ -146,6 +153,11 @@ export function AbaMei() {
       <SearchField placeholder="Buscar por razão social ou CNPJ..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px]" />
 
       <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
+        {filtradas.some((l) => !sel.marcados.has(l.contact_id)) && filtradas.length > pag.recorte.length && (
+          <DicaBotao texto="Marca todos os clientes da lista com os filtros atuais, inclusive os das outras páginas.">
+            <Button size="sm" variant="outline" onClick={() => sel.somar(filtradas.map((l) => l.contact_id))}>Marcar os {filtradas.length} da lista</Button>
+          </DicaBotao>
+        )}
         <DicaBotao custo="Emitir" texto="Gera o DAS do MEI de cada cliente marcado. Quem já tem DAS guardado e válido não é emitido de novo.">
           <Button size="sm" onClick={() => setLote('das')}>Gerar DAS ({sel.marcados.size})</Button>
         </DicaBotao>
@@ -164,7 +176,7 @@ export function AbaMei() {
         <Button size="sm" variant="ghost" disabled={marcar.isPending} onClick={() => marcar.mutate({ contactIds: [...sel.marcados], processo: 'das', valor: true })}>Marcar "recebe DAS da CA"</Button>
       </BarraSelecao>
 
-      <div className="overflow-x-auto rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
         {isLoading ? (
           <div className="space-y-2 p-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : filtradas.length === 0 ? (
@@ -174,8 +186,8 @@ export function AbaMei() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8">
-                  <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtradas.map((l) => l.contact_id))}
-                    onCheckedChange={(v) => (v ? sel.somar(filtradas.map((l) => l.contact_id)) : sel.limpar())} />
+                  <Checkbox aria-label="Marcar todos desta página" checked={sel.todos(idsDaPagina)}
+                    onCheckedChange={(v) => (v ? sel.somar(idsDaPagina) : sel.quitar(idsDaPagina))} />
                 </TableHead>
                 <TableHead>Situação</TableHead>
                 <TableHead>DAS {siglaCompetencia(pa)}</TableHead>
@@ -187,7 +199,7 @@ export function AbaMei() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtradas.map((l) => {
+              {pag.recorte.map((l) => {
                 const d = l.das.find((x) => x.periodo.slice(0, 7) === pa) ?? null;
                 return (
                   <TableRow key={l.contact_id}>
@@ -252,7 +264,11 @@ export function AbaMei() {
         )}
       </div>
 
-      <RodapeLista mostrando={filtradas.length} total={linhas.length} unidade="clientes MEI ativos" />
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <RodapeLista mostrando={filtradas.length} total={linhas.length} unidade="clientes MEI ativos" faixa={pag.faixa} />
+        <PaginacaoLista pagina={pag.pagina} totalPaginas={pag.totalPaginas} porPagina={pag.porPagina} total={filtradas.length}
+          onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
+      </div>
       <p className="text-meta text-muted-ink-2">O DAS do MEI aparece na coluna, mas não entra na situação: o MEI pode pagar pelo app. Os parcelamentos do MEI ficam em Parcelamentos.</p>
 
       <GerarLoteDialog

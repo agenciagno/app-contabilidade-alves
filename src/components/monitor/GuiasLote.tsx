@@ -41,6 +41,7 @@ export function useSelecao() {
     alternar: (id: string) => setMarcados((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; }),
     definir: (ids: string[]) => setMarcados(new Set(ids)),
     somar: (ids: string[]) => setMarcados((s) => new Set([...s, ...ids])),
+    quitar: (ids: string[]) => setMarcados((s) => { const n = new Set(s); ids.forEach((id) => n.delete(id)); return n; }),
     limpar: () => setMarcados(new Set()),
     todos: (ids: string[]) => ids.length > 0 && ids.every((id) => marcados.has(id)),
   };
