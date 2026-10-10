@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Loader2, RefreshCw, X } from 'lucide-react';
+import { Loader2, RefreshCw, Wallet, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DICA_RODAPE, DicaBotao } from '@/components/serpro/DicaBotao';
+import { usePagamentosClienteJanela } from '@/components/serpro/PagamentosDoCliente';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { CertificadosAba } from '@/components/certificates/CertificadosAba';
 import { FaixaEstados, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
@@ -81,6 +82,7 @@ export default function ProcuracoesFederal() {
 // ---------------------------------------------------------------- aba Procurações
 
 function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
+  const { abrir: abrirPagamentos, janela: janelaPagamentos } = usePagamentosClienteJanela();
   const [params, setParams] = useSearchParams();
   const fonteParam = params.get('fonte');
   const fonte: Fonte = fonteParam === 'procuracao' || (fonteParam === 'certificado' && veCertificados) ? fonteParam : 'situacao';
@@ -243,12 +245,19 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
                     </TableCell>
                     <TableCell><UltimaBusca iso={l.mapeadoEm} contactId={l.contact_id} /></TableCell>
                     <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                      <DicaBotao texto="Abre os pagamentos deste cliente na Receita (DARF, DAS, DAE e DJE) com a composição de cada guia e o comprovante. Abrir é grátis: só lê o que já está salvo.">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Pagamentos do cliente" onClick={() => abrirPagamentos(l.contact_id, l.nome, formatarCnpj(l.documento))}>
+                              <Wallet className="h-4 w-4" />
+                            </Button>
+                          </DicaBotao>
                       <DicaBotao custo="Consultar" texto="Consulta na Receita quais procurações este cliente deu à Contabilidade Alves e até quando valem. Use depois que o cliente outorgar ou renovar no e-CAC. Um aviso semanal chega quando alguma vence em breve.">
                         <Button size="sm" variant="outline" disabled={consultando} onClick={() => pedir(l)}>
                           {consultando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
                           Mapear<Preco tipo="Consultar" />
                         </Button>
                       </DicaBotao>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -296,6 +305,7 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {janelaPagamentos}
     </div>
   );
 }

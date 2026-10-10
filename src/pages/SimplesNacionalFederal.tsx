@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, FileText, Loader2, Mail, MoreHorizontal, Receipt, RefreshCw, Search, X } from 'lucide-react';
 
@@ -366,9 +366,7 @@ function AbaMensal({
                             <DropdownMenuItem disabled={!d || lendo} onSelect={() => leitura.executar(l.contact_id, pa)}>
                               {l.fat && l.fat.periodo_apuracao.slice(0, 7) === pa ? 'Reler faturamento' : 'Ler faturamento'}{d && !d.declaracao_path && <Preco tipo="Consultar" />}
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link to={`/dashboard-federal/pagamentos?q=${digitos(l.documento)}`}>Pagamentos e comprovantes</Link>
-                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setAberto(l.contact_id)}>Pagamentos e comprovantes</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>

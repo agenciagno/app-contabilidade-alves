@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, FileDown, FileText, Loader2, Receipt, RefreshCw, Send } from 'lucide-react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from 'recharts';
@@ -10,16 +9,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { useAbrirArquivo, useGerarDasComConfirmacao } from '@/components/serpro/pgdasdUi';
+import { PagamentosDoCliente } from '@/components/serpro/PagamentosDoCliente';
 import { EnviarClienteDialog } from '@/components/gestao360/EnviarClienteDialog';
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
 import { SeloMini, SeloMonitor, UltimaBusca } from '@/components/monitor/MonitorUi';
 import { ROTULO_CANAL, useEnviosCliente } from '@/hooks/useEnvioCliente';
 import { dasDoPeriodo, dasReaproveitavel, declaracaoVigente } from '@/hooks/useSerproPgdasd';
 import { dasUnificado } from '@/hooks/useSerproDasUnificado';
-import { siglaCompetencia } from '@/hooks/useSerproPagamentos';
+import { siglaCompetencia, usePagamentosCliente } from '@/hooks/useSerproPagamentos';
 import { modeloDocumentos } from '@/lib/mensagensCliente';
 import { seloDas, seloPgdasMes } from '@/lib/monitorEstados';
-import { digitos } from '@/lib/situacaoCarteira';
 import type { LinhaSimples } from '@/lib/simplesNacionalLinhas';
 
 const moeda = (v: number | null | undefined) => (v === null || v === undefined ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -52,6 +51,7 @@ export function FichaSimplesSheet({
   const { ocupado, abrirDeclaracao, abrirExtrato, abrirDas } = useAbrirArquivo();
   const { pedir: pedirDas, gerando, dialog: dialogGerar } = useGerarDasComConfirmacao();
   const envios = useEnviosCliente(linha.contact_id);
+  const { data: pagamentos = [] } = usePagamentosCliente(linha.contact_id);
   const [enviando, setEnviando] = useState(false);
 
   // Mês a mês do ano, do mais recente para o mais antigo. A situação do DAS vem do índice do PGDAS-D (pago ou não);
@@ -62,9 +62,11 @@ export function FichaSimplesSheet({
     return out.map((m) => {
       const decl = declaracaoVigente(l, m);
       const das = m === pa ? linha.das : dasUnificado(l, [], m, hoje);
-      return { pa: m, decl, declSelo: seloPgdasMes(l, m, hoje, abertura), das, dasSelo: !decl && das.estado === 'sem_das' ? null : seloDas(das), guias: dasDoPeriodo(l, m) };
+      // Documento de pagamento do DAS do mês (data e valor pagos, vindos de Pagamentos).
+      const pago = pagamentos.find((p) => p.tipo_sigla === 'DAS' && (p.periodo_apuracao ?? '').slice(0, 7) === m) ?? null;
+      return { pa: m, decl, declSelo: seloPgdasMes(l, m, hoje, abertura), das, dasSelo: !decl && das.estado === 'sem_das' ? null : seloDas(das), guias: dasDoPeriodo(l, m), pago };
     }).filter((x) => x.declSelo || x.dasSelo);
-  }, [l, pa, ano, hoje, abertura, linha.das]);
+  }, [l, pa, ano, hoje, abertura, linha.das, pagamentos]);
 
   const pagos = meses.filter((x) => x.das.estado === 'pago').length;
   const emAberto = meses.filter((x) => x.das.estado === 'vencido');
@@ -146,7 +148,6 @@ export function FichaSimplesSheet({
           <DicaBotao texto="Abre o envio ao cliente (e-mail ou WhatsApp) com os documentos já guardados para marcar.">
             <Button variant="outline" onClick={() => setEnviando(true)}><Send className="mr-2 h-4 w-4" />Enviar ao cliente</Button>
           </DicaBotao>
-          <Link to={`/dashboard-federal/pagamentos?q=${digitos(linha.documento)}`} className="px-2 text-ui-strong text-action hover:underline">Pagamentos e comprovantes</Link>
         </div>
 
         <section className="mt-6 space-y-2">
@@ -173,7 +174,14 @@ export function FichaSimplesSheet({
                         <TableCell className="font-mono text-ui">{siglaCompetencia(m.pa)}</TableCell>
                         <TableCell><SeloMini selo={m.declSelo} /></TableCell>
                         <TableCell><SeloMini selo={m.dasSelo} /></TableCell>
-                        <TableCell className="whitespace-nowrap text-right text-ui">{moeda(m.das.valor)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-right text-ui">
+                          {moeda(m.das.valor)}
+                          {m.pago && (
+                            <p className="text-meta text-muted-ink-2">
+                              pago em {dataBR(m.pago.data_arrecadacao)}{m.pago.valor_total != null && m.pago.valor_total !== m.das.valor ? ` · ${moeda(m.pago.valor_total)}` : ''}
+                            </p>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">
                             {m.decl && (
@@ -207,7 +215,15 @@ export function FichaSimplesSheet({
               </Table>
             </div>
           )}
-          <p className="text-meta text-muted-ink-2">Nos meses anteriores, "pago" vem do índice do PGDAS-D. Data e valor do pagamento ficam em Pagamentos.</p>
+          <p className="text-meta text-muted-ink-2">Nos meses anteriores, "pago" vem do índice do PGDAS-D. Data e valor aparecem quando os pagamentos do mês já foram consultados.</p>
+        </section>
+
+        <section className="mt-6 space-y-2">
+          <div>
+            <h3 className="text-ui-strong text-ink">Pagamentos de {siglaCompetencia(pa)}</h3>
+            <p className="text-meta text-muted-ink">DAS, DARF e demais documentos pagos, com a composição por receita e o comprovante. Abrir é grátis; só consultar e emitir cobram.</p>
+          </div>
+          <PagamentosDoCliente contactId={linha.contact_id} competencia={pa} consultadoEm={undefined} temDasNoMes={linha.das.docs.length > 0} />
         </section>
 
         <section className="mt-6 space-y-2">

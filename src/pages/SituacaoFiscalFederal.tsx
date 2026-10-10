@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { FileText, History, Loader2, RefreshCw } from 'lucide-react';
+import { FileText, History, Loader2, RefreshCw, Wallet } from 'lucide-react';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, PageHeader, SearchField } from '@/components/ds';
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
+import { usePagamentosClienteJanela } from '@/components/serpro/PagamentosDoCliente';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { useAbrirRelatorioSitfis, useGerarRelatorioSitfis } from '@/components/serpro/sitfisUi';
 import { FaixaEstados, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
@@ -40,6 +41,7 @@ function seloDoRelatorio(r: SitfisRow): Selo | null {
  * do painel abre esta lista já filtrada. Histórico: todo relatório pronto fica guardado e abre de novo sem consultar a Receita.
  */
 export default function SituacaoFiscalFederal() {
+  const { abrir: abrirPagamentos, janela: janelaPagamentos } = usePagamentosClienteJanela();
   const { data: linhas = [], isLoading } = useMatrizSitfis();
   const { executar, emAndamento, dialog } = useGerarRelatorioSitfis();
   const { ocupado, abrir } = useAbrirRelatorioSitfis();
@@ -154,6 +156,11 @@ export default function SituacaoFiscalFederal() {
                       <TableCell><UltimaBusca iso={u?.gerado_em ?? null} contactId={l.contact_id} /></TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <DicaBotao texto="Abre os pagamentos deste cliente na Receita (DARF, DAS, DAE e DJE) com a composição de cada guia e o comprovante. Abrir é grátis: só lê o que já está salvo.">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Pagamentos do cliente" onClick={() => abrirPagamentos(l.contact_id, l.nome, formatarCnpj(l.documento))}>
+                              <Wallet className="h-4 w-4" />
+                            </Button>
+                          </DicaBotao>
                           {u && (
                             <DicaBotao texto="Abre o PDF do último relatório, que já está guardado. Não consulta a Receita.">
                               <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="PDF do último relatório" disabled={ocupado === u.id} onClick={() => abrir(u.id)}>
@@ -261,6 +268,7 @@ export default function SituacaoFiscalFederal() {
         referencia="último relatório de cada cliente"
         opcoes={[{ tipo: 'sitfis', rotulo: 'Relatório de situação fiscal da Receita (último)' }, { tipo: 'relatorio_situacao', rotulo: 'Relatório de Situação Fiscal para o cliente (CA)' }]}
       />
+      {janelaPagamentos}
     </div>
   );
 }

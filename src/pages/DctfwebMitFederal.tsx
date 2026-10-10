@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { FileCode, FileText, Loader2, Mail, MoreHorizontal, Receipt, RefreshCw } from 'lucide-react';
+import { FileCode, FileText, Loader2, Mail, MoreHorizontal, Receipt, RefreshCw, Wallet } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
@@ -14,6 +14,7 @@ import { Preco, brl } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { useAbrirRecibo, useConsultaDctfwebMit } from '@/components/serpro/dctfwebUi';
+import { usePagamentosClienteJanela } from '@/components/serpro/PagamentosDoCliente';
 import { FaixaEstados, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
 import { useDeclaracaoDctfweb, useGerarGuiaDctfweb, useGuiasDctfweb, useGuiasEnviadas, useLinkGuiaDctfweb, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
@@ -39,6 +40,7 @@ const ultimaConsulta = (l: LinhaDctfwebMit) => [l.dctfweb?.consultado_em, l.mitC
  * Filiais seguem a matriz e ficam de fora, como no painel.
  */
 export default function DctfwebMitFederal() {
+  const { abrir: abrirPagamentos, janela: janelaPagamentos } = usePagamentosClienteJanela();
   const [competencia, setCompetencia] = useState(competenciaPadrao());
   const { data: linhas = [], isLoading } = useMatrizDctfwebMit(competencia);
   const { executar, emAndamento, dialog } = useConsultaDctfwebMit(competencia);
@@ -280,6 +282,7 @@ export default function DctfwebMitFederal() {
                               <DropdownMenuItem onSelect={() => abrirDeclaracao(l.contact_id, 'pdf')}><FileText className="mr-2 h-4 w-4" />Declaração completa (PDF)<Preco tipo="Consultar" /></DropdownMenuItem>
                               <DropdownMenuItem onSelect={() => abrirDeclaracao(l.contact_id, 'xml')}><FileCode className="mr-2 h-4 w-4" />Declaração em XML<Preco tipo="Consultar" /></DropdownMenuItem>
                               <DropdownMenuItem onSelect={() => { setMarcados(new Set([l.contact_id])); setAndamentoLote(true); }}><Receipt className="mr-2 h-4 w-4" />Guia da declaração em andamento<Preco tipo="Emitir" /></DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => abrirPagamentos(l.contact_id, l.nome, formatarCnpj(l.documento))}><Wallet className="mr-2 h-4 w-4" />Pagamentos e composição das guias</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                           {l.dctfweb?.status === 'transmitida' && (
@@ -369,6 +372,7 @@ export default function DctfwebMitFederal() {
         assuntoPadrao={`Guia da DCTFWeb ${siglaCompetencia(competencia)} · {cliente}`}
         mensagemPadrao={`Olá! Segue a guia (DARF) da DCTFWeb de ${siglaCompetencia(competencia)} da {cliente}. Qualquer dúvida, é só responder este e-mail.\n\nContabilidade Alves`}
       />
+      {janelaPagamentos}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { ChevronDown, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, RefreshCw, Wallet } from 'lucide-react';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { PageHeader, SearchField } from '@/components/ds';
@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
+import { usePagamentosClienteJanela } from '@/components/serpro/PagamentosDoCliente';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { FaixaEstados, RodapeLista, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
 import { AcaoLoteDialog, BarraSelecao, useSelecao } from '@/components/monitor/GuiasLote';
@@ -36,6 +37,7 @@ function seloDe(l: LinhaEProcesso): Selo | null {
  * Processos digitais da Receita em que o cliente é interessado (EPROCESSO.CONSPROCPORINTER271), no molde do Monitoramento.
  */
 export default function EProcessoFederal() {
+  const { abrir: abrirPagamentos, janela: janelaPagamentos } = usePagamentosClienteJanela();
   const { data: linhas = [], isLoading } = useMatrizEProcesso();
   const consultar = useConsultarEProcesso();
   const [estado, setEstado] = useEstadoUrl();
@@ -138,12 +140,19 @@ export default function EProcessoFederal() {
                         </TableCell>
                         <TableCell><UltimaBusca iso={l.consulta?.consultado_em ?? null} contactId={l.contact_id} /></TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                          <DicaBotao texto="Abre os pagamentos deste cliente na Receita (DARF, DAS, DAE e DJE) com a composição de cada guia e o comprovante. Abrir é grátis: só lê o que já está salvo.">
+                            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Pagamentos do cliente" onClick={() => abrirPagamentos(l.contact_id, l.nome, formatarCnpj(l.documento))}>
+                              <Wallet className="h-4 w-4" />
+                            </Button>
+                          </DicaBotao>
                           <DicaBotao custo="Consultar" texto="Consulta na Receita os processos digitais em que este cliente é interessado.">
                             <Button size="sm" variant="outline" disabled={consultando === l.contact_id} onClick={() => executar(l.contact_id)}>
                               {consultando === l.contact_id ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
                               Consultar<Preco tipo="Consultar" />
                             </Button>
                           </DicaBotao>
+                          </div>
                         </TableCell>
                       </TableRow>
                       {aberto && (
@@ -205,6 +214,7 @@ export default function EProcessoFederal() {
           return { ok: r.ok && !r.foraDoMonitoramento, error: r.semProcuracao ? 'Sem procuração para o e-Processo' : r.error, resumo: r.processos ? `${r.processos} ${r.processos === 1 ? 'processo' : 'processos'}` : 'Sem processo' };
         }}
       />
+      {janelaPagamentos}
     </div>
   );
 }
