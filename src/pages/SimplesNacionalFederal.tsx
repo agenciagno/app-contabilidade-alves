@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { CompetenciaNav } from '@/components/serpro/CompetenciaNav';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
@@ -337,21 +336,6 @@ function AbaMensal({
                             {consultando ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                           </Button>
                         </DicaBotao>
-                        <DropdownMenu>
-                          <DicaBotao texto="Mais ações: DAS de cobrança e regime de apuração. Os documentos, o faturamento e os pagamentos ficam na ficha do cliente (clique na linha).">
-                            <DropdownMenuTrigger asChild>
-                              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Mais ações"><MoreHorizontal className="h-4 w-4" /></Button>
-                            </DropdownMenuTrigger>
-                          </DicaBotao>
-                          <DropdownMenuContent align="end" className="w-[260px]">
-                            <DropdownMenuItem onSelect={() => { setMarcados(new Set([l.contact_id])); setCobrancaLote(true); }}>
-                              DAS de cobrança de {siglaCompetencia(pa)}<Preco tipo="Emitir" />
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => { setMarcados(new Set([l.contact_id])); setRegimeLote(true); }}>
-                              Regime de apuração de {ano}<Preco tipo="Consultar" />
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -384,6 +368,9 @@ function AbaMensal({
           consultando={consulta.emAndamento === linhaAberta.contact_id}
           onConsultar={() => consulta.executar(linhaAberta.contact_id)}
           onVerLeitura={() => setVerLeitura(true)}
+          onDasCobranca={() => { setMarcados(new Set([linhaAberta.contact_id])); setCobrancaLote(true); }}
+          onRegime={() => { setMarcados(new Set([linhaAberta.contact_id])); setRegimeLote(true); }}
+          regimeRotulo={rotuloRegime(regimes?.get(linhaAberta.contact_id)?.regime)}
           onLerFaturamento={() => leitura.executar(linhaAberta.contact_id, pa)}
           lendoFaturamento={leitura.emAndamento === linhaAberta.contact_id}
         />

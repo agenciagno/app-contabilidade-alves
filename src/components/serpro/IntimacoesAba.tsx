@@ -263,8 +263,9 @@ export function IntimacoesAba() {
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <BotaoNota tem={!!notaCliente} onClick={() => abrirNotaCliente(g)} dica={notaCliente ? 'Abre o bloco de notas deste cliente (já tem anotação).' : 'Abre o bloco de notas deste cliente para escrever uma observação.'} />
-                          <BotaoAviso msgs={paraAvisar(g)} canal="whatsapp" />
-                          <BotaoAviso msgs={paraAvisar(g)} canal="email" />
+                          {/* Com uma mensagem só, o aviso é o da linha da própria mensagem (ao abrir): não repete aqui. */}
+                          {paraAvisar(g).length > 1 && <BotaoAviso msgs={paraAvisar(g)} canal="whatsapp" />}
+                          {paraAvisar(g).length > 1 && <BotaoAviso msgs={paraAvisar(g)} canal="email" />}
                         </div>
                       </TableCell>
                     </TableRow>

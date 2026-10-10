@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { Eye } from 'lucide-react';
 import { PaginacaoLista, RodapeLista, usePaginacao } from '@/components/monitor/MonitorUi';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
@@ -234,14 +233,14 @@ export default function PagamentosFederal() {
                 <TableHead>DAS</TableHead>
                 {TIPOS_COLUNA.map((t) => <TableHead key={t} className="text-center">{t}</TableHead>)}
                 <TableHead>Situação</TableHead>
-                <TableHead className="text-center">Ver</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {pag.recorte.map((l) => {
                 const r = rotuloDas(l.das);
                 return (
-                  <TableRow key={l.contact_id} className="cursor-pointer" onClick={() => setAberto(l.contact_id)}>
+                  <TableRow key={l.contact_id} className="cursor-pointer" tabIndex={0} aria-label={`Abrir o painel de ${l.nome}`} onClick={() => setAberto(l.contact_id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) setAberto(l.contact_id); }}>
                     <TableCell className="min-w-[240px] max-w-[360px]">
                       <div className="flex items-start gap-3">
                         <span className="pt-0.5" onClick={(e) => e.stopPropagation()}>
@@ -275,13 +274,6 @@ export default function PagamentosFederal() {
                           </span>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <DicaBotao texto="Abre o painel do cliente com o DAS e os pagamentos já salvos. Não consulta a Receita.">
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); setAberto(l.contact_id); }}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </DicaBotao>
                     </TableCell>
                   </TableRow>
                 );

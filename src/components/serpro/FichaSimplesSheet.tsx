@@ -32,7 +32,7 @@ const mesCurto = (aaaamm: string) => `${aaaamm.slice(5, 7)}/${aaaamm.slice(2, 4)
  * Abrir a ficha é grátis: só lê o que já está salvo. Consultar, gerar DAS e baixar documento ainda não guardado cobram, e o botão diz.
  */
 export function FichaSimplesSheet({
-  linha, pa, hoje, abertura, posicao, onAnterior, onProximo, onClose, consultando, onConsultar, onVerLeitura, onLerFaturamento, lendoFaturamento,
+  linha, pa, hoje, abertura, posicao, onAnterior, onProximo, onClose, consultando, onConsultar, onVerLeitura, onLerFaturamento, lendoFaturamento, onDasCobranca, onRegime, regimeRotulo,
 }: {
   linha: LinhaSimples;
   pa: string;
@@ -48,6 +48,10 @@ export function FichaSimplesSheet({
   /** Lê o faturamento da declaração do mês (consulta o PDF da declaração se ainda não estiver guardado). */
   onLerFaturamento: () => void;
   lendoFaturamento: boolean;
+  /** DAS de cobrança do mês (período que já foi para a Cobrança da Receita) e consulta do regime de apuração do ano: abrem o diálogo de lote com este cliente. */
+  onDasCobranca: () => void;
+  onRegime: () => void;
+  regimeRotulo: string | null;
 }) {
   const l = linha.pg;
   const ano = Number(pa.slice(0, 4));
@@ -148,6 +152,12 @@ export function FichaSimplesSheet({
               </Button>
             </DicaBotao>
           )}
+          <DicaBotao custo="Emitir" texto={`Gera o DAS de ${siglaCompetencia(pa)} pelo sistema de Cobrança da Receita, para período que já foi para cobrança (o DAS comum não sai mais). Pede confirmação antes.`}>
+            <Button variant="outline" onClick={onDasCobranca}>DAS de cobrança de {siglaCompetencia(pa)}<Preco tipo="Emitir" /></Button>
+          </DicaBotao>
+          <DicaBotao custo="Consultar" texto={`Consulta se este cliente optou pelo regime de caixa ou de competência em ${ano}.${regimeRotulo ? ` Última consulta: ${regimeRotulo}.` : ''}`}>
+            <Button variant="outline" onClick={onRegime}>Regime de apuração de {ano}<Preco tipo="Consultar" /></Button>
+          </DicaBotao>
           <DicaBotao texto="Abre o envio ao cliente (e-mail ou WhatsApp) com os documentos já guardados para marcar.">
             <Button variant="outline" onClick={() => setEnviando(true)}><Send className="mr-2 h-4 w-4" />Enviar ao cliente</Button>
           </DicaBotao>

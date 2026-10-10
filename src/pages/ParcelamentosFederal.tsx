@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { Eye, Loader2, Mail, RefreshCw, Wallet } from 'lucide-react';
+import { Loader2, Mail, RefreshCw, Wallet } from 'lucide-react';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { PageHeader, SearchField } from '@/components/ds';
@@ -231,11 +231,6 @@ export default function ParcelamentosFederal() {
                           <DicaBotao texto="Abre os pagamentos deste cliente na Receita (DARF, DAS, DAE e DJE) com a composição de cada guia e o comprovante. Abrir é grátis: só lê o que já está salvo.">
                             <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Pagamentos do cliente" onClick={() => abrirPagamentos(l.contact_id, l.nome, formatarCnpj(l.documento))}>
                               <Wallet className="h-4 w-4" />
-                            </Button>
-                          </DicaBotao>
-                          <DicaBotao texto={temDados ? 'Abre o painel do cliente com os parcelamentos, as parcelas em aberto e a guia de cada uma. Não consulta a Receita.' : 'Consulte o cliente primeiro para ter o que ver.'}>
-                            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Ver parcelamentos" disabled={!temDados} onClick={() => setAberto(l.contact_id)}>
-                              <Eye className="h-4 w-4" />
                             </Button>
                           </DicaBotao>
                           <DicaBotao custo="Consultar" vezes={chamadas}

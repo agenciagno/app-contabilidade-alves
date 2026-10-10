@@ -161,7 +161,7 @@ function AbaClientes() {
 
       <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
         <DicaBotao custo="Consultar" texto="Abre a Consulta em Lote já com os clientes marcados na lista. Você confere antes de começar; quem já foi consultado hoje fica de fora.">
-          <Button size="sm" onClick={() => setLote({ inicial: [...sel.marcados] })}>Consulta em Lote ({sel.marcados.size})</Button>
+          <Button size="sm" onClick={() => setLote({ inicial: [...sel.marcados] })}>Consultar marcados ({sel.marcados.size})</Button>
         </DicaBotao>
         <DicaBotao custo="Consultar" texto="Consulta se cada cliente marcado aderiu ao Domicílio Tributário Eletrônico (DTE) da Receita e do Simples.">
           <Button size="sm" variant="outline" onClick={() => setDteLote(true)}>Consultar DTE</Button>
