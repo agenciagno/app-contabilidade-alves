@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { CheckCircle2, ChevronDown, ChevronRight, CircleDot, Clock, FileText, Mail, MailOpen, MessageCircle, MinusCircle, NotebookPen, type LucideIcon } from 'lucide-react';
@@ -11,6 +11,7 @@ import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PaginacaoLista, RodapeLista, usePaginacao } from '@/components/monitor/MonitorUi';
 import { AvisarClienteDialog, foneDoCliente, formatarFone, type AlvoAviso, type CanalTela } from '@/components/serpro/AvisarClienteDialog';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { NotaDialog, type NotaAlvo } from '@/components/serpro/NotaDialog';
@@ -98,6 +99,13 @@ export function IntimacoesAba() {
     const maisRecente = (g: GrupoCliente) => g.msgs[0]?.data_envio ?? '';
     return lista.sort((a, b) => ORDEM_SITUACAO.indexOf(a.situacao) - ORDEM_SITUACAO.indexOf(b.situacao) || maisRecente(b).localeCompare(maisRecente(a)));
   }, [mensagens, filtradas]);
+
+  const pag = usePaginacao(grupos, `${busca}|${categoria}|${situacao}`);
+  const topoTabela = useRef<HTMLDivElement>(null);
+  const irParaPagina = (n: number) => {
+    pag.setPagina(n);
+    requestAnimationFrame(() => topoTabela.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
 
   const tabelaExport = (): TabelaExport => ({
     arquivo: 'termos-de-intimacao',
@@ -200,7 +208,7 @@ export function IntimacoesAba() {
         <div className="sm:ml-auto"><ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas /></div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className="scroll-mt-16 overflow-hidden rounded-lg border border-line bg-paper">
         {isLoading ? (
           <div className="space-y-2 p-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
         ) : grupos.length === 0 ? (
@@ -214,7 +222,7 @@ export function IntimacoesAba() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10" />
-                <TableHead>Razão Social</TableHead>
+                <TableHead>Cliente / Razão Social</TableHead>
                 <TableHead>CNPJ</TableHead>
                 <TableHead>Lida</TableHead>
                 <TableHead>Situação</TableHead>
@@ -222,7 +230,7 @@ export function IntimacoesAba() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {grupos.map((g) => {
+              {pag.recorte.map((g) => {
                 const cliente = g.msgs[0];
                 const aberto = abertos[g.contactId] ?? (!!busca.trim() && grupos.length === 1);
                 const Icone = ICONE_SITUACAO[g.situacao];
@@ -333,6 +341,14 @@ export function IntimacoesAba() {
           </Table>
         )}
       </div>
+
+      {grupos.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <RodapeLista mostrando={grupos.length} total={grupos.length} unidade="clientes com mensagem" faixa={pag.faixa} />
+          <PaginacaoLista pagina={pag.pagina} totalPaginas={pag.totalPaginas} porPagina={pag.porPagina} total={grupos.length}
+            onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
+        </div>
+      )}
 
       {dialogs}
       <AvisarClienteDialog alvo={avisando} onClose={() => setAvisando(null)} />

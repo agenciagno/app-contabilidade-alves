@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { CalendarPlus, Loader2, Mail, RefreshCw } from 'lucide-react';
 
@@ -15,7 +15,7 @@ import { useConsultaDctfwebMit } from '@/components/serpro/dctfwebUi';
 import { FichaPresumidoRealSheet } from '@/components/serpro/FichaPresumidoRealSheet';
 import { mesesFaltantes, useDctfwebAno } from '@/hooks/useSerproFichaPresumido';
 import { useCadastroMonitor } from '@/hooks/useSituacaoCarteira';
-import { FaixaEstados, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
 import { useGerarGuiaDctfweb, useGuiasDctfweb, useGuiasEnviadas, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
 import { hojeBR } from '@/lib/prazosFederais';
@@ -84,6 +84,14 @@ export default function DctfwebMitFederal() {
   const contagem = contarEstados(base.map(seloDe));
   const filtradas = base.filter((l) => !estado || seloDe(l)?.estado === estado).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
+  const pag = usePaginacao(filtradas, `${busca}|${estado ?? ''}|${soNovos}|${competencia}`);
+  const topoTabela = useRef<HTMLDivElement>(null);
+  const irParaPagina = (n: number) => {
+    pag.setPagina(n);
+    requestAnimationFrame(() => topoTabela.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  const idsDaPagina = pag.recorte.map((l) => l.contact_id);
+
   const recebeGuia = (id: string) => !!marcacoes?.get(id)?.dctfweb;
   const quemRecebe = matrizes.filter((l) => recebeGuia(l.contact_id));
   // O servidor só reaproveita guia emitida HOJE, sem data de pagamento: é o que não cobra de novo.
@@ -105,7 +113,6 @@ export default function DctfwebMitFederal() {
   });
   const aEnviar = itensEnvio.filter((i) => i.email && !i.enviadoEm).length;
   const alternarMarcado = (id: string) => setMarcados((st) => { const n = new Set(st); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const todasMarcadas = filtradas.length > 0 && filtradas.every((l) => marcados.has(l.contact_id));
   const tabelaExport = (): TabelaExport => ({
     arquivo: `dctfweb-mit-${competencia}`,
     titulo: `DCTFWeb e MIT — competência ${siglaCompetencia(competencia)}`,
@@ -125,7 +132,7 @@ export default function DctfwebMitFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · dctfweb e mit" title="DCTFWeb e MIT." />
+      <PageHeader kicker="~/dashboard fiscal · dctfweb e mit" title="DCTFWeb | MIT." />
 
       <div className="space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -146,6 +153,11 @@ export default function DctfwebMitFederal() {
         </div>
 
         <BarraSelecao quantos={marcados.size} onLimpar={() => setMarcados(new Set())}>
+          {filtradas.some((l) => !marcados.has(l.contact_id)) && filtradas.length > pag.recorte.length && (
+            <DicaBotao texto="Marca todos os clientes da lista com os filtros atuais, inclusive os das outras páginas.">
+              <Button size="sm" variant="outline" onClick={() => setMarcados(new Set([...marcados, ...filtradas.map((l) => l.contact_id)]))}>Marcar os {filtradas.length} da lista</Button>
+            </DicaBotao>
+          )}
           <DicaBotao custo="Emitir" texto="Gera a guia (DARF) da DCTFWeb de cada cliente marcado. Pede confirmação antes.">
             <Button size="sm" onClick={() => setLoteAberto(true)}>Gerar guia ({marcados.size})</Button>
           </DicaBotao>
@@ -178,7 +190,7 @@ export default function DctfwebMitFederal() {
           </DicaBotao>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-line bg-paper">
+        <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
           {isLoading ? (
             <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : filtradas.length === 0 ? (
@@ -189,8 +201,8 @@ export default function DctfwebMitFederal() {
                 <TableRow>
                   <TableHead>
                     <div className="flex items-center gap-3">
-                      <Checkbox aria-label="Marcar todos da lista" checked={todasMarcadas}
-                        onCheckedChange={(v) => setMarcados(v ? new Set([...marcados, ...filtradas.map((l) => l.contact_id)]) : new Set())} />
+                      <Checkbox aria-label="Marcar todos desta página" checked={idsDaPagina.length > 0 && idsDaPagina.every((id) => marcados.has(id))}
+                        onCheckedChange={(v) => setMarcados((m) => { const n = new Set(m); idsDaPagina.forEach((id) => (v ? n.add(id) : n.delete(id))); return n; })} />
                       Cliente / Razão Social
                     </div>
                   </TableHead>
@@ -202,7 +214,7 @@ export default function DctfwebMitFederal() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtradas.map((l) => {
+                {pag.recorte.map((l) => {
                   const a = apuracaoVigente(l);
                   const consultando = emAndamento === l.contact_id;
                   const outros = [l.novo ? 'Movimento novo' : null, l.semProcuracao ? 'Sem procuração' : null].filter((x): x is string => !!x);
@@ -242,7 +254,7 @@ export default function DctfwebMitFederal() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell><UltimaBusca iso={ultimaConsulta(l)} contactId={l.contact_id} /></TableCell>
+                      <TableCell><UltimaBusca iso={ultimaConsulta(l)} /></TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <DicaBotao custo="Consultar" vezes={2}
@@ -262,7 +274,11 @@ export default function DctfwebMitFederal() {
           )}
         </div>
 
-        <RodapeLista mostrando={filtradas.length} total={matrizes.length} unidade="clientes do Lucro Presumido e do Lucro Real" filiais={linhas.length - matrizes.length} />
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <RodapeLista mostrando={filtradas.length} total={matrizes.length} unidade="clientes do Lucro Presumido e do Lucro Real" filiais={linhas.length - matrizes.length} faixa={pag.faixa} />
+          <PaginacaoLista pagina={pag.pagina} totalPaginas={pag.totalPaginas} porPagina={pag.porPagina} total={filtradas.length}
+            onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
+        </div>
       </div>
       {dialog}
 

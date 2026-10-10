@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2, RefreshCw, Wallet, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,7 +20,7 @@ import { DICA_RODAPE, DicaBotao } from '@/components/serpro/DicaBotao';
 import { usePagamentosClienteJanela } from '@/components/serpro/PagamentosDoCliente';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { CertificadosAba } from '@/components/certificates/CertificadosAba';
-import { FaixaEstados, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
 import { HORAS_MAPA_RECENTE, useMapearProcuracao, useProcuracoes, vencendo, type LinhaProcuracao } from '@/hooks/useSerproProcuracoes';
 import { certificadoPorCliente, useCertificates, type CertificadoDoCliente } from '@/hooks/useCertificates';
 import { useAtualizarVinculos, useVinculosRedesim } from '@/hooks/useSerproExtras';
@@ -66,7 +66,7 @@ export default function ProcuracoesFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · procurações e certificados" title="Procurações e Certificados." />
+      <PageHeader kicker="~/dashboard fiscal · procurações e certificados" title="Procurações | Certificados." />
 
       <div className="flex gap-1 border-b border-line">
         <DsTab active={aba === 'procuracoes'} onClick={() => irPara('procuracoes')}>Procurações</DsTab>
@@ -122,6 +122,14 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
   const contagem = contarEstados(base.map(seloDe));
   const filtradas = base.filter((l) => !estado || seloDe(l)?.estado === estado).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
+  const pag = usePaginacao(filtradas, `${busca}|${estado ?? ''}|${fonte}`);
+  const topoTabela = useRef<HTMLDivElement>(null);
+  const irParaPagina = (n: number) => {
+    pag.setPagina(n);
+    requestAnimationFrame(() => topoTabela.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  const idsDaPagina = pag.recorte.map((l) => l.contact_id);
+
   const executar = async (l: LinhaProcuracao) => {
     setEmAndamento(l.contact_id);
     try {
@@ -174,12 +182,17 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
       </div>
 
       <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
+        {filtradas.some((l) => !sel.marcados.has(l.contact_id)) && filtradas.length > pag.recorte.length && (
+          <DicaBotao texto="Marca todos os clientes da lista com os filtros atuais, inclusive os das outras páginas.">
+            <Button size="sm" variant="outline" onClick={() => sel.somar(filtradas.map((l) => l.contact_id))}>Marcar os {filtradas.length} da lista</Button>
+          </DicaBotao>
+        )}
         <DicaBotao custo="Consultar" texto="Consulta na Receita as procurações de cada cliente marcado, um de cada vez. Quem já foi mapeado hoje fica de fora.">
           <Button size="sm" onClick={() => setLoteAberto(true)}>Mapear ({sel.marcados.size})</Button>
         </DicaBotao>
       </BarraSelecao>
 
-      <div className="overflow-x-auto rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
         {carregando ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : filtradas.length === 0 ? (
@@ -188,20 +201,22 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
           <Table className="[&_td]:px-3 [&_th]:px-3">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-8">
-                  <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtradas.map((l) => l.contact_id))}
-                    onCheckedChange={(v) => (v ? sel.somar(filtradas.map((l) => l.contact_id)) : sel.limpar())} />
+                <TableHead>
+                  <div className="flex items-center gap-3">
+                    <Checkbox aria-label="Marcar todos desta página" checked={sel.todos(idsDaPagina)}
+                      onCheckedChange={(v) => (v ? sel.somar(idsDaPagina) : sel.quitar(idsDaPagina))} />
+                    Cliente / Razão Social
+                  </div>
                 </TableHead>
                 <TableHead>Situação</TableHead>
                 <TableHead>Procuração e-CAC</TableHead>
                 {veCertificados && <TableHead>Certificado digital</TableHead>}
-                <TableHead>Cliente / Razão Social</TableHead>
                 <TableHead>Última busca</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtradas.map((l) => {
+              {pag.recorte.map((l) => {
                 const consultando = emAndamento === l.contact_id;
                 const c = certDe(l);
                 const faltam = l.situacao === 'parcial' ? l.faltam : [];
@@ -210,7 +225,16 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
                 const principal = fonte === 'situacao' && !consultando ? piorSelo(selos) : seloDe(l);
                 return (
                   <TableRow key={l.contact_id}>
-                    <TableCell className="w-8"><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></TableCell>
+                    <TableCell className="min-w-[240px] max-w-[360px]">
+                      <div className="flex items-start gap-3">
+                        <span className="pt-0.5"><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></span>
+                        <div className="min-w-0">
+                          <p className="text-ui text-ink">{l.nome}</p>
+                          <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
+                          <p className="text-meta text-muted-ink-2">{REGIMES[l.regime ?? ''] ?? l.regime ?? 'Sem regime'}</p>
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell className="min-w-[170px]">
                       <SeloMonitor selo={principal} outros={fonte === 'situacao' ? outrosMotivos(selos, principal) : []} />
                     </TableCell>
@@ -238,12 +262,7 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
                         ) : <span className="text-meta text-muted-ink-2">Não cadastrado</span>}
                       </TableCell>
                     )}
-                    <TableCell className="min-w-[200px] max-w-[280px]">
-                      <p className="text-ui text-ink">{l.nome}</p>
-                      <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
-                      <p className="text-meta text-muted-ink-2">{REGIMES[l.regime ?? ''] ?? l.regime ?? 'Sem regime'}</p>
-                    </TableCell>
-                    <TableCell><UltimaBusca iso={l.mapeadoEm} contactId={l.contact_id} /></TableCell>
+                    <TableCell><UltimaBusca iso={l.mapeadoEm} /></TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                       <DicaBotao texto="Abre os pagamentos deste cliente na Receita (DARF, DAS, DAE e DJE) com a composição de cada guia e o comprovante. Abrir é grátis: só lê o que já está salvo.">
@@ -267,7 +286,11 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
         )}
       </div>
 
-      <RodapeLista mostrando={filtradas.length} total={matrizes.length} unidade="clientes ativos" filiais={linhas.length - matrizes.length} />
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <RodapeLista mostrando={filtradas.length} total={matrizes.length} unidade="clientes ativos" filiais={linhas.length - matrizes.length} faixa={pag.faixa} />
+        <PaginacaoLista pagina={pag.pagina} totalPaginas={pag.totalPaginas} porPagina={pag.porPagina} total={filtradas.length}
+          onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
+      </div>
 
       <AcaoLoteDialog
         aberto={loteAberto}

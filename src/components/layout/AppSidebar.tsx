@@ -175,6 +175,13 @@ interface SimpleModule extends RoleGated {
    * fica ativo (senão Dashboard Fiscal acende junto com Procurações).
    */
   activeExcept?: string[];
+  /**
+   * Onde o item aparece (10/10/2026): só na sidebar (`lateral`), só no menu fixo do topo das telas do Monitoramento (`superior`)
+   * ou nos dois (ausente). Os dois menus têm listas e ordens próprias.
+   */
+  menu?: 'lateral' | 'superior';
+  /** Nome no menu do topo, quando diferente do da sidebar. */
+  tituloTopo?: string;
 }
 
 interface CollapsibleModule extends RoleGated {
@@ -189,16 +196,22 @@ interface CollapsibleModule extends RoleGated {
 
 export type MenuEntry = SectionDivider | SimpleModule | CollapsibleModule;
 
-/** Itens do grupo "Monitoramento" (da seção até o próximo divisor): o menu fixo no topo das telas do Monitoramento Fiscal usa esta mesma lista. */
+/** Ordem dos itens no menu do topo das telas do Monitoramento (pedido de Gabriel, 10/10/2026). Fora desta lista não aparece no topo. */
+const ORDEM_TOPO = [
+  '/dashboard-federal', '/mensagens', '/dashboard-federal/simples-nacional', '/dashboard-federal/situacao-fiscal',
+  '/dashboard-federal/dctfweb-mit', '/dashboard-federal/parcelamentos', '/dashboard-federal/procuracoes', '/certidoes', '/dashboard-federal/eprocesso',
+];
+
+/** Itens do grupo "Monitoramento" que aparecem no menu fixo do topo das telas (na ordem do topo, que não é a da sidebar). */
 export function itensDoMonitoramento(): SimpleModule[] {
   const inicio = menuEntries.findIndex((e) => e.kind === 'section' && e.label === 'Monitoramento');
   const itens: SimpleModule[] = [];
   for (let i = inicio + 1; i < menuEntries.length; i++) {
     const e = menuEntries[i];
     if (e.kind === 'section') break;
-    if (e.kind === 'simple') itens.push(e);
+    if (e.kind === 'simple' && e.menu !== 'lateral' && ORDEM_TOPO.includes(e.url)) itens.push(e);
   }
-  return itens;
+  return itens.sort((a, b) => ORDEM_TOPO.indexOf(a.url) - ORDEM_TOPO.indexOf(b.url));
 }
 
 /** Permissão de um item simples do menu: papel, módulo e submódulo. Vale para a sidebar e para o menu do topo. */
@@ -267,13 +280,16 @@ export const menuEntries: MenuEntry[] = [
   {
     kind: 'simple',
     title: 'Dashboard Fiscal',
+    tituloTopo: 'Dashboard',
     url: '/dashboard-federal',
     icon: Landmark,
     iconName: 'landmark',
     moduleKey: 'dashboard_federal',
-    // Situação Fiscal e Procurações viraram itens próprios (01/10/2026), e em
-    // 08/10/2026 ganharam chave de permissão própria. Simples Nacional, em 09/10/2026.
-    activeExcept: ['/dashboard-federal/situacao-fiscal', '/dashboard-federal/procuracoes', '/dashboard-federal/simples-nacional', '/dashboard-federal/parcelamentos', '/dashboard-federal/dctfweb-mit', '/dashboard-federal/eprocesso'],
+    // Itens com rota própria dentro de /dashboard-federal: nelas o Dashboard não fica ativo.
+    activeExcept: [
+      '/dashboard-federal/situacao-fiscal', '/dashboard-federal/procuracoes', '/dashboard-federal/simples-nacional',
+      '/dashboard-federal/parcelamentos', '/dashboard-federal/dctfweb-mit', '/dashboard-federal/eprocesso',
+    ],
   },
   {
     kind: 'simple',
@@ -292,24 +308,6 @@ export const menuEntries: MenuEntry[] = [
     iconName: 'receipt',
     moduleKey: 'dashboard_federal',
   },
-  // Parcelamentos do Simples ativado em 09/10/2026 (pronto desde 30/09, sem rota); mesma permissão do Dashboard Fiscal.
-  {
-    kind: 'simple',
-    title: 'Parcelamentos',
-    url: '/dashboard-federal/parcelamentos',
-    icon: Layers,
-    iconName: 'layers',
-    moduleKey: 'dashboard_federal',
-  },
-  // DCTFWeb e MIT viraram item próprio em 10/10/2026 (pedido de Gabriel: estava escondida dentro do Dashboard Fiscal); mesma permissão da rota.
-  {
-    kind: 'simple',
-    title: 'DCTFWeb e MIT',
-    url: '/dashboard-federal/dctfweb-mit',
-    icon: FileCheck,
-    iconName: 'file-check',
-    moduleKey: 'dashboard_federal',
-  },
   {
     kind: 'simple',
     title: 'Situação Fiscal',
@@ -318,14 +316,43 @@ export const menuEntries: MenuEntry[] = [
     iconName: 'shield-check',
     moduleKey: 'monitoramento_situacao_fiscal',
   },
+  // DCTFWeb e MIT: item próprio desde 10/10/2026 (estava escondida dentro do Dashboard Fiscal); mesma permissão da rota.
+  {
+    kind: 'simple',
+    title: 'DCTFWeb | MIT',
+    url: '/dashboard-federal/dctfweb-mit',
+    icon: FileCheck,
+    iconName: 'file-check',
+    moduleKey: 'dashboard_federal',
+  },
+  // Parcelamentos, Procurações | Certificados, Certidões e e-Processo ficam só no menu do topo (pedido de Gabriel, 10/10/2026).
+  {
+    kind: 'simple',
+    title: 'Parcelamentos',
+    url: '/dashboard-federal/parcelamentos',
+    icon: Layers,
+    iconName: 'layers',
+    moduleKey: 'dashboard_federal',
+    menu: 'superior',
+  },
   // Procurações e Certificados viraram uma tela só em 09/10/2026 (Certificados é uma aba, com a permissão do Cadastro).
   {
     kind: 'simple',
-    title: 'Procurações e Certificados',
+    title: 'Procurações | Certificados',
     url: '/dashboard-federal/procuracoes',
     icon: FileSignature,
     iconName: 'file-signature',
     moduleKey: 'monitoramento_procuracoes',
+    menu: 'superior',
+  },
+  {
+    kind: 'simple',
+    title: 'Certidões',
+    url: '/certidoes',
+    icon: ScrollText,
+    iconName: 'scroll-text',
+    moduleKey: 'certidoes',
+    menu: 'superior',
   },
   // e-Processo (09/10/2026): processos digitais da Receita; item próprio, separado de "Processos" (decisão de Gabriel).
   {
@@ -335,17 +362,9 @@ export const menuEntries: MenuEntry[] = [
     icon: Scale,
     iconName: 'scale',
     moduleKey: 'dashboard_federal',
+    menu: 'superior',
   },
-  {
-    kind: 'simple',
-    title: 'Certidões',
-    url: '/certidoes',
-    icon: ScrollText,
-    iconName: 'scroll-text',
-    moduleKey: 'certidoes',
-  },
-  // Alvarás veio do grupo Cadastro (01/10/2026): rota e permissão seguem as
-  // do Cadastro, só o lugar no menu mudou.
+  // Alvarás veio do grupo Cadastro (01/10/2026): rota e permissão seguem as do Cadastro, só o lugar no menu mudou. Só na sidebar.
   {
     kind: 'simple',
     title: 'Alvarás',
@@ -354,6 +373,7 @@ export const menuEntries: MenuEntry[] = [
     iconName: 'file-text',
     moduleKey: 'cadastro',
     subKey: 'cadastros_alvaras',
+    menu: 'lateral',
   },
   {
     kind: 'simple',
@@ -362,6 +382,7 @@ export const menuEntries: MenuEntry[] = [
     icon: Gavel,
     iconName: 'gavel',
     moduleKey: 'processos',
+    menu: 'lateral',
   },
 
   { kind: 'section', label: 'Diagnóstico Fiscal' },
@@ -484,7 +505,7 @@ export function AppSidebar() {
 
   const isEntryVisible = (entry: MenuEntry): boolean => {
     if (entry.kind === 'section') return false; // resolvido na montagem da lista
-    if (entry.kind === 'simple') return itemSimplesVisivel(entry, { passesRoleGate, isModuleVisible, isSubItemVisible });
+    if (entry.kind === 'simple') return entry.menu !== 'superior' && itemSimplesVisivel(entry, { passesRoleGate, isModuleVisible, isSubItemVisible });
     if (!passesRoleGate(entry)) return false;
     // Grupo sem moduleKey (Cadastros) depende só dos itens.
     if (entry.moduleKey && !isModuleVisible(entry.moduleKey)) return false;

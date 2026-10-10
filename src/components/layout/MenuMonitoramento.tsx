@@ -43,7 +43,7 @@ export function MenuMonitoramento() {
                   ativo ? 'border-ink text-ui-strong text-ink' : 'border-transparent text-nav text-muted-ink hover:text-ink',
                 )}
               >
-                {item.title}
+                {item.tituloTopo ?? item.title}
                 {item.moduleKey === 'mensagens' && mensagensNovas > 0 && (
                   <span className="flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-danger px-1.5 text-badge font-medium text-white">
                     {mensagensNovas}

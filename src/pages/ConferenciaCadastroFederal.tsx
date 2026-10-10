@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
+import { PaginacaoLista, RodapeLista, usePaginacao } from '@/components/monitor/MonitorUi';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { ROTULO_PROBLEMA, useConferenciaCadastro, type TipoProblema } from '@/hooks/useSerproConferenciaCadastro';
 import type { TabelaExport } from '@/lib/exportarTabela';
@@ -46,6 +47,13 @@ export default function ConferenciaCadastroFederal() {
       .filter((l) => !q || l.nome.toLowerCase().includes(q) || (qDigitos && somenteDigitos(l.documento).includes(qDigitos)));
   }, [linhas, busca, filtro]);
 
+  const pag = usePaginacao(filtradas, `${busca}|${filtro}`);
+  const topoTabela = useRef<HTMLDivElement>(null);
+  const irParaPagina = (n: number) => {
+    pag.setPagina(n);
+    requestAnimationFrame(() => topoTabela.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+
   const tabelaExport = (): TabelaExport => ({
     arquivo: 'conferencia-cadastro',
     titulo: `Conferência do cadastro — ${format(new Date(), 'dd/MM/yyyy')}`,
@@ -79,7 +87,7 @@ export default function ConferenciaCadastroFederal() {
         </Select>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className="scroll-mt-16 overflow-hidden rounded-lg border border-line bg-paper">
         {carregando ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : filtradas.length === 0 ? (
@@ -90,13 +98,13 @@ export default function ConferenciaCadastroFederal() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Razão social</TableHead>
+                <TableHead>Cliente / Razão Social</TableHead>
                 <TableHead>Regime no cadastro</TableHead>
                 <TableHead>O que não bate</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtradas.map((l) => (
+              {pag.recorte.map((l) => (
                 <TableRow key={l.contact_id}>
                   <TableCell className="align-top">
                     <p className="text-ui text-ink">{l.nome}</p>
@@ -120,8 +128,13 @@ export default function ConferenciaCadastroFederal() {
         )}
       </div>
 
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <RodapeLista mostrando={filtradas.length} total={linhas.length} unidade="clientes com problema" faixa={pag.faixa} />
+        <PaginacaoLista pagina={pag.pagina} totalPaginas={pag.totalPaginas} porPagina={pag.porPagina} total={filtradas.length}
+          onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
+      </div>
       <p className="text-meta text-muted-ink-2">
-        Mostrando {filtradas.length} de {linhas.length} clientes com problema. O regime do cadastro só é comparado com a Receita quando a declaração PGDAS-D do cliente já foi consultada:
+        O regime do cadastro só é comparado com a Receita quando a declaração PGDAS-D do cliente já foi consultada:
         cliente de outro regime que entregue PGDAS-D só aparece aqui depois de consultado.
       </p>
     </div>

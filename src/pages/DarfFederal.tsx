@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { Copy, FileDown, Loader2, Barcode, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import { SearchableSelect } from '@/components/fiscal/SearchableSelect';
 import { Preco, brl } from '@/components/serpro/CustoSerpro';
 import { DICA_RODAPE, DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
+import { PaginacaoLista, RodapeLista, usePaginacao } from '@/components/monitor/MonitorUi';
 import {
   ROTULO_TIPO_PA, proximoDiaUtil, useClientesDarf, useCodigoBarrasDarf, useDarfsGerados, useGerarDarf, useLinkDarf,
   type DarfRow, type TipoPa,
@@ -40,6 +41,12 @@ function abrir(url: string) {
 export default function DarfFederal() {
   const { data: clientes = [] } = useClientesDarf();
   const { data: darfs = [], isLoading } = useDarfsGerados();
+  const pag = usePaginacao(darfs, 'darfs');
+  const topoTabela = useRef<HTMLDivElement>(null);
+  const irParaPagina = (n: number) => {
+    pag.setPagina(n);
+    requestAnimationFrame(() => topoTabela.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
   const gerar = useGerarDarf();
   const barras = useCodigoBarrasDarf();
   const link = useLinkDarf();
@@ -231,7 +238,7 @@ export default function DarfFederal() {
         ]}
       />
 
-      <div className="overflow-hidden rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
         {isLoading ? (
           <div className="space-y-2 p-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : darfs.length === 0 ? (
@@ -240,8 +247,8 @@ export default function DarfFederal() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Gerado em</TableHead>
                 <TableHead>Cliente / Razão Social</TableHead>
+                <TableHead>Gerado em</TableHead>
                 <TableHead>Receita · período</TableHead>
                 <TableHead className="text-right">Imposto</TableHead>
                 <TableHead className="text-right">Multa + juros</TableHead>
@@ -252,13 +259,13 @@ export default function DarfFederal() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {darfs.map((d) => (
+              {pag.recorte.map((d) => (
                 <TableRow key={d.id} className={d.id === ultimo ? 'bg-bg-2' : undefined}>
-                  <TableCell className="whitespace-nowrap text-ui text-muted-ink">{format(new Date(d.created_at), 'dd/MM/yyyy HH:mm')}</TableCell>
                   <TableCell>
                     <p className="text-ui text-ink">{nomeDe(d)}</p>
-                    <p className="text-meta text-muted-ink-2">{formatarCnpj(d.contacts?.document ?? '')}</p>
+                    <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(d.contacts?.document ?? '')}</p>
                   </TableCell>
+                  <TableCell className="whitespace-nowrap text-ui text-muted-ink">{format(new Date(d.created_at), 'dd/MM/yyyy HH:mm')}</TableCell>
                   <TableCell className="whitespace-nowrap text-ui">
                     <span className="font-mono">{d.codigo_receita}-{d.extensao}</span> · {d.data_pa}
                     <p className="text-meta text-muted-ink-2">venc. {dataBR(d.vencimento)}</p>
@@ -301,6 +308,14 @@ export default function DarfFederal() {
           </Table>
         )}
       </div>
+
+      {darfs.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <RodapeLista mostrando={darfs.length} total={darfs.length} unidade="DARFs gerados" faixa={pag.faixa} />
+          <PaginacaoLista pagina={pag.pagina} totalPaginas={pag.totalPaginas} porPagina={pag.porPagina} total={darfs.length}
+            onPagina={irParaPagina} onPorPagina={pag.setPorPagina} unidade="DARFs" />
+        </div>
+      )}
 
       <AlertDialog open={confirmando} onOpenChange={setConfirmando}>
         <AlertDialogContent>

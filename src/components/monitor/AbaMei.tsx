@@ -231,7 +231,7 @@ export function AbaMei() {
                       {l.divida && l.divida.itens.length > 0 && <p className="mt-0.5 text-meta text-muted-ink-2">{l.divida.itens.length} {l.divida.itens.length === 1 ? 'débito' : 'débitos'}</p>}
                     </TableCell>
                     <TableCell><SeloMini selo={seloEnquadramento(l)} /></TableCell>
-                    <TableCell><UltimaBusca iso={ultimaBuscaMei(l)} contactId={l.contact_id} /></TableCell>
+                    <TableCell><UltimaBusca iso={ultimaBuscaMei(l)} /></TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         {d && (

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { Eye } from 'lucide-react';
+import { PaginacaoLista, RodapeLista, usePaginacao } from '@/components/monitor/MonitorUi';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
@@ -142,6 +143,14 @@ export default function PagamentosFederal() {
       .filter((l) => !q || l.nome.toLowerCase().includes(q) || (qDigitos && l.documento.replace(/\D/g, '').includes(qDigitos)));
   }, [linhas, busca, situacao, regime, competencia]);
 
+  const pag = usePaginacao(filtradas, `${busca}|${situacao}|${regime}|${competencia}`);
+  const topoTabela = useRef<HTMLDivElement>(null);
+  const irParaPagina = (n: number) => {
+    pag.setPagina(n);
+    requestAnimationFrame(() => topoTabela.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  const idsDaPagina = pag.recorte.map((l) => l.contact_id);
+
   const linhaAberta = linhas.find((l) => l.contact_id === aberto) ?? null;
   const marcadas = linhas.filter((l) => sel.marcados.has(l.contact_id));
   // Comprovante é por documento pago: um item por documento sem comprovante guardado.
@@ -190,6 +199,11 @@ export default function PagamentosFederal() {
       </div>
 
       <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
+        {filtradas.some((l) => !sel.marcados.has(l.contact_id)) && filtradas.length > pag.recorte.length && (
+          <DicaBotao texto="Marca todos os clientes da lista com os filtros atuais, inclusive os das outras páginas.">
+            <Button size="sm" variant="outline" onClick={() => sel.somar(filtradas.map((l) => l.contact_id))}>Marcar os {filtradas.length} da lista</Button>
+          </DicaBotao>
+        )}
         <DicaBotao custo="Consultar" texto={`Consulta na Receita os pagamentos de ${siglaCompetencia(competencia)} de cada cliente marcado. Quem já foi consultado hoje fica de fora.`}>
           <Button size="sm" onClick={() => setLote('consultar')}>Consultar pagamentos ({sel.marcados.size})</Button>
         </DicaBotao>
@@ -201,7 +215,7 @@ export default function PagamentosFederal() {
         </DicaBotao>
       </BarraSelecao>
 
-      <div className="overflow-hidden rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
         {isLoading ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : filtradas.length === 0 ? (
@@ -210,12 +224,13 @@ export default function PagamentosFederal() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-8">
-                  <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtradas.map((l) => l.contact_id))}
-                    onCheckedChange={(v) => (v ? sel.somar(filtradas.map((l) => l.contact_id)) : sel.limpar())} />
+                <TableHead>
+                  <div className="flex items-center gap-3">
+                    <Checkbox aria-label="Marcar todos desta página" checked={sel.todos(idsDaPagina)}
+                      onCheckedChange={(v) => (v ? sel.somar(idsDaPagina) : sel.quitar(idsDaPagina))} />
+                    Cliente / Razão Social
+                  </div>
                 </TableHead>
-                <TableHead>Razão social</TableHead>
-                <TableHead>CNPJ</TableHead>
                 <TableHead>DAS</TableHead>
                 {TIPOS_COLUNA.map((t) => <TableHead key={t} className="text-center">{t}</TableHead>)}
                 <TableHead>Situação</TableHead>
@@ -223,18 +238,22 @@ export default function PagamentosFederal() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtradas.map((l) => {
+              {pag.recorte.map((l) => {
                 const r = rotuloDas(l.das);
                 return (
                   <TableRow key={l.contact_id} className="cursor-pointer" onClick={() => setAberto(l.contact_id)}>
-                    <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} />
+                    <TableCell className="min-w-[240px] max-w-[360px]">
+                      <div className="flex items-start gap-3">
+                        <span className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-ui text-ink">{l.nome}</p>
+                          <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
+                          <p className="text-meta text-muted-ink-2">{REGIMES[l.regime ?? ''] ?? l.regime ?? 'Sem regime'}</p>
+                        </div>
+                      </div>
                     </TableCell>
-                    <TableCell>
-                      <p className="text-ui text-ink">{l.nome}</p>
-                      <p className="text-meta text-muted-ink-2">{REGIMES[l.regime ?? ''] ?? l.regime ?? 'Sem regime'}</p>
-                    </TableCell>
-                    <TableCell className="font-mono text-ui">{formatarCnpj(l.documento)}</TableCell>
                     <TableCell>
                       {r ? (
                         <div className="space-y-0.5">
@@ -272,7 +291,11 @@ export default function PagamentosFederal() {
         )}
       </div>
 
-      <p className="text-meta text-muted-ink-2">Mostrando {filtradas.length} de {linhas.length} clientes ativos.</p>
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <RodapeLista mostrando={filtradas.length} total={linhas.length} unidade="clientes ativos" faixa={pag.faixa} />
+        <PaginacaoLista pagina={pag.pagina} totalPaginas={pag.totalPaginas} porPagina={pag.porPagina} total={filtradas.length}
+          onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
+      </div>
 
       <PagamentosClienteSheet
         linha={linhaAberta}

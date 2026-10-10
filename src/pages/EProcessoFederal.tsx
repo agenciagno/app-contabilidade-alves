@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, useRef } from 'react';
 import { format } from 'date-fns';
 import { ChevronDown, ChevronRight, Loader2, RefreshCw, Wallet } from 'lucide-react';
 
@@ -12,7 +12,7 @@ import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { usePagamentosClienteJanela } from '@/components/serpro/PagamentosDoCliente';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
-import { FaixaEstados, RodapeLista, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
 import { AcaoLoteDialog, BarraSelecao, useSelecao } from '@/components/monitor/GuiasLote';
 import { useConsultarEProcesso, useMatrizEProcesso, type LinhaEProcesso } from '@/hooks/useSerproExtras';
 import { ROTULO_ESTADO, contarEstados, type Selo } from '@/lib/monitorEstados';
@@ -60,6 +60,14 @@ export default function EProcessoFederal() {
   const contagem = contarEstados(base.map(seloLinha));
   const filtradas = base.filter((l) => !estado || seloLinha(l)?.estado === estado).sort((a, b) => b.processos.length - a.processos.length || a.nome.localeCompare(b.nome, 'pt-BR'));
 
+  const pag = usePaginacao(filtradas, `${busca}|${estado ?? ''}`);
+  const topoTabela = useRef<HTMLDivElement>(null);
+  const irParaPagina = (n: number) => {
+    pag.setPagina(n);
+    requestAnimationFrame(() => topoTabela.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  const idsDaPagina = pag.recorte.map((l) => l.contact_id);
+
   const executar = async (contactId: string) => {
     setConsultando(contactId);
     try { await consultar.mutateAsync({ contactId }); } finally { setConsultando(null); }
@@ -91,12 +99,17 @@ export default function EProcessoFederal() {
         </div>
 
         <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
+          {filtradas.some((l) => !sel.marcados.has(l.contact_id)) && filtradas.length > pag.recorte.length && (
+            <DicaBotao texto="Marca todos os clientes da lista com os filtros atuais, inclusive os das outras páginas.">
+              <Button size="sm" variant="outline" onClick={() => sel.somar(filtradas.map((l) => l.contact_id))}>Marcar os {filtradas.length} da lista</Button>
+            </DicaBotao>
+          )}
           <DicaBotao custo="Consultar" texto="Consulta na Receita os processos digitais em que cada cliente marcado é interessado. Quem já foi consultado hoje fica de fora.">
             <Button size="sm" onClick={() => setLoteAberto(true)}>Consultar ({sel.marcados.size})</Button>
           </DicaBotao>
         </BarraSelecao>
 
-        <div className="overflow-x-auto rounded-lg border border-line bg-paper">
+        <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
           {isLoading ? (
             <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : filtradas.length === 0 ? (
@@ -105,40 +118,45 @@ export default function EProcessoFederal() {
             <Table className="[&_td]:px-3 [&_th]:px-3">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-8">
-                    <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtradas.map((l) => l.contact_id))}
-                      onCheckedChange={(v) => (v ? sel.somar(filtradas.map((l) => l.contact_id)) : sel.limpar())} />
+                  <TableHead>
+                    <div className="flex items-center gap-3">
+                      <Checkbox aria-label="Marcar todos desta página" checked={sel.todos(idsDaPagina)}
+                        onCheckedChange={(v) => (v ? sel.somar(idsDaPagina) : sel.quitar(idsDaPagina))} />
+                      Cliente / Razão Social
+                    </div>
                   </TableHead>
-                  <TableHead className="w-8" />
                   <TableHead>Situação</TableHead>
                   <TableHead>Mais recente</TableHead>
-                  <TableHead>Cliente / Razão Social</TableHead>
                   <TableHead>Última busca</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtradas.map((l) => {
+                {pag.recorte.map((l) => {
                   const aberto = !!abertos[l.contact_id];
                   const recente = l.processos[0];
                   return (
                     <Fragment key={l.contact_id}>
                       <TableRow className={l.processos.length ? 'cursor-pointer' : undefined} onClick={() => l.processos.length && setAbertos((a) => ({ ...a, [l.contact_id]: !aberto }))}>
-                        <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} />
-                        </TableCell>
-                        <TableCell className="w-8 pr-0">
-                          {l.processos.length > 0 && (aberto ? <ChevronDown className="h-4 w-4 text-muted-ink" /> : <ChevronRight className="h-4 w-4 text-muted-ink" />)}
+                        <TableCell className="min-w-[260px] max-w-[380px]">
+                          <div className="flex items-start gap-3">
+                            <span className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                              <Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} />
+                            </span>
+                            <span className="w-4 shrink-0 pt-0.5">
+                              {l.processos.length > 0 && (aberto ? <ChevronDown className="h-4 w-4 text-muted-ink" /> : <ChevronRight className="h-4 w-4 text-muted-ink" />)}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-ui text-ink">{l.nome}</p>
+                              <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
+                            </div>
+                          </div>
                         </TableCell>
                         <TableCell className="min-w-[160px]"><SeloMonitor selo={seloLinha(l)} /></TableCell>
                         <TableCell className="max-w-[300px] text-meta text-muted-ink">
                           {recente ? <>{recente.tipo ?? 'Processo'} · {dataBR(recente.data_protocolo)}{recente.situacao ? ` · ${recente.situacao}` : ''}</> : '—'}
                         </TableCell>
-                        <TableCell className="min-w-[200px] max-w-[280px]">
-                          <p className="text-ui text-ink">{l.nome}</p>
-                          <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
-                        </TableCell>
-                        <TableCell><UltimaBusca iso={l.consulta?.consultado_em ?? null} contactId={l.contact_id} /></TableCell>
+                        <TableCell><UltimaBusca iso={l.consulta?.consultado_em ?? null} /></TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
                           <DicaBotao texto="Abre os pagamentos deste cliente na Receita (DARF, DAS, DAE e DJE) com a composição de cada guia e o comprovante. Abrir é grátis: só lê o que já está salvo.">
@@ -157,7 +175,7 @@ export default function EProcessoFederal() {
                       </TableRow>
                       {aberto && (
                         <TableRow className="hover:bg-transparent">
-                          <TableCell colSpan={7} className="bg-bg-2 p-4">
+                          <TableCell colSpan={5} className="bg-bg-2 p-4">
                             <div className="overflow-hidden rounded-lg border border-line bg-paper">
                               <Table className="[&_td]:px-3 [&_th]:px-3">
                                 <TableHeader>
@@ -195,7 +213,11 @@ export default function EProcessoFederal() {
           )}
         </div>
 
-        <RodapeLista mostrando={filtradas.length} total={matrizes.length} unidade="clientes ativos" filiais={linhas.length - matrizes.length} />
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <RodapeLista mostrando={filtradas.length} total={matrizes.length} unidade="clientes ativos" filiais={linhas.length - matrizes.length} faixa={pag.faixa} />
+          <PaginacaoLista pagina={pag.pagina} totalPaginas={pag.totalPaginas} porPagina={pag.porPagina} total={filtradas.length}
+            onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
+        </div>
       </div>
 
       <AcaoLoteDialog

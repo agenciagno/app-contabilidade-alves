@@ -225,7 +225,7 @@ export default function ParcelamentosFederal() {
                         {mes.length ? moeda(somaValor(mes)) : <span className="text-muted-ink-2">—</span>}
                         {guiaMes && <p className="text-meta text-muted-ink-2">Guia gerada</p>}
                       </TableCell>
-                      <TableCell><UltimaBusca iso={consultadoEm(l)} contactId={l.contact_id} /></TableCell>
+                      <TableCell><UltimaBusca iso={consultadoEm(l)} /></TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <DicaBotao texto="Abre os pagamentos deste cliente na Receita (DARF, DAS, DAE e DJE) com a composição de cada guia e o comprovante. Abrir é grátis: só lê o que já está salvo.">
