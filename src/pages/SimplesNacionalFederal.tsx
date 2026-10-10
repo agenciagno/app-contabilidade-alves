@@ -1,21 +1,21 @@
 import { useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, FileText, Loader2, Mail, MoreHorizontal, Receipt, RefreshCw, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, Loader2, Mail, MoreHorizontal, Receipt, RefreshCw, X } from 'lucide-react';
 
 import { DsTab, PageHeader, SearchField } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { CompetenciaNav } from '@/components/serpro/CompetenciaNav';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { FaturamentoClienteSheet } from '@/components/serpro/FaturamentoClienteSheet';
 import { FichaSimplesSheet } from '@/components/serpro/FichaSimplesSheet';
-import { useAbrirArquivo, useConsultaPgdasd } from '@/components/serpro/pgdasdUi';
+import { useConsultaPgdasd } from '@/components/serpro/pgdasdUi';
 import { useAbrirDefis, useConsultaDefis } from '@/components/serpro/defisUi';
 import { useLeituraFaturamento } from '@/components/serpro/useLeituraFaturamento';
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
@@ -114,7 +114,6 @@ function AbaMensal({
   const { data: leituras = [], isLoading: carregandoFat } = useFaturamentoAno(ano);
   const consulta = useConsultaPgdasd(ano);
   const leitura = useLeituraFaturamento();
-  const { ocupado, abrirDeclaracao } = useAbrirArquivo();
   const [aberto, setAberto] = useState<string | null>(null);
   const [verLeitura, setVerLeitura] = useState(false);
   const [filtroPgdas, setFiltroPgdas] = useState<string | null>(null);
@@ -297,10 +296,10 @@ function AbaMensal({
               {pag.recorte.map((l) => {
                 const consultando = consulta.emAndamento === l.contact_id;
                 const lendo = leitura.emAndamento === l.contact_id;
-                const d = l.declaracaoRow;
                 const p = l.fat ? percentualLimite(l.fat) : null;
                 return (
-                  <TableRow key={l.contact_id} className="cursor-pointer" onClick={() => setAberto(l.contact_id)}>
+                  <TableRow key={l.contact_id} className="cursor-pointer" tabIndex={0} aria-label={`Abrir a ficha de ${l.nome}`} onClick={() => setAberto(l.contact_id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) setAberto(l.contact_id); }}>
                     <TableCell className="min-w-[240px] max-w-[360px]">
                       <div className="flex items-start gap-3">
                         <span className="pt-0.5" onClick={(e) => e.stopPropagation()}>
@@ -333,40 +332,24 @@ function AbaMensal({
                     <TableCell><UltimaBusca iso={l.ultimaBusca} /></TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
-                        <DicaBotao texto="Abre a ficha do cliente: mês a mês, documentos, faturamento e envios. Não consulta a Receita.">
-                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setAberto(l.contact_id)}><Search className="h-4 w-4" /></Button>
-                        </DicaBotao>
                         <DicaBotao custo="Consultar" texto={`Consultar: busca na Receita as declarações e os DAS de ${ano} deste cliente, numa só chamada.`}>
                           <Button size="icon" variant="outline" className="h-8 w-8" aria-label="Consultar na Receita" disabled={consultando} onClick={() => consulta.executar(l.contact_id)}>
                             {consultando ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                           </Button>
                         </DicaBotao>
                         <DropdownMenu>
-                          <DicaBotao texto="Mais ações: documentos da declaração, leitura do faturamento e pagamentos.">
+                          <DicaBotao texto="Mais ações: DAS de cobrança e regime de apuração. Os documentos, o faturamento e os pagamentos ficam na ficha do cliente (clique na linha).">
                             <DropdownMenuTrigger asChild>
-                              <Button size="icon" variant="ghost" className="h-8 w-8">{lendo || (d && ocupado?.startsWith(d.id)) ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}</Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Mais ações"><MoreHorizontal className="h-4 w-4" /></Button>
                             </DropdownMenuTrigger>
                           </DicaBotao>
                           <DropdownMenuContent align="end" className="w-[260px]">
-                            <DropdownMenuItem disabled={!d} onSelect={() => d && abrirDeclaracao(d, 'declaracao')}>
-                              <FileText className="mr-2 h-4 w-4" />Declaração em PDF{d && !d.declaracao_path && <Preco tipo="Consultar" />}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled={!d} onSelect={() => d && abrirDeclaracao(d, 'recibo')}>
-                              <Receipt className="mr-2 h-4 w-4" />Recibo de entrega{d && !d.recibo_path && <Preco tipo="Consultar" />}
-                            </DropdownMenuItem>
-                            {d?.maed_notificacao_path && <DropdownMenuItem onSelect={() => abrirDeclaracao(d, 'maed_notificacao')}>Notificação da multa (MAED)</DropdownMenuItem>}
-                            {d?.maed_darf_path && <DropdownMenuItem onSelect={() => abrirDeclaracao(d, 'maed_darf')}>DARF da multa (MAED)</DropdownMenuItem>}
                             <DropdownMenuItem onSelect={() => { setMarcados(new Set([l.contact_id])); setCobrancaLote(true); }}>
                               DAS de cobrança de {siglaCompetencia(pa)}<Preco tipo="Emitir" />
                             </DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => { setMarcados(new Set([l.contact_id])); setRegimeLote(true); }}>
                               Regime de apuração de {ano}<Preco tipo="Consultar" />
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem disabled={!d || lendo} onSelect={() => leitura.executar(l.contact_id, pa)}>
-                              {l.fat && l.fat.periodo_apuracao.slice(0, 7) === pa ? 'Reler faturamento' : 'Ler faturamento'}{d && !d.declaracao_path && <Preco tipo="Consultar" />}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setAberto(l.contact_id)}>Pagamentos e comprovantes</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -401,6 +384,8 @@ function AbaMensal({
           consultando={consulta.emAndamento === linhaAberta.contact_id}
           onConsultar={() => consulta.executar(linhaAberta.contact_id)}
           onVerLeitura={() => setVerLeitura(true)}
+          onLerFaturamento={() => leitura.executar(linhaAberta.contact_id, pa)}
+          lendoFaturamento={leitura.emAndamento === linhaAberta.contact_id}
         />
       )}
       {linhaAberta && verLeitura && (

@@ -202,7 +202,7 @@ export function PagamentosDoCliente({
           <DicaBotao custo="Consultar" texto={`Baixa da Receita os pagamentos da competência ${siglaCompetencia(competencia)} deste cliente.`}>
             <Button onClick={consultar} disabled={consultando}>
               {consultando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-              Consultar pagamentos<Preco tipo="Consultar" />
+              Consultar pagamentos de {siglaCompetencia(competencia)}<Preco tipo="Consultar" />
             </Button>
           </DicaBotao>
           <DicaBotao texto="Mostra ou esconde os filtros para procurar pagamentos por tipo, documento, receita, datas e valores.">

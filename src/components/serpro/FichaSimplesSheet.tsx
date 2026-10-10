@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, FileDown, FileText, Loader2, Receipt, RefreshCw, Send } from 'lucide-react';
+import { BookOpenCheck, ChevronLeft, ChevronRight, FileCheck, FileDown, FileText, FileWarning, Loader2, Receipt, RefreshCw, Send } from 'lucide-react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from 'recharts';
 
 import { Button } from '@/components/ui/button';
@@ -32,7 +32,7 @@ const mesCurto = (aaaamm: string) => `${aaaamm.slice(5, 7)}/${aaaamm.slice(2, 4)
  * Abrir a ficha é grátis: só lê o que já está salvo. Consultar, gerar DAS e baixar documento ainda não guardado cobram, e o botão diz.
  */
 export function FichaSimplesSheet({
-  linha, pa, hoje, abertura, posicao, onAnterior, onProximo, onClose, consultando, onConsultar, onVerLeitura,
+  linha, pa, hoje, abertura, posicao, onAnterior, onProximo, onClose, consultando, onConsultar, onVerLeitura, onLerFaturamento, lendoFaturamento,
 }: {
   linha: LinhaSimples;
   pa: string;
@@ -45,6 +45,9 @@ export function FichaSimplesSheet({
   consultando: boolean;
   onConsultar: () => void;
   onVerLeitura: () => void;
+  /** Lê o faturamento da declaração do mês (consulta o PDF da declaração se ainda não estiver guardado). */
+  onLerFaturamento: () => void;
+  lendoFaturamento: boolean;
 }) {
   const l = linha.pg;
   const ano = Number(pa.slice(0, 4));
@@ -130,7 +133,7 @@ export function FichaSimplesSheet({
           <DicaBotao custo="Consultar" texto={`Consulta na Receita as declarações e os DAS de ${ano} deste cliente, numa só chamada.`}>
             <Button variant="outline" disabled={consultando} onClick={onConsultar}>
               {consultando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-              Consultar {ano}<Preco tipo="Consultar" />
+              Atualizar declarações e DAS de {ano}<Preco tipo="Consultar" />
             </Button>
           </DicaBotao>
           {linha.das.estado !== 'pago' && (
@@ -175,10 +178,10 @@ export function FichaSimplesSheet({
                         <TableCell><SeloMini selo={m.declSelo} /></TableCell>
                         <TableCell><SeloMini selo={m.dasSelo} /></TableCell>
                         <TableCell className="whitespace-nowrap text-right text-ui">
-                          {moeda(m.das.valor)}
+                          {moeda(m.das.valor ?? m.pago?.valor_total ?? null)}
                           {m.pago && (
                             <p className="text-meta text-muted-ink-2">
-                              pago em {dataBR(m.pago.data_arrecadacao)}{m.pago.valor_total != null && m.pago.valor_total !== m.das.valor ? ` · ${moeda(m.pago.valor_total)}` : ''}
+                              pago em {dataBR(m.pago.data_arrecadacao)}{m.das.valor != null && m.pago.valor_total != null && m.pago.valor_total !== m.das.valor ? ` · ${moeda(m.pago.valor_total)}` : ''}
                             </p>
                           )}
                         </TableCell>
@@ -188,6 +191,27 @@ export function FichaSimplesSheet({
                               <DicaBotao custo={m.decl.declaracao_path ? undefined : 'Consultar'} texto={m.decl.declaracao_path ? 'Abre o PDF da declaração, já guardado.' : 'Baixa da Receita o PDF da declaração e guarda.'}>
                                 <Button size="icon" variant="ghost" className="h-8 w-8" disabled={ocupado === `${m.decl.id}:declaracao`} onClick={() => abrirDeclaracao(m.decl!, 'declaracao')}>
                                   {ocupado === `${m.decl.id}:declaracao` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                                </Button>
+                              </DicaBotao>
+                            )}
+                            {m.decl && (
+                              <DicaBotao custo={m.decl.recibo_path ? undefined : 'Consultar'} texto={m.decl.recibo_path ? 'Abre o recibo de entrega da declaração, já guardado.' : 'Baixa da Receita o recibo de entrega da declaração e guarda.'}>
+                                <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Recibo de entrega" disabled={ocupado === `${m.decl.id}:recibo`} onClick={() => abrirDeclaracao(m.decl!, 'recibo')}>
+                                  {ocupado === `${m.decl.id}:recibo` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck className="h-4 w-4" />}
+                                </Button>
+                              </DicaBotao>
+                            )}
+                            {m.decl?.maed_notificacao_path && (
+                              <DicaBotao texto="Abre a notificação da multa por atraso (MAED) deste mês, já guardada.">
+                                <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Notificação da multa (MAED)" disabled={ocupado === `${m.decl.id}:maed_notificacao`} onClick={() => abrirDeclaracao(m.decl!, 'maed_notificacao')}>
+                                  {ocupado === `${m.decl.id}:maed_notificacao` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileWarning className="h-4 w-4 text-danger" />}
+                                </Button>
+                              </DicaBotao>
+                            )}
+                            {m.decl?.maed_darf_path && (
+                              <DicaBotao texto="Abre o DARF da multa por atraso (MAED) deste mês, já guardado.">
+                                <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="DARF da multa (MAED)" disabled={ocupado === `${m.decl.id}:maed_darf`} onClick={() => abrirDeclaracao(m.decl!, 'maed_darf')}>
+                                  {ocupado === `${m.decl.id}:maed_darf` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4 text-danger" />}
                                 </Button>
                               </DicaBotao>
                             )}
@@ -235,6 +259,15 @@ export function FichaSimplesSheet({
             <div className="flex items-center gap-3">
               {linha.limite && <SeloMini selo={linha.limite} />}
               {fat && <Button variant="outline" size="sm" onClick={onVerLeitura}>Ver leitura completa</Button>}
+              <DicaBotao custo={linha.declaracaoRow && !linha.declaracaoRow.declaracao_path ? 'Consultar' : undefined}
+                texto={!linha.declaracaoRow ? `Sem declaração de ${siglaCompetencia(pa)}: o faturamento sai da declaração do mês.`
+                  : 'Lê o faturamento do PDF da declaração do mês (e guarda o PDF, se ainda não estiver guardado).'}>
+                <Button variant="outline" size="sm" disabled={!linha.declaracaoRow || lendoFaturamento} onClick={onLerFaturamento}>
+                  {lendoFaturamento ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <BookOpenCheck className="mr-1.5 h-4 w-4" />}
+                  {fat && fat.periodo_apuracao.slice(0, 7) === pa ? 'Reler faturamento' : 'Ler faturamento'}
+                  {linha.declaracaoRow && !linha.declaracaoRow.declaracao_path && <Preco tipo="Consultar" />}
+                </Button>
+              </DicaBotao>
             </div>
           </div>
           {barras.length > 0 ? (
@@ -250,7 +283,7 @@ export function FichaSimplesSheet({
             </div>
           ) : (
             <p className="rounded-lg border border-dashed border-line p-6 text-center text-ui text-muted-ink">
-              Sem leitura do faturamento. Na lista, use "Ler faturamento" no menu da linha (lê o PDF da declaração do mês).
+              Sem leitura do faturamento. Use "Ler faturamento" acima (lê o PDF da declaração do mês).
             </p>
           )}
         </section>
