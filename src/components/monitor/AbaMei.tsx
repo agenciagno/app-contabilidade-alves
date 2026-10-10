@@ -187,15 +187,17 @@ export function AbaMei() {
           <Table className="[&_td]:px-3 [&_th]:px-3">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-8">
-                  <Checkbox aria-label="Marcar todos desta página" checked={sel.todos(idsDaPagina)}
-                    onCheckedChange={(v) => (v ? sel.somar(idsDaPagina) : sel.quitar(idsDaPagina))} />
+                <TableHead>
+                  <div className="flex items-center gap-3">
+                    <Checkbox aria-label="Marcar todos desta página" checked={sel.todos(idsDaPagina)}
+                      onCheckedChange={(v) => (v ? sel.somar(idsDaPagina) : sel.quitar(idsDaPagina))} />
+                    Cliente / Razão Social
+                  </div>
                 </TableHead>
                 <TableHead>Situação</TableHead>
                 <TableHead>DAS {siglaCompetencia(pa)}</TableHead>
                 <TableHead>Dívida ativa {ano}</TableHead>
                 <TableHead>No MEI</TableHead>
-                <TableHead>Cliente / Razão Social</TableHead>
                 <TableHead>Última busca</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -205,7 +207,16 @@ export function AbaMei() {
                 const d = l.das.find((x) => x.periodo.slice(0, 7) === pa) ?? null;
                 return (
                   <TableRow key={l.contact_id}>
-                    <TableCell className="w-8"><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></TableCell>
+                    <TableCell className="min-w-[240px] max-w-[360px]">
+                      <div className="flex items-start gap-3">
+                        <span className="pt-0.5"><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></span>
+                        <div className="min-w-0">
+                          <p className="text-ui text-ink">{l.nome}</p>
+                          <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
+                          {marcacoes?.get(l.contact_id)?.das && <p className="text-meta text-muted-ink-2">Recebe DAS da CA</p>}
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell className="min-w-[170px]"><SeloMonitor selo={seloDe(l)} /></TableCell>
                     <TableCell className="whitespace-nowrap text-ui">
                       {d ? (
@@ -220,11 +231,6 @@ export function AbaMei() {
                       {l.divida && l.divida.itens.length > 0 && <p className="mt-0.5 text-meta text-muted-ink-2">{l.divida.itens.length} {l.divida.itens.length === 1 ? 'débito' : 'débitos'}</p>}
                     </TableCell>
                     <TableCell><SeloMini selo={seloEnquadramento(l)} /></TableCell>
-                    <TableCell className="min-w-[200px] max-w-[280px]">
-                      <p className="text-ui text-ink">{l.nome}</p>
-                      <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
-                      {marcacoes?.get(l.contact_id)?.das && <p className="text-meta text-muted-ink-2">Recebe DAS da CA</p>}
-                    </TableCell>
                     <TableCell><UltimaBusca iso={ultimaBuscaMei(l)} contactId={l.contact_id} /></TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
