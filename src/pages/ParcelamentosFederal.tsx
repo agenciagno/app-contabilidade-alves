@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { Eye, Loader2, Mail, RefreshCw, Wallet } from 'lucide-react';
 
@@ -14,7 +14,7 @@ import { usePagamentosClienteJanela } from '@/components/serpro/PagamentosDoClie
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { ParcelamentosClienteSheet } from '@/components/serpro/ParcelamentosClienteSheet';
 import { useConsultaParcelamentos } from '@/components/serpro/parcelamentosUi';
-import { FaixaEstados, RodapeLista, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
 import {
   AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote,
 } from '@/components/monitor/GuiasLote';
@@ -74,6 +74,14 @@ export default function ParcelamentosFederal() {
   }, [matrizes, busca]);
   const contagem = contarEstados(base.map(seloDe));
   const filtradas = base.filter((l) => !estado || seloDe(l)?.estado === estado).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+  const pag = usePaginacao(filtradas, `${busca}|${estado ?? ''}`);
+  const topoTabela = useRef<HTMLDivElement>(null);
+  const irParaPagina = (n: number) => {
+    pag.setPagina(n);
+    requestAnimationFrame(() => topoTabela.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  const idsDaPagina = pag.recorte.map((l) => l.contact_id);
 
   const marcadas = matrizes.filter((l) => sel.marcados.has(l.contact_id));
   const comAtivos = matrizes.filter((l) => modalidadesAtivas(l).length > 0);
@@ -140,6 +148,11 @@ export default function ParcelamentosFederal() {
         </div>
 
         <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
+          {filtradas.some((l) => !sel.marcados.has(l.contact_id)) && filtradas.length > pag.recorte.length && (
+            <DicaBotao texto="Marca todos os clientes da lista com os filtros atuais, inclusive os das outras páginas.">
+              <Button size="sm" variant="outline" onClick={() => sel.somar(filtradas.map((l) => l.contact_id))}>Marcar os {filtradas.length} da lista</Button>
+            </DicaBotao>
+          )}
           <DicaBotao custo="Consultar" texto="Consulta na Receita os parcelamentos de cada cliente marcado (pedidos e parcelas em aberto). Quem já foi consultado hoje fica de fora.">
             <Button size="sm" onClick={() => setLote('consultar')}>Consultar ({sel.marcados.size})</Button>
           </DicaBotao>
@@ -151,7 +164,7 @@ export default function ParcelamentosFederal() {
           </DicaBotao>
         </BarraSelecao>
 
-        <div className="overflow-x-auto rounded-lg border border-line bg-paper">
+        <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
           {isLoading ? (
             <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : filtradas.length === 0 ? (
@@ -160,21 +173,23 @@ export default function ParcelamentosFederal() {
             <Table className="[&_td]:px-3 [&_th]:px-3">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-8">
-                    <Checkbox aria-label="Marcar todos da lista" checked={sel.todos(filtradas.map((l) => l.contact_id))}
-                      onCheckedChange={(v) => (v ? sel.somar(filtradas.map((l) => l.contact_id)) : sel.limpar())} />
+                  <TableHead>
+                    <div className="flex items-center gap-3">
+                      <Checkbox aria-label="Marcar todos desta página" checked={sel.todos(idsDaPagina)}
+                        onCheckedChange={(v) => (v ? sel.somar(idsDaPagina) : sel.quitar(idsDaPagina))} />
+                      Cliente / Razão Social
+                    </div>
                   </TableHead>
                   <TableHead>Situação</TableHead>
                   <TableHead>Parcelamentos ativos</TableHead>
                   <TableHead>Atrasadas</TableHead>
                   <TableHead>Do mês</TableHead>
-                  <TableHead>Cliente / Razão Social</TableHead>
                   <TableHead>Última busca</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtradas.map((l) => {
+                {pag.recorte.map((l) => {
                   const atr = parcelasAtrasadas(l, atual);
                   const mes = parcelasDoMes(l, atual);
                   const consultando = emAndamento === l.contact_id;
@@ -188,8 +203,17 @@ export default function ParcelamentosFederal() {
                   ].filter((x): x is string => !!x);
                   return (
                     <TableRow key={l.contact_id} className={temDados ? 'cursor-pointer' : undefined} onClick={() => temDados && setAberto(l.contact_id)}>
-                      <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} />
+                      <TableCell className="min-w-[240px] max-w-[360px]">
+                        <div className="flex items-start gap-3">
+                          <span className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-ui text-ink">{l.nome}</p>
+                            <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
+                            <p className="text-meta text-muted-ink-2">{l.regime === 'mei' ? 'MEI' : 'Simples Nacional'}</p>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell className="min-w-[170px]"><SeloMonitor selo={seloDe(l)} outros={outros} /></TableCell>
                       <TableCell className="text-meta text-muted-ink">
@@ -200,11 +224,6 @@ export default function ParcelamentosFederal() {
                       <TableCell className="whitespace-nowrap text-ui">
                         {mes.length ? moeda(somaValor(mes)) : <span className="text-muted-ink-2">—</span>}
                         {guiaMes && <p className="text-meta text-muted-ink-2">Guia gerada</p>}
-                      </TableCell>
-                      <TableCell className="min-w-[200px] max-w-[280px]">
-                        <p className="text-ui text-ink">{l.nome}</p>
-                        <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
-                        <p className="text-meta text-muted-ink-2">{l.regime === 'mei' ? 'MEI' : 'Simples Nacional'}</p>
                       </TableCell>
                       <TableCell><UltimaBusca iso={consultadoEm(l)} contactId={l.contact_id} /></TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
@@ -237,7 +256,11 @@ export default function ParcelamentosFederal() {
           )}
         </div>
 
-        <RodapeLista mostrando={filtradas.length} total={matrizes.length} unidade="clientes do Simples Nacional e MEI" filiais={linhas.length - matrizes.length} />
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <RodapeLista mostrando={filtradas.length} total={matrizes.length} unidade="clientes do Simples Nacional e MEI" filiais={linhas.length - matrizes.length} faixa={pag.faixa} />
+          <PaginacaoLista pagina={pag.pagina} totalPaginas={pag.totalPaginas} porPagina={pag.porPagina} total={filtradas.length}
+            onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
+        </div>
       </div>
 
       <ParcelamentosClienteSheet linha={linhaAberta} onClose={() => setAberto(null)} />
