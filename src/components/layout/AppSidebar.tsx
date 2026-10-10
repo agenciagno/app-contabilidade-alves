@@ -273,7 +273,7 @@ export const menuEntries: MenuEntry[] = [
     moduleKey: 'dashboard_federal',
     // Situação Fiscal e Procurações viraram itens próprios (01/10/2026), e em
     // 08/10/2026 ganharam chave de permissão própria. Simples Nacional, em 09/10/2026.
-    activeExcept: ['/dashboard-federal/situacao-fiscal', '/dashboard-federal/procuracoes', '/dashboard-federal/simples-nacional', '/dashboard-federal/parcelamentos', '/dashboard-federal/eprocesso'],
+    activeExcept: ['/dashboard-federal/situacao-fiscal', '/dashboard-federal/procuracoes', '/dashboard-federal/simples-nacional', '/dashboard-federal/parcelamentos', '/dashboard-federal/dctfweb-mit', '/dashboard-federal/eprocesso'],
   },
   {
     kind: 'simple',
@@ -299,6 +299,15 @@ export const menuEntries: MenuEntry[] = [
     url: '/dashboard-federal/parcelamentos',
     icon: Layers,
     iconName: 'layers',
+    moduleKey: 'dashboard_federal',
+  },
+  // DCTFWeb e MIT viraram item próprio em 10/10/2026 (pedido de Gabriel: estava escondida dentro do Dashboard Fiscal); mesma permissão da rota.
+  {
+    kind: 'simple',
+    title: 'DCTFWeb e MIT',
+    url: '/dashboard-federal/dctfweb-mit',
+    icon: FileCheck,
+    iconName: 'file-check',
     moduleKey: 'dashboard_federal',
   },
   {
