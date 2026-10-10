@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { FileCode, FileText, Loader2, Mail, MoreHorizontal, Receipt, RefreshCw, Wallet } from 'lucide-react';
+import { CalendarPlus, FileCode, FileText, Loader2, Mail, MoreHorizontal, Receipt, RefreshCw, Wallet } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
@@ -15,6 +15,9 @@ import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { useAbrirRecibo, useConsultaDctfwebMit } from '@/components/serpro/dctfwebUi';
 import { usePagamentosClienteJanela } from '@/components/serpro/PagamentosDoCliente';
+import { FichaPresumidoRealSheet } from '@/components/serpro/FichaPresumidoRealSheet';
+import { mesesFaltantes, useDctfwebAno } from '@/hooks/useSerproFichaPresumido';
+import { useCadastroMonitor } from '@/hooks/useSituacaoCarteira';
 import { FaixaEstados, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl } from '@/components/monitor/MonitorUi';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
 import { useDeclaracaoDctfweb, useGerarGuiaDctfweb, useGuiasDctfweb, useGuiasEnviadas, useLinkGuiaDctfweb, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
@@ -78,6 +81,13 @@ export default function DctfwebMitFederal() {
   };
   const [consultaLote, setConsultaLote] = useState(false);
   const [baixarAberto, setBaixarAberto] = useState(false);
+  // Ficha mês a mês (10/10/2026) e "Completar o ano" em lote.
+  const [aberto, setAberto] = useState<string | null>(null);
+  const [completarLote, setCompletarLote] = useState(false);
+  const { responsaveis, aberturas } = useCadastroMonitor();
+  const { data: consultadosAno } = useDctfwebAno(Number(competencia.slice(0, 4)));
+  const mesAtual = mesDeData(new Date());
+  const faltantesDe = (id: string) => mesesFaltantes(consultadosAno?.get(id), Number(competencia.slice(0, 4)), competencia, mesAtual, aberturas.get(id) ?? null);
 
   const seloDe = (l: LinhaDctfwebMit): Selo | null => (emAndamento === l.contact_id
     ? { estado: 'processando', motivo: 'Consultando…' }
@@ -178,6 +188,9 @@ export default function DctfwebMitFederal() {
           <DicaBotao custo="Emitir" texto="Gera a guia da declaração da DCTFWeb ainda EM ANDAMENTO (antes de transmitir) de cada cliente marcado.">
             <Button size="sm" variant="outline" onClick={() => setAndamentoLote(true)}>Guia em andamento</Button>
           </DicaBotao>
+          <DicaBotao custo="Consultar" texto={`Consulta o recibo da DCTFWeb dos meses de ${competencia.slice(0, 4)} que ainda não foram consultados de cada cliente marcado (uma consulta por mês). Mostra o total antes de começar.`}>
+            <Button size="sm" variant="outline" onClick={() => setCompletarLote(true)}><CalendarPlus className="mr-1.5 h-4 w-4" />Completar o ano</Button>
+          </DicaBotao>
           <DicaBotao texto="Baixa num ZIP os recibos e as guias da DCTFWeb já guardados. Não consulta a Receita.">
             <Button size="sm" variant="outline" onClick={() => setBaixarAberto(true)}>Baixar</Button>
           </DicaBotao>
@@ -225,8 +238,8 @@ export default function DctfwebMitFederal() {
                   const consultando = emAndamento === l.contact_id;
                   const outros = [l.novo ? 'Movimento novo' : null, l.semProcuracao ? 'Sem procuração' : null].filter((x): x is string => !!x);
                   return (
-                    <TableRow key={l.contact_id}>
-                      <TableCell className="w-8">
+                    <TableRow key={l.contact_id} className="cursor-pointer" onClick={() => setAberto(l.contact_id)}>
+                      <TableCell className="w-8" onClick={(e) => e.stopPropagation()}>
                         <Checkbox aria-label={`Marcar ${l.nome}`} checked={marcados.has(l.contact_id)} onCheckedChange={() => alternarMarcado(l.contact_id)} />
                       </TableCell>
                       <TableCell className="min-w-[170px]"><SeloMonitor selo={seloDe(l)} outros={outros} /></TableCell>
@@ -257,7 +270,7 @@ export default function DctfwebMitFederal() {
                         <p className="text-meta text-muted-ink-2">{REGIMES[l.regime ?? ''] ?? l.regime ?? 'Sem regime'}{recebeGuia(l.contact_id) ? ' · recebe guia da CA' : ''}</p>
                       </TableCell>
                       <TableCell><UltimaBusca iso={ultimaConsulta(l)} contactId={l.contact_id} /></TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           {guias?.get(l.contact_id) ? (
                             <DicaBotao texto="Abre a guia (DARF) da DCTFWeb já gerada para esta competência. Não consulta a Receita.">
@@ -372,6 +385,53 @@ export default function DctfwebMitFederal() {
         assuntoPadrao={`Guia da DCTFWeb ${siglaCompetencia(competencia)} · {cliente}`}
         mensagemPadrao={`Olá! Segue a guia (DARF) da DCTFWeb de ${siglaCompetencia(competencia)} da {cliente}. Qualquer dúvida, é só responder este e-mail.\n\nContabilidade Alves`}
       />
+      <AcaoLoteDialog
+        aberto={completarLote}
+        onClose={() => setCompletarLote(false)}
+        titulo={`Completar ${competencia.slice(0, 4)}: DCTFWeb dos meses que faltam`}
+        descricao="Para cada cliente marcado, uma consulta por mês ainda não consultado (do começo do ano até o mês escolhido, nunca o mês corrente), um de cada vez. A MIT do ano já vem inteira e não é consultada de novo."
+        itens={matrizes.filter((l) => marcados.has(l.contact_id)).map((l) => {
+          const n = faltantesDe(l.contact_id).length;
+          return { contactId: l.contact_id, nome: l.nome, vezes: n, pular: n === 0 ? 'Ano já completo' : null };
+        })}
+        tipo="Consultar"
+        rotuloAcao="Completar"
+        rotuloFeito="Meses completados"
+        executar={async (item) => {
+          const meses = faltantesDe(item.contactId);
+          let feitos = 0;
+          for (const m of meses) {
+            const r = await consultarDm.mutateAsync({ contactId: item.contactId, competencia: m, soDctfweb: true });
+            if (!r.ok) return { ok: false, error: `${siglaCompetencia(m)}: ${r.semProcuracao ? 'sem procuração para a DCTFWeb' : r.error ?? 'a Receita recusou'}${feitos ? ` (${feitos} mês(es) antes deste já foram consultados)` : ''}` };
+            feitos += 1;
+          }
+          return { ok: true, resumo: `${feitos} ${feitos === 1 ? 'mês consultado' : 'meses consultados'}` };
+        }}
+      />
+      {(() => {
+        const idx = filtradas.findIndex((l) => l.contact_id === aberto);
+        const linhaAberta = idx >= 0 ? filtradas[idx] : linhas.find((l) => l.contact_id === aberto) ?? null;
+        if (!linhaAberta) return null;
+        const outros = [linhaAberta.novo ? 'Movimento novo' : null, linhaAberta.semProcuracao ? 'Sem procuração' : null].filter((x): x is string => !!x);
+        return (
+          <FichaPresumidoRealSheet
+            key={linhaAberta.contact_id}
+            linha={linhaAberta}
+            competencia={competencia}
+            selo={seloDe(linhaAberta)}
+            outros={outros}
+            responsavel={responsaveis.get(linhaAberta.contact_id)?.nome ?? null}
+            abertura={aberturas.get(linhaAberta.contact_id) ?? null}
+            posicao={{ atual: idx >= 0 ? idx + 1 : 1, total: idx >= 0 ? filtradas.length : 1 }}
+            onAnterior={idx > 0 ? () => setAberto(filtradas[idx - 1].contact_id) : null}
+            onProximo={idx >= 0 && idx < filtradas.length - 1 ? () => setAberto(filtradas[idx + 1].contact_id) : null}
+            onClose={() => setAberto(null)}
+            consultando={emAndamento === linhaAberta.contact_id}
+            onConsultar={() => executar(linhaAberta.contact_id)}
+            onGerarGuia={() => { setMarcados(new Set([linhaAberta.contact_id])); setLoteAberto(true); }}
+          />
+        );
+      })()}
       {janelaPagamentos}
     </div>
   );

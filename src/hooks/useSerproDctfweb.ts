@@ -129,8 +129,9 @@ function useInvalidar() {
 export function useConsultarDctfwebMit() {
   const invalidar = useInvalidar();
   return useMutation({
-    mutationFn: (v: { contactId: string; competencia: string; force?: boolean }) =>
-      invocarSerpro<ResultadoDctfweb>('serpro-dctfweb', { action: 'consultar', contact_id: v.contactId, competencia: v.competencia, force: v.force }),
+    /** `soDctfweb`: só o recibo do mês (1 consulta), sem a MIT do ano; é o que "Completar o ano" usa. */
+    mutationFn: (v: { contactId: string; competencia: string; force?: boolean; soDctfweb?: boolean }) =>
+      invocarSerpro<ResultadoDctfweb>('serpro-dctfweb', { action: 'consultar', contact_id: v.contactId, competencia: v.competencia, force: v.force, so_dctfweb: v.soDctfweb }),
     onSuccess: (d) => invalidar(d?.tarefas_concluidas),
   });
 }

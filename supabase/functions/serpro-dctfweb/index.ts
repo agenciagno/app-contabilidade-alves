@@ -17,6 +17,7 @@ import { perfilAtivo } from "../_shared/acesso.ts";
 //       1) DCTFWEB.CONSRECIBO32 (Consultar, categoria GERAL_MENSAL): recibo da declaração do mês. MG08 = não há declaração transmitida.
 //       2) MIT.LISTAAPURACOES317 (Consultar): todas as apurações do ANO da competência numa chamada.
 //       São duas consultas cobradas por clique. Uma parte pode falhar sem derrubar a outra.
+//       `so_dctfweb: true` (10/10/2026, "Completar o ano" da ficha do Presumido e Real): só o recibo do mês (1 consulta), sem a MIT do ano.
 //   link      { id }   link assinado (10 min) do recibo da DCTFWeb já guardado (sem chamada ao Serpro).
 //   gerar_guia { contact_id, competencia: "AAAA-MM", confirmar_emissao: true, data_pagamento?: "AAAA-MM-DD", novo? }
 //       DCTFWEB.GERARGUIA31 (Emitir, cobrado; Rodada 5, 09/10/2026): guia (DARF) da declaração mais recente da competência, categoria GERAL_MENSAL.
@@ -85,7 +86,7 @@ const resp = (corpo: Record<string, unknown>, http = 200): Resp => ({ corpo, htt
  * `semAviso`: a rodada soma as tarefas concluídas e avisa uma vez só no fim (em vez de um aviso por cliente).
  */
 async function consultarCliente(o: {
-  contactId: string; competencia: string; uid: string | null; origem: "manual" | "cron"; force?: boolean; semAviso?: boolean; motivo?: string;
+  contactId: string; competencia: string; uid: string | null; origem: "manual" | "cron"; force?: boolean; semAviso?: boolean; motivo?: string; soDctfweb?: boolean;
 }): Promise<Resp> {
   const c = await carregarCliente(o.contactId);
   if (c.resp) return { corpo: await c.resp.clone().json(), http: c.resp.status };
@@ -103,7 +104,7 @@ async function consultarCliente(o: {
       supabase.from("serpro_mit_consultas").select("consultado_em").eq("contact_id", contactId).eq("ano", Number(ano)).maybeSingle(),
     ]);
     const recente = (t?: string | null) => !!t && Date.now() - Date.parse(t) < RECENTE_MIN * 60_000;
-    if (recente(d?.consultado_em) && recente(m?.consultado_em)) return resp({ ok: true, recente: true });
+    if (recente(d?.consultado_em) && (o.soDctfweb || recente(m?.consultado_em))) return resp({ ok: true, recente: true });
   }
 
   const agora = new Date().toISOString();
@@ -152,6 +153,13 @@ async function consultarCliente(o: {
       { contact_id: contactId, company_id: COMPANY_ID, ultima_consulta_em: new Date().toISOString() }, { onConflict: "contact_id" });
   }
 
+  // Só a DCTFWeb do mês (completar meses antigos sem repetir a MIT do ano, que já vem inteira numa consulta).
+  if (o.soDctfweb) {
+    if (!dctf.ok) return resp({ ok: false, error: dctf.erro ?? "Falha na consulta ao Serpro", dctfweb: dctf });
+    if (!o.semAviso) await avisarConclusoes(supabase, COMPANY_ID, c.contato!.name ?? "Cliente", tarefasConcluidas);
+    return resp({ ok: true, dctfweb: dctf, tarefas_concluidas: tarefasConcluidas });
+  }
+
   // ---- MIT (o ano inteiro)
   const m = await serpro({
     tipo: "Consultar", idSistema: "MIT", idServico: "LISTAAPURACOES317",
@@ -197,7 +205,7 @@ async function consultarCliente(o: {
 }
 
 async function consultar(payload: any, uid: string) {
-  const r = await consultarCliente({ contactId: String(payload.contact_id ?? ""), competencia: String(payload.competencia ?? ""), uid, origem: "manual", force: !!payload.force });
+  const r = await consultarCliente({ contactId: String(payload.contact_id ?? ""), competencia: String(payload.competencia ?? ""), uid, origem: "manual", force: !!payload.force, soDctfweb: payload.so_dctfweb === true });
   return json(r.corpo, r.http);
 }
 
