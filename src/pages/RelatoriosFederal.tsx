@@ -14,12 +14,12 @@ import { useFichaFiscal } from '@/components/monitor/FichaFiscal';
 import {
   AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, useSelecao, type ItemEnvio, type ResultadoLote,
 } from '@/components/monitor/GuiasLote';
-import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMonitor, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMonitor, useEstadoUrl, usePaginacao, TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { useMarcacoesGuia } from '@/hooks/useGuiasCliente';
 import { useRelatorioCompleto } from '@/hooks/useRelatorioCompleto';
-import { useGuardarRelatorio, useRelatorioConfig, useUltimosRelatorios } from '@/hooks/useRelatoriosCliente';
-import { competenciaPadrao, siglaCompetencia } from '@/hooks/useSerproPagamentos';
+import { useGuardarRelatorio, useUltimosRelatorios } from '@/hooks/useRelatoriosCliente';
+import { competenciaPadrao } from '@/hooks/useSerproPagamentos';
 import { useSituacaoCarteira } from '@/hooks/useSituacaoCarteira';
 import { ROTULO_ESTADO, contarEstados, type Selo } from '@/lib/monitorEstados';
 import { pdfParaBase64 } from '@/lib/pdfRelatorios';
@@ -53,7 +53,6 @@ export default function RelatoriosFederal() {
   const { linhas: carteira, carregando } = useSituacaoCarteira();
   const { data: ultimos, isLoading: carregandoRel } = useUltimosRelatorios();
   const { data: marcacoes } = useMarcacoesGuia();
-  const { data: config } = useRelatorioConfig();
   const ficha = useFichaFiscal();
   const [estado, setEstado] = useEstadoUrl();
   const buscaInicial = useBuscaInicial();
@@ -63,7 +62,6 @@ export default function RelatoriosFederal() {
   const [lote, setLote] = useState<'gerar' | 'enviar' | 'baixar' | null>(null);
   const [gerando, setGerando] = useState<{ id: string; resolve: (r: ResultadoLote) => void } | null>(null);
   const hoje = hojeBR();
-  const mes = hoje.slice(0, 7);
   const competencia = competenciaPadrao();
 
   const linhas = useMemo<LinhaRelatorio[]>(() => carteira.map((l) => {
@@ -91,9 +89,6 @@ export default function RelatoriosFederal() {
 
   const ultimo = (id: string) => ultimos?.get(id) ?? null;
   const enviado = (id: string) => { const u = ultimo(id); return !!u?.enviadoEm && u.enviadoEm >= u.geradoEm; };
-  const geradosNoMes = linhas.filter((x) => ultimo(x.l.contact_id)?.geradoEm.slice(0, 7) === mes).length;
-  const enviadosNoMes = linhas.filter((x) => (ultimo(x.l.contact_id)?.enviadoEm ?? '').slice(0, 7) === mes).length;
-  const nuncaGerados = linhas.filter((x) => !ultimo(x.l.contact_id)).length;
   const marcadas = linhas.filter((x) => sel.marcados.has(x.l.contact_id));
 
   const itensEnvio: ItemEnvio[] = marcadas.flatMap(({ l }) => {
@@ -123,16 +118,10 @@ export default function RelatoriosFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · relatórios" title="Relatórios." />
+      <PageHeader kicker="~/dashboard fiscal · relatórios" title="Relatórios" />
 
       <div className="space-y-5">
         {ocupado ? <Skeleton className="h-[88px] w-full" /> : <FaixaEstados contagem={contagem} ativo={estado} onChange={setEstado} />}
-
-        <p className="text-meta text-muted-ink">
-          Relatório Completo da Empresa (situação, obrigações do ano até {siglaCompetencia(competencia)}, pagamentos, parcelamentos, comunicações e o que fazer).
-          {' '}Em {format(new Date(`${mes}-01T12:00:00`), 'MM/yyyy')}: <span className="text-ink">{geradosNoMes} gerados</span> · <span className="text-ink">{enviadosNoMes} enviados</span> · {nuncaGerados} clientes sem nenhum relatório.
-          {config && !config.faturamento_validado ? ' Sem a validação do contador (Tech > Rotinas), o PDF sai sem a assinatura dele.' : ''}
-        </p>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <SearchField placeholder="Buscar por razão social ou CNPJ..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px] flex-1" />
@@ -159,7 +148,7 @@ export default function RelatoriosFederal() {
           </DicaBotao>
         </BarraSelecao>
 
-        <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
+        <div ref={topoTabela} className={TABELA_ROLAVEL}>
           {ocupado ? (
             <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : filtradas.length === 0 ? (

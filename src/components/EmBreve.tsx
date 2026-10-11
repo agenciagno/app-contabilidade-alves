@@ -23,7 +23,7 @@ export function EmBreve({ moduleKey }: EmBreveProps) {
     <div className="space-y-6">
       <PageHeader
         kicker="~/módulo"
-        title="Em breve."
+        title="Em breve"
         subtitle="Este módulo já aparece no menu, mas ainda não tem tela."
       />
 

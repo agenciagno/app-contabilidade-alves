@@ -17,7 +17,7 @@ import { useConsultaPgdasd } from '@/components/serpro/pgdasdUi';
 import { useAbrirDefis, useConsultaDefis } from '@/components/serpro/defisUi';
 import { useLeituraFaturamento } from '@/components/serpro/useLeituraFaturamento';
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
-import { FaixaEstados, FiltroSelo, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, passaFiltroSelo, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, FiltroSelo, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, passaFiltroSelo, useEstadoUrl, usePaginacao, TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 import { AbaMei } from '@/components/monitor/AbaMei';
 import { useFichaFiscal } from '@/components/monitor/FichaFiscal';
 import { AcoesEmLoteDialog, BotaoAcoesEmLote } from '@/components/monitor/AcoesEmLote';
@@ -73,7 +73,7 @@ export default function SimplesNacionalFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · simples nacional" title="Simples Nacional | MEI." />
+      <PageHeader kicker="~/dashboard fiscal · simples nacional" title="Simples Nacional | MEI" />
 
       <div className="flex gap-1 border-b border-line">
         <DsTab active={aba === 'mensal'} onClick={() => irPara('mensal')}>Mensal</DsTab>
@@ -268,7 +268,7 @@ function AbaMensal({
         <FiltroSelo rotulo="DAS" selos={base.map((l) => l.dasSelo)} valor={filtroDas} onChange={setFiltroDas} semSelo="Sem DAS (sem declaração)" />
       </div>
 
-      <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className={TABELA_ROLAVEL}>
         {carregando ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : filtradas.length === 0 ? (
@@ -602,7 +602,7 @@ function AbaDefis({
         </DicaBotao>
       </BarraSelecao>
 
-      <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className={TABELA_ROLAVEL}>
         {isLoading || carregandoCadastro ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : filtradas.length === 0 ? (

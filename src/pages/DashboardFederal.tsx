@@ -6,11 +6,12 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RTooltip } from 'r
 
 import { DsAlert, PageHeader } from '@/components/ds';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
-import { SeloMonitor } from '@/components/monitor/MonitorUi';
+import { SeloMonitor, TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 import { NotificacoesFiscais } from '@/components/monitor/NotificacoesFiscais';
 import { useFichaFiscal } from '@/components/monitor/FichaFiscal';
 import { AusenciasBox, Caixa, DeclaracoesBox, LimiteSimplesBox, MensagensEcacBox, ParcelamentosBox, RelatoriosFiscaisBox } from '@/components/monitor/PainelBoxes';
@@ -111,7 +112,7 @@ export default function DashboardFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal" title="Dashboard Fiscal." />
+      <PageHeader kicker="~/dashboard fiscal" title="Dashboard Fiscal" />
 
       {!conferencia.carregando && conferencia.linhas.length > 0 && (
         <DsAlert
@@ -255,36 +256,38 @@ export default function DashboardFederal() {
               {listaAberta.length === 0 ? (
                 <p className="mt-8 text-center text-ui text-muted-ink">Nenhum cliente nesta situação.</p>
               ) : (
-                <Table className="mt-6">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Empresa</TableHead>
-                      <TableHead>Regime</TableHead>
-                      <TableHead>Situação</TableHead>
-                      <TableHead>Responsável</TableHead>
-                      <TableHead className="text-right">Ação</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {[...listaAberta].sort((a, b) => a.l.nome.localeCompare(b.l.nome, 'pt-BR')).map(({ l, selos, cliente }) => {
-                      const conta = (Object.keys(selos) as ProcessoPainel[]).filter((k) => !FORA_DA_SITUACAO_DO_CLIENTE.includes(k)).map((k) => selos[k]);
-                      return (
-                        <TableRow key={l.contact_id}>
-                          <TableCell>
-                            <p className="text-ui-strong text-ink">{l.nome}</p>
-                            <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-ui text-muted-ink">{l.regimeRotulo}</TableCell>
-                          <TableCell><SeloMonitor selo={cliente} outros={outrosMotivos(conta, cliente)} /></TableCell>
-                          <TableCell className="text-ui text-muted-ink">{l.responsavel?.nome ?? 'Sem responsável'}</TableCell>
-                          <TableCell className="text-right">
-                            <button type="button" onClick={() => ficha.abrir(l.contact_id)} className="text-ui-strong text-action hover:underline">Ficha fiscal</button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                <div className={cn(TABELA_ROLAVEL, 'mt-6 max-h-[calc(100vh-14rem)]')}>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Empresa</TableHead>
+                        <TableHead>Regime</TableHead>
+                        <TableHead>Situação</TableHead>
+                        <TableHead>Responsável</TableHead>
+                        <TableHead className="text-right">Ação</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...listaAberta].sort((a, b) => a.l.nome.localeCompare(b.l.nome, 'pt-BR')).map(({ l, selos, cliente }) => {
+                        const conta = (Object.keys(selos) as ProcessoPainel[]).filter((k) => !FORA_DA_SITUACAO_DO_CLIENTE.includes(k)).map((k) => selos[k]);
+                        return (
+                          <TableRow key={l.contact_id}>
+                            <TableCell>
+                              <p className="text-ui-strong text-ink">{l.nome}</p>
+                              <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-ui text-muted-ink">{l.regimeRotulo}</TableCell>
+                            <TableCell><SeloMonitor selo={cliente} outros={outrosMotivos(conta, cliente)} /></TableCell>
+                            <TableCell className="text-ui text-muted-ink">{l.responsavel?.nome ?? 'Sem responsável'}</TableCell>
+                            <TableCell className="text-right">
+                              <button type="button" onClick={() => ficha.abrir(l.contact_id)} className="text-ui-strong text-action hover:underline">Ficha fiscal</button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </>
           )}

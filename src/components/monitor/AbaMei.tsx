@@ -15,7 +15,7 @@ import { useFichaFiscal } from '@/components/monitor/FichaFiscal';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
-import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao, TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 import {
   AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote,
 } from '@/components/monitor/GuiasLote';
@@ -176,7 +176,7 @@ export function AbaMei() {
         <Button size="sm" variant="ghost" disabled={marcar.isPending} onClick={() => marcar.mutate({ contactIds: [...sel.marcados], processo: 'das', valor: true })}>Marcar "recebe DAS da CA"</Button>
       </BarraSelecao>
 
-      <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className={TABELA_ROLAVEL}>
         {isLoading ? (
           <div className="space-y-2 p-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : filtradas.length === 0 ? (

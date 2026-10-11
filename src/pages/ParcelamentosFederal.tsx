@@ -13,7 +13,7 @@ import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { ParcelamentosClienteSheet } from '@/components/serpro/ParcelamentosClienteSheet';
 import { useConsultaParcelamentos } from '@/components/serpro/parcelamentosUi';
-import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao, TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 import {
   AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote,
 } from '@/components/monitor/GuiasLote';
@@ -125,7 +125,7 @@ export default function ParcelamentosFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · parcelamentos" title="Parcelamentos." />
+      <PageHeader kicker="~/dashboard fiscal · parcelamentos" title="Parcelamentos" />
 
       <div className="space-y-5">
         {isLoading ? <Skeleton className="h-[88px] w-full" /> : <FaixaEstados contagem={contagem} ativo={estado} onChange={setEstado} />}
@@ -160,7 +160,7 @@ export default function ParcelamentosFederal() {
           </DicaBotao>
         </BarraSelecao>
 
-        <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
+        <div ref={topoTabela} className={TABELA_ROLAVEL}>
           {isLoading ? (
             <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : filtradas.length === 0 ? (

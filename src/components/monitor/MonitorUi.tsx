@@ -127,6 +127,15 @@ export function RodapeLista({ mostrando, total, unidade, filiais = 0, faixa }: {
   );
 }
 
+/**
+ * Contêiner das tabelas de lista do Monitoramento (10/10/2026, pedido de Gabriel): a tabela ganha altura própria com rolagem interna e o
+ * cabeçalho fica fixo no topo. O `<div>` interno do componente `Table` (que também rola) deixa de ser o rolador, senão o cabeçalho não gruda.
+ * Só a tabela de primeiro nível: tabelas aninhadas (ex.: mensagens dentro de um cliente) mantêm o cabeçalho normal.
+ */
+export const TABELA_ROLAVEL = 'scroll-mt-16 max-h-[calc(100vh-12rem)] overflow-auto rounded-lg border border-line bg-paper [&>div]:overflow-visible '
+  + '[&>div>table>thead>tr>th]:sticky [&>div>table>thead>tr>th]:top-0 [&>div>table>thead>tr>th]:z-10 [&>div>table>thead>tr>th]:bg-paper '
+  + '[&>div>table>thead>tr>th]:shadow-[inset_0_-1px_0_var(--line)]';
+
 export const POR_PAGINA = [30, 50, 100] as const;
 
 /**

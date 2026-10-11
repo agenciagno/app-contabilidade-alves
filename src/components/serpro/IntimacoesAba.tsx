@@ -11,7 +11,7 @@ import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PaginacaoLista, RodapeLista, usePaginacao } from '@/components/monitor/MonitorUi';
+import { PaginacaoLista, RodapeLista, usePaginacao, TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 import { AvisarClienteDialog, foneDoCliente, formatarFone, type AlvoAviso, type CanalTela } from '@/components/serpro/AvisarClienteDialog';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { NotaDialog, type NotaAlvo } from '@/components/serpro/NotaDialog';
@@ -208,7 +208,7 @@ export function IntimacoesAba() {
         <div className="sm:ml-auto"><ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas /></div>
       </div>
 
-      <div ref={topoTabela} className="scroll-mt-16 overflow-hidden rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className={TABELA_ROLAVEL}>
         {isLoading ? (
           <div className="space-y-2 p-4">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
         ) : grupos.length === 0 ? (

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { PaginacaoLista, RodapeLista, usePaginacao } from '@/components/monitor/MonitorUi';
+import { PaginacaoLista, RodapeLista, usePaginacao, TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
@@ -167,7 +167,7 @@ export default function PagamentosFederal() {
     <div className="space-y-6">
       <PageHeader
         kicker="~/dashboard fiscal · pagamentos e das"
-        title="Pagamentos e DAS."
+        title="Pagamentos e DAS"
         subtitle="Documentos de arrecadação pagos na Receita (DARF e DAE) e o DAS do Simples (gerado, pago, a vencer ou vencido) por cliente ativo e competência. O aviso de pagamento novo vem da rotina diária das 07:35, sem custo. A situação do DAS é atualizada pela rotina do PGDAS (dia 16 e dia seguinte ao prazo) ou por Atualizar DAS no painel do cliente. Para ver valor, data e composição, abra o cliente e use Consultar pagamentos. A Receita só informa o que foi pago: zero em um mês consultado não prova que não havia o que pagar."
         actions={(
           <div className="flex items-center gap-2">
@@ -221,7 +221,7 @@ export default function PagamentosFederal() {
         </DicaBotao>
       </BarraSelecao>
 
-      <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className={TABELA_ROLAVEL}>
         {isLoading ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : filtradas.length === 0 ? (

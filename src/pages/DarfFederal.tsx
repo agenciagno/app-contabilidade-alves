@@ -17,7 +17,7 @@ import { SearchableSelect } from '@/components/fiscal/SearchableSelect';
 import { Preco, brl } from '@/components/serpro/CustoSerpro';
 import { DICA_RODAPE, DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
-import { PaginacaoLista, RodapeLista, usePaginacao } from '@/components/monitor/MonitorUi';
+import { PaginacaoLista, RodapeLista, usePaginacao, TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 import {
   ROTULO_TIPO_PA, proximoDiaUtil, useClientesDarf, useCodigoBarrasDarf, useDarfsGerados, useGerarDarf, useLinkDarf,
   type DarfRow, type TipoPa,
@@ -141,7 +141,7 @@ export default function DarfFederal() {
     <div className="space-y-6">
       <PageHeader
         kicker="~/dashboard fiscal · darf atualizado"
-        title="DARF atualizado."
+        title="DARF atualizado"
         subtitle="Calcula multa e juros de um débito e gera o DARF para pagar. O sistema não descobre a dívida: você informa a receita, o período, o vencimento original, o valor do imposto e a data em que o cliente vai pagar, e a Receita devolve o DARF atualizado até essa data. DAS do Simples tem tela própria, não use aqui."
         actions={<ExportarMenu montar={tabelaExport} disabled={darfs.length === 0} escolherColunas />}
       />
@@ -238,7 +238,7 @@ export default function DarfFederal() {
         ]}
       />
 
-      <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className={TABELA_ROLAVEL}>
         {isLoading ? (
           <div className="space-y-2 p-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : darfs.length === 0 ? (

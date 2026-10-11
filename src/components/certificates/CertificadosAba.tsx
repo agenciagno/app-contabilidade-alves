@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 import { format } from 'date-fns';
 import {
   Bell, Copy, Download, Eye, Loader2, MoreHorizontal, Pencil, Plus, RotateCw, Trash2,
@@ -194,7 +195,7 @@ export function CertificadosAba() {
         </Select>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-line bg-paper">
+      <div className={TABELA_ROLAVEL}>
         {isLoading ? (
           <div className="space-y-2 p-4">
             {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}

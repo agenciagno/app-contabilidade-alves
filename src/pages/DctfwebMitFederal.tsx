@@ -17,7 +17,7 @@ import { useConsultaDctfwebMit } from '@/components/serpro/dctfwebUi';
 import { FichaPresumidoRealSheet } from '@/components/serpro/FichaPresumidoRealSheet';
 import { mesesFaltantes, useDctfwebAno } from '@/hooks/useSerproFichaPresumido';
 import { useCadastroMonitor } from '@/hooks/useSituacaoCarteira';
-import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao, TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
 import { useGerarGuiaDctfweb, useGuiasDctfweb, useGuiasEnviadas, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
 import { hojeBR } from '@/lib/prazosFederais';
@@ -137,7 +137,7 @@ export default function DctfwebMitFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · dctfweb e mit" title="DCTFWeb | MIT." />
+      <PageHeader kicker="~/dashboard fiscal · dctfweb e mit" title="DCTFWeb | MIT" />
 
       <div className="space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -191,7 +191,7 @@ export default function DctfwebMitFederal() {
           </DicaBotao>
         </div>
 
-        <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
+        <div ref={topoTabela} className={TABELA_ROLAVEL}>
           {isLoading ? (
             <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
           ) : filtradas.length === 0 ? (

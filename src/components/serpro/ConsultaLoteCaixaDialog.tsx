@@ -131,7 +131,7 @@ export function ConsultaLoteCaixaDialog({ aberto, onClose, clientes, inicial }: 
                 <label key={c.contact_id} className={cn('flex items-center gap-3 rounded-sm px-2 py-1.5', sem ? 'opacity-60' : 'cursor-pointer hover:bg-bg-2')}>
                   <Checkbox checked={marcados.has(c.contact_id)} disabled={sem} onCheckedChange={() => alternar(c.contact_id)} aria-label={`Marcar ${c.nome}`} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-ui text-ink">{c.nome}</span>
+                    <span className="block truncate text-ui text-ink" title={c.nome}>{c.nome}</span>
                     <span className="block font-mono text-meta text-muted-ink-2">{formatarCnpj(c.documento)}</span>
                   </span>
                   <SeloMini selo={seloCaixaPostal(seloCaixa(c).estado)} />

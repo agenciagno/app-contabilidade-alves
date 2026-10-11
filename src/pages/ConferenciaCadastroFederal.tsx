@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
-import { PaginacaoLista, RodapeLista, usePaginacao } from '@/components/monitor/MonitorUi';
+import { PaginacaoLista, RodapeLista, usePaginacao, TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { ROTULO_PROBLEMA, useConferenciaCadastro, type TipoProblema } from '@/hooks/useSerproConferenciaCadastro';
 import type { TabelaExport } from '@/lib/exportarTabela';
@@ -65,7 +65,7 @@ export default function ConferenciaCadastroFederal() {
     <div className="space-y-6">
       <PageHeader
         kicker="~/dashboard fiscal · conferência do cadastro"
-        title="Conferência do cadastro."
+        title="Conferência do cadastro"
         subtitle="Clientes ativos em que o cadastro e o que a Receita mostra (ou o próprio monitoramento) não batem: Simples sem declaração, declaração do Simples em cliente de outro regime, cliente ativo com data de saída e PJ sem regime. Só lê o que já está salvo: não consulta o Serpro e não gera custo. A Receita só é comparada onde a declaração já foi consultada."
         actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} />}
       />
@@ -87,7 +87,7 @@ export default function ConferenciaCadastroFederal() {
         </Select>
       </div>
 
-      <div ref={topoTabela} className="scroll-mt-16 overflow-hidden rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className={TABELA_ROLAVEL}>
         {carregando ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : filtradas.length === 0 ? (

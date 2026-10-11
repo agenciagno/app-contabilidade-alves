@@ -15,7 +15,7 @@ import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { IntimacoesAba } from '@/components/serpro/IntimacoesAba';
 import { ConsultaLoteCaixaDialog } from '@/components/serpro/ConsultaLoteCaixaDialog';
 import { MensagensClienteSheet } from '@/components/serpro/MensagensClienteSheet';
-import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
+import { FaixaEstados, PaginacaoLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao, TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 import { seloDte, useConsultarDte, useDteMapa } from '@/hooks/useSerproExtras';
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { STATUS_MONITORADO, seloCaixa, useClientesCaixa, type ClienteCaixa, type SeloEstado } from '@/hooks/useSerproCaixaPostal';
@@ -59,7 +59,7 @@ export default function MensagensEcac() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/caixa postal e-cac" title="Caixa Postal e-CAC." />
+      <PageHeader kicker="~/caixa postal e-cac" title="Caixa Postal e-CAC" />
 
       <div className="flex gap-1 border-b border-line">
         <DsTab active={aba === 'clientes'} onClick={() => irPara('clientes')}>Clientes</DsTab>
@@ -168,7 +168,7 @@ function AbaClientes() {
         </DicaBotao>
       </BarraSelecao>
 
-      <div ref={topoTabela} className="scroll-mt-16 overflow-x-auto rounded-lg border border-line bg-paper">
+      <div ref={topoTabela} className={TABELA_ROLAVEL}>
         {isLoading ? (
           <div className="space-y-2 p-4">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : filtrados.length === 0 ? (
@@ -222,8 +222,7 @@ function AbaClientes() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-        <RodapeLista mostrando={filtrados.length} total={matrizes.length} unidade="clientes ativos" filiais={monitorados.length - matrizes.length} faixa={pag.faixa} />
+      <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-3">
         <PaginacaoLista pagina={pag.pagina} totalPaginas={pag.totalPaginas} porPagina={pag.porPagina} total={filtrados.length}
           onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
       </div>

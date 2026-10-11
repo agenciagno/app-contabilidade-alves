@@ -182,7 +182,7 @@ export function AcoesEmLoteDialog({ aberto, onClose, acoes, clientes, extras = [
                 <label key={c.id} className={cn('flex items-center gap-3 rounded-sm px-2 py-1.5', motivo ? 'opacity-60' : 'cursor-pointer hover:bg-bg-2')}>
                   <Checkbox checked={!motivo && marcados.has(c.id)} disabled={!!motivo} onCheckedChange={() => alternar(c.id)} aria-label={`Marcar ${c.nome}`} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-ui text-ink">{c.nome}</span>
+                    <span className="block truncate text-ui text-ink" title={c.nome}>{c.nome}</span>
                     <span className="block font-mono text-meta text-muted-ink-2">{formatarCnpj(c.documento)}{motivo ? ` · ${motivo}` : ''}</span>
                   </span>
                   <SeloMini selo={seloDe(c)} />
