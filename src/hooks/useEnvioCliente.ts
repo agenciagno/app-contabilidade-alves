@@ -81,6 +81,7 @@ export function useEnviarCliente() {
       qc.invalidateQueries({ queryKey: ['envios-cliente', p.contactId] });
       qc.invalidateQueries({ queryKey: ['ausencia-acompanhamentos'] });
       qc.invalidateQueries({ queryKey: ['guias-enviadas'] });
+      qc.invalidateQueries({ queryKey: ['relatorios-ultimos'] });
     },
   });
 }

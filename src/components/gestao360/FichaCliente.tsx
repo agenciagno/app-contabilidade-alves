@@ -14,8 +14,10 @@ import { ROTULO_CANAL, useDocumentosCliente, useEnviosCliente } from '@/hooks/us
 import { useGuardarRelatorio, useRelatorioConfig } from '@/hooks/useRelatoriosCliente';
 import type { FaturamentoRow } from '@/hooks/useSerproFaturamento';
 import { modeloDocumentos, modeloRelatorioFaturamento, modeloRelatorioSituacao, type ModeloMensagem } from '@/lib/mensagensCliente';
-import { baixarPdf, brl, carregarLogo, gerarPdfFaturamento, gerarPdfSituacao, mesAno, pdfParaBase64 } from '@/lib/pdfRelatorios';
-import { calcularScore, montarPlanoAcao, montarRelatorioFaturamento } from '@/lib/relatoriosCliente';
+import { baixarPdf, brl, carregarLogo, gerarPdfFaturamento, mesAno, pdfParaBase64 } from '@/lib/pdfRelatorios';
+import { arquivoRelatorioCompleto, useRelatorioCompleto } from '@/hooks/useRelatorioCompleto';
+import { ROTULO_VEREDITO } from '@/lib/relatorioCompleto';
+import { calcularScore, montarRelatorioFaturamento } from '@/lib/relatoriosCliente';
 import { hojeBR } from '@/lib/prazosFederais';
 import { digitos, ROTULO_NIVEL, type LinhaCarteira } from '@/lib/situacaoCarteira';
 
@@ -140,6 +142,8 @@ export function FichaCliente({ linha: l, faturamento = null, extra }: {
   const envios = useEnviosCliente(l.contact_id);
   const config = useRelatorioConfig();
   const guardar = useGuardarRelatorio();
+  // Relatório Completo da Empresa (10/10/2026): substitui o Relatório de Situação Fiscal e é guardado no mesmo tipo (`situacao`).
+  const completo = useRelatorioCompleto(l.contact_id);
   const [envio, setEnvio] = useState<{ marcados: string[]; modelo?: ModeloMensagem } | null>(null);
   const [gerando, setGerando] = useState<'situacao' | 'faturamento' | null>(null);
   const guardados = docs.data ?? [];
@@ -153,14 +157,14 @@ export function FichaCliente({ linha: l, faturamento = null, extra }: {
 
   const montarPdf = async (tipo: 'situacao' | 'faturamento'): Promise<ArrayBuffer> => {
     const logo = await carregarLogo();
-    if (tipo === 'situacao') return gerarPdfSituacao(dados, score, montarPlanoAcao(l, score), hojeBR(), logo);
+    if (tipo === 'situacao') return completo.gerarPdf();
     const c = config.data;
     const assinatura = c && (c.contador_nome || c.contador_crc || c.contador_cpf) ? { nome: c.contador_nome, crc: c.contador_crc, cpf: c.contador_cpf } : null;
     return gerarPdfFaturamento(dados, relFat!, assinatura, !validado, hojeBR(), logo);
   };
   const baixar = async (tipo: 'situacao' | 'faturamento') => {
     setGerando(tipo);
-    try { baixarPdf(await montarPdf(tipo), arquivo(tipo === 'situacao' ? 'situacao-fiscal' : validado ? 'faturamento' : 'faturamento-rascunho')); }
+    try { baixarPdf(await montarPdf(tipo), tipo === 'situacao' ? arquivoRelatorioCompleto(l.nome) : arquivo(validado ? 'faturamento' : 'faturamento-rascunho')); }
     catch { toast.error('Não foi possível gerar o PDF.'); }
     finally { setGerando(null); }
   };
@@ -169,7 +173,7 @@ export function FichaCliente({ linha: l, faturamento = null, extra }: {
     try {
       const r = await guardar.mutateAsync({
         contactId: l.contact_id, tipo, periodo: tipo === 'faturamento' ? relFat?.periodo : undefined, pdfBase64: pdfParaBase64(await montarPdf(tipo)),
-        resumo: tipo === 'situacao' ? { percentual: score.percentual, regulares: score.regulares, verificados: score.verificados, naoVerificados: score.naoVerificados } : { periodo: relFat?.periodo, rbt12: relFat?.rbt12 },
+        resumo: tipo === 'situacao' ? { modelo: 'completo', veredito: completo.relatorio?.veredito, competencia: completo.relatorio?.competencia, percentual: score.percentual, regulares: score.regulares, verificados: score.verificados, naoVerificados: score.naoVerificados } : { periodo: relFat?.periodo, rbt12: relFat?.rbt12 },
       });
       setEnvio({ marcados: [`${r.tipo}:${r.id}`], modelo: tipo === 'situacao' ? modeloRelatorioSituacao() : modeloRelatorioFaturamento() });
     } catch (e) { toast.error((e as Error)?.message || 'Não foi possível guardar o relatório.'); }
@@ -216,18 +220,19 @@ export function FichaCliente({ linha: l, faturamento = null, extra }: {
         <h3 className="text-ui-strong text-ink">Relatórios para o cliente</h3>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="min-w-[260px] flex-1">
-            <p className="text-ui text-ink">Relatório de situação fiscal</p>
+            <p className="text-ui text-ink">Relatório Completo da Empresa</p>
             <p className="text-meta text-muted-ink">
               {score.verificados === 0
                 ? 'Nenhum item verificado ainda: o relatório sairia só com itens "não verificados".'
-                : `Score${score.naoVerificados > 0 ? ' parcial' : ''} ${score.percentual}% · ${score.regulares} de ${score.verificados} itens verificados regulares · ${score.naoVerificados} não ${score.naoVerificados === 1 ? 'verificado' : 'verificados'}`}
+                : `${completo.relatorio ? `${ROTULO_VEREDITO[completo.relatorio.veredito]} · ` : ''}Score${score.naoVerificados > 0 ? ' parcial' : ''} ${score.percentual}% · situação, obrigações do ano, pagamentos, parcelamentos, comunicações e o que fazer`}
+              {completo.assinatura ? ' · com assinatura do contador' : ''}
             </p>
           </div>
-          <Button variant="outline" size="sm" disabled={ocupado} onClick={() => baixar('situacao')}>
+          <Button variant="outline" size="sm" disabled={ocupado || !completo.relatorio} onClick={() => baixar('situacao')}>
             {gerando === 'situacao' ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}Baixar PDF
           </Button>
           <DicaBotao texto={score.verificados === 0 ? 'Ainda não há item verificado deste cliente.' : 'Gera o PDF, guarda e abre o envio ao cliente com o relatório já marcado.'}>
-            <Button size="sm" disabled={ocupado || score.verificados === 0} onClick={() => enviarRelatorio('situacao')}><Send className="mr-1.5 h-4 w-4" />Enviar ao cliente</Button>
+            <Button size="sm" disabled={ocupado || score.verificados === 0 || !completo.relatorio} onClick={() => enviarRelatorio('situacao')}><Send className="mr-1.5 h-4 w-4" />Enviar ao cliente</Button>
           </DicaBotao>
         </div>
         {l.regime === 'simples_nacional' && (

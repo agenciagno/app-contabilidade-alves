@@ -202,6 +202,7 @@ export type MenuEntry = SectionDivider | SimpleModule | CollapsibleModule;
 const ORDEM_TOPO = [
   '/dashboard-federal', '/mensagens', '/dashboard-federal/simples-nacional', '/dashboard-federal/situacao-fiscal',
   '/dashboard-federal/dctfweb-mit', '/dashboard-federal/parcelamentos', '/dashboard-federal/procuracoes', '/certidoes', '/dashboard-federal/eprocesso',
+  '/dashboard-federal/relatorios',
 ];
 
 /** Itens do grupo "Monitoramento" que aparecem no menu fixo do topo das telas (na ordem do topo, que não é a da sidebar). */
@@ -290,7 +291,7 @@ export const menuEntries: MenuEntry[] = [
     // Itens com rota própria dentro de /dashboard-federal: nelas o Dashboard não fica ativo.
     activeExcept: [
       '/dashboard-federal/situacao-fiscal', '/dashboard-federal/procuracoes', '/dashboard-federal/simples-nacional',
-      '/dashboard-federal/parcelamentos', '/dashboard-federal/dctfweb-mit', '/dashboard-federal/eprocesso',
+      '/dashboard-federal/parcelamentos', '/dashboard-federal/dctfweb-mit', '/dashboard-federal/eprocesso', '/dashboard-federal/relatorios',
     ],
   },
   {
@@ -366,6 +367,15 @@ export const menuEntries: MenuEntry[] = [
     iconName: 'scale',
     moduleKey: 'dashboard_federal',
     menu: 'superior',
+  },
+  // Relatórios (10/10/2026, R3 da varredura): Relatório Completo da Empresa de cada cliente; nos dois menus, depois de DCTFWeb | MIT na sidebar e no fim do topo.
+  {
+    kind: 'simple',
+    title: 'Relatórios',
+    url: '/dashboard-federal/relatorios',
+    icon: FileBarChart,
+    iconName: 'file-bar-chart',
+    moduleKey: 'dashboard_federal',
   },
   // Certificados (10/10/2026, pedido de Gabriel): atalho da sidebar para a aba Certificados de Procurações | Certificados; permissão da aba.
   {

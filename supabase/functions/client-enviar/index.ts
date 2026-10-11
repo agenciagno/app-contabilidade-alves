@@ -72,7 +72,7 @@ const DOCS: Record<string, Spec> = {
   comprovante: { tabela: 'serpro_pagamentos', coluna: 'comprovante_path', bucket: 'serpro-comprovantes', extra: 'periodo_apuracao,tipo_sigla,comprovante_emitido_em', ordem: 'comprovante_emitido_em',
     rotulo: (r) => `Comprovante de pagamento ${r.tipo_sigla ? `${r.tipo_sigla} ` : ''}${mesAno(r.periodo_apuracao)}`.trim(), data: (r) => String(r.comprovante_emitido_em ?? r.periodo_apuracao ?? ''), periodo: { coluna: 'periodo_apuracao', formato: 'mes' } },
   relatorio_situacao: { tabela: 'client_relatorios', coluna: 'path', bucket: 'client-relatorios', extra: 'tipo,gerado_em', ordem: 'gerado_em', onde: ['tipo', 'situacao'],
-    rotulo: (r) => `Relatório de Situação Fiscal (gerado em ${dataBR(r.gerado_em)})`, data: (r) => String(r.gerado_em ?? '') },
+    rotulo: (r) => `Relatório Completo da Empresa (gerado em ${dataBR(r.gerado_em)})`, data: (r) => String(r.gerado_em ?? '') },
   relatorio_faturamento: { tabela: 'client_relatorios', coluna: 'path', bucket: 'client-relatorios', extra: 'tipo,gerado_em,periodo', ordem: 'gerado_em', onde: ['tipo', 'faturamento'],
     rotulo: (r) => `Relatório de Faturamento dos últimos 12 meses (até ${mesAno(r.periodo ? `${r.periodo}-01` : r.gerado_em)})`, data: (r) => String(r.gerado_em ?? '') },
   parcela_guia: { tabela: 'serpro_parcelas_guias', coluna: 'pdf_path', bucket: 'serpro-parcelamentos', extra: 'modalidade,parcela,gerado_em', ordem: 'gerado_em',

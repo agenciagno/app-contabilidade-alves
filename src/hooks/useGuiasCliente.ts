@@ -11,8 +11,9 @@ import { useCompany } from '@/hooks/useCompany';
 import { invocarSerpro } from '@/lib/invocarSerpro';
 import { fetchAllPages } from '@/lib/fetch-all';
 
-export type ProcessoGuia = 'das' | 'dctfweb' | 'parcela' | 'das_mei';
-export const ORIGEM_ENVIO: Record<ProcessoGuia, string> = { das: 'guia_das', dctfweb: 'guia_dctfweb', parcela: 'guia_parcela', das_mei: 'guia_das_mei' };
+/** `relatorio`: Relatório Completo da Empresa enviado em lote pela tela Relatórios (10/10/2026). */
+export type ProcessoGuia = 'das' | 'dctfweb' | 'parcela' | 'das_mei' | 'relatorio';
+export const ORIGEM_ENVIO: Record<ProcessoGuia, string> = { das: 'guia_das', dctfweb: 'guia_dctfweb', parcela: 'guia_parcela', das_mei: 'guia_das_mei', relatorio: 'relatorio_completo' };
 
 export interface MarcacaoGuia { das: boolean; dctfweb: boolean; email: string | null }
 

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
 import { useProfile } from '@/hooks/useProfile';
 import { invocarSerpro } from '@/lib/invocarSerpro';
+import { fetchAllPages } from '@/lib/fetch-all';
 
 /** Contador que assina o Relatório de Faturamento e se o modelo foi validado. Sem validação o relatório só sai como rascunho (e não vai ao cliente). */
 export interface RelatorioConfig {
@@ -62,6 +63,34 @@ export function useGuardarRelatorio() {
   return useMutation({
     mutationFn: (v: { contactId: string; tipo: 'situacao' | 'faturamento'; periodo?: string; pdfBase64: string; resumo?: Record<string, unknown> }) =>
       invocarSerpro<RelatorioGuardado>('client-enviar', { action: 'guardar_relatorio', contact_id: v.contactId, tipo: v.tipo, periodo: v.periodo, pdf_base64: v.pdfBase64, resumo: v.resumo }),
-    onSuccess: (_r, v) => qc.invalidateQueries({ queryKey: ['envio-documentos', v.contactId] }),
+    onSuccess: (_r, v) => {
+      qc.invalidateQueries({ queryKey: ['envio-documentos', v.contactId] });
+      qc.invalidateQueries({ queryKey: ['relatorios-ultimos'] });
+    },
+  });
+}
+
+/** Último Relatório Completo guardado de cada cliente (tipo `situacao`) e o último envio dele, para a tela Relatórios. */
+export interface UltimoRelatorio { id: string; geradoEm: string; enviadoEm: string | null }
+
+export function useUltimosRelatorios() {
+  const { company } = useCompany();
+  return useQuery({
+    queryKey: ['relatorios-ultimos', company?.id],
+    enabled: !!company?.id,
+    queryFn: async (): Promise<Map<string, UltimoRelatorio>> => {
+      const [rel, env] = await Promise.all([
+        fetchAllPages<{ id: string; contact_id: string; gerado_em: string }>(() => supabase.from('client_relatorios')
+          .select('id, contact_id, gerado_em').eq('company_id', company!.id).eq('tipo', 'situacao').order('gerado_em', { ascending: false }).order('id')),
+        fetchAllPages<{ contact_id: string; enviado_em: string }>(() => supabase.from('client_envios')
+          .select('contact_id, enviado_em').eq('company_id', company!.id).contains('documentos', [{ tipo: 'relatorio_situacao' }])
+          .order('enviado_em', { ascending: false }).order('id')),
+      ]);
+      const enviado = new Map<string, string>();
+      for (const e of env) if (!enviado.has(e.contact_id)) enviado.set(e.contact_id, e.enviado_em);
+      const m = new Map<string, UltimoRelatorio>();
+      for (const r of rel) if (!m.has(r.contact_id)) m.set(r.contact_id, { id: r.id, geradoEm: r.gerado_em, enviadoEm: enviado.get(r.contact_id) ?? null });
+      return m;
+    },
   });
 }

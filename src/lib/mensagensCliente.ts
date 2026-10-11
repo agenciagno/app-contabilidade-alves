@@ -52,8 +52,8 @@ export const modeloDocumentos = (): ModeloMensagem => ({
 });
 
 export const modeloRelatorioSituacao = (): ModeloMensagem => ({
-  assunto: 'Relatório de situação fiscal da sua empresa',
-  texto: `${ABERTURA} Segue o relatório de situação fiscal da sua empresa, com o que está em dia, o que está pendente e o que precisa ser feito.\n\nSe quiser conversar sobre algum ponto, é só responder por aqui.\n\n${ASSINATURA}`,
+  assunto: 'Relatório completo da sua empresa',
+  texto: `${ABERTURA} Segue o relatório completo da sua empresa: situação fiscal, obrigações do ano, pagamentos e o que precisa ser feito.\n\nSe quiser conversar sobre algum ponto, é só responder por aqui.\n\n${ASSINATURA}`,
 });
 
 export const modeloRelatorioFaturamento = (): ModeloMensagem => ({

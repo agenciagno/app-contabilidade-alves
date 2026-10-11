@@ -225,7 +225,7 @@ export default function SituacaoFiscalFederal() {
         onClose={() => setBaixarAberto(false)}
         contactIds={[...sel.marcados]}
         referencia="último relatório de cada cliente"
-        opcoes={[{ tipo: 'sitfis', rotulo: 'Relatório de situação fiscal da Receita (último)' }, { tipo: 'relatorio_situacao', rotulo: 'Relatório de Situação Fiscal para o cliente (CA)' }]}
+        opcoes={[{ tipo: 'sitfis', rotulo: 'Relatório de situação fiscal da Receita (último)' }, { tipo: 'relatorio_situacao', rotulo: 'Relatório Completo da Empresa (CA)' }]}
       />
       <AcoesEmLoteDialog
         aberto={acoesLote}

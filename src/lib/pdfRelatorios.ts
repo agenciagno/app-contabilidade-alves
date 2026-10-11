@@ -1,11 +1,12 @@
 /**
- * PDFs dos relatórios para o cliente (rodada 3): Relatório de Situação Fiscal e Relatório de Faturamento (12 meses).
+ * PDFs dos relatórios para o cliente: Relatório Completo da Empresa (10/10/2026, substituiu o de Situação Fiscal da rodada 3) e Relatório de Faturamento (12 meses).
  * Gera no navegador (jsPDF), sem servidor e sem custo. O Relatório de Faturamento leva a assinatura do contador (nome, CRC, CPF) e, sem o
  * modelo validado, sai com marca d'água "RASCUNHO" (a tela também impede o envio ao cliente).
  * Só caracteres do alfabeto latino (Helvetica padrão do PDF): nada de símbolos especiais.
  */
-import type { AcaoPlano, RelatorioFaturamento, Score } from '@/lib/relatoriosCliente';
+import type { RelatorioFaturamento } from '@/lib/relatoriosCliente';
 import { ROTULO_PRIORIDADE } from '@/lib/relatoriosCliente';
+import { ROTULO_VEREDITO, type RelatorioCompleto } from '@/lib/relatorioCompleto';
 
 export interface DadosEmpresa { nome: string; cnpj: string; regime: string }
 export interface Assinatura { nome: string; crc: string; cpf: string }
@@ -116,76 +117,209 @@ function paragrafo(doc: Doc, texto: string, y: number, tamanho = 8, c: RGB = MUT
 const ROTULO_ESTADO = { regular: 'Regular', pendente: 'Pendente', nao_verificado: 'Não verificado' } as const;
 const COR_ESTADO: Record<keyof typeof ROTULO_ESTADO, RGB> = { regular: OK, pendente: DANGER, nao_verificado: MUTED };
 
-// ---------------------------------------------------------------- Relatório de Situação Fiscal
-export async function gerarPdfSituacao(d: DadosEmpresa, score: Score, plano: AcaoPlano[], geradoEm: string, logo?: string): Promise<ArrayBuffer> {
+// ---------------------------------------------------------------- Relatório Completo da Empresa (10/10/2026)
+const COR_MONITOR: Record<string, RGB> = { em_dia: OK, pendencia: WARN, atencao: DANGER, processando: ACTION, nao_verificado: MUTED };
+const COR_VEREDITO: Record<RelatorioCompleto['veredito'], RGB> = { regular: OK, atencao: WARN, pendencias: DANGER };
+const TABELA = {
+  styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 2, textColor: INK, lineColor: LINE, lineWidth: { bottom: 0.2 }, valign: 'top' as const },
+  headStyles: { fillColor: BG2, textColor: MUTED, fontStyle: 'bold' as const, fontSize: 8 },
+};
+
+/**
+ * "Como está minha empresa por completo?": capa com veredito e as 3 ações mais urgentes, situação por item (score), situação fiscal e
+ * certidão, obrigações do ano mês a mês, pagamentos do ano, faturamento, parcelamentos, comunicações e e-Processo, procuração e
+ * certificado, plano de ação e, com o modelo validado pelo contador, a assinatura dele. Só dado já salvo; cada bloco diz de quando é.
+ */
+export async function gerarPdfCompleto(r: RelatorioCompleto, assinatura: Assinatura | null, geradoEm: string, logo?: string): Promise<ArrayBuffer> {
   const { doc, autoTable } = await novoDoc();
-  let y = cabecalho(doc, 'Relatório de Situação Fiscal', geradoEm, logo);
-  y = identificacao(doc, d, y);
+  const pagina = (y: number, precisa: number) => { if (y + precisa > 272) { doc.addPage(); return 22; } return y; };
+  const tabela = (y: number, opcoes: Record<string, unknown>) => {
+    autoTable(doc, { startY: y, margin: { left: M, right: M }, theme: 'plain', ...TABELA, ...opcoes } as never);
+    return finalY(doc) + 8;
+  };
+  const periodo = `${mesAno(`${r.ano}-01`)} a ${mesAno(r.competencia)}`;
 
-  // Cartão do score
-  fundo(doc, BG2); doc.roundedRect(M, y, LARGURA, 34, 2, 2, 'F');
-  const pct = score.percentual;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(30); cor(doc, pct === null ? MUTED : pct >= 80 ? OK : pct >= 50 ? WARN : DANGER);
-  doc.text(pct === null ? '—' : `${pct}%`, M + 8, y + 17);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(11); cor(doc, INK);
-  doc.text(score.verificados === 0 ? 'Nenhum item verificado ainda' : `${score.regulares} de ${score.verificados} itens verificados estão regulares`, M + 48, y + 11);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); cor(doc, MUTED);
-  doc.text(`${score.pendentes} ${score.pendentes === 1 ? 'pendente' : 'pendentes'}  ·  ${score.naoVerificados} não ${score.naoVerificados === 1 ? 'verificado' : 'verificados'}`, M + 48, y + 17);
-  const total = score.itens.length || 1;
-  const barra = 118; let x = M + 48;
-  for (const [n, c] of [[score.regulares, OK], [score.pendentes, DANGER], [score.naoVerificados, [186, 196, 207] as RGB]] as [number, RGB][]) {
-    if (!n) continue;
-    const w = (barra * n) / total; fundo(doc, c); doc.rect(x, y + 21, w, 3.2, 'F'); x += w;
-  }
-  if (score.naoVerificados > 0 && score.verificados > 0) {
-    doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); cor(doc, MUTED);
-    doc.text('Score parcial: considera só os itens já verificados. Os demais seguem como "não verificado".', M + 48, y + 29.5);
-  }
-  y += 42;
+  let y = cabecalho(doc, 'Relatório Completo da Empresa', geradoEm, logo);
+  y = identificacao(doc, { nome: r.nome, cnpj: formatarDoc(r.documento), regime: r.regime }, y);
+  y = paragrafo(doc, `Período: ${periodo}. Dados lidos da Receita Federal e da PGFN e registrados no sistema da Contabilidade Alves até ${dataBR(geradoEm)}.`, y - 3, 8);
+  y += 3;
 
-  y = titulo(doc, 'Situação por item', y);
-  autoTable(doc, {
-    startY: y, margin: { left: M, right: M }, theme: 'plain',
+  // Capa: veredito, score e as 3 ações mais urgentes
+  const top = r.plano.slice(0, 3);
+  const alturaCapa = 30 + top.length * 6;
+  fundo(doc, BG2); doc.roundedRect(M, y, LARGURA, alturaCapa, 2, 2, 'F');
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); cor(doc, MUTED); doc.text('Como está a sua empresa', M + 6, y + 8);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(17); cor(doc, COR_VEREDITO[r.veredito]); doc.text(ROTULO_VEREDITO[r.veredito], M + 6, y + 16);
+  const pct = r.score.percentual;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(20); cor(doc, pct === null ? MUTED : pct >= 80 ? OK : pct >= 50 ? WARN : DANGER);
+  doc.text(pct === null ? '—' : `${pct}%`, 210 - M - 6, y + 14, { align: 'right' });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); cor(doc, MUTED);
+  doc.text(r.score.verificados === 0 ? 'nenhum item verificado' : `${r.score.regulares} de ${r.score.verificados} itens regulares${r.score.naoVerificados ? ' (parcial)' : ''}`, 210 - M - 6, y + 19, { align: 'right' });
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); cor(doc, INK);
+  doc.text(top.length ? 'O mais importante agora' : 'Nenhuma ação necessária nos itens verificados.', M + 6, y + 25);
+  top.forEach((a, i) => {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); cor(doc, a.prioridade === 1 ? DANGER : a.prioridade === 2 ? WARN : ACTION);
+    doc.text(ROTULO_PRIORIDADE[a.prioridade], M + 6, y + 31 + i * 6);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); cor(doc, INK);
+    doc.text(doc.splitTextToSize(`${a.titulo} · ${a.quem}`, LARGURA - 34)[0] as string, M + 28, y + 31 + i * 6);
+  });
+  y += alturaCapa + 8;
+
+  // 1. Situação por item
+  y = titulo(doc, '1. Situação por item', y);
+  y = tabela(y, {
     head: [['Item', 'Situação', 'Detalhe', 'Lido em']],
-    body: score.itens.map((i) => [i.rotulo, ROTULO_ESTADO[i.estado], i.detalhe, i.lidoEm ? dataBR(i.lidoEm) : '—']),
-    styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 2.2, textColor: INK, lineColor: LINE, lineWidth: { bottom: 0.2 } },
-    headStyles: { fillColor: BG2, textColor: MUTED, fontStyle: 'bold', fontSize: 8 },
+    body: r.score.itens.map((i) => [i.rotulo, ROTULO_ESTADO[i.estado], i.detalhe, i.lidoEm ? dataBR(i.lidoEm) : '—']),
     columnStyles: { 0: { cellWidth: 50, fontStyle: 'bold' }, 1: { cellWidth: 26 }, 2: { cellWidth: 70 }, 3: { cellWidth: 28 } },
-    didParseCell: (h) => {
-      if (h.section === 'body' && h.column.index === 1) {
-        const estado = score.itens[h.row.index].estado; h.cell.styles.textColor = COR_ESTADO[estado]; h.cell.styles.fontStyle = 'bold';
-      }
+    didParseCell: (h: { section: string; column: { index: number }; row: { index: number }; cell: { styles: Record<string, unknown> } }) => {
+      if (h.section === 'body' && h.column.index === 1) { h.cell.styles.textColor = COR_ESTADO[r.score.itens[h.row.index].estado]; h.cell.styles.fontStyle = 'bold'; }
     },
   });
-  y = finalY(doc) + 10;
 
-  if (y > 235) { doc.addPage(); y = 22; }
-  y = titulo(doc, 'O que precisa ser feito', y);
-  if (plano.length === 0) {
-    y = paragrafo(doc, 'Nenhuma ação necessária com os itens verificados.', y + 5, 9, INK);
-  } else {
-    autoTable(doc, {
-      startY: y, margin: { left: M, right: M }, theme: 'plain',
-      head: [['Prioridade', 'Ação', 'O que fazer', 'Quem']],
-      body: plano.map((a) => [ROTULO_PRIORIDADE[a.prioridade], a.titulo, a.oQueFazer, a.quem]),
-      styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 2.2, textColor: INK, lineColor: LINE, lineWidth: { bottom: 0.2 }, valign: 'top' },
-      headStyles: { fillColor: BG2, textColor: MUTED, fontStyle: 'bold', fontSize: 8 },
-      columnStyles: { 0: { cellWidth: 22, fontStyle: 'bold' }, 1: { cellWidth: 44, fontStyle: 'bold' }, 2: { cellWidth: 74 }, 3: { cellWidth: 34 } },
-      didParseCell: (h) => {
-        if (h.section === 'body' && h.column.index === 0) h.cell.styles.textColor = plano[h.row.index].prioridade === 1 ? DANGER : plano[h.row.index].prioridade === 2 ? WARN : plano[h.row.index].prioridade === 3 ? ACTION : MUTED;
+  // 2. Situação fiscal e certidão
+  y = pagina(y, 40);
+  y = titulo(doc, '2. Situação fiscal e certidão federal', y);
+  const c = r.situacao.certidao;
+  y = tabela(y, {
+    body: [
+      ['Relatório da Receita e da PGFN', `${r.situacao.resultado}${r.situacao.geradoEm ? ` (de ${dataBR(r.situacao.geradoEm)})` : ''}`],
+      ...(r.situacao.categorias.length ? [['Pendências apontadas', r.situacao.categorias.join('; ')]] : []),
+      ['Certidão federal', `${c.texto}${c.tipo ? ` · ${c.tipo}` : ''}${c.validade ? ` · válida até ${dataBR(c.validade)}` : ''}`],
+    ],
+    columnStyles: { 0: { cellWidth: 60, textColor: MUTED }, 1: { fontStyle: 'bold' } },
+  });
+
+  // 3. Obrigações do ano
+  if (r.obrigacoes) {
+    const o = r.obrigacoes;
+    y = pagina(y, 50);
+    y = titulo(doc, `3. Obrigações de ${r.ano}, mês a mês`, y);
+    y = tabela(y, {
+      head: [['Mês', o.colunas[0], o.colunas[1], o.colunas[0] === 'PGDAS-D' ? 'DAS pago' : 'DARF pago', 'Pago em']],
+      body: o.meses.map((m) => [mesAno(m.pa), m.a?.texto ?? '—', m.b?.texto ?? '—', m.pago === null ? '—' : brl(m.pago), m.pagoEm ? dataBR(m.pagoEm) : '—']),
+      columnStyles: { 0: { cellWidth: 24, fontStyle: 'bold' }, 3: { halign: 'right' }, 4: { cellWidth: 24 } },
+      didParseCell: (h: { section: string; column: { index: number }; row: { index: number }; cell: { styles: Record<string, unknown> } }) => {
+        if (h.section !== 'body' || (h.column.index !== 1 && h.column.index !== 2)) return;
+        const cel = h.column.index === 1 ? o.meses[h.row.index].a : o.meses[h.row.index].b;
+        if (cel) h.cell.styles.textColor = COR_MONITOR[cel.estado] ?? INK;
       },
     });
-    y = finalY(doc) + 8;
+    if (o.colunas[0] === 'DCTFWeb') y = paragrafo(doc, 'IRPJ e CSLL são trimestrais e o mesmo período pode receber DARF de outras origens: o valor pago não é comparado automaticamente com o apurado.', y - 5, 7.5) + 4;
+  } else {
+    y = pagina(y, 20);
+    y = titulo(doc, `3. Obrigações de ${r.ano}`, y);
+    y = paragrafo(doc, 'O acompanhamento mês a mês cobre o Simples Nacional (PGDAS-D e DAS) e o Lucro Presumido e o Real (DCTFWeb e MIT).', y + 4, 8.5, INK) + 4;
   }
 
-  if (y > 250) { doc.addPage(); y = 22; }
-  paragrafo(doc,
-    'Este relatório reúne o que a Receita Federal e a PGFN disponibilizam à Contabilidade Alves por meio do Serpro e o que está registrado em nosso sistema, na data de leitura de cada item. '
-    + '"Não verificado" quer dizer que ainda não temos o dado confirmado: não significa que esteja regular. O relatório não substitui a certidão oficial emitida pela Receita Federal.', y, 7.5);
+  // 4. Pagamentos do ano
+  y = pagina(y, 40);
+  y = titulo(doc, `4. Pagamentos de ${r.ano} registrados na Receita`, y);
+  if (r.pagamentos.quantidade === 0) {
+    y = paragrafo(doc, 'Nenhum pagamento do ano consultado até agora.', y + 4, 8.5, INK) + 4;
+  } else {
+    y = tabela(y, {
+      head: [['Tipo de documento', 'Quantidade', 'Total pago']],
+      body: [...r.pagamentos.porTipo.map((p) => [p.tipo, String(p.quantidade), brl(p.total)]), ['Total', String(r.pagamentos.quantidade), brl(r.pagamentos.total)]],
+      columnStyles: { 1: { halign: 'right', cellWidth: 30 }, 2: { halign: 'right', cellWidth: 40, fontStyle: 'bold' } },
+      didParseCell: (h: { section: string; row: { index: number }; cell: { styles: Record<string, unknown> } }) => {
+        if (h.section === 'body' && h.row.index === r.pagamentos.porTipo.length) { h.cell.styles.fontStyle = 'bold'; h.cell.styles.fillColor = BG2; }
+      },
+    });
+  }
 
-  rodape(doc, 'Contabilidade Alves · Juatuba/MG · Relatório de Situação Fiscal');
+  // 5. Faturamento (Simples)
+  let n = 5;
+  if (r.faturamento) {
+    const f = r.faturamento;
+    y = pagina(y, 30);
+    y = titulo(doc, `${n++}. Faturamento e limite do Simples Nacional`, y);
+    y = tabela(y, {
+      body: [
+        [`Receita dos últimos 12 meses (RBT12, até ${mesAno(f.periodo)})`, brl(f.rbt12)],
+        ['Limite do Simples Nacional', brl(f.limite)],
+        ['Uso do limite', f.percentualLimite === null ? '—' : `${f.percentualLimite.toFixed(1).replace('.', ',')}%`],
+      ],
+      columnStyles: { 0: { cellWidth: 110, textColor: MUTED }, 1: { halign: 'right', fontStyle: 'bold' } },
+    });
+  }
+
+  // Parcelamentos
+  if (r.parcelamentos && (r.parcelamentos.ativos.length || r.parcelamentos.atrasadas.length || r.parcelamentos.doMes !== null)) {
+    const p = r.parcelamentos;
+    y = pagina(y, 30);
+    y = titulo(doc, `${n++}. Parcelamentos`, y);
+    y = tabela(y, {
+      body: [
+        ['Parcelamentos ativos', p.ativos.length ? p.ativos.join(', ') : 'Nenhum'],
+        ['Parcelas em atraso', p.atrasadas.length ? `${p.atrasadas.length} (${p.atrasadas.map((a) => a.parcela).join(', ')}) · ${brl(p.valorAtrasado)}` : 'Nenhuma'],
+        ['Parcela do mês', p.doMes === null ? '—' : brl(p.doMes)],
+      ],
+      columnStyles: { 0: { cellWidth: 60, textColor: MUTED }, 1: { fontStyle: 'bold' } },
+    });
+  }
+
+  // Comunicações e e-Processo
+  y = pagina(y, 30);
+  y = titulo(doc, `${n++}. Comunicações da Receita e processos`, y);
+  const cm = r.comunicacoes;
+  y = tabela(y, {
+    body: [
+      ['Mensagens da Caixa Postal que pedem ação', cm.abertas === 0 ? 'Nenhuma em aberto' : `${cm.abertas} em aberto${cm.intimacoes ? ` · ${cm.intimacoes} intimação(ões)` : ''}${cm.exclusaoSimples ? ' · inclui termo de exclusão do Simples' : ''}`],
+      ['Processos digitais (e-Processo)', !r.eprocessos.consultado ? 'Ainda não consultado' : r.eprocessos.lista.length === 0 ? 'Nenhum processo' : `${r.eprocessos.lista.length} ${r.eprocessos.lista.length === 1 ? 'processo' : 'processos'}`],
+      ...r.eprocessos.lista.slice(0, 8).map((p) => [`   ${p.numero}`, `${p.tipo}${p.situacao ? ` · ${p.situacao}` : ''}${p.protocolo ? ` · protocolo ${dataBR(p.protocolo)}` : ''}`]),
+    ],
+    columnStyles: { 0: { cellWidth: 70, textColor: MUTED }, 1: { fontStyle: 'bold' } },
+  });
+
+  // Procuração e certificado
+  y = pagina(y, 25);
+  y = titulo(doc, `${n++}. Procuração eletrônica e certificado digital`, y);
+  y = tabela(y, {
+    body: [['Procuração no e-CAC para a Contabilidade Alves', r.procuracao], ['Certificado digital da empresa', r.certificado]],
+    columnStyles: { 0: { cellWidth: 70, textColor: MUTED }, 1: { fontStyle: 'bold' } },
+  });
+
+  // Plano de ação
+  y = pagina(y, 30);
+  y = titulo(doc, `${n++}. O que precisa ser feito`, y);
+  if (r.plano.length === 0) {
+    y = paragrafo(doc, 'Nenhuma ação necessária com os itens verificados.', y + 4, 9, INK) + 4;
+  } else {
+    y = tabela(y, {
+      head: [['Prioridade', 'Ação', 'O que fazer', 'Quem']],
+      body: r.plano.map((a) => [ROTULO_PRIORIDADE[a.prioridade], a.titulo, a.oQueFazer, a.quem]),
+      columnStyles: { 0: { cellWidth: 22, fontStyle: 'bold' }, 1: { cellWidth: 44, fontStyle: 'bold' }, 2: { cellWidth: 74 }, 3: { cellWidth: 34 } },
+      didParseCell: (h: { section: string; column: { index: number }; row: { index: number }; cell: { styles: Record<string, unknown> } }) => {
+        if (h.section === 'body' && h.column.index === 0) { const p = r.plano[h.row.index].prioridade; h.cell.styles.textColor = p === 1 ? DANGER : p === 2 ? WARN : p === 3 ? ACTION : MUTED; }
+      },
+    });
+  }
+
+  y = pagina(y, 30);
+  y = paragrafo(doc,
+    'Este relatório reúne o que a Receita Federal e a PGFN disponibilizam à Contabilidade Alves por meio do Serpro e o que está registrado em nosso sistema, na data de leitura de cada item. '
+    + '"Não verificado" quer dizer que ainda não temos o dado confirmado: não significa que esteja regular. Os pagamentos mostram só o que a Receita informa como pago. O relatório não substitui a certidão oficial emitida pela Receita Federal.', y, 7.5);
+
+  if (assinatura) {
+    y = pagina(y + 6, 40);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); cor(doc, INK);
+    doc.text(`Juatuba/MG, ${dataLonga(geradoEm)}.`, M, y);
+    y += 20;
+    doc.setDrawColor(INK[0], INK[1], INK[2]); doc.setLineWidth(0.3); doc.line(M, y, M + 85, y);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); cor(doc, INK); doc.text(assinatura.nome, M, y + 5);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); cor(doc, MUTED);
+    doc.text(`Contador  ·  CRC ${assinatura.crc}  ·  CPF ${assinatura.cpf}`, M, y + 10);
+    doc.text('Contabilidade Alves', M, y + 15);
+  }
+
+  rodape(doc, 'Contabilidade Alves · Juatuba/MG · Relatório Completo da Empresa');
   return doc.output('arraybuffer');
 }
+
+const formatarDoc = (d: string) => {
+  const n = d.replace(/\D/g, '');
+  return n.length === 14 ? n.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : d;
+};
 
 // ---------------------------------------------------------------- Relatório de Faturamento (12 meses)
 export async function gerarPdfFaturamento(

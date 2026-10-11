@@ -87,7 +87,8 @@ export function AcaoLoteDialog({
   descricao: string;
   itens: ItemLote[];
   executar: (item: ItemLote, dataPagamento?: string) => Promise<ResultadoLote>;
-  tipo: 'Consultar' | 'Emitir';
+  /** Ausente: ação sem chamada ao Serpro (ex.: gerar o Relatório Completo), sem custo no botão. */
+  tipo?: 'Consultar' | 'Emitir';
   /** Chamadas cobradas por cliente (ex.: DCTFWeb e MIT = 2). */
   vezes?: number;
   /** Verbo do botão: "Gerar", "Consultar", "Mapear"... */
@@ -113,8 +114,8 @@ export function AcaoLoteDialog({
   const vaiRodar = (i: ItemLote) => incluirPulados || !i.pular;
   const alvo = itens.filter(vaiRodar);
   const pulados = itens.length - alvo.length;
-  const chamadas = alvo.filter((i) => !!dataPagamento || !i.guardada).reduce((s, i) => s + (i.vezes ?? vezes), 0);
-  const custo = custoLote(tipo, chamadas);
+  const chamadas = tipo ? alvo.filter((i) => !!dataPagamento || !i.guardada).reduce((s, i) => s + (i.vezes ?? vezes), 0) : 0;
+  const custo = tipo ? custoLote(tipo, chamadas) : null;
   const passaAlerta = admin && custo !== null && gastoCiclo !== null && alerta !== null && gastoCiclo + custo > alerta;
   const terminou = resultados.size > 0 && !rodando;
   const ok = [...resultados.values()].filter((r) => r.estado === 'ok').length;
@@ -149,7 +150,7 @@ export function AcaoLoteDialog({
       <DialogContent className="max-w-[640px]">
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
-          <DialogDescription>{descricao}{admin ? ' Cada chamada é cobrada pelo Serpro; o total aparece no botão.' : ''}</DialogDescription>
+          <DialogDescription>{descricao}{admin && tipo ? ' Cada chamada é cobrada pelo Serpro; o total aparece no botão.' : ''}</DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[40vh] space-y-1 overflow-y-auto rounded-md border border-line p-2">
@@ -217,7 +218,7 @@ export function AcaoLoteDialog({
               {(!terminou || erros > 0) && (
                 <Button onClick={iniciar} disabled={!alvo.length || !dataValida}>
                   {terminou ? 'Tentar de novo os com erro' : `${rotuloAcao} ${alvo.length}`}
-                  {!terminou && chamadas > 0 && <Preco tipo={tipo} vezes={chamadas} />}
+                  {!terminou && tipo && chamadas > 0 && <Preco tipo={tipo} vezes={chamadas} />}
                 </Button>
               )}
             </>
