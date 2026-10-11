@@ -364,6 +364,17 @@ export const menuEntries: MenuEntry[] = [
     moduleKey: 'dashboard_federal',
     menu: 'superior',
   },
+  // Certificados (10/10/2026, pedido de Gabriel): atalho da sidebar para a aba Certificados de Procurações | Certificados; permissão da aba.
+  {
+    kind: 'simple',
+    title: 'Certificados',
+    url: '/dashboard-federal/procuracoes?aba=certificados',
+    icon: BadgeCheck,
+    iconName: 'badge-check',
+    moduleKey: 'cadastro',
+    subKey: 'cadastros_certificados',
+    menu: 'lateral',
+  },
   // Alvarás veio do grupo Cadastro (01/10/2026): rota e permissão seguem as do Cadastro, só o lugar no menu mudou. Só na sidebar.
   {
     kind: 'simple',
