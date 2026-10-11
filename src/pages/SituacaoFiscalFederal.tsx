@@ -1,21 +1,20 @@
 import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { FileText, Loader2, RefreshCw, Wallet } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
-import { DsBadge, PageHeader, SearchField } from '@/components/ds';
+import { useFichaFiscal } from '@/components/monitor/FichaFiscal';
+import { PageHeader, SearchField } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
-import { usePagamentosClienteJanela } from '@/components/serpro/PagamentosDoCliente';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
-import { useAbrirRelatorioSitfis, useGerarRelatorioSitfis } from '@/components/serpro/sitfisUi';
-import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
-import { DIAS_RELATORIO_VELHO, estadoSitfis, relatorioVelho, useGerarSitfis, useMatrizSitfis, type LinhaSitfis, type SitfisRow } from '@/hooks/useSerproSitfis';
+import { useGerarRelatorioSitfis } from '@/components/serpro/sitfisUi';
+import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
+import { DIAS_RELATORIO_VELHO, estadoSitfis, relatorioVelho, useGerarSitfis, useMatrizSitfis, type LinhaSitfis } from '@/hooks/useSerproSitfis';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, useSelecao } from '@/components/monitor/GuiasLote';
 import { AcoesEmLoteDialog, BotaoAcoesEmLote } from '@/components/monitor/AcoesEmLote';
 import { hojeBR } from '@/lib/prazosFederais';
@@ -31,25 +30,17 @@ const formatarCnpj = (d: string) => {
 };
 const dataBR = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—');
 
-/** Resultado de UM relatório guardado (para o histórico), com a mesma leitura cautelosa da linha. */
-function seloDoRelatorio(r: SitfisRow): Selo | null {
-  if (!r.confiavel || r.resultado === 'nao_lido' || !r.resultado) return seloSitfis('a_conferir');
-  return seloSitfis(r.resultado);
-}
-
 /**
  * Situação Fiscal (Rodada 3, 09/10/2026: molde único do Monitoramento). Selo de `seloSitfis`, o mesmo do Dashboard Fiscal, então a barra
  * do painel abre esta lista já filtrada. Histórico: todo relatório pronto fica guardado e abre de novo sem consultar a Receita.
  */
 export default function SituacaoFiscalFederal() {
-  const { abrir: abrirPagamentos, janela: janelaPagamentos } = usePagamentosClienteJanela();
   const { data: linhas = [], isLoading } = useMatrizSitfis();
   const { executar, emAndamento, dialog } = useGerarRelatorioSitfis();
-  const { ocupado, abrir } = useAbrirRelatorioSitfis();
   const [estado, setEstado] = useEstadoUrl();
   const buscaInicial = useBuscaInicial();
   const [busca, setBusca] = useState(buscaInicial);
-  const [historico, setHistorico] = useState<LinhaSitfis | null>(null);
+  const ficha = useFichaFiscal();
   const sel = useSelecao();
   const gerarSitfis = useGerarSitfis();
   const [loteAberto, setLoteAberto] = useState(false);
@@ -157,11 +148,9 @@ export default function SituacaoFiscalFederal() {
                     relatorioVelho(l) ? `Relatório com mais de ${DIAS_RELATORIO_VELHO} dias` : null,
                   ].filter((x): x is string => !!x);
                   return (
-                    <TableRow key={l.contact_id}
-                      className={l.historico.length > 0 ? 'cursor-pointer' : undefined}
-                      tabIndex={l.historico.length > 0 ? 0 : undefined}
-                      onClick={() => { if (l.historico.length > 0) setHistorico(l); }}
-                      onKeyDown={(ev) => { if (ev.key === 'Enter' && ev.target === ev.currentTarget && l.historico.length > 0) setHistorico(l); }}>
+                    <TableRow key={l.contact_id} className="cursor-pointer" tabIndex={0} aria-label={`Abrir a ficha fiscal de ${l.nome}`}
+                      onClick={() => ficha.abrir(l.contact_id, 'sitfis')}
+                      onKeyDown={(ev) => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) ficha.abrir(l.contact_id, 'sitfis'); }}>
                       <TableCell className="min-w-[240px] max-w-[360px]">
                         <div className="flex items-start gap-3">
                           <span className="pt-0.5" onClick={(ev) => ev.stopPropagation()}><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></span>
@@ -184,11 +173,6 @@ export default function SituacaoFiscalFederal() {
                       <TableCell><UltimaBusca iso={u?.gerado_em ?? null} /></TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1" onClick={(ev) => ev.stopPropagation()}>
-                          <DicaBotao texto="Abre os pagamentos deste cliente na Receita (DARF, DAS, DAE e DJE) com a composição de cada guia e o comprovante. Abrir é grátis: só lê o que já está salvo.">
-                            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Pagamentos do cliente" onClick={() => abrirPagamentos(l.contact_id, l.nome, formatarCnpj(l.documento))}>
-                              <Wallet className="h-4 w-4" />
-                            </Button>
-                          </DicaBotao>
                           <DicaBotao custo="Emitir"
                             texto={l.processando ? 'A Receita ainda estava preparando o relatório deste cliente. Clique para buscar o PDF pronto.'
                               : 'Pede à Receita o relatório de situação fiscal (Receita e PGFN) deste cliente e guarda o PDF. Leva alguns segundos.'}>
@@ -214,49 +198,6 @@ export default function SituacaoFiscalFederal() {
         </div>
       </div>
 
-      <Dialog open={!!historico} onOpenChange={(o) => !o && setHistorico(null)}>
-        <DialogContent className="max-w-[640px]">
-          <DialogHeader>
-            <DialogTitle>Histórico da situação fiscal</DialogTitle>
-            <DialogDescription>{historico?.nome} · {historico ? formatarCnpj(historico.documento) : ''}</DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto rounded-md border border-line">
-            <Table className="[&_td]:px-3 [&_th]:px-3">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Gerado em</TableHead>
-                  <TableHead>Resultado</TableHead>
-                  <TableHead>Certidão</TableHead>
-                  <TableHead className="text-right">PDF</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {historico?.historico.map((r, i) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="whitespace-nowrap font-mono text-ui">
-                      {r.gerado_em ? format(new Date(r.gerado_em), 'dd/MM/yyyy HH:mm') : '—'}
-                      {i === 0 && <DsBadge tone="neutral" dot={false} className="ml-2">Mais recente</DsBadge>}
-                    </TableCell>
-                    <TableCell>
-                      <SeloMini selo={seloDoRelatorio(r)} />
-                      {r.categorias.length > 0 && <p className="mt-0.5 max-w-[220px] text-meta text-muted-ink-2">{r.categorias.join('; ')}</p>}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-meta text-muted-ink">{r.certidao_tipo ? `${r.certidao_tipo} · até ${dataBR(r.certidao_validade)}` : '—'}</TableCell>
-                    <TableCell className="text-right">
-                      <DicaBotao texto="Abre o PDF deste relatório, que já está guardado. Não consulta a Receita.">
-                        <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Abrir PDF" disabled={!r.pdf_path || ocupado === r.id} onClick={() => abrir(r.id)}>
-                          {ocupado === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                        </Button>
-                      </DicaBotao>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <p className="text-meta text-muted-ink-2">Um relatório novo entra aqui a cada mês, pela rotina mensal ou por um clique em Atualizar.</p>
-        </DialogContent>
-      </Dialog>
 
       {dialog}
       <AcaoLoteDialog
@@ -298,7 +239,6 @@ export default function SituacaoFiscalFederal() {
         ]}
         onContinuar={(acao, ids) => { sel.definir(ids); if (acao === 'gerar') setLoteAberto(true); else setBaixarAberto(true); }}
       />
-      {janelaPagamentos}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { DocumentoPagamentoCard, PagamentosDoCliente, dataPagBR as dataBR, moedaPag as moeda, numerosDuplicados } from '@/components/serpro/PagamentosDoCliente';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { BotaoFichaFiscal } from '@/components/monitor/FichaFiscal';
 import { useAbrirArquivo, useGerarDasComConfirmacao } from '@/components/serpro/pgdasdUi';
 import { siglaCompetencia, usePagamentosCliente, type PagamentoRow } from '@/hooks/useSerproPagamentos';
 import type { DasRow } from '@/hooks/useSerproPgdasd';
@@ -68,7 +69,10 @@ export function PagamentosClienteSheet({
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-[780px]">
         <SheetHeader className="space-y-1 text-left">
-          <p className="font-mono text-meta text-muted-ink-2">{linha.documento}</p>
+          <div className="flex items-center justify-between gap-3 pr-8">
+            <p className="font-mono text-meta text-muted-ink-2">{linha.documento}</p>
+            <BotaoFichaFiscal contactId={linha.contact_id} />
+          </div>
           <SheetTitle className="text-[20px]">{linha.nome}</SheetTitle>
           <SheetDescription asChild>
             <div className="flex flex-wrap items-center gap-2">

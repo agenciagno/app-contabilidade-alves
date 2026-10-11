@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { CalendarPlus, Loader2, Mail, RefreshCw } from 'lucide-react';
 
@@ -62,7 +63,9 @@ export default function DctfwebMitFederal() {
   const [consultaLote, setConsultaLote] = useState(false);
   const [baixarAberto, setBaixarAberto] = useState(false);
   // Ficha mês a mês (10/10/2026) e "Completar o ano" em lote.
-  const [aberto, setAberto] = useState<string | null>(null);
+  // `?cliente=` (link da Ficha Fiscal) abre a ficha mês a mês deste cliente.
+  const [params] = useSearchParams();
+  const [aberto, setAberto] = useState<string | null>(() => params.get('cliente'));
   const [completarLote, setCompletarLote] = useState(false);
   const [acoesLote, setAcoesLote] = useState(false);
   const { responsaveis, aberturas } = useCadastroMonitor();

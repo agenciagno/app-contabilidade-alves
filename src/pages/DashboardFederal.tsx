@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
 import { SeloMonitor } from '@/components/monitor/MonitorUi';
 import { NotificacoesFiscais } from '@/components/monitor/NotificacoesFiscais';
+import { useFichaFiscal } from '@/components/monitor/FichaFiscal';
 import { AusenciasBox, Caixa, DeclaracoesBox, LimiteSimplesBox, MensagensEcacBox, ParcelamentosBox, RelatoriosFiscaisBox } from '@/components/monitor/PainelBoxes';
 import { useMatrizParcelamentos } from '@/hooks/useSerproParcelamentos';
 import { useSituacaoCarteira, useCadastroMonitor } from '@/hooks/useSituacaoCarteira';
@@ -69,6 +70,7 @@ export default function DashboardFederal() {
   const resumoParc = useMemo(() => resumoParcelamentos(parcelamentos), [parcelamentos]);
   const conferencia = useConferenciaCadastro();
   const [lista, setLista] = useState<EstadoMonitor | null>(null);
+  const ficha = useFichaFiscal();
 
   const diasCert = useMemo(() => certificadoPorCliente(certificados), [certificados]);
 
@@ -276,7 +278,7 @@ export default function DashboardFederal() {
                           <TableCell><SeloMonitor selo={cliente} outros={outrosMotivos(conta, cliente)} /></TableCell>
                           <TableCell className="text-ui text-muted-ink">{l.responsavel?.nome ?? 'Sem responsável'}</TableCell>
                           <TableCell className="text-right">
-                            <Link to={`/crm/cliente/${l.contact_id}`} className="text-ui-strong text-action hover:underline">Ver</Link>
+                            <button type="button" onClick={() => ficha.abrir(l.contact_id)} className="text-ui-strong text-action hover:underline">Ficha fiscal</button>
                           </TableCell>
                         </TableRow>
                       );

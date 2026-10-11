@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { Loader2, Mail, RefreshCw, Wallet } from 'lucide-react';
+import { Loader2, Mail, RefreshCw } from 'lucide-react';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { PageHeader, SearchField } from '@/components/ds';
@@ -10,7 +10,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
-import { usePagamentosClienteJanela } from '@/components/serpro/PagamentosDoCliente';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { ParcelamentosClienteSheet } from '@/components/serpro/ParcelamentosClienteSheet';
 import { useConsultaParcelamentos } from '@/components/serpro/parcelamentosUi';
@@ -44,7 +43,6 @@ export function seloDaLinha(l: LinhaParcelamentos, atual = competenciaAtual()): 
  * no molde do Monitoramento: faixa de estados, selo, lote de consulta e de guias da parcela, envio com conferência e ZIP das guias.
  */
 export default function ParcelamentosFederal() {
-  const { abrir: abrirPagamentos, janela: janelaPagamentos } = usePagamentosClienteJanela();
   const { data: linhas = [], isLoading } = useMatrizParcelamentos();
   const { executar, emAndamento, dialog } = useConsultaParcelamentos();
   const consultar = useConsultarParcelamentos();
@@ -226,11 +224,6 @@ export default function ParcelamentosFederal() {
                       <TableCell><UltimaBusca iso={consultadoEm(l)} /></TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
-                          <DicaBotao texto="Abre os pagamentos deste cliente na Receita (DARF, DAS, DAE e DJE) com a composição de cada guia e o comprovante. Abrir é grátis: só lê o que já está salvo.">
-                            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Pagamentos do cliente" onClick={() => abrirPagamentos(l.contact_id, l.nome, formatarCnpj(l.documento))}>
-                              <Wallet className="h-4 w-4" />
-                            </Button>
-                          </DicaBotao>
                           <DicaBotao custo="Consultar" vezes={chamadas}
                             texto={temDados ? 'Consulta na Receita os pedidos de parcelamento do ordinário e das modalidades que o cliente já teve, e as parcelas em aberto dos ativos.'
                               : 'Primeira consulta: olha as quatro modalidades (ordinário, especial, PERT-SN e RELP-SN) e, onde houver parcelamento ativo, as parcelas em aberto.'}>
@@ -325,7 +318,6 @@ export default function ParcelamentosFederal() {
         referencia="todas as guias de parcela guardadas"
         opcoes={[{ tipo: 'parcela_guia', rotulo: 'Guias de parcela' }]}
       />
-      {janelaPagamentos}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { BotaoFichaFiscal } from '@/components/monitor/FichaFiscal';
 import { useAbrirMensagemFlow } from '@/components/serpro/AbrirMensagemFlow';
 import { useConsultaCliente } from '@/components/serpro/useConsultaCliente';
 import {
@@ -44,7 +45,10 @@ export function MensagensClienteSheet({ cliente, onClose }: { cliente: ClienteCa
       <Sheet open onOpenChange={(o) => !o && onClose()}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-[780px]">
           <SheetHeader className="space-y-1 text-left">
-            <p className="font-mono text-meta text-muted-ink-2">{cliente.documento}</p>
+            <div className="flex items-center justify-between gap-3 pr-8">
+              <p className="font-mono text-meta text-muted-ink-2">{cliente.documento}</p>
+              <BotaoFichaFiscal contactId={cliente.contact_id} />
+            </div>
             <SheetTitle className="text-[20px]">{cliente.nome}</SheetTitle>
             <SheetDescription asChild>
               <div className="flex flex-wrap items-center gap-2">

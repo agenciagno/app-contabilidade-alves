@@ -1,8 +1,8 @@
 import { Fragment, useMemo, useState, useRef } from 'react';
-import { format } from 'date-fns';
-import { ChevronDown, ChevronRight, Loader2, RefreshCw, Wallet } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
+import { useFichaFiscal } from '@/components/monitor/FichaFiscal';
 import { PageHeader, SearchField } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,7 +10,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
-import { usePagamentosClienteJanela } from '@/components/serpro/PagamentosDoCliente';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
 import { AcaoLoteDialog, BarraSelecao, useSelecao } from '@/components/monitor/GuiasLote';
@@ -38,7 +37,6 @@ function seloDe(l: LinhaEProcesso): Selo | null {
  * Processos digitais da Receita em que o cliente é interessado (EPROCESSO.CONSPROCPORINTER271), no molde do Monitoramento.
  */
 export default function EProcessoFederal() {
-  const { abrir: abrirPagamentos, janela: janelaPagamentos } = usePagamentosClienteJanela();
   const { data: linhas = [], isLoading } = useMatrizEProcesso();
   const consultar = useConsultarEProcesso();
   const [estado, setEstado] = useEstadoUrl();
@@ -49,6 +47,7 @@ export default function EProcessoFederal() {
   const sel = useSelecao();
   const [loteAberto, setLoteAberto] = useState(false);
   const [acoesLote, setAcoesLote] = useState(false);
+  const ficha = useFichaFiscal();
   const hoje = hojeBR();
 
   const matrizes = useMemo(() => linhas.filter((l) => !l.filial), [linhas]);
@@ -142,14 +141,21 @@ export default function EProcessoFederal() {
                   const recente = l.processos[0];
                   return (
                     <Fragment key={l.contact_id}>
-                      <TableRow className={l.processos.length ? 'cursor-pointer' : undefined} onClick={() => l.processos.length && setAbertos((a) => ({ ...a, [l.contact_id]: !aberto }))}>
+                      <TableRow className="cursor-pointer" tabIndex={0} aria-label={`Abrir a ficha fiscal de ${l.nome}`}
+                        onClick={() => ficha.abrir(l.contact_id, 'eprocesso')}
+                        onKeyDown={(ev) => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) ficha.abrir(l.contact_id, 'eprocesso'); }}>
                         <TableCell className="min-w-[260px] max-w-[380px]">
                           <div className="flex items-start gap-3">
                             <span className="pt-0.5" onClick={(e) => e.stopPropagation()}>
                               <Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} />
                             </span>
-                            <span className="w-4 shrink-0 pt-0.5">
-                              {l.processos.length > 0 && (aberto ? <ChevronDown className="h-4 w-4 text-muted-ink" /> : <ChevronRight className="h-4 w-4 text-muted-ink" />)}
+                            <span className="w-4 shrink-0 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                              {l.processos.length > 0 && (
+                                <button type="button" aria-label={aberto ? 'Esconder os processos' : 'Mostrar os processos'} aria-expanded={aberto}
+                                  onClick={() => setAbertos((a) => ({ ...a, [l.contact_id]: !aberto }))}>
+                                  {aberto ? <ChevronDown className="h-4 w-4 text-muted-ink" /> : <ChevronRight className="h-4 w-4 text-muted-ink" />}
+                                </button>
+                              )}
                             </span>
                             <div className="min-w-0">
                               <p className="text-ui text-ink">{l.nome}</p>
@@ -164,11 +170,6 @@ export default function EProcessoFederal() {
                         <TableCell><UltimaBusca iso={l.consulta?.consultado_em ?? null} /></TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
-                          <DicaBotao texto="Abre os pagamentos deste cliente na Receita (DARF, DAS, DAE e DJE) com a composição de cada guia e o comprovante. Abrir é grátis: só lê o que já está salvo.">
-                            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Pagamentos do cliente" onClick={() => abrirPagamentos(l.contact_id, l.nome, formatarCnpj(l.documento))}>
-                              <Wallet className="h-4 w-4" />
-                            </Button>
-                          </DicaBotao>
                           <DicaBotao custo="Consultar" texto="Consulta na Receita os processos digitais em que este cliente é interessado.">
                             <Button size="sm" variant="outline" disabled={consultando === l.contact_id} onClick={() => executar(l.contact_id)}>
                               {consultando === l.contact_id ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
@@ -249,7 +250,6 @@ export default function EProcessoFederal() {
           return { ok: r.ok && !r.foraDoMonitoramento, error: r.semProcuracao ? 'Sem procuração para o e-Processo' : r.error, resumo: r.processos ? `${r.processos} ${r.processos === 1 ? 'processo' : 'processos'}` : 'Sem processo' };
         }}
       />
-      {janelaPagamentos}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis }
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { BotaoFichaFiscal } from '@/components/monitor/FichaFiscal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
@@ -99,6 +100,7 @@ export function FichaSimplesSheet({
           <div className="flex items-center justify-between gap-3 pr-8">
             <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(linha.documento)}</p>
             <div className="flex items-center gap-1">
+              <BotaoFichaFiscal contactId={linha.contact_id} />
               <DicaBotao texto="Cliente anterior da lista, com os mesmos filtros.">
                 <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Cliente anterior" disabled={!onAnterior} onClick={() => onAnterior?.()}><ChevronLeft className="h-4 w-4" /></Button>
               </DicaBotao>

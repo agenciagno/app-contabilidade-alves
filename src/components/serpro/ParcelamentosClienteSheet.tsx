@@ -4,6 +4,7 @@ import { FileDown, Loader2 } from 'lucide-react';
 import { DsBadge } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { BotaoFichaFiscal } from '@/components/monitor/FichaFiscal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
@@ -39,7 +40,10 @@ export function ParcelamentosClienteSheet({ linha, onClose }: { linha: LinhaParc
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-[760px]">
         <SheetHeader className="space-y-1 text-left">
-          <p className="font-mono text-meta text-muted-ink-2">{linha.documento}</p>
+          <div className="flex items-center justify-between gap-3 pr-8">
+            <p className="font-mono text-meta text-muted-ink-2">{linha.documento}</p>
+            <BotaoFichaFiscal contactId={linha.contact_id} secao="parcelamentos" />
+          </div>
           <SheetTitle className="text-[20px]">{linha.nome}</SheetTitle>
           <SheetDescription asChild>
             <div className="flex flex-wrap items-center gap-2">

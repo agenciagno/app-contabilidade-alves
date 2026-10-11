@@ -14,6 +14,7 @@ import { ForcePasswordChange } from '@/components/auth/ForcePasswordChange';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { NotificationPopupModal } from '@/components/notifications/NotificationPopupModal';
+import { FichaFiscalProvider } from '@/components/monitor/FichaFiscal';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -179,7 +180,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </div>
                 }
               >
-                {children}
+                <FichaFiscalProvider>{children}</FichaFiscalProvider>
               </Suspense>
             </main>
           </SidebarInset>

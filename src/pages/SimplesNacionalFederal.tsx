@@ -9,7 +9,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CompetenciaNav } from '@/components/serpro/CompetenciaNav';
-import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { FaturamentoClienteSheet } from '@/components/serpro/FaturamentoClienteSheet';
@@ -20,6 +19,7 @@ import { useLeituraFaturamento } from '@/components/serpro/useLeituraFaturamento
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
 import { FaixaEstados, FiltroSelo, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, passaFiltroSelo, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
 import { AbaMei } from '@/components/monitor/AbaMei';
+import { useFichaFiscal } from '@/components/monitor/FichaFiscal';
 import { AcoesEmLoteDialog, BotaoAcoesEmLote } from '@/components/monitor/AcoesEmLote';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
 import { useGuiasEnviadas, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
@@ -114,7 +114,9 @@ function AbaMensal({
   const { data: leituras = [], isLoading: carregandoFat } = useFaturamentoAno(ano);
   const consulta = useConsultaPgdasd(ano);
   const leitura = useLeituraFaturamento();
-  const [aberto, setAberto] = useState<string | null>(null);
+  // `?cliente=` (link da Ficha Fiscal) abre a ficha do Simples deste cliente.
+  const [paramsMensal] = useSearchParams();
+  const [aberto, setAberto] = useState<string | null>(() => paramsMensal.get('cliente'));
   const [verLeitura, setVerLeitura] = useState(false);
   const [filtroPgdas, setFiltroPgdas] = useState<string | null>(null);
   const [filtroDas, setFiltroDas] = useState<string | null>(null);
@@ -516,6 +518,7 @@ function AbaDefis({
   const [baixarAberto, setBaixarAberto] = useState(false);
   const [filtroSituacao, setFiltroSituacao] = useState<string | null>(null);
   const [acoesLote, setAcoesLote] = useState(false);
+  const ficha = useFichaFiscal();
   const hojeIso = hojeBR();
 
   const seloDe = (l: LinhaDefis): Selo | null => (consulta.emAndamento === l.contact_id
@@ -627,10 +630,12 @@ function AbaDefis({
                 const d = defisDoAno(l, ano);
                 const consultando = consulta.emAndamento === l.contact_id;
                 return (
-                  <TableRow key={l.contact_id}>
+                  <TableRow key={l.contact_id} className="cursor-pointer" tabIndex={0} aria-label={`Abrir a ficha fiscal de ${l.nome}`}
+                    onClick={() => ficha.abrir(l.contact_id)}
+                    onKeyDown={(ev) => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) ficha.abrir(l.contact_id); }}>
                     <TableCell className="min-w-[240px] max-w-[360px]">
                       <div className="flex items-start gap-3">
-                        <span className="pt-0.5"><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></span>
+                        <span className="pt-0.5" onClick={(ev) => ev.stopPropagation()}><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></span>
                         <div className="min-w-0">
                           <p className="text-ui text-ink">{l.nome}</p>
                           <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}{l.anoAbertura ? ` · aberta em ${l.anoAbertura}` : ''}</p>
@@ -641,7 +646,7 @@ function AbaDefis({
                     <TableCell className="font-mono text-ui">{d?.id_defis ?? '—'}{d && d.tipo >= 3 && <span className="ml-1 text-meta text-muted-ink-2">(situação especial)</span>}</TableCell>
                     <TableCell className="whitespace-nowrap text-ui text-muted-ink">{d?.transmitida_em ? format(new Date(d.transmitida_em), 'dd/MM/yyyy HH:mm') : '—'}</TableCell>
                     <TableCell><UltimaBusca iso={l.consultadoEm} /></TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         {d && (
                           <>

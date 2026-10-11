@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { Download, Loader2, Send } from 'lucide-react';
@@ -29,13 +29,15 @@ function linhasDaFicha(l: LinhaCarteira): Linha[] {
   const out: Linha[] = [];
   const q = `?q=${digitos(l.documento)}`;
   const fed = (p: string) => `/dashboard-federal/${p}${q}`;
+  // PGDAS-D, DAS, DCTFWeb e MIT abrem já na ficha do cliente na tela (`&cliente=`).
+  const comFicha = (p: string) => `/dashboard-federal/${p}${q}&cliente=${l.contact_id}`;
 
   if (l.pgdas.estado !== 'nao_se_aplica') {
     const p = l.pgdas;
-    if (p.estado === 'nao_consultado') out.push({ fonte: 'PGDAS-D', tom: 'neutral', rotulo: 'Não consultado', detalhe: 'Ainda sem consulta neste ano', to: fed('pgdas') });
-    else if (p.estado === 'em_falta') out.push({ fonte: 'PGDAS-D', tom: 'danger', rotulo: 'Em falta', detalhe: p.emFalta.map(sigla).join(', '), to: fed('pgdas') });
-    else if (p.estado === 'a_confirmar') out.push({ fonte: 'PGDAS-D', tom: 'warn', rotulo: 'A confirmar', detalhe: `${p.aConfirmar.map(sigla).join(', ')}: consultar de novo`, to: fed('pgdas') });
-    else out.push({ fonte: 'PGDAS-D', tom: 'ok', rotulo: 'Em dia', detalhe: p.aVencer.length ? `${sigla(p.aVencer[0])} ainda no prazo` : undefined, to: fed('pgdas') });
+    if (p.estado === 'nao_consultado') out.push({ fonte: 'PGDAS-D', tom: 'neutral', rotulo: 'Não consultado', detalhe: 'Ainda sem consulta neste ano', to: comFicha('simples-nacional') });
+    else if (p.estado === 'em_falta') out.push({ fonte: 'PGDAS-D', tom: 'danger', rotulo: 'Em falta', detalhe: p.emFalta.map(sigla).join(', '), to: comFicha('simples-nacional') });
+    else if (p.estado === 'a_confirmar') out.push({ fonte: 'PGDAS-D', tom: 'warn', rotulo: 'A confirmar', detalhe: `${p.aConfirmar.map(sigla).join(', ')}: consultar de novo`, to: comFicha('simples-nacional') });
+    else out.push({ fonte: 'PGDAS-D', tom: 'ok', rotulo: 'Em dia', detalhe: p.aVencer.length ? `${sigla(p.aVencer[0])} ainda no prazo` : undefined, to: comFicha('simples-nacional') });
   }
 
   if (l.defis.estado !== 'nao_se_aplica' && l.defis.estado !== 'filial') {
@@ -44,7 +46,7 @@ function linhasDaFicha(l: LinhaCarteira): Linha[] {
       entregue: { tom: 'ok', rotulo: 'Entregue' }, retificada: { tom: 'ok', rotulo: 'Retificada' },
       em_atraso: { tom: 'danger', rotulo: 'Não entregue' }, a_entregar: { tom: 'info', rotulo: 'A entregar' }, nao_consultado: { tom: 'neutral', rotulo: 'Não consultado' },
     };
-    out.push({ fonte: `DEFIS ${d.ano}`, ...(m[d.estado] ?? { tom: 'neutral' as BadgeTone, rotulo: d.estado }), to: fed('defis') });
+    out.push({ fonte: `DEFIS ${d.ano}`, ...(m[d.estado] ?? { tom: 'neutral' as BadgeTone, rotulo: d.estado }), to: `${fed('simples-nacional')}&aba=defis` });
   }
 
   if (l.das !== 'nao_simples' && l.das !== 'filial') {
@@ -52,7 +54,7 @@ function linhasDaFicha(l: LinhaCarteira): Linha[] {
       pago: { tom: 'ok', rotulo: 'Pago' }, vencido: { tom: 'danger', rotulo: 'Vencido' }, a_vencer: { tom: 'info', rotulo: 'A vencer' },
       sem_das: { tom: 'neutral', rotulo: 'Sem DAS gerado' }, nao_consultado: { tom: 'neutral', rotulo: 'Não consultado' },
     };
-    out.push({ fonte: `DAS ${sigla(l.dasCompetencia)}`, ...(m[l.das] ?? { tom: 'neutral' as BadgeTone, rotulo: l.das }), to: fed('pagamentos') });
+    out.push({ fonte: `DAS ${sigla(l.dasCompetencia)}`, ...(m[l.das] ?? { tom: 'neutral' as BadgeTone, rotulo: l.das }), to: comFicha('simples-nacional') });
   }
 
   if (l.dctfweb !== 'nao_se_aplica' && l.dctfweb !== 'filial') {
@@ -60,14 +62,14 @@ function linhasDaFicha(l: LinhaCarteira): Linha[] {
       transmitida: { tom: 'ok', rotulo: 'Com recibo' }, nao_consultado: { tom: 'neutral', rotulo: 'Não consultado' },
       sem_declaracao: { tom: 'warn', rotulo: 'A confirmar', detalhe: 'Sem declaração: só existe com movimento' },
     };
-    out.push({ fonte: 'DCTFWeb', ...(m[l.dctfweb] ?? { tom: 'neutral' as BadgeTone, rotulo: l.dctfweb }), to: fed('dctfweb-mit') });
+    out.push({ fonte: 'DCTFWeb', ...(m[l.dctfweb] ?? { tom: 'neutral' as BadgeTone, rotulo: l.dctfweb }), to: comFicha('dctfweb-mit') });
   }
   if (l.mit !== 'nao_se_aplica' && l.mit !== 'filial') {
     const m: Record<string, { tom: BadgeTone; rotulo: string }> = {
       encerrada: { tom: 'ok', rotulo: 'Encerrada' }, outra_situacao: { tom: 'info', rotulo: 'Outra situação' },
       sem_apuracao: { tom: 'warn', rotulo: 'A confirmar' }, nao_consultado: { tom: 'neutral', rotulo: 'Não consultado' },
     };
-    out.push({ fonte: 'MIT', ...(m[l.mit] ?? { tom: 'neutral' as BadgeTone, rotulo: l.mit }), to: fed('dctfweb-mit') });
+    out.push({ fonte: 'MIT', ...(m[l.mit] ?? { tom: 'neutral' as BadgeTone, rotulo: l.mit }), to: comFicha('dctfweb-mit') });
   }
 
   const sf: Record<string, { tom: BadgeTone; rotulo: string }> = {
@@ -126,7 +128,13 @@ function linhasDaFicha(l: LinhaCarteira): Linha[] {
 const DOCS_VISIVEIS = 6;
 
 /** Ficha do cliente escolhido no filtro: o mesmo estado que a carteira soma, só que de um cliente, mais os documentos para enviar. */
-export function FichaCliente({ linha: l, faturamento = null }: { linha: LinhaCarteira; /** Leitura de faturamento mais recente e confiável do cliente. */ faturamento?: FaturamentoRow | null }) {
+export function FichaCliente({ linha: l, faturamento = null, extra }: {
+  linha: LinhaCarteira;
+  /** Leitura de faturamento mais recente e confiável do cliente. */
+  faturamento?: FaturamentoRow | null;
+  /** Bloco logo abaixo do cabeçalho (a Ficha Fiscal põe aqui o "O que fazer"). */
+  extra?: ReactNode;
+}) {
   const linhas = linhasDaFicha(l);
   const docs = useDocumentosCliente(l.contact_id);
   const envios = useEnviosCliente(l.contact_id);
@@ -190,6 +198,8 @@ export function FichaCliente({ linha: l, faturamento = null }: { linha: LinhaCar
           {l.motivos.map((m) => <li key={m}>{m}</li>)}
         </ul>
       )}
+
+      {extra}
 
       <div className="divide-y divide-line-2">
         {linhas.map((r) => (

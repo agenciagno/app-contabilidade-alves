@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { FileBadge, Loader2, Mail, MoreHorizontal, Receipt, Wallet } from 'lucide-react';
+import { FileBadge, Loader2, Mail, MoreHorizontal, Receipt } from 'lucide-react';
 
 import { SearchField } from '@/components/ds';
 import { Button } from '@/components/ui/button';
@@ -11,10 +11,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { CompetenciaNav } from '@/components/serpro/CompetenciaNav';
 import { AcoesEmLoteDialog, BotaoAcoesEmLote } from '@/components/monitor/AcoesEmLote';
+import { useFichaFiscal } from '@/components/monitor/FichaFiscal';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
-import { usePagamentosClienteJanela } from '@/components/serpro/PagamentosDoCliente';
 import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
 import {
   AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote,
@@ -55,7 +55,7 @@ function seloDivida(l: LinhaMei, ano: number): Selo | null {
  * (o MEI pode pagar pelo app; DAS não gerado não é obrigação descumprida).
  */
 export function AbaMei() {
-  const { abrir: abrirPagamentos, janela: janelaPagamentos } = usePagamentosClienteJanela();
+  const ficha = useFichaFiscal();
   const [pa, setPa] = useState(competenciaPadrao());
   const ano = Number(pa.slice(0, 4));
   const hoje = hojeBR();
@@ -204,10 +204,12 @@ export function AbaMei() {
               {pag.recorte.map((l) => {
                 const d = l.das.find((x) => x.periodo.slice(0, 7) === pa) ?? null;
                 return (
-                  <TableRow key={l.contact_id}>
+                  <TableRow key={l.contact_id} className="cursor-pointer" tabIndex={0} aria-label={`Abrir a ficha fiscal de ${l.nome}`}
+                    onClick={() => ficha.abrir(l.contact_id)}
+                    onKeyDown={(ev) => { if (ev.key === 'Enter' && ev.target === ev.currentTarget) ficha.abrir(l.contact_id); }}>
                     <TableCell className="min-w-[240px] max-w-[360px]">
                       <div className="flex items-start gap-3">
-                        <span className="pt-0.5"><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></span>
+                        <span className="pt-0.5" onClick={(ev) => ev.stopPropagation()}><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></span>
                         <div className="min-w-0">
                           <p className="text-ui text-ink">{l.nome}</p>
                           <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
@@ -230,7 +232,7 @@ export function AbaMei() {
                     </TableCell>
                     <TableCell><SeloMini selo={seloEnquadramento(l)} /></TableCell>
                     <TableCell><UltimaBusca iso={ultimaBuscaMei(l)} /></TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(ev) => ev.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         {d && (
                           <DicaBotao texto="Abre o DAS do MEI já guardado. Não consulta a Receita.">
@@ -257,9 +259,6 @@ export function AbaMei() {
                             )}
                             <DropdownMenuItem onSelect={() => { sel.definir([l.contact_id]); setLote('ccmei'); }}>
                               <FileBadge className="mr-2 h-4 w-4" />Emitir CCMEI<Preco tipo="Emitir" />
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => abrirPagamentos(l.contact_id, l.nome, formatarCnpj(l.documento))}>
-                              <Wallet className="mr-2 h-4 w-4" />Pagamentos e comprovantes
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -375,7 +374,6 @@ export function AbaMei() {
         referencia={`competência ${siglaCompetencia(pa)}`}
         opcoes={[{ tipo: 'mei_das', rotulo: 'DAS do MEI' }, { tipo: 'mei_ccmei', rotulo: 'CCMEI (último)' }]}
       />
-      {janelaPagamentos}
     </div>
   );
 }
