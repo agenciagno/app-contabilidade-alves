@@ -238,33 +238,44 @@ export function seloCertificado(dias: number | null): Selo | null {
 
 // ---------------------------------------------------------------- painel (Dashboard Federal)
 
-export type ProcessoPainel = 'pgdas' | 'das' | 'defis' | 'limite' | 'dctfweb_mit' | 'caixa' | 'intimacoes' | 'sitfis' | 'procuracao' | 'certificado';
+export type ProcessoPainel = 'pgdas' | 'das' | 'defis' | 'mei' | 'limite' | 'dctfweb_mit' | 'caixa' | 'intimacoes' | 'sitfis' | 'eprocesso' | 'procuracao' | 'certificado';
 
 /**
  * Selo de cada fonte de UM cliente da carteira. `limite` aparece na barra do painel, mas não entra na situação do cliente:
  * faturamento não lido é falta de leitura nossa, não obrigação do cliente (senão quase todo cliente ficaria cinza).
+ * `eprocesso` também fica fora da situação (11/10/2026, decisão de Gabriel): processo em análise não é problema do cliente. `mei` entra:
+ * dívida ativa ou saída do MEI é pendência real.
  */
 export function selosDaCarteira(
   l: LinhaCarteira,
   /** Sobrescreve PGDAS-D, DAS e limite com a mesma linha da tela Simples Nacional, para painel e lista contarem igual. */
-  opcoes: { pgdas?: Selo | null; das?: Selo | null; limite?: Selo | null; diasCertificado?: number | null } = {},
+  opcoes: { pgdas?: Selo | null; das?: Selo | null; limite?: Selo | null; mei?: Selo | null; eprocesso?: Selo | null; diasCertificado?: number | null } = {},
 ): Record<ProcessoPainel, Selo | null> {
   const simples = l.regime === 'simples_nacional';
   return {
     pgdas: opcoes.pgdas !== undefined ? opcoes.pgdas : seloPgdasCarteira(l.pgdas),
     das: opcoes.das !== undefined ? opcoes.das : seloDasEstado(l.das),
     defis: seloDefis(l.defis.estado, l.defis.ano),
+    mei: opcoes.mei ?? null,
     limite: opcoes.limite !== undefined ? opcoes.limite : seloLimite(l.limite, simples),
     dctfweb_mit: seloDctfwebMit(l.dctfweb, l.mit),
     caixa: seloCaixaPostal(l.caixa),
     intimacoes: seloIntimacoes(l),
     sitfis: seloSitfis(l.sitfis),
+    eprocesso: opcoes.eprocesso ?? null,
     procuracao: seloProcuracao(l.procuracao),
     certificado: seloCertificado(opcoes.diasCertificado ?? null),
   };
 }
 
-export const FORA_DA_SITUACAO_DO_CLIENTE: ProcessoPainel[] = ['limite'];
+export const FORA_DA_SITUACAO_DO_CLIENTE: ProcessoPainel[] = ['limite', 'eprocesso'];
+
+/** e-Processo: processo em que o cliente é interessado pede acompanhamento (pendência); sem processo é em dia. */
+export function seloEProcesso(consultado: boolean, processos: number): Selo {
+  if (!consultado) return { estado: 'nao_verificado', motivo: 'Não consultado' };
+  if (processos === 0) return { estado: 'em_dia', motivo: 'Sem processo' };
+  return { estado: 'pendencia', motivo: `${processos} ${processos === 1 ? 'processo' : 'processos'}` };
+}
 
 export function seloDoCliente(selos: Record<ProcessoPainel, Selo | null>): Selo {
   const conta = (Object.keys(selos) as ProcessoPainel[]).filter((k) => !FORA_DA_SITUACAO_DO_CLIENTE.includes(k)).map((k) => selos[k]);

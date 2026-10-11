@@ -42,7 +42,7 @@ export function NotificacoesFiscais() {
             Notificações
             {unreadCount > 0 && <span className="rounded-pill bg-danger px-1.5 text-badge font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}
           </h2>
-          <p className="text-meta text-muted-ink">Mensagens da Receita, pagamentos novos, movimento na DCTFWeb e alertas da equipe.</p>
+          <p className="text-meta text-muted-ink">Receita, pagamentos, DCTFWeb | MIT e alertas da equipe.</p>
         </div>
         <Button variant="ghost" size="sm" className="h-8 shrink-0 px-2 text-meta" disabled={unreadCount === 0} onClick={markAllAsRead}>
           <CheckCheck className="mr-1.5 h-4 w-4" />Marcar lidas

@@ -58,7 +58,7 @@ export function useConsultaDctfwebMit(competencia: string) {
           <DicaBotao className={DICA_RODAPE} texto="Fecha sem consultar.">
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
           </DicaBotao>
-          <DicaBotao className={DICA_RODAPE} custo="Consultar" vezes={2} texto="Consulta a Receita de novo (DCTFWeb e MIT), mesmo já tendo consultado há pouco.">
+          <DicaBotao className={DICA_RODAPE} custo="Consultar" vezes={2} texto="Consulta a Receita de novo (DCTFWeb | MIT), mesmo já tendo consultado há pouco.">
             <AlertDialogAction onClick={() => { const id = aConfirmar!; setAConfirmar(null); executar(id, true); }}>
               Consultar de novo<Preco tipo="Consultar" vezes={2} />
             </AlertDialogAction>

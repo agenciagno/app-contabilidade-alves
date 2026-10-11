@@ -1,12 +1,13 @@
 /**
- * Boxes do Dashboard Fiscal (09/10/2026, desenho do print de referência do MonitorHub): Limite do Simples, Ausências de Declarações,
- * Relatórios Fiscais, Declarações e Mensagens e-CAC. Só mostram números já calculados em `src/lib/painelFiscal.ts`.
+ * Boxes do Dashboard Fiscal (09/10/2026, desenho do print de referência do MonitorHub): Limite do Simples, Declarações,
+ * Caixa Postal e Parcelamentos. Em 11/10/2026 saíram Ausências e Relatórios Fiscais (a Declarações ficou com uma caixa só).
+ * Só mostram números já calculados (`src/lib/painelFiscal.ts` e o painel de processos da própria página).
  */
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
-  AlertTriangle, ArrowRight, CalendarX, CheckCircle2, ChevronRight, Gavel, FileWarning, MinusCircle, Receipt, Scale, UserX,
+  AlertTriangle, ArrowRight, CalendarX, CheckCircle2, Gavel, FileWarning, MinusCircle, Receipt, Scale, UserX,
 } from 'lucide-react';
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from 'recharts';
 
@@ -15,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { COR_ESTADO, ESTADOS, ROTULO_ESTADO, type ContagemEstados, type EstadoMonitor } from '@/lib/monitorEstados';
 import {
-  maioresLimites, type BarraDeclaracao, type CartaoAusencia, type ResumoMensagens, type ResumoParcelamentos, type TipoLimite,
+  maioresLimites, type ResumoMensagens, type ResumoParcelamentos, type TipoLimite,
 } from '@/lib/painelFiscal';
 import type { LinhaSimples } from '@/lib/simplesNacionalLinhas';
 import { LIMITE_SIMPLES } from '@/hooks/useSerproFaturamento';
@@ -67,7 +68,7 @@ export function LimiteSimplesBox({ simples }: { simples: LinhaSimples[] }) {
   return (
     <Caixa
       titulo="Limite do Simples"
-      subtitulo={`Os ${itens.length || 10} maiores clientes do Simples pela receita dos ${tipo === 'rbt12' ? 'últimos 12 meses (RBT12)' : 'meses do ano (RBA)'}, contra o sublimite e o limite.`}
+      subtitulo={`Maiores clientes do Simples por ${tipo === 'rbt12' ? 'RBT12 (12 meses)' : 'RBA (ano)'}, contra o sublimite e o limite.`}
       acao={(
         <div className="flex shrink-0 items-center gap-2">
           <span className="text-meta text-muted-ink">Tipo</span>
@@ -83,7 +84,7 @@ export function LimiteSimplesBox({ simples }: { simples: LinhaSimples[] }) {
     >
       {itens.length === 0 ? (
         <p className="flex h-[200px] items-center justify-center px-6 text-center text-ui text-muted-ink-2">
-          Nenhum cliente com o faturamento lido ainda. A leitura mensal roda no dia 30; antes disso, use "Ler faturamento" na tela Simples Nacional.
+          Nenhum faturamento lido ainda. A leitura roda no dia 30 ou em "Ler faturamento", na ficha do Simples.
         </p>
       ) : (
         <div style={{ height: Math.max(220, itens.length * 34 + 50) }}>
@@ -105,129 +106,67 @@ export function LimiteSimplesBox({ simples }: { simples: LinhaSimples[] }) {
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-2 text-meta text-muted-ink">
-        <span>{lidos} de {total} clientes do Simples com o faturamento lido. Só entra quem tem leitura confiável.</span>
-        <VerTudo to={SIMPLES}>Ver no Simples Nacional</VerTudo>
+        <span>{lidos} de {total} clientes com faturamento lido.</span>
+        <VerTudo to={SIMPLES}>Simples Nacional | MEI</VerTudo>
       </div>
     </Caixa>
   );
 }
 
-// ---------------------------------------------------------------- Ausências de Declarações
-function CartaoAusenciaUi({ titulo, subtitulo, c, faltamRotulo, tom, to }: {
-  titulo: string; subtitulo: string; c: CartaoAusencia; faltamRotulo: string; tom: 'atencao' | 'pendencia'; to: string;
-}) {
-  return (
-    <Link to={to} className="group flex flex-col gap-3 rounded-lg bg-bg-2 p-4 transition-colors hover:bg-bg-3">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-ui-strong text-ink">{titulo}</p>
-          <p className="text-meta text-muted-ink">{subtitulo}</p>
-        </div>
-        <ChevronRight className="h-4 w-4 shrink-0 text-muted-ink-2 transition-transform group-hover:translate-x-0.5" />
-      </div>
-      <div className="flex items-end justify-between gap-3">
-        <div className="flex items-center gap-2" title={faltamRotulo}>
-          <IconeEstado estado={tom} />
-          <div>
-            <p className="text-metric-xl leading-none text-ink">{c.faltam}</p>
-            <p className="text-meta text-muted-ink">{faltamRotulo}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2" title="Em dia">
-          <div className="text-right">
-            <p className="text-metric-xl leading-none text-ink">{c.emDia}</p>
-            <p className="text-meta text-muted-ink">em dia</p>
-          </div>
-          <IconeEstado estado="em_dia" />
-        </div>
-      </div>
-      {c.aVerificar > 0 && <p className="text-meta text-muted-ink-2">{c.aVerificar} {c.aVerificar === 1 ? 'cliente' : 'clientes'} a verificar (sem consulta ou consultar de novo)</p>}
-    </Link>
-  );
+// ---------------------------------------------------------------- Declarações (11/10/2026)
+/** Uma obrigação do painel: a contagem é a mesma da barra de "Por Processo" e da lista que abre ao clicar. */
+export interface LinhaDeclaracao {
+  chave: string;
+  titulo: string;
+  /** Nota curta ao lado do título (ex.: "Prazo 20/10"). */
+  nota?: string;
+  to: string;
+  contagem: ContagemEstados;
+  /** DCTFWeb | MIT: sem declaração não prova atraso (só existe com movimento), então a pendência é "a confirmar". */
+  aConfirmar?: boolean;
 }
 
-export function AusenciasBox({ simples, dctfwebMit }: { simples: CartaoAusencia; dctfwebMit: CartaoAusencia }) {
-  return (
-    <Caixa titulo="Ausências de Declarações" subtitulo="Clientes com declaração em falta, e os que estão em dia.">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-        <CartaoAusenciaUi titulo="Simples" subtitulo="PGDAS-D e DEFIS" c={simples} faltamRotulo="em falta" tom="atencao" to="/gestao-360/ausencias" />
-        <CartaoAusenciaUi titulo="DCTFWeb e MIT" subtitulo="Presumido e Real" c={dctfwebMit} faltamRotulo="a confirmar" tom="pendencia" to="/gestao-360/ausencias" />
-      </div>
-    </Caixa>
-  );
-}
-
-// ---------------------------------------------------------------- Relatórios Fiscais (situação fiscal)
-/** Trechos do conic-gradient: um arco por estado, na ordem dos estados, em graus. */
-function arcos(fatias: { chave: EstadoMonitor; valor: number }[], total: number): string {
-  let acumulado = 0;
-  return fatias.filter((f) => f.valor > 0).map((f) => {
-    const ini = (acumulado / total) * 360;
-    acumulado += f.valor;
-    return `${COR_ESTADO[f.chave]} ${ini}deg ${(acumulado / total) * 360}deg`;
-  }).join(', ');
-}
-
-export function RelatoriosFiscaisBox({ contagem }: { contagem: ContagemEstados }) {
-  const fatias = ESTADOS.filter((e) => e !== 'processando').map((e) => ({ chave: e, valor: contagem[e] }));
-  const algum = fatias.some((f) => f.valor > 0);
-  const rotulo: Record<EstadoMonitor, string> = {
-    em_dia: 'Sem pendências', pendencia: 'Conferir o PDF', atencao: 'Com pendências', nao_verificado: 'Sem relatório', processando: 'Processando',
-  };
-  return (
-    <Caixa titulo="Relatórios Fiscais" subtitulo="Relatório de situação fiscal de cada cliente, lido do e-CAC." acao={<VerTudo to="/dashboard-federal/situacao-fiscal">Abrir</VerTudo>}>
-      <div className="flex items-center gap-5">
-        <div className="relative h-[130px] w-[130px] shrink-0">
-          {/* Rosca desenhada com conic-gradient: sem dado, fica um anel cinza; os arcos usam as cores dos estados. */}
-          <div className="absolute inset-0 rounded-pill" style={{ background: algum ? `conic-gradient(${arcos(fatias, contagem.total)})` : 'var(--bg-3)' }} />
-          <div className="absolute inset-[22px] flex flex-col items-center justify-center rounded-pill bg-paper">
-            <span className="text-metric-xl leading-none text-ink">{contagem.total}</span>
-            <span className="text-meta text-muted-ink">clientes</span>
-          </div>
-        </div>
-        <ul className="min-w-0 flex-1 space-y-2">
-          {fatias.map((f) => (
-            <li key={f.chave} className="flex items-center gap-2 text-ui">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-pill" style={{ background: COR_ESTADO[f.chave] }} aria-hidden />
-              <span className="min-w-0 flex-1 truncate text-muted-ink" title={ROTULO_ESTADO[f.chave]}>{rotulo[f.chave]}</span>
-              <span className="text-ui-strong text-ink">{f.valor}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </Caixa>
-  );
-}
-
-// ---------------------------------------------------------------- Declarações
-const DESTINO_DECLARACAO: Record<BarraDeclaracao['chave'], string> = {
-  pgdas: `${SIMPLES}?fonte=declaracao`,
-  defis: `${SIMPLES}?aba=defis`,
-  dctfweb: '/dashboard-federal/dctfweb-mit',
-  mit: '/dashboard-federal/dctfweb-mit',
+const ROTULO_DECLARACAO: Record<EstadoMonitor, string> = {
+  em_dia: 'em dia', pendencia: 'no prazo', atencao: 'em falta', nao_verificado: 'sem consulta', processando: 'consultando',
 };
 
-export function DeclaracoesBox({ barras, competencia, className }: { barras: BarraDeclaracao[]; competencia: string; className?: string }) {
+/** Declarações do Simples e do Presumido/Real numa caixa só: cada número abre a tela já filtrada na situação. */
+export function DeclaracoesBox({ linhas, subtitulo, className }: { linhas: LinhaDeclaracao[]; subtitulo?: string; className?: string }) {
+  const estados = ESTADOS.filter((e) => e !== 'processando');
   return (
-    <Caixa className={className} titulo="Declarações" subtitulo={`Declarações feitas entre os clientes já consultados (competência ${competencia}).`}>
-      <div className="space-y-4">
-        {barras.map((b) => {
-          const pct = b.total > 0 ? (b.feitas / b.total) * 100 : 0;
+    <Caixa className={className} titulo="Declarações" subtitulo={subtitulo}>
+      <div className="space-y-5">
+        {linhas.map((d) => {
+          const total = d.contagem.total;
           return (
-            <Link key={b.chave} to={DESTINO_DECLARACAO[b.chave]} className="group block" title={b.nota}>
+            <div key={d.chave} className="space-y-2">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="text-ui-strong text-ink group-hover:text-action">{b.titulo}</span>
-                <span className="text-meta text-muted-ink">{b.feitas} / {b.total} declarados</span>
+                <Link to={d.to} className="text-ui-strong text-ink hover:text-action">{d.titulo}</Link>
+                {d.nota && <span className="text-meta text-muted-ink-2">{d.nota}</span>}
               </div>
-              <div className="mt-1.5 flex items-center gap-2">
-                <div className="h-3 flex-1 overflow-hidden rounded-pill bg-bg-3" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={`${b.titulo}: ${b.feitas} de ${b.total} declarados`}>
-                  <div className="h-full rounded-pill" style={{ width: `${pct}%`, background: 'var(--em-dia)' }} />
-                </div>
-                <IconeEstado estado={b.pior} className="h-8 w-8" />
-              </div>
-              {b.prazo && <p className="mt-1 text-meta text-muted-ink-2">{b.prazo}</p>}
-              {b.naoConsultados > 0 && <p className="mt-1 text-meta text-muted-ink-2">{b.naoConsultados} {b.naoConsultados === 1 ? 'cliente' : 'clientes'} ainda não consultados</p>}
-            </Link>
+              {total === 0 ? (
+                <p className="text-meta text-muted-ink-2">Nenhum cliente.</p>
+              ) : (
+                <>
+                  <div className="flex h-2.5 overflow-hidden rounded-pill bg-bg-3" aria-hidden>
+                    {estados.map((e) => d.contagem[e] > 0 && (
+                      <span key={e} className="h-full border-r border-paper last:border-r-0" style={{ width: `${(d.contagem[e] / total) * 100}%`, background: COR_ESTADO[e] }} />
+                    ))}
+                  </div>
+                  <ul className="flex flex-wrap gap-x-4 gap-y-1">
+                    {estados.map((e) => d.contagem[e] > 0 && (
+                      <li key={e}>
+                        <Link to={`${d.to}${d.to.includes('?') ? '&' : '?'}estado=${e}`} className="flex items-center gap-1.5 text-ui text-muted-ink hover:text-ink">
+                          <span className="h-2 w-2 shrink-0 rounded-pill" style={{ background: COR_ESTADO[e] }} aria-hidden />
+                          <span className="text-ui-strong text-ink">{d.contagem[e]}</span>
+                          {e === 'pendencia' && d.aConfirmar ? 'a confirmar' : ROTULO_DECLARACAO[e]}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
           );
         })}
       </div>
@@ -252,8 +191,8 @@ export function MensagensEcacBox({ r, ultimas, carregandoUltimas, className }: {
   return (
     <Caixa
       titulo="Caixa Postal e-CAC"
-      subtitulo="Caixa Postal da Receita: quantos clientes estão em cada situação. Um cliente conta uma vez, no mais grave."
-      acao={<VerTudo to="/mensagens">Abrir mensagens</VerTudo>}
+      subtitulo="Clientes por situação. Cada um conta uma vez, no mais grave."
+      acao={<VerTudo to="/mensagens">Abrir</VerTudo>}
       className={className}
     >
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -292,12 +231,12 @@ export function MensagensEcacBox({ r, ultimas, carregandoUltimas, className }: {
       <div className="space-y-2 border-t border-line pt-4">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3">
           <p className="text-ui-strong text-ink">Últimas mensagens recebidas</p>
-          <span className="text-meta text-muted-ink-2">só as já baixadas; dos demais clientes o sistema sabe apenas que há mensagem nova</span>
+          <span className="text-meta text-muted-ink-2">só as já baixadas</span>
         </div>
         {carregandoUltimas ? (
           <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : ultimas.length === 0 ? (
-          <p className="py-6 text-center text-ui text-muted-ink-2">Nenhuma mensagem baixada ainda. Use Consultar na tela Caixa Postal e-CAC.</p>
+          <p className="py-6 text-center text-ui text-muted-ink-2">Nenhuma mensagem baixada ainda.</p>
         ) : (
           <ul className="divide-y divide-line-2">
             {ultimas.map((m) => {
@@ -334,8 +273,8 @@ export function ParcelamentosBox({ r, carregando, className }: { r: ResumoParcel
   return (
     <Caixa
       titulo="Parcelamentos"
-      subtitulo="Parcelamentos do Simples (ordinário, especial, PERT-SN e RELP-SN): quem tem parcela em atraso ou a do mês em aberto."
-      acao={<VerTudo to={PARCELAMENTOS}>Ver parcelamentos</VerTudo>}
+      subtitulo="Clientes com parcela em atraso ou do mês em aberto."
+      acao={<VerTudo to={PARCELAMENTOS}>Abrir</VerTudo>}
       className={className}
     >
       {carregando ? <Skeleton className="h-[140px] w-full" /> : (

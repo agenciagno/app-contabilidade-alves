@@ -120,7 +120,7 @@ export default function DctfwebMitFederal() {
   const alternarMarcado = (id: string) => setMarcados((st) => { const n = new Set(st); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const tabelaExport = (): TabelaExport => ({
     arquivo: `dctfweb-mit-${competencia}`,
-    titulo: `DCTFWeb e MIT — competência ${siglaCompetencia(competencia)}`,
+    titulo: `DCTFWeb | MIT — competência ${siglaCompetencia(competencia)}`,
     colunas: ['Razão social', 'CNPJ', 'Regime', 'Competência', 'Situação', 'Estado', 'DCTFWeb', 'Movimento novo', 'MIT', 'MIT encerrada em', 'MIT valor apurado', 'Consultado em'],
     linhas: filtradas.map((l) => {
       const a = apuracaoVigente(l);
@@ -137,7 +137,7 @@ export default function DctfwebMitFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · dctfweb e mit" title="DCTFWeb | MIT" />
+      <PageHeader kicker="~/dashboard fiscal · dctfweb | mit" title="DCTFWeb | MIT" />
 
       <div className="space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -297,7 +297,7 @@ export default function DctfwebMitFederal() {
       <AcaoLoteDialog
         aberto={consultaLote}
         onClose={() => setConsultaLote(false)}
-        titulo={`Consultar DCTFWeb e MIT de ${siglaCompetencia(competencia)}`}
+        titulo={`Consultar DCTFWeb | MIT de ${siglaCompetencia(competencia)}`}
         descricao="Duas consultas por cliente marcado (recibo da DCTFWeb do mês e MIT do ano), um de cada vez."
         itens={matrizes.filter((l) => marcados.has(l.contact_id)).map((l) => ({
           contactId: l.contact_id, nome: l.nome, pular: (ultimaConsulta(l) ?? '').slice(0, 10) === hoje ? 'Consultado hoje' : null,

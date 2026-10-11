@@ -8,6 +8,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { invocarSerpro } from '@/lib/invocarSerpro';
 import { fetchAllPages } from '@/lib/fetch-all';
 import { STATUS_MONITORADO } from '@/hooks/useSerproCaixaPostal';
+import { piorSelo, type Selo } from '@/lib/monitorEstados';
 
 export interface DasMeiRow { id: string; contact_id: string; periodo: string; numero_das: string | null; vencimento: string | null; limite_acolhimento: string | null; valor_total: number | null; data_pagamento: string | null; emitido_em: string }
 export interface DividaMeiRow { contact_id: string; ano: number; consultado_em: string; itens: { periodo: string; tributo: string; valor: number; ente: string; situacao: string }[]; total: number }
@@ -118,3 +119,22 @@ export function useLinkMei() {
     mutationFn: (v: { tipo: 'das' | 'ccmei'; id: string }) => invocarSerpro<ResultadoMei>('serpro-mei', { action: 'link', tipo: v.tipo, id: v.id }),
   });
 }
+
+// ---------------------------------------------------------------- selos (aba MEI e Dashboard Fiscal)
+const moedaBR = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+export function seloEnquadramento(l: LinhaMei): Selo | null {
+  if (!l.situacao) return { estado: 'nao_verificado', motivo: 'Situação não consultada' };
+  if (l.situacao.optante_mei === false) return { estado: 'atencao', motivo: 'Fora do MEI' };
+  return { estado: 'em_dia', motivo: l.situacao.situacao_cadastral ? `Ativo no MEI · ${l.situacao.situacao_cadastral}` : 'Ativo no MEI' };
+}
+
+/** Dívida ativa do ano (PGMEI): qualquer débito é atenção. */
+export function seloDivida(l: LinhaMei, ano: number): Selo | null {
+  if (!l.divida) return { estado: 'nao_verificado', motivo: `Dívida ativa ${ano} não consultada` };
+  if (l.divida.total > 0) return { estado: 'atencao', motivo: `Dívida ativa ${moedaBR(l.divida.total)}` };
+  return { estado: 'em_dia', motivo: `Sem dívida ativa em ${ano}` };
+}
+
+/** Situação do MEI = o pior entre a situação no MEI e a dívida ativa do ano. O DAS do MEI não entra (pode pagar pelo app). */
+export const seloMei = (l: LinhaMei, ano: number): Selo | null => piorSelo([seloEnquadramento(l), seloDivida(l, ano)]);

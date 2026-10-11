@@ -21,11 +21,11 @@ import {
 } from '@/components/monitor/GuiasLote';
 import { useGuiasEnviadas, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
 import {
-  dasMeiValido, ultimaBuscaMei, useDividaAtivaMei, useEmitirCcmei, useGerarDasMei, useLinkMei, useMatrizMei, useSituacaoMei, type LinhaMei,
+  dasMeiValido, seloDivida, seloEnquadramento, seloMei, ultimaBuscaMei, useDividaAtivaMei, useEmitirCcmei, useGerarDasMei, useLinkMei, useMatrizMei, useSituacaoMei, type LinhaMei,
 } from '@/hooks/useSerproMei';
 import { competenciaPadrao, mesDeData, siglaCompetencia } from '@/hooks/useSerproPagamentos';
 import { abrirPdf } from '@/hooks/useSerproPgdasd';
-import { ROTULO_ESTADO, contarEstados, piorSelo, type Selo } from '@/lib/monitorEstados';
+import { ROTULO_ESTADO, contarEstados, type Selo } from '@/lib/monitorEstados';
 import { hojeBR } from '@/lib/prazosFederais';
 import type { TabelaExport } from '@/lib/exportarTabela';
 
@@ -37,18 +37,6 @@ const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curr
 const ddmm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 /** Situação no MEI (CCMEI): fora do MEI é atenção. */
-function seloEnquadramento(l: LinhaMei): Selo | null {
-  if (!l.situacao) return { estado: 'nao_verificado', motivo: 'Situação não consultada' };
-  if (l.situacao.optante_mei === false) return { estado: 'atencao', motivo: 'Fora do MEI' };
-  return { estado: 'em_dia', motivo: l.situacao.situacao_cadastral ? `Ativo no MEI · ${l.situacao.situacao_cadastral}` : 'Ativo no MEI' };
-}
-/** Dívida ativa do ano (PGMEI): qualquer débito é atenção. */
-function seloDivida(l: LinhaMei, ano: number): Selo | null {
-  if (!l.divida) return { estado: 'nao_verificado', motivo: `Dívida ativa ${ano} não consultada` };
-  if (l.divida.total > 0) return { estado: 'atencao', motivo: `Dívida ativa ${moeda(l.divida.total)}` };
-  return { estado: 'em_dia', motivo: `Sem dívida ativa em ${ano}` };
-}
-
 /**
  * Aba MEI do Simples Nacional (Rodada 4, 09/10/2026; decisão de Gabriel: aba dentro do Simples, sem rota nova).
  * Selo da linha = o pior entre a situação no MEI e a dívida ativa do ano. O DAS do MEI aparece na coluna e não entra na situação
@@ -77,7 +65,7 @@ export function AbaMei() {
   const [abrindo, setAbrindo] = useState<string | null>(null);
   const [acoesLote, setAcoesLote] = useState(false);
 
-  const seloDe = (l: LinhaMei): Selo | null => piorSelo([seloEnquadramento(l), seloDivida(l, ano)]);
+  const seloDe = (l: LinhaMei): Selo | null => seloMei(l, ano);
   const base = useMemo(() => {
     const q = busca.trim().toLowerCase();
     const qd = q.replace(/\D/g, '');

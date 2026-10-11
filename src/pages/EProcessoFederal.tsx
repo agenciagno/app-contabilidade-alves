@@ -15,7 +15,7 @@ import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMonitor, UltimaBusca, us
 import { AcaoLoteDialog, BarraSelecao, useSelecao } from '@/components/monitor/GuiasLote';
 import { AcoesEmLoteDialog, BotaoAcoesEmLote } from '@/components/monitor/AcoesEmLote';
 import { useConsultarEProcesso, useMatrizEProcesso, type LinhaEProcesso } from '@/hooks/useSerproExtras';
-import { ROTULO_ESTADO, contarEstados, type Selo } from '@/lib/monitorEstados';
+import { ROTULO_ESTADO, contarEstados, seloEProcesso, type Selo } from '@/lib/monitorEstados';
 import { hojeBR } from '@/lib/prazosFederais';
 import type { TabelaExport } from '@/lib/exportarTabela';
 
@@ -25,12 +25,7 @@ const formatarCnpj = (d: string) => {
 };
 const dataBR = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—');
 
-/** Processo em que o cliente é interessado pede acompanhamento (pendência); sem processo é em dia. */
-function seloDe(l: LinhaEProcesso): Selo | null {
-  if (!l.consulta) return { estado: 'nao_verificado', motivo: 'Não consultado' };
-  if (!l.processos.length) return { estado: 'em_dia', motivo: 'Sem processo' };
-  return { estado: 'pendencia', motivo: `${l.processos.length} ${l.processos.length === 1 ? 'processo' : 'processos'}` };
-}
+const seloDe = (l: LinhaEProcesso): Selo | null => seloEProcesso(!!l.consulta, l.processos.length);
 
 /**
  * e-Processo (Rodada 5 do Monitoramento, 09/10/2026; decisão de Gabriel: item próprio, separado de "Processos").
