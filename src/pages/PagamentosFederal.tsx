@@ -7,6 +7,7 @@ import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, useSelecao } from '@/components/monitor/GuiasLote';
+import { AcoesEmLoteDialog, BotaoAcoesEmLote } from '@/components/monitor/AcoesEmLote';
 import { hojeBR } from '@/lib/prazosFederais';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -104,6 +105,7 @@ export default function PagamentosFederal() {
   const comprovante = useComprovantePagamento();
   const [lote, setLote] = useState<'consultar' | 'comprovantes' | null>(null);
   const [baixarAberto, setBaixarAberto] = useState(false);
+  const [acoesLote, setAcoesLote] = useState(false);
   const hoje = hojeBR();
 
   const isLoading = carregandoPag || carregandoSn;
@@ -167,7 +169,12 @@ export default function PagamentosFederal() {
         kicker="~/dashboard fiscal · pagamentos e das"
         title="Pagamentos e DAS."
         subtitle="Documentos de arrecadação pagos na Receita (DARF e DAE) e o DAS do Simples (gerado, pago, a vencer ou vencido) por cliente ativo e competência. O aviso de pagamento novo vem da rotina diária das 07:35, sem custo. A situação do DAS é atualizada pela rotina do PGDAS (dia 16 e dia seguinte ao prazo) ou por Atualizar DAS no painel do cliente. Para ver valor, data e composição, abra o cliente e use Consultar pagamentos. A Receita só informa o que foi pago: zero em um mês consultado não prova que não havia o que pagar."
-        actions={<ExportarMenu montar={() => tabelaExport(filtradas, competencia)} disabled={filtradas.length === 0} escolherColunas />}
+        actions={(
+          <div className="flex items-center gap-2">
+            <BotaoAcoesEmLote onClick={() => setAcoesLote(true)} disabled={linhas.length === 0} />
+            <ExportarMenu montar={() => tabelaExport(filtradas, competencia)} disabled={filtradas.length === 0} escolherColunas />
+          </div>
+        )}
       />
 
       <CompetenciaNav competencia={competencia} onChange={setCompetencia} limite={limite} />
@@ -300,6 +307,27 @@ export default function PagamentosFederal() {
       />
       {consultaPag.dialog}
       {consultaDas.dialog}
+      <AcoesEmLoteDialog
+        aberto={acoesLote}
+        onClose={() => setAcoesLote(false)}
+        clientes={linhas.map((l) => ({ id: l.contact_id, nome: l.nome, documento: l.documento, selo: null }))}
+        extras={[
+          { chave: 'novo', rotulo: 'Pagamento novo', dica: 'A Receita avisou de pagamento desde a última consulta.', ids: linhas.filter((l) => l.novo).map((l) => l.contact_id) },
+          { chave: 'nao_consultado', rotulo: 'Não consultados', dica: `Sem consulta de pagamentos de ${siglaCompetencia(competencia)}.`, ids: linhas.filter((l) => !l.ultimaConsulta).map((l) => l.contact_id) },
+          { chave: 'das_vencido', rotulo: 'DAS vencido', dica: 'DAS do Simples sem pagamento registrado.', ids: linhas.filter((l) => l.das.estado === 'vencido').map((l) => l.contact_id) },
+        ]}
+        acoes={[
+          { chave: 'consultar', rotulo: `Consultar pagamentos de ${siglaCompetencia(competencia)}`, custo: 'Consultar', padrao: ['novo'],
+            fora: (id) => (linhas.find((l) => l.contact_id === id)?.semProcuracao ? 'Sem procuração' : null),
+            dica: 'Traz os documentos pagos da competência (DARF, DAE e DAS). Quem já foi consultado hoje fica de fora.' },
+          { chave: 'comprovantes', rotulo: 'Emitir comprovantes', custo: 'Emitir', padrao: [],
+            fora: (id) => (linhas.find((l) => l.contact_id === id)?.docs.some((d) => !d.comprovante_path) ? null : 'Nada a emitir'),
+            dica: 'Um comprovante por pagamento já consultado que ainda não tem comprovante guardado.' },
+          { chave: 'baixar', rotulo: 'Baixar comprovantes e DAS', padrao: [],
+            dica: 'Baixa num ZIP os comprovantes e os DAS já guardados da competência. Não consulta a Receita.' },
+        ]}
+        onContinuar={(acao, ids) => { sel.definir(ids); if (acao === 'baixar') setBaixarAberto(true); else setLote(acao as 'consultar' | 'comprovantes'); }}
+      />
       <AcaoLoteDialog
         aberto={lote === 'consultar'}
         onClose={() => setLote(null)}

@@ -18,6 +18,7 @@ import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMonitor, UltimaBusca, us
 import {
   AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote,
 } from '@/components/monitor/GuiasLote';
+import { AcoesEmLoteDialog, BotaoAcoesEmLote } from '@/components/monitor/AcoesEmLote';
 import {
   ROTULO_MOD, chamadasDaConsulta, competenciaAtual, consultadoEm, estadoParcelamento, modalidadesAtivas, parcelasAtrasadas, parcelasDoMes,
   rotuloParcela, somaValor, useConsultarParcelamentos, useGerarGuiaParcela, useMatrizParcelamentos, type LinhaParcelamentos, type Modalidade,
@@ -60,6 +61,7 @@ export default function ParcelamentosFederal() {
   const [lote, setLote] = useState<'consultar' | 'guias' | null>(null);
   const [envioAberto, setEnvioAberto] = useState(false);
   const [baixarAberto, setBaixarAberto] = useState(false);
+  const [acoesLote, setAcoesLote] = useState(false);
   const hoje = hojeBR();
 
   const seloDe = (l: LinhaParcelamentos): Selo | null => (emAndamento === l.contact_id
@@ -133,11 +135,7 @@ export default function ParcelamentosFederal() {
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <SearchField placeholder="Buscar por razão social ou CNPJ..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px] flex-1" />
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-            <DicaBotao texto={`Marca na lista quem tem parcelamento ativo (${comAtivos.length}).`}>
-              <Button variant="outline" size="sm" className="h-10" disabled={!comAtivos.length} onClick={() => sel.definir(comAtivos.map((l) => l.contact_id))}>
-                Selecionar com parcelamento ({comAtivos.length})
-              </Button>
-            </DicaBotao>
+            <BotaoAcoesEmLote onClick={() => setAcoesLote(true)} disabled={matrizes.length === 0} />
             <DicaBotao texto="Lista as guias de parcela geradas neste mês dos clientes que recebem DAS pela CA, para conferir e mandar por e-mail.">
               <Button variant="outline" size="sm" className="h-10" onClick={() => setEnvioAberto(true)}>
                 <Mail className="mr-1.5 h-4 w-4" />Conferir e enviar{aEnviar ? ` (${aEnviar})` : ''}
@@ -261,6 +259,22 @@ export default function ParcelamentosFederal() {
       <ParcelamentosClienteSheet linha={linhaAberta} onClose={() => setAberto(null)} />
       {dialog}
 
+      <AcoesEmLoteDialog
+        aberto={acoesLote}
+        onClose={() => setAcoesLote(false)}
+        clientes={matrizes.map((l) => ({ id: l.contact_id, nome: l.nome, documento: l.documento, selo: seloDe(l) }))}
+        extras={[{ chave: 'ativos', rotulo: 'Com parcelamento ativo', dica: 'Clientes com ao menos um parcelamento em andamento.', ids: comAtivos.map((l) => l.contact_id) }]}
+        acoes={[
+          { chave: 'consultar', rotulo: 'Consultar parcelamentos', custo: 'Consultar', padrao: ['pendencia', 'atencao', 'nao_verificado'],
+            dica: 'Traz os pedidos e as parcelas em aberto de cada cliente. Quem já foi consultado hoje fica de fora.' },
+          { chave: 'guias', rotulo: 'Gerar guias das parcelas', custo: 'Emitir', padrao: ['ativos'],
+            fora: (id) => { const l = matrizes.find((x) => x.contact_id === id); return l && parcelasAtrasadas(l, atual).length + parcelasDoMes(l, atual).length > 0 ? null : 'Sem parcela em aberto'; },
+            dica: 'Uma guia por parcela em aberto (atrasadas e a do mês).' },
+          { chave: 'baixar', rotulo: 'Baixar guias', padrao: ['ativos'],
+            dica: 'Baixa num ZIP as guias de parcela já guardadas. Não consulta a Receita.' },
+        ]}
+        onContinuar={(acao, ids) => { sel.definir(ids); if (acao === 'baixar') setBaixarAberto(true); else setLote(acao as 'consultar' | 'guias'); }}
+      />
       <AcaoLoteDialog
         aberto={lote === 'consultar'}
         onClose={() => setLote(null)}

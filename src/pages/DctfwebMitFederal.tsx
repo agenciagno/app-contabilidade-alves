@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { CalendarPlus, Loader2, Mail, RefreshCw } from 'lucide-react';
 
 import { PageHeader, SearchField } from '@/components/ds';
+import { AcoesEmLoteDialog, BotaoAcoesEmLote } from '@/components/monitor/AcoesEmLote';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -63,6 +64,7 @@ export default function DctfwebMitFederal() {
   // Ficha mês a mês (10/10/2026) e "Completar o ano" em lote.
   const [aberto, setAberto] = useState<string | null>(null);
   const [completarLote, setCompletarLote] = useState(false);
+  const [acoesLote, setAcoesLote] = useState(false);
   const { responsaveis, aberturas } = useCadastroMonitor();
   const { data: consultadosAno } = useDctfwebAno(Number(competencia.slice(0, 4)));
   const mesAtual = mesDeData(new Date());
@@ -138,11 +140,7 @@ export default function DctfwebMitFederal() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <CompetenciaNav competencia={competencia} onChange={(v) => { setCompetencia(v); setMarcados(new Set()); }} limite={mesDeData(new Date())} />
           <div className="flex flex-wrap items-center gap-2">
-            <DicaBotao texto={`Marca na lista os clientes que recebem a guia da DCTFWeb pela CA (marcação do cadastro), para gerar em lote. ${quemRecebe.length} marcados no cadastro.`}>
-              <Button variant="outline" size="sm" className="h-10" disabled={!quemRecebe.length} onClick={() => setMarcados(new Set(quemRecebe.map((l) => l.contact_id)))}>
-                Selecionar quem recebe guia ({quemRecebe.length})
-              </Button>
-            </DicaBotao>
+            <BotaoAcoesEmLote onClick={() => setAcoesLote(true)} disabled={matrizes.length === 0} />
             <DicaBotao texto="Lista as guias já geradas dos clientes que recebem guia pela CA, para conferir e mandar por e-mail. Nada sai sem você confirmar.">
               <Button variant="outline" size="sm" className="h-10" onClick={() => setEnvioAberto(true)}>
                 <Mail className="mr-1.5 h-4 w-4" />Conferir e enviar{aEnviar ? ` (${aEnviar})` : ''}
@@ -340,6 +338,37 @@ export default function DctfwebMitFederal() {
         itens={itensEnvio}
         assuntoPadrao={`Guia da DCTFWeb ${siglaCompetencia(competencia)} · {cliente}`}
         mensagemPadrao={`Olá! Segue a guia (DARF) da DCTFWeb de ${siglaCompetencia(competencia)} da {cliente}. Qualquer dúvida, é só responder este e-mail.\n\nContabilidade Alves`}
+      />
+      <AcoesEmLoteDialog
+        aberto={acoesLote}
+        onClose={() => setAcoesLote(false)}
+        clientes={matrizes.map((l) => ({ id: l.contact_id, nome: l.nome, documento: l.documento, selo: seloDe(l) }))}
+        extras={[
+          { chave: 'recebe', rotulo: 'Recebe a guia pela CA', dica: 'Marcação do cadastro: a CA gera e envia a guia da DCTFWeb.', ids: quemRecebe.map((l) => l.contact_id) },
+          { chave: 'novo', rotulo: 'Movimento novo', dica: 'A Receita avisou de eSocial, Reinf ou transmissão desde a última consulta.', ids: matrizes.filter((l) => l.novo).map((l) => l.contact_id) },
+        ]}
+        acoes={[
+          { chave: 'consultar', rotulo: `Consultar ${siglaCompetencia(competencia)}`, custo: 'Consultar', vezes: 2, padrao: ['novo', 'nao_verificado'],
+            dica: 'Recibo da DCTFWeb do mês e MIT do ano de cada cliente. Quem já foi consultado hoje fica de fora.' },
+          { chave: 'completar', rotulo: `Completar ${competencia.slice(0, 4)}`, custo: 'Consultar', padrao: ['pendencia', 'atencao', 'nao_verificado', 'em_dia'],
+            fora: (id) => (faltantesDe(id).length === 0 ? 'Ano já completo' : null),
+            dica: 'Consulta os meses do ano que ainda não foram consultados (uma consulta por mês). Mostra o total antes.' },
+          { chave: 'gerar', rotulo: 'Gerar guia', custo: 'Emitir', padrao: ['recebe'],
+            fora: (id) => { const l = matrizes.find((x) => x.contact_id === id); return l && estadoDctfweb(l) === 'sem_declaracao' ? 'Sem DCTFWeb no mês' : null; },
+            dica: 'Gera a guia (DARF) da DCTFWeb do mês de cada cliente.' },
+          { chave: 'andamento', rotulo: 'Guia em andamento', custo: 'Emitir', padrao: [],
+            dica: 'Gera a guia da declaração ainda em andamento (antes de transmitir).' },
+          { chave: 'baixar', rotulo: 'Baixar recibos e guias', padrao: ['recebe'],
+            dica: 'Baixa num ZIP os recibos e as guias já guardados. Não consulta a Receita.' },
+        ]}
+        onContinuar={(acao, ids) => {
+          setMarcados(new Set(ids));
+          if (acao === 'consultar') setConsultaLote(true);
+          else if (acao === 'completar') setCompletarLote(true);
+          else if (acao === 'gerar') setLoteAberto(true);
+          else if (acao === 'andamento') setAndamentoLote(true);
+          else setBaixarAberto(true);
+        }}
       />
       <AcaoLoteDialog
         aberto={completarLote}

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { FileText, History, Loader2, RefreshCw, Wallet } from 'lucide-react';
+import { FileText, Loader2, RefreshCw, Wallet } from 'lucide-react';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
 import { DsBadge, PageHeader, SearchField } from '@/components/ds';
@@ -17,6 +17,7 @@ import { useAbrirRelatorioSitfis, useGerarRelatorioSitfis } from '@/components/s
 import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
 import { DIAS_RELATORIO_VELHO, estadoSitfis, relatorioVelho, useGerarSitfis, useMatrizSitfis, type LinhaSitfis, type SitfisRow } from '@/hooks/useSerproSitfis';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, useSelecao } from '@/components/monitor/GuiasLote';
+import { AcoesEmLoteDialog, BotaoAcoesEmLote } from '@/components/monitor/AcoesEmLote';
 import { hojeBR } from '@/lib/prazosFederais';
 import { ROTULO_ESTADO, contarEstados, seloSitfis, type Selo } from '@/lib/monitorEstados';
 import type { TabelaExport } from '@/lib/exportarTabela';
@@ -53,6 +54,7 @@ export default function SituacaoFiscalFederal() {
   const gerarSitfis = useGerarSitfis();
   const [loteAberto, setLoteAberto] = useState(false);
   const [baixarAberto, setBaixarAberto] = useState(false);
+  const [acoesLote, setAcoesLote] = useState(false);
   const hoje = hojeBR();
 
   const seloDe = (l: LinhaSitfis): Selo | null => (emAndamento === l.contact_id
@@ -100,7 +102,10 @@ export default function SituacaoFiscalFederal() {
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <SearchField placeholder="Buscar por razão social ou CNPJ..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px] flex-1" />
-          <ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />
+          <div className="flex items-center gap-2">
+            <BotaoAcoesEmLote onClick={() => setAcoesLote(true)} disabled={matrizes.length === 0} />
+            <ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />
+          </div>
         </div>
 
         <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
@@ -152,10 +157,14 @@ export default function SituacaoFiscalFederal() {
                     relatorioVelho(l) ? `Relatório com mais de ${DIAS_RELATORIO_VELHO} dias` : null,
                   ].filter((x): x is string => !!x);
                   return (
-                    <TableRow key={l.contact_id}>
+                    <TableRow key={l.contact_id}
+                      className={l.historico.length > 0 ? 'cursor-pointer' : undefined}
+                      tabIndex={l.historico.length > 0 ? 0 : undefined}
+                      onClick={() => { if (l.historico.length > 0) setHistorico(l); }}
+                      onKeyDown={(ev) => { if (ev.key === 'Enter' && ev.target === ev.currentTarget && l.historico.length > 0) setHistorico(l); }}>
                       <TableCell className="min-w-[240px] max-w-[360px]">
                         <div className="flex items-start gap-3">
-                          <span className="pt-0.5"><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></span>
+                          <span className="pt-0.5" onClick={(ev) => ev.stopPropagation()}><Checkbox aria-label={`Marcar ${l.nome}`} checked={sel.marcados.has(l.contact_id)} onCheckedChange={() => sel.alternar(l.contact_id)} /></span>
                           <div className="min-w-0">
                             <p className="text-ui text-ink">{l.nome}</p>
                             <p className="font-mono text-meta text-muted-ink-2">{formatarCnpj(l.documento)}</p>
@@ -165,7 +174,7 @@ export default function SituacaoFiscalFederal() {
                       </TableCell>
                       <TableCell className="min-w-[170px]"><SeloMonitor selo={seloDe(l)} outros={outros} /></TableCell>
                       <TableCell className="max-w-[260px] text-meta text-muted-ink">
-                        {u?.categorias.length ? u.categorias.join('; ') : u && e === 'com_pendencias' ? 'Abra o PDF' : '—'}
+                        {u?.categorias.length ? u.categorias.join('; ') : u && e === 'com_pendencias' ? 'Clique na linha para abrir o PDF' : '—'}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-ui">
                         {u?.certidao_tipo ? (
@@ -174,26 +183,12 @@ export default function SituacaoFiscalFederal() {
                       </TableCell>
                       <TableCell><UltimaBusca iso={u?.gerado_em ?? null} /></TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-1" onClick={(ev) => ev.stopPropagation()}>
                           <DicaBotao texto="Abre os pagamentos deste cliente na Receita (DARF, DAS, DAE e DJE) com a composição de cada guia e o comprovante. Abrir é grátis: só lê o que já está salvo.">
                             <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Pagamentos do cliente" onClick={() => abrirPagamentos(l.contact_id, l.nome, formatarCnpj(l.documento))}>
                               <Wallet className="h-4 w-4" />
                             </Button>
                           </DicaBotao>
-                          {u && (
-                            <DicaBotao texto="Abre o PDF do último relatório, que já está guardado. Não consulta a Receita.">
-                              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="PDF do último relatório" disabled={ocupado === u.id} onClick={() => abrir(u.id)}>
-                                {ocupado === u.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                              </Button>
-                            </DicaBotao>
-                          )}
-                          {l.historico.length > 0 && (
-                            <DicaBotao texto={`Histórico: os ${l.historico.length === 1 ? '1 relatório guardado' : `${l.historico.length} relatórios guardados`} deste cliente, cada um com o seu PDF. Não consulta a Receita.`}>
-                              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Histórico de relatórios" onClick={() => setHistorico(l)}>
-                                <History className="h-4 w-4" />
-                              </Button>
-                            </DicaBotao>
-                          )}
                           <DicaBotao custo="Emitir"
                             texto={l.processando ? 'A Receita ainda estava preparando o relatório deste cliente. Clique para buscar o PDF pronto.'
                               : 'Pede à Receita o relatório de situação fiscal (Receita e PGFN) deste cliente e guarda o PDF. Leva alguns segundos.'}>
@@ -290,6 +285,18 @@ export default function SituacaoFiscalFederal() {
         contactIds={[...sel.marcados]}
         referencia="último relatório de cada cliente"
         opcoes={[{ tipo: 'sitfis', rotulo: 'Relatório de situação fiscal da Receita (último)' }, { tipo: 'relatorio_situacao', rotulo: 'Relatório de Situação Fiscal para o cliente (CA)' }]}
+      />
+      <AcoesEmLoteDialog
+        aberto={acoesLote}
+        onClose={() => setAcoesLote(false)}
+        clientes={matrizes.map((l) => ({ id: l.contact_id, nome: l.nome, documento: l.documento, selo: seloDe(l) }))}
+        acoes={[
+          { chave: 'gerar', rotulo: 'Gerar relatório', custo: 'Emitir', padrao: ['pendencia', 'atencao', 'nao_verificado'],
+            dica: 'Pede à Receita o relatório de situação fiscal (Receita e PGFN) de cada cliente. Quem já tem relatório de hoje fica de fora.' },
+          { chave: 'baixar', rotulo: 'Baixar PDFs', padrao: ['pendencia'], fora: (id) => (matrizes.find((l) => l.contact_id === id)?.ultimo ? null : 'Sem relatório guardado'),
+            dica: 'Baixa num ZIP o último relatório guardado de cada cliente. Não consulta a Receita.' },
+        ]}
+        onContinuar={(acao, ids) => { sel.definir(ids); if (acao === 'gerar') setLoteAberto(true); else setBaixarAberto(true); }}
       />
       {janelaPagamentos}
     </div>

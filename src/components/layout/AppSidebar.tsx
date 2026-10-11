@@ -182,6 +182,8 @@ interface SimpleModule extends RoleGated {
   menu?: 'lateral' | 'superior';
   /** Nome no menu do topo, quando diferente do da sidebar. */
   tituloTopo?: string;
+  /** Tela ainda "Em breve": o item mostra o selo nos dois menus (decisão de Gabriel, 10/10/2026). */
+  emBreve?: boolean;
 }
 
 interface CollapsibleModule extends RoleGated {
@@ -349,6 +351,7 @@ export const menuEntries: MenuEntry[] = [
     kind: 'simple',
     title: 'Certidões',
     url: '/certidoes',
+    emBreve: true,
     icon: ScrollText,
     iconName: 'scroll-text',
     moduleKey: 'certidoes',
@@ -380,6 +383,7 @@ export const menuEntries: MenuEntry[] = [
     kind: 'simple',
     title: 'Alvarás',
     url: '/cadastros/alvaras',
+    emBreve: true,
     icon: FileText,
     iconName: 'file-text',
     moduleKey: 'cadastro',
@@ -390,6 +394,7 @@ export const menuEntries: MenuEntry[] = [
     kind: 'simple',
     title: 'Processos',
     url: '/processos',
+    emBreve: true,
     icon: Gavel,
     iconName: 'gavel',
     moduleKey: 'processos',
@@ -647,6 +652,9 @@ export function AppSidebar() {
         >
           <entry.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
           {showLabels && <span className="flex-1 truncate">{entry.title}</span>}
+          {showLabels && entry.emBreve && (
+            <span className="shrink-0 rounded-pill border border-nav-on-surface/30 px-1.5 text-[10px] leading-4 opacity-70">em breve</span>
+          )}
           {entry.moduleKey === 'mensagens' && mensagensNovas > 0 && (
             <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-danger px-1.5 text-badge font-medium text-white">
               {mensagensNovas}

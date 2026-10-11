@@ -20,6 +20,7 @@ import { useLeituraFaturamento } from '@/components/serpro/useLeituraFaturamento
 import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
 import { FaixaEstados, FiltroSelo, PaginacaoLista, RodapeLista, SeloMini, SeloMonitor, UltimaBusca, passaFiltroSelo, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
 import { AbaMei } from '@/components/monitor/AbaMei';
+import { AcoesEmLoteDialog, BotaoAcoesEmLote } from '@/components/monitor/AcoesEmLote';
 import { AcaoLoteDialog, BaixarLoteDialog, BarraSelecao, EnviarGuiasDialog, GerarLoteDialog, useSelecao, type ItemEnvio, type ItemLote } from '@/components/monitor/GuiasLote';
 import { useGuiasEnviadas, useMarcacoesGuia, useMarcarGuia } from '@/hooks/useGuiasCliente';
 import { rotuloRegime, useConsultarRegime, useRegimeMapa } from '@/hooks/useSerproExtras';
@@ -125,6 +126,7 @@ function AbaMensal({
   const [baixarAberto, setBaixarAberto] = useState(false);
   const [cobrancaLote, setCobrancaLote] = useState(false);
   const [regimeLote, setRegimeLote] = useState(false);
+  const [acoesLote, setAcoesLote] = useState(false);
   const consultarPg = useConsultarPgdasd();
   const { data: regimes } = useRegimeMapa(ano);
   const consultarRegime = useConsultarRegime();
@@ -210,11 +212,7 @@ function AbaMensal({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <CompetenciaNav competencia={pa} onChange={(v) => { setPa(v); setMarcados(new Set()); }} limite={mesDeData(new Date())} />
         <div className="flex flex-wrap items-center gap-2">
-          <DicaBotao texto={`Marca na lista os clientes que recebem o DAS pela CA (marcação do cadastro), para gerar em lote. ${quemRecebe.length} marcados no cadastro.`}>
-            <Button variant="outline" size="sm" className="h-10" disabled={!quemRecebe.length} onClick={() => setMarcados(new Set(quemRecebe.map((l) => l.contact_id)))}>
-              Selecionar quem recebe DAS ({quemRecebe.length})
-            </Button>
-          </DicaBotao>
+          <BotaoAcoesEmLote onClick={() => setAcoesLote(true)} disabled={linhas.length === 0} />
           <DicaBotao texto="Lista os DAS já gerados dos clientes que recebem DAS pela CA, para conferir e mandar por e-mail. Nada sai sem você confirmar.">
             <Button variant="outline" size="sm" className="h-10" onClick={() => setEnvioAberto(true)}>
               <Mail className="mr-1.5 h-4 w-4" />Conferir e enviar{aEnviar ? ` (${aEnviar})` : ''}
@@ -386,6 +384,37 @@ function AbaMensal({
       )}
       {consulta.dialog}
 
+      <AcoesEmLoteDialog
+        aberto={acoesLote}
+        onClose={() => setAcoesLote(false)}
+        clientes={linhas.map((l) => ({ id: l.contact_id, nome: l.nome, documento: l.documento, selo: seloDe(l) }))}
+        extras={[{ chave: 'recebe', rotulo: 'Recebe o DAS pela CA', dica: 'Marcação do cadastro: a CA gera e envia o DAS.', ids: quemRecebe.map((l) => l.contact_id) }]}
+        acoes={[
+          { chave: 'consultar', rotulo: `Consultar PGDAS-D de ${ano}`, custo: 'Consultar', padrao: ['pendencia', 'atencao', 'nao_verificado'],
+            seloDe: (id) => linhas.find((l) => l.contact_id === id)?.declaracao ?? null,
+            dica: 'Traz as declarações e os DAS do ano de cada cliente. Quem já foi consultado hoje fica de fora.' },
+          { chave: 'gerar', rotulo: `Gerar DAS de ${siglaCompetencia(pa)}`, custo: 'Emitir', padrao: ['recebe'],
+            seloDe: (id) => linhas.find((l) => l.contact_id === id)?.dasSelo ?? null,
+            fora: (id) => { const l = linhas.find((x) => x.contact_id === id); return !l?.declaracaoRow ? 'Sem PGDAS-D no mês' : l.das.estado === 'pago' ? 'DAS já pago' : null; },
+            dica: 'Um DAS por cliente. Quem já tem DAS guardado e válido não é emitido de novo.' },
+          { chave: 'cobranca', rotulo: `DAS de cobrança de ${siglaCompetencia(pa)}`, custo: 'Emitir', padrao: [],
+            seloDe: (id) => linhas.find((l) => l.contact_id === id)?.dasSelo ?? null,
+            fora: (id) => (linhas.find((x) => x.contact_id === id)?.declaracaoRow ? null : 'Sem PGDAS-D no mês'),
+            dica: 'Para período que já foi para o sistema de Cobrança da Receita (o DAS comum não sai mais).' },
+          { chave: 'regime', rotulo: `Regime de apuração de ${ano}`, custo: 'Consultar', padrao: [],
+            dica: 'Consulta se o cliente optou pelo regime de caixa ou de competência no ano.' },
+          { chave: 'baixar', rotulo: 'Baixar DAS e declarações', padrao: ['recebe'],
+            dica: 'Baixa num ZIP os DAS, recibos e declarações já guardados. Não consulta a Receita.' },
+        ]}
+        onContinuar={(acao, ids) => {
+          setMarcados(new Set(ids));
+          if (acao === 'consultar') setConsultaLote(true);
+          else if (acao === 'gerar') setLoteAberto(true);
+          else if (acao === 'cobranca') setCobrancaLote(true);
+          else if (acao === 'regime') setRegimeLote(true);
+          else setBaixarAberto(true);
+        }}
+      />
       <GerarLoteDialog
         aberto={loteAberto}
         onClose={() => setLoteAberto(false)}
@@ -486,6 +515,7 @@ function AbaDefis({
   const [consultaLote, setConsultaLote] = useState(false);
   const [baixarAberto, setBaixarAberto] = useState(false);
   const [filtroSituacao, setFiltroSituacao] = useState<string | null>(null);
+  const [acoesLote, setAcoesLote] = useState(false);
   const hojeIso = hojeBR();
 
   const seloDe = (l: LinhaDefis): Selo | null => (consulta.emAndamento === l.contact_id
@@ -498,6 +528,7 @@ function AbaDefis({
     [linhas, ano, busca],
   );
   const contagem = contarEstados(base.map(seloDe));
+  const doAno = useMemo(() => linhas.filter((l) => !l.filial && statusDefis(l, ano) !== 'nao_se_aplica'), [linhas, ano]);
   const filtradas = base
     .filter((l) => !estado || seloDe(l)?.estado === estado)
     .filter((l) => passaFiltroSelo(seloDe(l), filtroSituacao, motivoDoSelo))
@@ -541,7 +572,10 @@ function AbaDefis({
             <Button size="icon" variant="ghost" className="h-9 w-9" disabled={ano >= anoMax} onClick={() => setAno(ano + 1)}><ChevronRight className="h-4 w-4" /></Button>
           </DicaBotao>
         </div>
-        <ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />
+        <div className="flex items-center gap-2">
+          <BotaoAcoesEmLote onClick={() => setAcoesLote(true)} disabled={doAno.length === 0} />
+          <ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />
+        </div>
       </div>
 
       {isLoading || carregandoCadastro ? <Skeleton className="h-[88px] w-full" /> : <FaixaEstados contagem={contagem} ativo={estado} onChange={setEstado} />}
@@ -647,6 +681,18 @@ function AbaDefis({
           onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
       </div>
       {consulta.dialog}
+      <AcoesEmLoteDialog
+        aberto={acoesLote}
+        onClose={() => setAcoesLote(false)}
+        clientes={doAno.map((l) => ({ id: l.contact_id, nome: l.nome, documento: l.documento, selo: seloDe(l) }))}
+        acoes={[
+          { chave: 'consultar', rotulo: 'Consultar DEFIS', custo: 'Consultar', padrao: ['pendencia', 'atencao', 'nao_verificado'],
+            dica: 'Traz as DEFIS de todos os anos numa chamada. Quem já foi consultado hoje fica de fora.' },
+          { chave: 'baixar', rotulo: `Baixar DEFIS de ${ano}`, padrao: ['em_dia'],
+            dica: 'Baixa num ZIP as declarações e os recibos já guardados. Não consulta a Receita.' },
+        ]}
+        onContinuar={(acao, ids) => { sel.definir(ids); if (acao === 'consultar') setConsultaLote(true); else setBaixarAberto(true); }}
+      />
       <AcaoLoteDialog
         aberto={consultaLote}
         onClose={() => setConsultaLote(false)}

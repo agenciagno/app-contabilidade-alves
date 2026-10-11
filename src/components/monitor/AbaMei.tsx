@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { CompetenciaNav } from '@/components/serpro/CompetenciaNav';
+import { AcoesEmLoteDialog, BotaoAcoesEmLote } from '@/components/monitor/AcoesEmLote';
 import { Preco } from '@/components/serpro/CustoSerpro';
 import { DicaBotao } from '@/components/serpro/DicaBotao';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
@@ -74,6 +75,7 @@ export function AbaMei() {
   const [envioAberto, setEnvioAberto] = useState(false);
   const [baixarAberto, setBaixarAberto] = useState(false);
   const [abrindo, setAbrindo] = useState<string | null>(null);
+  const [acoesLote, setAcoesLote] = useState(false);
 
   const seloDe = (l: LinhaMei): Selo | null => piorSelo([seloEnquadramento(l), seloDivida(l, ano)]);
   const base = useMemo(() => {
@@ -136,11 +138,7 @@ export function AbaMei() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <CompetenciaNav competencia={pa} onChange={(v) => { setPa(v); sel.limpar(); }} limite={mesDeData(new Date())} />
         <div className="flex flex-wrap items-center gap-2">
-          <DicaBotao texto={`Marca na lista os MEI que recebem o DAS pela CA (marcação do cadastro). ${quemRecebe.length} marcados.`}>
-            <Button variant="outline" size="sm" className="h-10" disabled={!quemRecebe.length} onClick={() => sel.definir(quemRecebe.map((l) => l.contact_id))}>
-              Selecionar quem recebe DAS ({quemRecebe.length})
-            </Button>
-          </DicaBotao>
+          <BotaoAcoesEmLote onClick={() => setAcoesLote(true)} disabled={linhas.length === 0} />
           <DicaBotao texto="Lista os DAS do MEI já gerados dos clientes que recebem DAS pela CA, para conferir e mandar por e-mail.">
             <Button variant="outline" size="sm" className="h-10" onClick={() => setEnvioAberto(true)}>
               <Mail className="mr-1.5 h-4 w-4" />Conferir e enviar{aEnviar ? ` (${aEnviar})` : ''}
@@ -282,6 +280,30 @@ export function AbaMei() {
       </div>
       <p className="text-meta text-muted-ink-2">O DAS do MEI aparece na coluna, mas não entra na situação: o MEI pode pagar pelo app. Os parcelamentos do MEI ficam em Parcelamentos.</p>
 
+      <AcoesEmLoteDialog
+        aberto={acoesLote}
+        onClose={() => setAcoesLote(false)}
+        clientes={linhas.map((l) => ({ id: l.contact_id, nome: l.nome, documento: l.documento, selo: seloDe(l) }))}
+        extras={[{ chave: 'recebe', rotulo: 'Recebe o DAS pela CA', dica: 'Marcação do cadastro: a CA gera e envia o DAS do MEI.', ids: quemRecebe.map((l) => l.contact_id) }]}
+        acoes={[
+          { chave: 'das', rotulo: `Gerar DAS de ${siglaCompetencia(pa)}`, custo: 'Emitir', padrao: ['recebe'],
+            dica: 'Um DAS do MEI por cliente. Quem já tem DAS guardado e válido não é emitido de novo.' },
+          { chave: 'divida', rotulo: `Dívida ativa de ${ano}`, custo: 'Consultar', padrao: ['pendencia', 'atencao', 'nao_verificado'],
+            seloDe: (id) => { const l = linhas.find((x) => x.contact_id === id); return l ? seloDivida(l, ano) : null; },
+            dica: 'Consulta os débitos do ano em dívida ativa.' },
+          { chave: 'situacao', rotulo: 'Situação no MEI', custo: 'Consultar', padrao: ['pendencia', 'atencao', 'nao_verificado'],
+            seloDe: (id) => { const l = linhas.find((x) => x.contact_id === id); return l ? seloEnquadramento(l) : null; },
+            dica: 'Consulta a situação cadastral e o enquadramento no MEI.' },
+          { chave: 'ccmei', rotulo: 'Emitir CCMEI', custo: 'Emitir', padrao: [],
+            dica: 'Emite o Certificado da Condição de MEI (CCMEI).' },
+          { chave: 'baixar', rotulo: 'Baixar DAS e CCMEI', padrao: ['recebe'],
+            dica: 'Baixa num ZIP os DAS do MEI e os CCMEI já guardados. Não consulta a Receita.' },
+        ]}
+        onContinuar={(acao, ids) => {
+          sel.definir(ids);
+          if (acao === 'baixar') setBaixarAberto(true); else setLote(acao as 'das' | 'divida' | 'situacao' | 'ccmei');
+        }}
+      />
       <GerarLoteDialog
         aberto={lote === 'das'}
         onClose={() => setLote(null)}

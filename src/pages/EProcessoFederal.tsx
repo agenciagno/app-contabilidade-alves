@@ -14,6 +14,7 @@ import { usePagamentosClienteJanela } from '@/components/serpro/PagamentosDoClie
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { FaixaEstados, PaginacaoLista, RodapeLista, SeloMonitor, UltimaBusca, useEstadoUrl, usePaginacao } from '@/components/monitor/MonitorUi';
 import { AcaoLoteDialog, BarraSelecao, useSelecao } from '@/components/monitor/GuiasLote';
+import { AcoesEmLoteDialog, BotaoAcoesEmLote } from '@/components/monitor/AcoesEmLote';
 import { useConsultarEProcesso, useMatrizEProcesso, type LinhaEProcesso } from '@/hooks/useSerproExtras';
 import { ROTULO_ESTADO, contarEstados, type Selo } from '@/lib/monitorEstados';
 import { hojeBR } from '@/lib/prazosFederais';
@@ -47,6 +48,7 @@ export default function EProcessoFederal() {
   const [consultando, setConsultando] = useState<string | null>(null);
   const sel = useSelecao();
   const [loteAberto, setLoteAberto] = useState(false);
+  const [acoesLote, setAcoesLote] = useState(false);
   const hoje = hojeBR();
 
   const matrizes = useMemo(() => linhas.filter((l) => !l.filial), [linhas]);
@@ -95,7 +97,10 @@ export default function EProcessoFederal() {
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <SearchField placeholder="Buscar por cliente, CNPJ, número ou tipo do processo..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px] flex-1" />
-          <ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />
+          <div className="flex items-center gap-2">
+            <BotaoAcoesEmLote onClick={() => setAcoesLote(true)} disabled={matrizes.length === 0} />
+            <ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />
+          </div>
         </div>
 
         <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
@@ -220,6 +225,14 @@ export default function EProcessoFederal() {
         </div>
       </div>
 
+      <AcoesEmLoteDialog
+        aberto={acoesLote}
+        onClose={() => setAcoesLote(false)}
+        clientes={matrizes.map((l) => ({ id: l.contact_id, nome: l.nome, documento: l.documento, selo: seloLinha(l) }))}
+        acoes={[{ chave: 'consultar', rotulo: 'Consultar e-Processo', custo: 'Consultar', padrao: ['pendencia', 'atencao', 'nao_verificado'],
+          dica: 'Consulta os processos digitais em que cada cliente é interessado. Quem já foi consultado hoje fica de fora.' }]}
+        onContinuar={(_acao, ids) => { sel.definir(ids); setLoteAberto(true); }}
+      />
       <AcaoLoteDialog
         aberto={loteAberto}
         onClose={() => setLoteAberto(false)}

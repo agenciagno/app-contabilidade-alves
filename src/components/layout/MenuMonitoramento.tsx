@@ -44,6 +44,7 @@ export function MenuMonitoramento() {
                 )}
               >
                 {item.tituloTopo ?? item.title}
+                {item.emBreve && <span className="rounded-pill border border-line px-1.5 text-[10px] leading-4 text-muted-ink-2">em breve</span>}
                 {item.moduleKey === 'mensagens' && mensagensNovas > 0 && (
                   <span className="flex h-5 min-w-[20px] items-center justify-center rounded-pill bg-danger px-1.5 text-badge font-medium text-white">
                     {mensagensNovas}

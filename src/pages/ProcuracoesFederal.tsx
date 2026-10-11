@@ -8,6 +8,7 @@ import { DsBadge, DsTab, PageHeader, SearchField } from '@/components/ds';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AcaoLoteDialog, BarraSelecao, useSelecao } from '@/components/monitor/GuiasLote';
+import { AcoesEmLoteDialog, BotaoAcoesEmLote } from '@/components/monitor/AcoesEmLote';
 import { hojeBR } from '@/lib/prazosFederais';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -99,6 +100,7 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
   const [busca, setBusca] = useState(buscaInicial);
   const sel = useSelecao();
   const [loteAberto, setLoteAberto] = useState(false);
+  const [acoesLote, setAcoesLote] = useState(false);
   const hoje = hojeBR();
 
   const certDe = (l: LinhaProcuracao): CertificadoDoCliente | null => certPor.get(l.contact_id) ?? null;
@@ -178,7 +180,10 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <SearchField placeholder="Buscar por razão social ou CNPJ..." value={busca} onChange={(e) => setBusca(e.target.value)} wrapperClassName="max-w-[429px] flex-1" />
-        <ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />
+        <div className="flex items-center gap-2">
+          <BotaoAcoesEmLote onClick={() => setAcoesLote(true)} disabled={matrizes.length === 0} />
+          <ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} escolherColunas />
+        </div>
       </div>
 
       <BarraSelecao quantos={sel.marcados.size} onLimpar={sel.limpar}>
@@ -292,6 +297,14 @@ function AbaProcuracoes({ veCertificados }: { veCertificados: boolean }) {
           onPagina={irParaPagina} onPorPagina={pag.setPorPagina} />
       </div>
 
+      <AcoesEmLoteDialog
+        aberto={acoesLote}
+        onClose={() => setAcoesLote(false)}
+        clientes={matrizes.map((l) => ({ id: l.contact_id, nome: l.nome, documento: l.documento, selo: seloProcuracaoDa(l) }))}
+        acoes={[{ chave: 'mapear', rotulo: 'Mapear procurações', custo: 'Consultar', padrao: ['pendencia', 'atencao', 'nao_verificado'],
+          dica: 'Consulta quais procurações cada cliente deu à Contabilidade Alves e até quando valem. Quem já foi mapeado hoje fica de fora.' }]}
+        onContinuar={(_acao, ids) => { sel.definir(ids); setLoteAberto(true); }}
+      />
       <AcaoLoteDialog
         aberto={loteAberto}
         onClose={() => setLoteAberto(false)}
