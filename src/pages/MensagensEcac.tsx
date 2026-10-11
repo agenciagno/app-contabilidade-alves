@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { AjudaDaTela } from '@/components/monitor/AjudaDaTela';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 
@@ -59,7 +60,7 @@ export default function MensagensEcac() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/caixa postal e-cac" title="Caixa Postal e-CAC" />
+      <PageHeader kicker="~/caixa postal e-cac" title="Caixa Postal e-CAC" ajuda={<AjudaDaTela tela="caixa-postal" />} />
 
       <div className="flex gap-1 border-b border-line">
         <DsTab active={aba === 'clientes'} onClick={() => irPara('clientes')}>Clientes</DsTab>

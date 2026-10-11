@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { AjudaDaTela } from '@/components/monitor/AjudaDaTela';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { CalendarPlus, Loader2, Mail, RefreshCw } from 'lucide-react';
@@ -137,7 +138,7 @@ export default function DctfwebMitFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · dctfweb | mit" title="DCTFWeb | MIT" />
+      <PageHeader kicker="~/dashboard fiscal · dctfweb | mit" title="DCTFWeb | MIT" ajuda={<AjudaDaTela tela="dctfweb-mit" />} />
 
       <div className="space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { AjudaDaTela } from '@/components/monitor/AjudaDaTela';
 import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, FileText, Loader2, Mail, Receipt, RefreshCw, X } from 'lucide-react';
@@ -73,7 +74,7 @@ export default function SimplesNacionalFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · simples nacional" title="Simples Nacional | MEI" />
+      <PageHeader kicker="~/dashboard fiscal · simples nacional" title="Simples Nacional | MEI" ajuda={<AjudaDaTela tela="simples" />} />
 
       <div className="flex gap-1 border-b border-line">
         <DsTab active={aba === 'mensal'} onClick={() => irPara('mensal')}>Mensal</DsTab>

@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { AjudaDaTela } from '@/components/monitor/AjudaDaTela';
 import { format } from 'date-fns';
 
 import { DsBadge, PageHeader, SearchField, StatCardRow } from '@/components/ds';
@@ -66,6 +67,7 @@ export default function ConferenciaCadastroFederal() {
       <PageHeader
         kicker="~/dashboard fiscal · conferência do cadastro"
         title="Conferência do cadastro"
+        ajuda={<AjudaDaTela tela="conferencia" />}
         subtitle="Clientes ativos em que o cadastro e o que a Receita mostra (ou o próprio monitoramento) não batem: Simples sem declaração, declaração do Simples em cliente de outro regime, cliente ativo com data de saída e PJ sem regime. Só lê o que já está salvo: não consulta o Serpro e não gera custo. A Receita só é comparada onde a declaração já foi consultada."
         actions={<ExportarMenu montar={tabelaExport} disabled={filtradas.length === 0} />}
       />

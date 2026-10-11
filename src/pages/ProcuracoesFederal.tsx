@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { AjudaDaTela } from '@/components/monitor/AjudaDaTela';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2, RefreshCw, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -67,7 +68,7 @@ export default function ProcuracoesFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · procurações e certificados" title="Procurações | Certificados" />
+      <PageHeader kicker="~/dashboard fiscal · procurações e certificados" title="Procurações | Certificados" ajuda={<AjudaDaTela tela="procuracoes" />} />
 
       <div className="flex gap-1 border-b border-line">
         <DsTab active={aba === 'procuracoes'} onClick={() => irPara('procuracoes')}>Procurações</DsTab>

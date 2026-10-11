@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { AjudaDaTela } from '@/components/monitor/AjudaDaTela';
 import { format } from 'date-fns';
 import { Loader2, RefreshCw } from 'lucide-react';
 
@@ -86,7 +87,7 @@ export default function SituacaoFiscalFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · situação fiscal" title="Situação fiscal" />
+      <PageHeader kicker="~/dashboard fiscal · situação fiscal" title="Situação fiscal" ajuda={<AjudaDaTela tela="situacao-fiscal" />} />
 
       <div className="space-y-5">
         {isLoading ? <Skeleton className="h-[88px] w-full" /> : <FaixaEstados contagem={contagem} ativo={estado} onChange={setEstado} />}

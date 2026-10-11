@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState, useRef } from 'react';
+import { AjudaDaTela } from '@/components/monitor/AjudaDaTela';
 import { ChevronDown, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
 
 import { useBuscaInicial } from '@/hooks/useBuscaInicial';
@@ -84,7 +85,7 @@ export default function EProcessoFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · e-processo" title="e-Processo" />
+      <PageHeader kicker="~/dashboard fiscal · e-processo" title="e-Processo" ajuda={<AjudaDaTela tela="eprocesso" />} />
 
       <div className="space-y-5">
         {isLoading ? <Skeleton className="h-[88px] w-full" /> : <FaixaEstados contagem={contagem} ativo={estado} onChange={setEstado} />}

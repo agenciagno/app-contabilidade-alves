@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { AjudaDaTela } from '@/components/monitor/AjudaDaTela';
 import { format } from 'date-fns';
 import { Loader2, Mail, RefreshCw } from 'lucide-react';
 
@@ -125,7 +126,7 @@ export default function ParcelamentosFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · parcelamentos" title="Parcelamentos" />
+      <PageHeader kicker="~/dashboard fiscal · parcelamentos" title="Parcelamentos" ajuda={<AjudaDaTela tela="parcelamentos" />} />
 
       <div className="space-y-5">
         {isLoading ? <Skeleton className="h-[88px] w-full" /> : <FaixaEstados contagem={contagem} ativo={estado} onChange={setEstado} />}

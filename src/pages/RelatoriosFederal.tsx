@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AjudaDaTela } from '@/components/monitor/AjudaDaTela';
 import { format } from 'date-fns';
 import { Mail } from 'lucide-react';
 
@@ -118,7 +119,7 @@ export default function RelatoriosFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal · relatórios" title="Relatórios" />
+      <PageHeader kicker="~/dashboard fiscal · relatórios" title="Relatórios" ajuda={<AjudaDaTela tela="relatorios" />} />
 
       <div className="space-y-5">
         {ocupado ? <Skeleton className="h-[88px] w-full" /> : <FaixaEstados contagem={contagem} ativo={estado} onChange={setEstado} />}

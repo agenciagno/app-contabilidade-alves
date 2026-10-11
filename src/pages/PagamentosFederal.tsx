@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { AjudaDaTela } from '@/components/monitor/AjudaDaTela';
 import { format } from 'date-fns';
 import { PaginacaoLista, RodapeLista, usePaginacao, TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 
@@ -168,6 +169,7 @@ export default function PagamentosFederal() {
       <PageHeader
         kicker="~/dashboard fiscal · pagamentos e das"
         title="Pagamentos e DAS"
+        ajuda={<AjudaDaTela tela="pagamentos" />}
         subtitle="Documentos de arrecadação pagos na Receita (DARF e DAE) e o DAS do Simples (gerado, pago, a vencer ou vencido) por cliente ativo e competência. O aviso de pagamento novo vem da rotina diária das 07:35, sem custo. A situação do DAS é atualizada pela rotina do PGDAS (dia 16 e dia seguinte ao prazo) ou por Atualizar DAS no painel do cliente. Para ver valor, data e composição, abra o cliente e use Consultar pagamentos. A Receita só informa o que foi pago: zero em um mês consultado não prova que não havia o que pagar."
         actions={(
           <div className="flex items-center gap-2">

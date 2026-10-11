@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AjudaDaTela } from '@/components/monitor/AjudaDaTela';
 import { Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ChevronRight, ClipboardCheck } from 'lucide-react';
@@ -170,7 +171,7 @@ export default function DashboardFederal() {
 
   return (
     <div className="space-y-6">
-      <PageHeader kicker="~/dashboard fiscal" title="Dashboard Fiscal" />
+      <PageHeader kicker="~/dashboard fiscal" title="Dashboard Fiscal" ajuda={<AjudaDaTela tela="dashboard" />} />
 
       {!conferencia.carregando && conferencia.linhas.length > 0 && (
         <DsAlert

@@ -385,15 +385,24 @@ export interface PageHeaderProps {
   title: string;
   subtitle?: React.ReactNode;
   actions?: React.ReactNode;
+  /** Ícone de ajuda ao lado do título (ex.: o "Como funciona" do Monitoramento). */
+  ajuda?: React.ReactNode;
   className?: string;
 }
 
-export function PageHeader({ kicker, title, subtitle, actions, className }: PageHeaderProps) {
+export function PageHeader({ kicker, title, subtitle, actions, ajuda, className }: PageHeaderProps) {
   return (
     <div className={cn('flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between', className)}>
       <div className="min-w-0">
         <p className="text-kicker uppercase text-muted-ink-2">{kicker}</p>
-        <h1 className="mt-1 text-display first-letter:uppercase text-ink">{title}</h1>
+        {ajuda ? (
+          <div className="mt-1 flex items-center gap-3">
+            <h1 className="text-display first-letter:uppercase text-ink">{title}</h1>
+            {ajuda}
+          </div>
+        ) : (
+          <h1 className="mt-1 text-display first-letter:uppercase text-ink">{title}</h1>
+        )}
         {subtitle && <p className="mt-1 text-body text-muted-ink">{subtitle}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
