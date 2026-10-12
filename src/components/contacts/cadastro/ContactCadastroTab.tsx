@@ -945,12 +945,15 @@ function OperacionalSection({
 }
 
 // ============ Situação do cliente (períodos de status) ============
+// Só o histórico (pedido de Gabriel, 12/10/2026): uma linha por período, "Status: de X até Y". O Ativo que nunca teve troca
+// puxa o início do contrato; a data do período vigente se ajusta na própria linha.
 const fmtData = (d: string) => format(parseISO(d), 'dd/MM/yyyy');
-function faixaDoPeriodo(p: StatusPeriodo) {
-  if (p.inicio && p.fim) return `de ${fmtData(p.inicio)} até ${fmtData(p.fim)}`;
-  if (p.inicio) return `desde ${fmtData(p.inicio)} (vigente)`;
+
+function faixaDoPeriodo(p: StatusPeriodo, inicio: string | null) {
+  if (inicio && p.fim) return `de ${fmtData(inicio)} até ${fmtData(p.fim)}`;
+  if (inicio) return `desde ${fmtData(inicio)}`;
   if (p.fim) return `até ${fmtData(p.fim)}`;
-  return 'data não informada (vigente)';
+  return 'data de início não informada';
 }
 
 function SituacaoClientePanel({
@@ -965,90 +968,101 @@ function SituacaoClientePanel({
 }) {
   const { data: periodos = [], isLoading } = useStatusPeriodos(contactId);
   const { data: dispensadas = [] } = useTarefasDispensadas(contactId);
+  const [ajustando, setAjustando] = useState(false);
   const dispensadasPorPeriodo = useMemo(() => {
     const m = new Map<string, typeof dispensadas>();
     dispensadas.forEach(d => { if (d.periodo_id) m.set(d.periodo_id, [...(m.get(d.periodo_id) ?? []), d]); });
     return m;
   }, [dispensadas]);
-  const statusAtual: string = original.status_cliente || 'Ativo';
-  const semData = !trocouStatus && !form.status_cliente_desde && statusAtual !== 'Ativo';
+  const inicioContrato: string | null = original.data_inicio_contrato || null;
 
   return (
     <section className="rounded-lg border border-line bg-paper p-4 lg:col-span-2">
       <header className="mb-4 border-b border-line pb-2">
         <h4 className="text-sm font-semibold text-ink">Situação do cliente</h4>
         <p className="text-meta text-muted-ink">
-          Quando o cliente entra ou sai do Ativo. Fora do Ativo não geramos tarefas nem consultamos o Serpro; o que ficou sem entrega nesse intervalo se explica por aqui.
+          Histórico de quando o cliente esteve Ativo e fora do Ativo. Fora do Ativo não geramos tarefas nem consultamos o Serpro; o que ficou sem entrega nesse intervalo se explica por aqui.
         </p>
       </header>
 
-      {trocouStatus ? (
-        <p className="text-sm text-muted-ink">Troca de status pendente: informe a data no campo Status do Cliente (acima) e salve.</p>
+      {isLoading ? (
+        <Skeleton className="h-10 w-full" />
+      ) : periodos.length === 0 ? (
+        <p className="text-sm text-muted-ink">Nenhum período registrado.</p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Status atual</Label>
-            <div className="pt-1"><DsBadge tone={getContactStatusTone(statusAtual)}>{statusAtual}</DsBadge></div>
-          </div>
-          <Field label="Desde">
-            <Input
-              type="date"
-              max={hoje}
-              value={form.status_cliente_desde || ''}
-              onChange={e => set('status_cliente_desde', e.target.value)}
-            />
-            {semData && <p className="mt-1 text-xs text-warn">Informe desde quando o cliente está fora do Ativo.</p>}
-          </Field>
-          <Field label="Motivo">
-            <Input
-              value={form.status_cliente_motivo || ''}
-              onChange={e => set('status_cliente_motivo', e.target.value)}
-              placeholder="Opcional"
-            />
-          </Field>
-        </div>
+        <ul className="divide-y divide-line rounded-md border border-line">
+          {periodos.map(p => {
+            const apagadas = dispensadasPorPeriodo.get(p.id) ?? [];
+            const vigente = !p.fim;
+            // Ativo desde sempre (linha de partida, sem troca): mostra o início do contrato.
+            const emprestado = !p.inicio && p.status === 'Ativo' && p.origem === 'historico' && !!inicioContrato;
+            const inicio = p.inicio ?? (emprestado ? inicioContrato : null);
+            const semData = !inicio && !p.fim;
+            return (
+              <li key={p.id} className="px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <DsBadge tone={getContactStatusTone(p.status)}>{p.status}</DsBadge>
+                  <span className={semData ? 'text-warn' : 'text-ink'}>{faixaDoPeriodo(p, inicio)}</span>
+                  {vigente && <span className="text-meta text-muted-ink">vigente</span>}
+                  {(emprestado || p.motivo || p.origem === 'receita') && (
+                    <span className="text-meta text-muted-ink">
+                      {[emprestado ? 'início do contrato' : null, p.origem === 'receita' ? 'Receita Federal' : null, p.motivo].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                  {vigente && !trocouStatus && (
+                    <button
+                      type="button"
+                      onClick={() => setAjustando(a => !a)}
+                      className="ml-auto flex items-center gap-1 text-meta text-action hover:underline"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      {ajustando ? 'Fechar' : 'Ajustar data'}
+                    </button>
+                  )}
+                </div>
+                {vigente && ajustando && !trocouStatus && (
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Desde">
+                      <Input
+                        type="date"
+                        max={hoje}
+                        value={form.status_cliente_desde || ''}
+                        onChange={e => set('status_cliente_desde', e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Motivo (opcional)">
+                      <Input
+                        value={form.status_cliente_motivo || ''}
+                        onChange={e => set('status_cliente_motivo', e.target.value)}
+                      />
+                    </Field>
+                    <p className="text-xs text-muted-foreground sm:col-span-2">Vale ao salvar esta aba. Só o responsável pelo cliente, admin e super admin ajustam.</p>
+                  </div>
+                )}
+                {apagadas.length > 0 && (
+                  <details className="mt-1.5">
+                    <summary className="cursor-pointer text-meta text-muted-ink">
+                      {apagadas.length} {apagadas.length === 1 ? 'tarefa apagada ou não gerada' : 'tarefas apagadas ou não geradas'} neste período
+                    </summary>
+                    <ul className="mt-1 space-y-0.5 pl-4 text-meta text-muted-ink">
+                      {apagadas.map(d => (
+                        <li key={d.id}>
+                          {d.fiscal_obligations_catalog?.name ?? 'Obrigação'} · competência {String(d.competence_month).padStart(2, '0')}/{d.competence_year}
+                          {d.due_date ? ` · vence ${fmtData(d.due_date)}` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       )}
 
-      <div className="mt-5">
-        <p className="text-[11px] uppercase tracking-[0.05em] text-muted-ink-2">Histórico</p>
-        {isLoading ? (
-          <Skeleton className="mt-2 h-10 w-full" />
-        ) : periodos.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-ink">Nenhum período registrado.</p>
-        ) : (
-          <ul className="mt-2 divide-y divide-line rounded-md border border-line">
-            {periodos.map(p => {
-              const apagadas = dispensadasPorPeriodo.get(p.id) ?? [];
-              return (
-                <li key={p.id} className="px-3 py-2 text-sm">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <DsBadge tone={getContactStatusTone(p.status)}>{p.status}</DsBadge>
-                    <span className="text-ink">{faixaDoPeriodo(p)}</span>
-                    <span className="text-meta text-muted-ink">
-                      {ORIGEM_PERIODO_LABEL[p.origem]}{p.motivo ? ` · ${p.motivo}` : ''}
-                    </span>
-                  </div>
-                  {apagadas.length > 0 && (
-                    <details className="mt-1.5">
-                      <summary className="cursor-pointer text-meta text-muted-ink">
-                        {apagadas.length} {apagadas.length === 1 ? 'tarefa apagada ou não gerada' : 'tarefas apagadas ou não geradas'} neste período
-                      </summary>
-                      <ul className="mt-1 space-y-0.5 pl-4 text-meta text-muted-ink">
-                        {apagadas.map(d => (
-                          <li key={d.id}>
-                            {d.fiscal_obligations_catalog?.name ?? 'Obrigação'} · competência {String(d.competence_month).padStart(2, '0')}/{d.competence_year}
-                            {d.due_date ? ` · vence ${fmtData(d.due_date)}` : ''}
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+      {trocouStatus && (
+        <p className="mt-3 text-sm text-muted-ink">Troca de status pendente: informe a data no campo Status do Cliente (acima) e salve.</p>
+      )}
     </section>
   );
 }
