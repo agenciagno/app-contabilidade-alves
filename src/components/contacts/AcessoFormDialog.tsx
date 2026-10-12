@@ -31,6 +31,7 @@ import {
   PortalTipo,
   useSalvarAcesso,
 } from '@/hooks/useAcessosCliente';
+import { useAcessoTipos, useCriarAcessoTipo } from '@/hooks/useAcessoTipos';
 
 interface Props {
   open: boolean;
@@ -46,7 +47,14 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
-  const [portal, setPortal] = useState<PortalTipo>('gov_br');
+  // 'gov_br' | 'siare' | ... (portal fixo) ou 'tipo:<id>' (tipo criado pela equipe, gravado como portal 'outros').
+  const [tipoSel, setTipoSel] = useState<string>('gov_br');
+  const [criandoTipo, setCriandoTipo] = useState(false);
+  const [novoTipo, setNovoTipo] = useState('');
+  const { data: tipos = [] } = useAcessoTipos();
+  const criarTipo = useCriarAcessoTipo();
+  const tipoPersonalizadoId = tipoSel.startsWith('tipo:') ? tipoSel.slice(5) : null;
+  const portal: PortalTipo = tipoPersonalizadoId ? 'outros' : tipoSel;
   const [portalLabel, setPortalLabel] = useState('');
   const [login, setLogin] = useState('');
   const [senha, setSenha] = useState('');
@@ -60,7 +68,11 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
 
   useEffect(() => {
     if (open) {
-      setPortal(lockCertificado ? 'certificado_digital' : ((acesso?.portal as PortalTipo) ?? 'gov_br'));
+      setTipoSel(lockCertificado
+        ? 'certificado_digital'
+        : acesso?.tipo_id ? `tipo:${acesso.tipo_id}` : ((acesso?.portal as string) ?? 'gov_br'));
+      setCriandoTipo(false);
+      setNovoTipo('');
       setPortalLabel(acesso?.portal_label ?? '');
       setLogin(acesso?.login ?? '');
       setSenha('');
@@ -83,6 +95,7 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
         acesso_id: acesso?.id,
         contact_id: contactId,
         portal,
+        tipo_id: tipoPersonalizadoId,
         portal_label: portalLabel || null,
         login: login || null,
         senha: senha || undefined,
@@ -118,6 +131,22 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
     }
   };
 
+  const adicionarTipo = async () => {
+    const nome = novoTipo.trim();
+    if (nome.length < 2) return;
+    // Nome que já existe na lista: só seleciona, sem criar de novo.
+    const existente = tipos.find((t) => t.nome.trim().toLowerCase() === nome.toLowerCase());
+    try {
+      const tipo = existente ?? await criarTipo.mutateAsync(nome);
+      setTipoSel(`tipo:${tipo.id}`);
+      setCriandoTipo(false);
+      setNovoTipo('');
+      toast.success(existente ? `Tipo "${tipo.nome}" selecionado` : `Tipo "${tipo.nome}" criado e salvo na lista`);
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Falha ao criar o tipo de acesso.');
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -133,7 +162,15 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
           {!lockCertificado && (
             <div className="space-y-2">
               <Label>Portal</Label>
-              <Select value={portal} onValueChange={(v) => setPortal(v as PortalTipo)}>
+              <Select
+                value={tipoSel}
+                onValueChange={(v) => {
+                  if (!v) return; // Radix dispara onValueChange('') espúrio
+                  if (v === '__novo__') { setCriandoTipo(true); return; }
+                  setCriandoTipo(false);
+                  setTipoSel(v);
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -143,8 +180,42 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
                       {opt.label}
                     </SelectItem>
                   ))}
+                  {tipos.map((t) => (
+                    <SelectItem key={t.id} value={`tipo:${t.id}`}>
+                      {t.nome}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="__novo__" className="font-medium text-primary">
+                    + Novo tipo de acesso
+                  </SelectItem>
                 </SelectContent>
               </Select>
+              {criandoTipo && (
+                <div className="space-y-2 rounded-md border border-dashed p-3">
+                  <Label className="text-xs">Nome do novo tipo de acesso</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      autoFocus
+                      value={novoTipo}
+                      maxLength={60}
+                      onChange={(e) => setNovoTipo(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); adicionarTipo(); } }}
+                      placeholder="Ex: Alvará online"
+                    />
+                    <Button
+                      type="button"
+                      onClick={adicionarTipo}
+                      disabled={novoTipo.trim().length < 2 || criarTipo.isPending}
+                    >
+                      Adicionar
+                    </Button>
+                    <Button type="button" variant="ghost" onClick={() => { setCriandoTipo(false); setNovoTipo(''); }}>
+                      Cancelar
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Fica salvo na lista e vale para todos os clientes.</p>
+                </div>
+              )}
             </div>
           )}
 

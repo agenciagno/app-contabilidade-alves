@@ -86,7 +86,8 @@ export default function CofreGlobal() {
   const revelar = useRevelarSenha();
 
   const [search, setSearch] = useState('');
-  const [portaisSelecionados, setPortaisSelecionados] = useState<PortalTipo[]>(PORTAL_ORDER);
+  // Colunas ocultas (começa vazio): assim todo tipo novo criado pela equipe já aparece.
+  const [ocultas, setOcultas] = useState<string[]>([]);
   const [apenasAlertas, setApenasAlertas] = useState(false);
   const [popoverState, setPopoverState] = useState<{ key: string; senha: string } | null>(
     null
@@ -114,7 +115,8 @@ export default function CofreGlobal() {
         };
         map.set(row.contact_id, entry);
       }
-      entry.acessos[row.portal] = row;
+      // Tipo personalizado tem coluna própria (chave "tipo:<id>"); o resto segue a coluna do portal.
+      entry.acessos[row.tipo_id ? `tipo:${row.tipo_id}` : row.portal] = row;
       if (row.alerta_vencimento) entry.temAlerta = true;
     }
     return Array.from(map.values());
@@ -129,14 +131,24 @@ export default function CofreGlobal() {
     });
   }, [clientes, search, apenasAlertas]);
 
-  const colunasVisiveis = PORTAL_ORDER.filter((p) => portaisSelecionados.includes(p));
+  // Colunas: os portais fixos e, depois, um tipo personalizado por coluna (os que aparecem nos acessos).
+  const colunas = useMemo(() => {
+    const fixas = PORTAL_ORDER.map((p) => ({ key: p as string, titulo: PORTAL_SHORT[p], rotulo: PORTAL_LABELS[p] }));
+    const personalizadas = new Map<string, string>();
+    (data ?? []).forEach((r) => { if (r.tipo_id && r.tipo_nome) personalizadas.set(`tipo:${r.tipo_id}`, r.tipo_nome); });
+    const extras = [...personalizadas.entries()]
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([key, nome]) => ({ key, titulo: nome, rotulo: nome }));
+    return [...fixas, ...extras];
+  }, [data]);
+  const colunasVisiveis = colunas.filter((c) => !ocultas.includes(c.key));
 
   const stats = useMemo(() => ({
     credenciais: (data ?? []).length,
     aVencer: (data ?? []).filter((r) => r.alerta_vencimento).length,
-    portais: PORTAL_ORDER.length,
+    portais: colunas.length,
     clientes: clientes.length,
-  }), [data, clientes]);
+  }), [data, clientes, colunas]);
 
   const handleRevelar = async (row: CofreGlobalRow) => {
     const key = row.acesso_id + ':rev';
@@ -165,10 +177,8 @@ export default function CofreGlobal() {
     }
   };
 
-  const togglePortal = (p: PortalTipo) => {
-    setPortaisSelecionados((cur) =>
-      cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]
-    );
+  const togglePortal = (chave: string) => {
+    setOcultas((cur) => (cur.includes(chave) ? cur.filter((x) => x !== chave) : [...cur, chave]));
   };
 
   if (!podeAcessar) return null;
@@ -205,19 +215,19 @@ export default function CofreGlobal() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm">
-              Portais ({portaisSelecionados.length})
+              Portais ({colunasVisiveis.length})
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Colunas de portais</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {PORTAL_ORDER.map((p) => (
+            {colunas.map((c) => (
               <DropdownMenuCheckboxItem
-                key={p}
-                checked={portaisSelecionados.includes(p)}
-                onCheckedChange={() => togglePortal(p)}
+                key={c.key}
+                checked={!ocultas.includes(c.key)}
+                onCheckedChange={() => togglePortal(c.key)}
               >
-                {PORTAL_LABELS[p]}
+                {c.rotulo}
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
@@ -259,9 +269,9 @@ export default function CofreGlobal() {
                   <TableHead className="sticky left-0 bg-background z-10 min-w-[220px]">
                     Cliente
                   </TableHead>
-                  {colunasVisiveis.map((p) => (
-                    <TableHead key={p} className="text-center min-w-[120px]">
-                      {PORTAL_SHORT[p]}
+                  {colunasVisiveis.map((c) => (
+                    <TableHead key={c.key} className="text-center min-w-[120px]">
+                      {c.titulo}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -277,7 +287,8 @@ export default function CofreGlobal() {
                         {c.nome_cliente}
                       </Link>
                     </TableCell>
-                    {colunasVisiveis.map((p) => {
+                    {colunasVisiveis.map((col) => {
+                      const p = col.key;
                       const acc = c.acessos[p];
                       if (!acc) {
                         return (

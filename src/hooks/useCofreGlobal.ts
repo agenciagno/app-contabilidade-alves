@@ -13,6 +13,9 @@ export interface CofreGlobalRow {
   validade_certificado: string | null;
   senha_atualizada_em: string | null;
   alerta_vencimento: boolean;
+  /** Tipo personalizado criado pela equipe (portal = 'outros'). */
+  tipo_id: string | null;
+  tipo_nome: string | null;
 }
 
 export function useCofreGlobal() {
@@ -22,7 +25,7 @@ export function useCofreGlobal() {
       const { data, error } = await (supabase as any)
         .from('vw_cofre_global')
         .select(
-          'contact_id, nome_cliente:cliente_nome, acesso_id, portal, portal_label, login, observacao, validade_certificado, senha_atualizada_em, alerta_vencimento'
+          'contact_id, nome_cliente:cliente_nome, acesso_id, portal, portal_label, login, observacao, validade_certificado, senha_atualizada_em, alerta_vencimento, tipo_id, tipo_nome'
         )
         .order('cliente_nome', { ascending: true });
       if (error) throw error;

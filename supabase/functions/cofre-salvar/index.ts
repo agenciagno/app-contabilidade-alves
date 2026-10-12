@@ -78,7 +78,9 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { acesso_id, contact_id, portal, portal_label, login, senha, validade_certificado, observacao } = body;
+    const { acesso_id, contact_id, portal: portalRecebido, portal_label, login, senha, validade_certificado, observacao, tipo_id } = body;
+    // Tipo personalizado (catálogo acesso_tipos) sempre grava portal = 'outros'.
+    const portal = tipo_id ? "outros" : portalRecebido;
 
     if (!contact_id || !portal) {
       return new Response(
@@ -109,6 +111,16 @@ serve(async (req) => {
       );
     }
 
+    if (tipo_id) {
+      const { data: tipo } = await supabaseAdmin.from("acesso_tipos").select("id, company_id").eq("id", tipo_id).maybeSingle();
+      if (!tipo || tipo.company_id !== company_id) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Tipo de acesso inválido." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     let senha_encrypted = undefined;
     if (senha) {
       const { data: encrypted, error: encryptError } = await supabaseAdmin.rpc("cofre_encrypt_internal", {
@@ -135,6 +147,8 @@ serve(async (req) => {
       atualizado_por: profile.id,
     };
     if (senha_encrypted !== undefined) payload.senha_encrypted = senha_encrypted;
+    // Só mexe no tipo quando a tela manda o campo (versão antiga da tela não manda e não pode zerar o tipo).
+    if ("tipo_id" in body) payload.tipo_id = tipo_id ?? null;
 
     let result;
     if (acesso_id) {
@@ -155,7 +169,7 @@ serve(async (req) => {
       if (error) {
         if (error.code === "23505") {
           return new Response(
-            JSON.stringify({ success: false, error: `Já existe um acesso para o portal ${portal} neste cliente.` }),
+            JSON.stringify({ success: false, error: tipo_id ? "Já existe um acesso deste tipo neste cliente." : `Já existe um acesso para o portal ${portal} neste cliente.` }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }

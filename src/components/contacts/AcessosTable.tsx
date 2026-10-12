@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   AcessoPortal,
-  PORTAL_LABELS,
+  nomeDoTipoDeAcesso,
   useExcluirAcesso,
   useRevelarSenha,
 } from '@/hooks/useAcessosCliente';
@@ -122,7 +122,7 @@ export function AcessosTable({ acessos, contactId, onEdit }: Props) {
                 <TableRow key={a.id}>
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className="font-medium">{PORTAL_LABELS[a.portal] ?? a.portal}</span>
+                      <span className="font-medium">{nomeDoTipoDeAcesso(a)}</span>
                       {a.portal_label && (
                         <span className="text-xs text-muted-foreground">{a.portal_label}</span>
                       )}
@@ -202,7 +202,7 @@ export function AcessosTable({ acessos, contactId, onEdit }: Props) {
             <AlertDialogTitle>Excluir acesso?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta ação não pode ser desfeita. O acesso ao portal{' '}
-              <strong>{toDelete && PORTAL_LABELS[toDelete.portal]}</strong> será removido.
+              <strong>{toDelete && nomeDoTipoDeAcesso(toDelete)}</strong> será removido.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -32,11 +32,20 @@ export interface AcessoPortal {
   anexo_url: string | null;
   updated_at: string;
   atualizado_por: string | null;
+  /** Tipo personalizado (catálogo da empresa); nesse caso `portal` é 'outros'. */
+  tipo_id?: string | null;
+  tipo?: { nome: string } | null;
 }
+
+/** Nome do tipo de acesso como aparece nas telas: o personalizado, ou o do portal fixo. */
+export const nomeDoTipoDeAcesso = (a: { portal: string; tipo?: { nome: string } | null }) =>
+  a.tipo?.nome ?? PORTAL_LABELS[a.portal] ?? a.portal;
 export interface SalvarAcessoInput {
   acesso_id?: string;
   contact_id: string;
   portal: PortalTipo;
+  /** Tipo personalizado (acesso_tipos). Quando vem, o servidor grava portal = 'outros'. */
+  tipo_id?: string | null;
   portal_label?: string | null;
   login?: string | null;
   senha?: string;
@@ -52,7 +61,7 @@ export function useAcessosCliente(contactId: string | undefined) {
       const { data, error } = await (supabase as any)
         .from('acessos_portais')
         .select(
-          'id, contact_id, company_id, portal, portal_label, login, validade_certificado, observacao, anexo_url, updated_at, atualizado_por'
+          'id, contact_id, company_id, portal, portal_label, login, validade_certificado, observacao, anexo_url, updated_at, atualizado_por, tipo_id, tipo:acesso_tipos(nome)'
         )
         .eq('contact_id', contactId)
         .order('portal', { ascending: true });
