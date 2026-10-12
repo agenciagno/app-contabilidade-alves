@@ -244,13 +244,13 @@ export const menuEntries: MenuEntry[] = [
     icon: Send,
     moduleKey: 'tech',
     items: [
-      // Audiência por item (decisão Gabriel 10/08): Consumo Serpro é da operação
+      // Audiência por item (decisão Gabriel 10/08): SERPRO é da operação
       // interna; Clientes Externos e LGPD vivem na visão do produto;
       // Central de Notificações existe nas duas.
       { title: 'Clientes Externos', url: '/tech/clientes-externos', icon: Building2, iconName: 'building-2', requireSuperAdmin: true, audience: 'external' },
       { title: 'Canais de Suporte', url: '/tech/suporte-canais', icon: MessageSquare, iconName: 'message-square', requireSuperAdmin: true, audience: 'external' },
       { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check', requireAdmin: true, audience: 'external' },
-      { title: 'Consumo Serpro', url: '/tech/consumo-serpro', icon: Gauge, iconName: 'gauge', subKey: 'tech_consumo_serpro', requireAdmin: true, audience: 'internal' },
+      { title: 'SERPRO', url: '/tech/consumo-serpro', icon: Gauge, iconName: 'gauge', subKey: 'tech_consumo_serpro', requireAdmin: true, audience: 'internal' },
       { title: 'Central de Notificações', url: '/central-notificacoes', icon: BellRing, iconName: 'bell-ring', subKey: 'tech_central_notificacoes', requireSuperAdmin: true },
     ],
   },

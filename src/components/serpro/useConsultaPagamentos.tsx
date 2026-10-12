@@ -12,7 +12,7 @@ import { sufixoTarefas } from '@/lib/tarefasConcluidas';
 /**
  * Consulta de pagamentos de UM cliente num mês, sempre por clique (sem lote).
  * Se o mês deste cliente foi consultado há pouco, pede confirmação antes de consultar de novo.
- * O valor do clique aparece no botão e na dica só para administrador e super administrador (`Preco`, `DicaBotao`); o total fica em Tech > Consumo Serpro.
+ * O valor do clique aparece no botão e na dica só para administrador e super administrador (`Preco`, `DicaBotao`); o total fica em Tech > SERPRO.
  */
 export function useConsultaPagamentos(competencia: string) {
   const consultar = useConsultarPagamentos();

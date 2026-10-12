@@ -33,7 +33,7 @@ export const MODULE_TREE: ModuleNode[] = [
     key: 'tech',
     label: 'Tech',
     children: [
-      { key: 'tech_consumo_serpro', label: 'Consumo Serpro' },
+      { key: 'tech_consumo_serpro', label: 'SERPRO' },
       { key: 'tech_central_notificacoes', label: 'Central de Notificações' },
     ],
   },
@@ -168,7 +168,7 @@ export const INTERNAL_PICKER_TREE: PickerNode[] = [
     key: 'tech',
     label: 'Tech',
     children: [
-      { key: 'tech_consumo_serpro', label: 'Consumo Serpro' },
+      { key: 'tech_consumo_serpro', label: 'SERPRO' },
       { key: 'tech_central_notificacoes', label: 'Central de Notificações' },
     ],
   },
@@ -306,7 +306,7 @@ export const MODULE_AUDIENCE: Record<string, ModuleAudience> = {
   financeiro_relatorios: 'external',
 
   // Tech: o grupo existe nos dois mundos; cada item declara o seu lado.
-  // (Clientes Externos, LGPD e Consumo Serpro não têm chave de submódulo — a
+  // (Clientes Externos, LGPD e SERPRO não têm chave de submódulo — a
   // audiência deles vive no item do menu e no guard da rota.)
   tech: 'both',
   tech_consumo_serpro: 'internal',

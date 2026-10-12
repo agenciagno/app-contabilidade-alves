@@ -28,7 +28,7 @@ const msg = (e: unknown, padrao: string) => (e as Error)?.message || padrao;
 /**
  * Consulta do ANO de UM cliente (as 12 competências numa chamada), sempre por clique, sem lote.
  * Se o ano deste cliente foi consultado há pouco, pede confirmação antes de consultar de novo.
- * O valor do clique aparece no botão e na dica só para administrador e super administrador (`Preco`, `DicaBotao`); o total fica em Tech > Consumo Serpro.
+ * O valor do clique aparece no botão e na dica só para administrador e super administrador (`Preco`, `DicaBotao`); o total fica em Tech > SERPRO.
  */
 export function useConsultaPgdasd(ano: number) {
   const consultar = useConsultarPgdasd();

@@ -11,7 +11,7 @@ import { useConsultarCaixa } from '@/hooks/useSerproCaixaPostal';
 /**
  * Consulta da lista de UM cliente (sem ciência) sempre disparada por clique.
  * Se o cliente foi consultado há pouco, pede confirmação antes de consultar de novo.
- * O valor do clique aparece no botão e na dica só para administrador e super administrador (`Preco`, `DicaBotao`); o total fica em Tech > Consumo Serpro.
+ * O valor do clique aparece no botão e na dica só para administrador e super administrador (`Preco`, `DicaBotao`); o total fica em Tech > SERPRO.
  * Usado pela linha da tabela (botão Consultar) e pelo painel do cliente.
  */
 export function useConsultaCliente() {

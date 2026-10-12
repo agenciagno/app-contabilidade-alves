@@ -155,7 +155,7 @@ const App = () => (
 
               <Route path="/acessos" element={<AppLayout><ModuleGuard moduleName="cadastro" subModule="acessos"><CofreGlobal /></ModuleGuard></AppLayout>} />
               {/* Audiência por rota Tech (decisão Gabriel 10/08): Clientes Externos
-                  e LGPD vivem no Sistema Externo; Consumo Serpro no Interno. As telas
+                  e LGPD vivem no Sistema Externo; SERPRO no Interno. As telas
                   continuam checando papel (super admin/admin) por conta própria. */}
               <Route path="/tech/clientes-externos" element={<AppLayout><AudienceGuard audience="external"><TechClientesExternos /></AudienceGuard></AppLayout>} />
               <Route path="/tech/clientes-externos/:id" element={<AppLayout><AudienceGuard audience="external"><TechClienteExternoDetalhe /></AudienceGuard></AppLayout>} />

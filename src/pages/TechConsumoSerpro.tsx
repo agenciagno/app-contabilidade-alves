@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
@@ -13,8 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
-import { useCompany } from '@/hooks/useCompany';
 import { useCustoSerpro } from '@/hooks/useSerproConsumo';
 import {
   custoEstimado, useConsumoSerpro, useSalvarSerproConfig, useSerproConfig,
@@ -26,35 +22,22 @@ const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curr
 const ALERTAS_EQUIPE: { chave: 'alerta_pgdas_antes_prazo' | 'alerta_mensagem_parada' | 'alerta_baixa_sem_declaracao' | 'alerta_sem_resposta'; titulo: string; texto: string }[] = [
   {
     chave: 'alerta_pgdas_antes_prazo', titulo: 'PGDAS-D faltando até 3 dias para o prazo',
-    texto: 'Do dia 17 até o prazo (dia 20, ou o próximo dia útil), avisa quais clientes do Simples ainda estão sem PGDAS-D transmitido na última leitura. Só entra cliente lido nos últimos 7 dias. Um aviso por cliente e por competência.',
+    texto: 'Do dia 17 até o prazo, avisa quais clientes do Simples ainda não transmitiram o PGDAS-D na última leitura (só os lidos nos últimos 7 dias). Um aviso por cliente e competência.',
   },
   {
     chave: 'alerta_mensagem_parada', titulo: 'Mensagem da Receita sem tratamento',
-    texto: 'Mensagem crítica da Caixa Postal (intimação, malha, exclusão do Simples, multa MAED, cobrança, processo) que continua como "nova" 3 dias depois de enviada, dentro dos últimos 30 dias. Um aviso por mensagem.',
+    texto: 'Mensagem crítica da Caixa Postal (intimação, malha, exclusão do Simples, multa MAED, cobrança, processo) ainda "nova" 3 dias depois de enviada, nos últimos 30 dias. Um aviso por mensagem.',
   },
   {
     chave: 'alerta_baixa_sem_declaracao', titulo: 'Tarefa de DAS concluída sem declaração na Receita',
-    texto: 'Tarefa de DAS concluída de uma competência dos últimos 3 meses, mas a Receita não mostra o PGDAS-D (consulta depois do prazo). Leva ao Cross-check, onde dá para reabrir a tarefa.',
+    texto: 'Tarefa de DAS concluída (últimos 3 meses), mas a Receita não mostra o PGDAS-D depois do prazo. Leva ao Cross-check, onde dá para reabrir a tarefa.',
   },
   {
     chave: 'alerta_sem_resposta', titulo: 'Cliente avisado sem resposta',
-    texto: 'Cliente avisado por e-mail ou WhatsApp a partir de CA · Ausências há 3 dias ou mais e com a declaração ainda em aberto, enquanto o acompanhamento estiver em "A tratar", "Cliente avisado" ou "Aguardando cliente".',
+    texto: 'Cliente avisado por e-mail ou WhatsApp (CA · Ausências) há 3 dias ou mais, com a declaração ainda em aberto e o acompanhamento em "A tratar", "Cliente avisado" ou "Aguardando cliente".',
   },
 ];
 const ROTULO_TIPO: Record<TipoRotina, string> = { Monitorar: 'Monitorar (grátis)', Consultar: 'Consultar', Emitir: 'Emitir', sem_chamada: 'Sem chamada ao Serpro' };
-
-function useNomesUsuarios() {
-  const { company } = useCompany();
-  return useQuery({
-    queryKey: ['serpro-nomes-usuarios', company?.id],
-    enabled: !!company?.id,
-    queryFn: async () => {
-      const { data, error } = await supabase.from('profiles').select('user_id, full_name').eq('company_id', company!.id);
-      if (error) throw error;
-      return new Map((data ?? []).map((p) => [p.user_id, p.full_name ?? 'Usuário']));
-    },
-  });
-}
 
 /** Valores do Serpro são só de administrador (decisão de Gabriel, 09/10/2026): o menu já esconde a tela; aqui trava o endereço digitado. */
 export default function TechConsumoSerpro() {
@@ -62,7 +45,7 @@ export default function TechConsumoSerpro() {
   if (!admin) {
     return (
       <div className="space-y-6">
-        <PageHeader kicker="~/tech · consumo serpro" title="Consumo Serpro." />
+        <PageHeader kicker="~/tech · serpro" title="SERPRO." />
         <DsAlert tone="info" title="Só administradores" description="O consumo e os valores do Serpro aparecem só para administradores." />
       </div>
     );
@@ -73,7 +56,6 @@ export default function TechConsumoSerpro() {
 function ConsumoSerproAdmin() {
   const { data: chamadas = [], isLoading } = useConsumoSerpro();
   const { data: config } = useSerproConfig();
-  const { data: nomes } = useNomesUsuarios();
   const { data: clientesCaixa = [] } = useClientesCaixa();
   const salvar = useSalvarSerproConfig();
   const [alerta, setAlerta] = useState('');
@@ -90,21 +72,11 @@ function ConsumoSerproAdmin() {
     const custo = (['Consultar', 'Emitir', 'Declarar'] as const).reduce((s, t) => s + custoEstimado(t, qtd(t)), 0);
 
     const porServico = new Map<string, { tipo: string; total: number; cobradas: number }>();
-    const porDia = new Map<string, { total: number; cobradas: number }>();
-    const porUsuario = new Map<string, { total: number; cobradas: number }>();
     for (const c of prod) {
       const chave = `${c.id_sistema}.${c.id_servico}`;
       const s = porServico.get(chave) ?? { tipo: c.tipo_chamada, total: 0, cobradas: 0 };
       s.total++; if (c.cobravel) s.cobradas++;
       porServico.set(chave, s);
-      const d = format(new Date(c.created_at), 'dd/MM');
-      const dia = porDia.get(d) ?? { total: 0, cobradas: 0 };
-      dia.total++; if (c.cobravel) dia.cobradas++;
-      porDia.set(d, dia);
-      const u = c.acionado_por ?? (c.origem === 'cron' ? 'cron' : 'sistema');
-      const us = porUsuario.get(u) ?? { total: 0, cobradas: 0 };
-      us.total++; if (c.cobravel) us.cobradas++;
-      porUsuario.set(u, us);
     }
     const cronCobradas = cobradas.filter((c) => c.origem === 'cron');
     const erros = {
@@ -119,8 +91,6 @@ function ConsumoSerproAdmin() {
       rotinaCusto: (['Consultar', 'Emitir', 'Declarar'] as const).reduce((acc, t) => acc + custoEstimado(t, cronCobradas.filter((c) => c.tipo_chamada === t).length), 0),
       consulta: qtd('Consultar'), emissao: qtd('Emitir'), declaracao: qtd('Declarar'), erros, testes: chamadas.length - prod.length,
       servicos: [...porServico.entries()].sort((a, b) => b[1].total - a[1].total),
-      dias: [...porDia.entries()].slice(0, 14),
-      usuarios: [...porUsuario.entries()].sort((a, b) => b[1].total - a[1].total),
     };
   }, [chamadas]);
 
@@ -142,37 +112,37 @@ function ConsumoSerproAdmin() {
   const INTERRUPTORES_QUE_COBRAM: { chave: InterruptorRotina; titulo: string; texto: React.ReactNode; rotina: RotinaSerpro; ligada: string; desligada: string }[] = [
     {
       chave: 'auto_rotina_pgdas', rotina: rotina('pgdas-consulta'), titulo: 'Consultar o PGDAS-D sozinho',
-      texto: (<>No <strong className="text-ink">dia 16</strong>, o sistema consulta o ano de cada cliente do Simples (07:45 a 08:00) para mostrar quem já transmitiu o mês anterior e como estão os DAS. No <strong className="text-ink">dia seguinte ao prazo</strong> (dia 20, ou o próximo dia útil se cair em fim de semana ou feriado nacional), consulta de novo só quem ainda não transmitiu. Quem não tem procuração não é consultado, e quem já foi consultado no dia não é cobrado de novo.</>),
+      texto: (<>Dia <strong className="text-ink">16</strong>: consulta todos os clientes do Simples e mostra quem já transmitiu e como estão os DAS. No <strong className="text-ink">dia seguinte ao prazo</strong>: consulta só quem ainda não transmitiu. Sem procuração ou já consultado no dia: não cobra.</>),
       ligada: 'Consulta automática do PGDAS-D ligada.', desligada: 'Consulta automática do PGDAS-D desligada.',
     },
     {
       chave: 'auto_leitura_faturamento', rotina: rotina('leitura-faturamento'), titulo: 'Ler o faturamento do Simples todo mês',
-      texto: (<>Todo mês, no <strong className="text-ink">dia 30</strong> (em fevereiro, no último dia), a partir das 18:20, o sistema baixa e lê o PDF da declaração do mês anterior de <strong className="text-ink">todos os clientes do Simples</strong> (só matriz) e guarda receita, acumulado de 12 meses, limite, sublimite e fator r, que alimentam o cartão "Faturamento e limites". <strong className="text-ink">A primeira leitura é em 30/10/2026.</strong> Cada rodada custa cerca de <strong className="text-ink">{reais(custoEstimado('Consultar', 144))}</strong> (144 clientes). Quem já foi lido, quem não tem procuração e quem ainda não transmitiu não é cobrado. Ao terminar, avisa no sino quantos estão acima do limite, em atenção ou perto do sublimite. Ela usa a lista de declarações que a rotina do PGDAS-D (dias 16 e seguinte ao prazo) mantém atualizada: com aquela rotina desligada, não há o que ler.</>),
+      texto: (<>Dia <strong className="text-ink">30</strong> (fev.: último dia): lê o PDF da declaração do mês anterior de <strong className="text-ink">todos os clientes do Simples</strong> (só matriz) e atualiza o cartão "Faturamento e limites". <strong className="text-ink">Primeira leitura: 30/10/2026.</strong> Sem procuração, já lido ou sem transmissão: não cobra. Avisa no sino ao terminar. Precisa da rotina do PGDAS-D ligada.</>),
       ligada: 'Leitura mensal do faturamento ligada.', desligada: 'Leitura mensal do faturamento desligada.',
     },
     {
       chave: 'auto_rotina_sitfis', rotina: rotina('sitfis-mensal'), titulo: 'Gerar a situação fiscal de todos os clientes todo mês',
-      texto: (<>Todo mês, no <strong className="text-ink">dia 30</strong> (em fevereiro, no último dia), a partir das 19:00, o sistema gera o relatório de situação fiscal de <strong className="text-ink">todos os clientes ativos</strong> (só matriz) e lê o resultado: sem pendências, com pendências ou a conferir. <strong className="text-ink">A primeira rodada é em 30/10/2026</strong>, sem rodada de atualização antes. Cada relatório emitido custa <strong className="text-ink">R$ 0,32</strong>, cerca de <strong className="text-ink">{reais(custoEstimado('Emitir', 197))} por rodada</strong> (197 clientes); o pedido do protocolo é grátis. Quem não tem procuração, quem já tem relatório do dia e quem falhou hoje não é cobrado de novo. Ao terminar, avisa no sino, e no dia seguinte às 08:00 a rotina de tarefas cria a tarefa de quem tem pendência.</>),
+      texto: (<>Dia <strong className="text-ink">30</strong> (fev.: último dia): gera o relatório de situação fiscal de <strong className="text-ink">todos os clientes ativos</strong> (só matriz). <strong className="text-ink">Primeira rodada: 30/10/2026.</strong> Cada relatório custa <strong className="text-ink">R$ 0,32</strong>; o pedido do protocolo é grátis. Sem procuração ou já com relatório do dia: não cobra. Avisa no sino, e no dia seguinte a rotina de tarefas cria a tarefa de quem tem pendência.</>),
       ligada: 'Rotina mensal da Situação Fiscal ligada.', desligada: 'Rotina mensal da Situação Fiscal desligada.',
     },
     {
       chave: 'auto_rotina_dctfweb', rotina: rotina('dctfweb-mensal'), titulo: 'Consultar a DCTFWeb e a MIT de quem teve movimento, todo mês',
-      texto: (<>Todo dia às 07:40 a Receita informa, de graça, quais clientes do Presumido e do Real tiveram movimento na DCTFWeb (marcados como "Movimento novo"). No <strong className="text-ink">dia 30 de cada mês</strong> (em fevereiro, no último dia), a partir das 20:00, o sistema consulta na Receita <strong className="text-ink">só esses clientes</strong>: o recibo da DCTFWeb do mês anterior e as apurações da MIT do ano (2 consultas por cliente), e conclui as tarefas "DCTF" e "MIT" de quem entregou. Quem não teve movimento não é consultado nem cobrado. <strong className="text-ink">A primeira rodada é em 30/10/2026</strong>, sem rodada de atualização antes. Custa no máximo <strong className="text-ink">{reais(custoEstimado('Consultar', 70))} por rodada</strong> (35 clientes, se todos tiverem movimento). Ao terminar, avisa no sino.</>),
+      texto: (<>Todo dia, a Receita avisa de graça quem do Presumido e do Real teve movimento. Dia <strong className="text-ink">30</strong> (fev.: último dia): consulta <strong className="text-ink">só esses clientes</strong> (recibo da DCTFWeb e apurações da MIT) e conclui as tarefas "DCTF" e "MIT" de quem entregou. Sem movimento: não cobra. <strong className="text-ink">Primeira rodada: 30/10/2026.</strong></>),
       ligada: 'Rotina mensal da DCTFWeb e MIT ligada.', desligada: 'Rotina mensal da DCTFWeb e MIT desligada.',
     },
     {
       chave: 'auto_rotina_defis', rotina: rotina('defis-anual'), titulo: 'Conferir a DEFIS duas vezes por ano',
-      texto: (<>A DEFIS vence em <strong className="text-ink">31 de março</strong> do ano seguinte (se cair em fim de semana ou feriado, no próximo dia útil). Em <strong className="text-ink">15 de março</strong>, o sistema consulta o índice das DEFIS de cada cliente do Simples que ainda não tem a do ano na lista, para a equipe cobrar a tempo. No <strong className="text-ink">dia seguinte ao prazo</strong> (1º de abril de 2027), consulta de novo <strong className="text-ink">só quem continua sem a DEFIS</strong>: a consulta depois do prazo é a prova de "não entregue". Empresa aberta depois do ano, filial e quem não tem procuração não entram. Ao fim de cada rodada, avisa no sino.</>),
+      texto: (<>Vence em <strong className="text-ink">31 de março</strong> (ou próximo dia útil). Em <strong className="text-ink">15 de março</strong>: consulta quem ainda não tem a DEFIS do ano, para a equipe cobrar a tempo. No <strong className="text-ink">dia seguinte ao prazo</strong>: consulta só quem continua sem ela (prova de "não entregue"). Ficam de fora empresa aberta depois do ano, filial e quem não tem procuração.</>),
       ligada: 'Rotina anual da DEFIS ligada.', desligada: 'Rotina anual da DEFIS desligada.',
     },
     {
       chave: 'auto_lote_pagamentos_simples', rotina: rotina('lote-simples'), titulo: 'Detalhes dos pagamentos do Simples no dia 30',
-      texto: (<>Durante o mês, quem pagou aparece pela rotina gratuita diária (selo "pagamento novo"). No <strong className="text-ink">dia 30</strong> (em fevereiro, no último dia do mês), às 18:00, o sistema relê esse sensor gratuito e consulta Pagamentos na Receita <strong className="text-ink">só dos clientes do Simples que tiveram pagamento no mês</strong>, para guardar os detalhes: documento, data, valor e composição. Quem não pagou nada não é cobrado. Conclui a tarefa do DAS de quem pagou e, ao terminar, avisa no sino quantos DAS continuam sem pagamento. Quem não tem procuração e quem já foi consultado no dia também não é cobrado. A Receita demora uns dias para registrar: o pagamento dos últimos dias do mês entra na consulta do mês seguinte.</>),
+      texto: (<>Dia <strong className="text-ink">30</strong> (fev.: último dia): usa o selo gratuito "pagamento novo" para achar quem pagou e consulta <strong className="text-ink">só esses clientes do Simples</strong> (documento, data, valor e composição). Conclui a tarefa do DAS e avisa no sino quantos seguem sem pagamento. Quem não pagou ou não tem procuração: não cobra. Pagamento dos últimos dias do mês entra no mês seguinte.</>),
       ligada: 'Lote do dia 30 do Simples ligado.', desligada: 'Lote do dia 30 do Simples desligado.',
     },
     {
       chave: 'auto_lote_pagamentos_presumido_real', rotina: rotina('lote-presumido-real'), titulo: 'Consulta completa dos pagamentos do Presumido e do Real no dia 30',
-      texto: (<>Durante o mês, quem pagou aparece pela rotina gratuita diária (selo "pagamento novo"). No <strong className="text-ink">dia 30</strong> (em fevereiro, no último dia do mês), às 18:10, o sistema consulta Pagamentos na Receita de <strong className="text-ink">todos os clientes do Presumido e do Real</strong> (só matriz) e guarda os detalhes dos DARF pagos. Conclui as tarefas de PIS/COFINS e IRPJ/CSLL quando os dois tributos foram pagos e, ao terminar, avisa no sino. Quem não tem procuração e quem já foi consultado no dia não é cobrado.</>),
+      texto: (<>Dia <strong className="text-ink">30</strong> (fev.: último dia): consulta os pagamentos de <strong className="text-ink">todos os clientes do Presumido e do Real</strong> (só matriz) e guarda os DARF pagos. Conclui PIS/COFINS e IRPJ/CSLL quando os dois foram pagos. Sem procuração ou já consultado no dia: não cobra.</>),
       ligada: 'Lote do dia 30 do Presumido e Real ligado.', desligada: 'Lote do dia 30 do Presumido e Real desligado.',
     },
   ];
@@ -191,13 +161,11 @@ function ConsumoSerproAdmin() {
     } catch { toast.error('Não foi possível salvar.'); }
   };
 
-  const nomeUsuario = (id: string) => (id === 'cron' ? 'Rotina automática (07:30)' : id === 'sistema' ? 'Sistema' : nomes?.get(id) ?? 'Usuário');
-
   return (
     <div className="space-y-6">
       <PageHeader
-        kicker="~/tech · consumo serpro"
-        title="Consumo Serpro."
+        kicker="~/tech · serpro"
+        title="SERPRO."
       />
 
       <Tabs defaultValue="consumo" className="space-y-6">
@@ -289,34 +257,57 @@ function ConsumoSerproAdmin() {
             </div>
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <section className="space-y-3">
-              <h2 className="text-h4-card text-ink">Por dia (últimos 14 com chamadas)</h2>
-              <div className="overflow-hidden rounded-lg border border-line bg-paper">
-                <Table>
-                  <TableHeader><TableRow><TableHead>Dia</TableHead><TableHead className="text-right">Chamadas</TableHead><TableHead className="text-right">Cobradas</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {r.dias.map(([d, v]) => (
-                      <TableRow key={d}><TableCell className="font-mono text-ui">{d}</TableCell><TableCell className="text-right font-mono text-ui">{v.total}</TableCell><TableCell className="text-right font-mono text-ui">{v.cobradas}</TableCell></TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </section>
-            <section className="space-y-3">
-              <h2 className="text-h4-card text-ink">Por usuário</h2>
-              <div className="overflow-hidden rounded-lg border border-line bg-paper">
-                <Table>
-                  <TableHeader><TableRow><TableHead>Quem</TableHead><TableHead className="text-right">Chamadas</TableHead><TableHead className="text-right">Cobradas</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {r.usuarios.map(([u, v]) => (
-                      <TableRow key={u}><TableCell className="text-ui">{nomeUsuario(u)}</TableCell><TableCell className="text-right font-mono text-ui">{v.total}</TableCell><TableCell className="text-right font-mono text-ui">{v.cobradas}</TableCell></TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </section>
-          </div>
+          <section className="space-y-4 rounded-lg border border-line bg-paper p-5">
+            <div className="space-y-1">
+              <h2 className="text-h4-card text-ink">Rotinas automáticas e custo fixo por mês</h2>
+              <p className="text-ui text-muted-ink">
+                O que roda sozinho e quanto custa por mês. É o custo fixo: o que passar disso vem de cliques da equipe.
+              </p>
+            </div>
+
+            <StatCardRow
+              items={[
+                { label: 'Custo fixo por mês', value: reais(custoFixoMes), hint: custoFixoMes === 0 ? 'nenhuma rotina automática cobra' : 'rotinas automáticas que cobram' },
+                { label: 'Rotinas ligadas', value: ligadas.length, hint: `${ligadas.length - fixas.length} grátis ou sem chamada ao Serpro${desligadasQueCobram.length ? ` · ${desligadasQueCobram.length} desligada${desligadasQueCobram.length === 1 ? '' : 's'}` : ''}` },
+                { label: 'Cobrado por rotina neste ciclo', value: r.rotinaCobradas, hint: `${reais(r.rotinaCusto)} medido no registro de chamadas`, emphasis: r.rotinaCobradas > 0 ? 'warm' : 'none' },
+                { label: 'Se ligar as desligadas', value: reais(custoSeLigar), hint: desligadasQueCobram.length ? 'por mês (estimativa), além do custo fixo' : 'nenhuma rotina que cobra está desligada' },
+              ]}
+            />
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Rotina</TableHead>
+                  <TableHead>Quando</TableHead>
+                  <TableHead>Tipo de chamada</TableHead>
+                  <TableHead className="text-right">Chamadas por mês</TableHead>
+                  <TableHead className="text-right">Custo por mês</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ROTINAS.map((x) => {
+                  const on = ligada(x);
+                  const custo = cobra(x) ? reais(custoEstimado(x.tipo as 'Consultar' | 'Emitir', x.chamadasPorMes)) : 'R$ 0,00';
+                  return (
+                    <TableRow key={x.id} className={on ? undefined : 'opacity-70'}>
+                      <TableCell className="align-top text-ui text-ink">
+                        {x.nome}
+                        {x.interruptor && <div className="mt-1"><DsBadge tone={on ? 'ok' : 'neutral'}>{on ? 'Ligada' : 'Desligada'}</DsBadge></div>}
+                      </TableCell>
+                      <TableCell className="align-top text-ui text-muted-ink">{x.quando}</TableCell>
+                      <TableCell className="align-top text-ui text-muted-ink">{ROTULO_TIPO[x.tipo]}</TableCell>
+                      <TableCell className="text-right align-top text-ui text-ink">{on ? x.chamadasPorMes : <span className="text-muted-ink-2">{x.chamadasPorMes} se ligar</span>}</TableCell>
+                      <TableCell className="text-right align-top text-ui text-ink">{on ? custo : <span className="text-muted-ink-2">{custo} se ligar</span>}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+
+            <p className="text-meta text-muted-ink-2">
+              Passe único do PGDAS da carteira do Simples (aprovado em 01/10/2026): uma consulta por cliente, feita uma vez, sem repetir sozinha. Aparece como gasto manual no ciclo.
+            </p>
+          </section>
         </TabsContent>
 
         <TabsContent value="rotinas" className="mt-0 space-y-6">
@@ -324,11 +315,9 @@ function ConsumoSerproAdmin() {
             <div className="min-w-[260px] flex-1 space-y-1">
               <h2 className="text-h4-card text-ink">Concluir tarefas fiscais sozinho</h2>
               <p className="text-ui text-muted-ink">
-                Quando você consulta um cliente e a Receita prova que está feito, a tarefa daquele mês é concluída na hora, com a origem registrada:
-                DAS <strong className="text-ink">pago</strong> ou declaração <strong className="text-ink">sem receita e sem débito</strong> ("DAS - Simples Nacional"),
-                DCTFWeb com recibo ("DCTFWeb" e "EFD-Reinf (DCTF)"), MIT encerrada ("MIT") e DARF pago de PIS e COFINS ou de IRPJ e CSLL do mesmo período.
-                "Sem declaração" ou "sem apuração" não conclui (a Receita não prova "sem movimento"), e DAS transmitido sozinho também não:
-                a tarefa inclui enviar o DAS ao cliente.
+                Quando a consulta prova que o item está feito, a tarefa do mês é concluída na hora, com a origem registrada.
+                <strong className="text-ink"> Conclui:</strong> DAS pago ou declaração sem receita e sem débito, DCTFWeb com recibo, MIT encerrada e DARF pago de PIS/COFINS ou de IRPJ/CSLL.
+                <strong className="text-ink"> Não conclui:</strong> "sem declaração", "sem apuração" ou DAS só transmitido (a tarefa inclui enviar o DAS ao cliente).
               </p>
             </div>
             <DicaBotao texto={config?.auto_concluir_tarefas === false ? 'Desligado: nenhuma tarefa é concluída sozinha. Ligue para voltar a concluir.' : 'Ligado: desligue se quiser que as tarefas fiquem sempre por conta da equipe.'}>
@@ -347,10 +336,8 @@ function ConsumoSerproAdmin() {
             <div className="min-w-[260px] flex-1 space-y-1">
               <h2 className="text-h4-card text-ink">Criar tarefas fiscais sozinho</h2>
               <p className="text-ui text-muted-ink">
-                Todo dia às 08:00, o sistema olha o que já está salvo e cria uma tarefa fiscal, com o responsável do cliente, quando a Receita mandou algo
-                que ainda não tem tarefa aberta: <strong className="text-ink">comunicação que exige ação</strong> na Caixa Postal (dos últimos 30 dias),
-                ou <strong className="text-ink">pendência na Situação Fiscal</strong>.
-                É uma tarefa aberta por cliente e por tipo. Não chama o Serpro e não custa nada.
+                Todo dia, 08:00: cria a tarefa, com o responsável do cliente, para <strong className="text-ink">mensagem da Caixa Postal que exige ação</strong> (últimos 30 dias)
+                e para <strong className="text-ink">pendência na Situação Fiscal</strong>. Uma tarefa aberta por cliente e por tipo. Não chama o Serpro: grátis.
               </p>
             </div>
             <DicaBotao texto={config?.auto_criar_tarefas === false ? 'Desligado: nenhuma tarefa é criada sozinha. Ligue para voltar a criar.' : 'Ligado: desligue se quiser criar as tarefas só à mão.'}>
@@ -369,8 +356,8 @@ function ConsumoSerproAdmin() {
             <div className="space-y-1">
               <h2 className="text-h4-card text-ink">Alertas da equipe no sino</h2>
               <p className="text-ui text-muted-ink">
-                Todo dia às 08:15, o sistema olha o que já está salvo e avisa no sino o <strong className="text-ink">responsável do cliente</strong> (ou quem o cobre na ausência);
-                cliente sem responsável vai para os administradores. Um aviso por item: nunca repete. Não chama o Serpro e não custa nada.
+                Todo dia, 08:15: avisa no sino o <strong className="text-ink">responsável do cliente</strong> (ou quem o cobre na ausência); sem responsável, vai para os administradores.
+                Um aviso por item, nunca repete. Não chama o Serpro: grátis.
               </p>
             </div>
             <div className="divide-y divide-line-2">
@@ -398,8 +385,6 @@ function ConsumoSerproAdmin() {
             </div>
           </section>
 
-          <ConfigRelatorios />
-
           {INTERRUPTORES_QUE_COBRAM.map((it) => {
             const ligado = config ? config[it.chave] : (it.rotina.padraoLigado ?? true);
             return (
@@ -410,7 +395,7 @@ function ConsumoSerproAdmin() {
                     <DsBadge tone={ligado ? 'ok' : 'neutral'}>{ligado ? 'Ligada' : 'Desligada'}</DsBadge>
                   </h2>
                   <p className="text-ui text-muted-ink">
-                    {it.texto} Cada chamada é cobrada: cerca de <strong className="text-ink">{reais(custoEstimado(it.rotina.tipo === 'Emitir' ? 'Emitir' : 'Consultar', it.rotina.chamadasPorMes))} por mês</strong> na média ({it.rotina.chamadasPorMes} chamadas por mês, estimativa).
+                    {it.texto} Custa cerca de <strong className="text-ink">{reais(custoEstimado(it.rotina.tipo === 'Emitir' ? 'Emitir' : 'Consultar', it.rotina.chamadasPorMes))} por mês</strong> ({it.rotina.chamadasPorMes} chamadas, estimativa).
                   </p>
                 </div>
                 <DicaBotao texto={ligado ? 'Ligado: desligue se não quiser que o sistema consulte (e cobre) sozinho.' : 'Desligado: nenhuma consulta automática desta rotina. Ligue quando quiser.'}>
@@ -426,61 +411,6 @@ function ConsumoSerproAdmin() {
               </section>
             );
           })}
-
-          <section className="space-y-4 rounded-lg border border-line bg-paper p-5">
-            <div className="space-y-1">
-              <h2 className="text-h4-card text-ink">Rotinas automáticas e custo fixo por mês</h2>
-              <p className="text-ui text-muted-ink">
-                Tudo o que roda sozinho, sem ninguém clicar, e quanto isso custa no Serpro. É o seu custo fixo: o que passar disso vem de cliques da equipe.
-                Os avisos do sino e as tarefas criadas leem só o que já está salvo no sistema.
-              </p>
-            </div>
-
-            <StatCardRow
-              items={[
-                { label: 'Custo fixo por mês', value: reais(custoFixoMes), hint: custoFixoMes === 0 ? 'nenhuma rotina automática cobra' : 'rotinas automáticas que cobram' },
-                { label: 'Rotinas ligadas', value: ligadas.length, hint: `${ligadas.length - fixas.length} grátis ou sem chamada ao Serpro${desligadasQueCobram.length ? ` · ${desligadasQueCobram.length} desligada${desligadasQueCobram.length === 1 ? '' : 's'}` : ''}` },
-                { label: 'Cobrado por rotina neste ciclo', value: r.rotinaCobradas, hint: `${reais(r.rotinaCusto)} medido no registro de chamadas`, emphasis: r.rotinaCobradas > 0 ? 'warm' : 'none' },
-                { label: 'Se ligar as desligadas', value: reais(custoSeLigar), hint: desligadasQueCobram.length ? 'por mês (estimativa), além do custo fixo' : 'nenhuma rotina que cobra está desligada' },
-              ]}
-            />
-
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Rotina</TableHead>
-                  <TableHead>Quando</TableHead>
-                  <TableHead>O que faz</TableHead>
-                  <TableHead>Tipo de chamada</TableHead>
-                  <TableHead className="text-right">Chamadas por mês</TableHead>
-                  <TableHead className="text-right">Custo por mês</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ROTINAS.map((x) => {
-                  const on = ligada(x);
-                  const custo = cobra(x) ? reais(custoEstimado(x.tipo as 'Consultar' | 'Emitir', x.chamadasPorMes)) : 'R$ 0,00';
-                  return (
-                    <TableRow key={x.id} className={on ? undefined : 'opacity-70'}>
-                      <TableCell className="align-top text-ui text-ink">
-                        {x.nome}
-                        {x.interruptor && <div className="mt-1"><DsBadge tone={on ? 'ok' : 'neutral'}>{on ? 'Ligada' : 'Desligada'}</DsBadge></div>}
-                      </TableCell>
-                      <TableCell className="align-top text-ui text-muted-ink">{x.quando}</TableCell>
-                      <TableCell className="max-w-[420px] align-top text-meta text-muted-ink">{x.faz}</TableCell>
-                      <TableCell className="align-top text-ui text-muted-ink">{ROTULO_TIPO[x.tipo]}</TableCell>
-                      <TableCell className="text-right align-top text-ui text-ink">{on ? x.chamadasPorMes : <span className="text-muted-ink-2">{x.chamadasPorMes} se ligar</span>}</TableCell>
-                      <TableCell className="text-right align-top text-ui text-ink">{on ? custo : <span className="text-muted-ink-2">{custo} se ligar</span>}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-
-            <p className="text-meta text-muted-ink-2">
-              Há também o passe único do PGDAS da carteira do Simples, aprovado em 01/10/2026: uma consulta por cliente, feita uma vez, que não se repete sozinha. Ele aparece como gasto manual no ciclo.
-            </p>
-          </section>
         </TabsContent>
 
         <TabsContent value="regras" className="mt-0 space-y-6">
@@ -503,6 +433,8 @@ function ConsumoSerproAdmin() {
               {!foraPorStatus.has('Suspensa - Contabilidade') && ' · nenhum suspenso por falta de pagamento'}.
             </p>
           </section>
+
+          <ConfigRelatorios />
         </TabsContent>
       </Tabs>
     </div>
