@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,7 +38,11 @@ import { toast } from 'sonner';
 import { TAX_REGIMES } from '@/constants/taxRegimes';
 import { PORTE_OPTIONS } from '@/constants/porte';
 import { RESPONSIBLE_FIELDS } from '@/constants/responsibleFields';
-import { STATUS_CLIENTE, STATUS_AJUDA } from '@/constants/statusCliente';
+import { STATUS_CLIENTE, STATUS_AJUDA, statusEhInativo, statusPedeAviso } from '@/constants/statusCliente';
+import { useStatusPeriodos, useTarefasDispensadas, ORIGEM_PERIODO_LABEL, StatusPeriodo } from '@/hooks/useStatusPeriodos';
+import { getContactStatusTone } from '@/lib/contact-display';
+import { DsBadge } from '@/components/ds';
+import { format, parseISO } from 'date-fns';
 import { SETORES_ATUACAO, getSegmentos, inferRamoFromCnaeDescricao } from '@/constants/ramoAtuacao';
 
 interface Props {
@@ -54,12 +58,13 @@ const ESFERAS_DATAS = [
   { label: 'Estado', sufixo: 'estado' },
 ] as const;
 
-const DATAS_GRUPOS: { titulo: string; campos: { key: string; label: string }[] }[] = [
-  { titulo: 'Abertura', campos: ESFERAS_DATAS.map(e => ({ key: `data_abertura_${e.sufixo}`, label: e.label })) },
-  { titulo: 'Baixa', campos: ESFERAS_DATAS.map(e => ({ key: `data_encerramento_${e.sufixo}`, label: e.label })) },
-  { titulo: 'Paralisação', campos: ESFERAS_DATAS.map(e => ({ key: `data_paralisacao_${e.sufixo}`, label: e.label })) },
+const DATAS_GRUPOS: { titulo: string; ajuda?: string; campos: { key: string; label: string }[] }[] = [
+  { titulo: 'Abertura', ajuda: 'Quando a empresa foi registrada em cada órgão.', campos: ESFERAS_DATAS.map(e => ({ key: `data_abertura_${e.sufixo}`, label: e.label })) },
+  { titulo: 'Baixa', ajuda: 'Quando a empresa foi encerrada em cada órgão.', campos: ESFERAS_DATAS.map(e => ({ key: `data_encerramento_${e.sufixo}`, label: e.label })) },
+  { titulo: 'Paralisação', ajuda: 'Quando a empresa parou as atividades em cada órgão.', campos: ESFERAS_DATAS.map(e => ({ key: `data_paralisacao_${e.sufixo}`, label: e.label })) },
   {
     titulo: 'Outras',
+    ajuda: 'Contrato com a Contabilidade e datas de início de cada área.',
     campos: [
       { key: 'data_inicio_contrato', label: 'Início do contrato' },
       { key: 'data_saida_cliente', label: 'Fim do contrato' },
@@ -142,6 +147,7 @@ function CnaeCard({ cnae }: { cnae: any }) {
 
 export function ContactCadastroTab({ contactId }: Props) {
   const { data, isLoading, updateSuperPerfil, lookupCnpj } = useSuperPerfil(contactId);
+  const queryClient = useQueryClient();
   const [form, setForm] = useState<Record<string, any>>({});
   const [cnpjLoading, setCnpjLoading] = useState(false);
 
@@ -208,8 +214,12 @@ export function ContactCadastroTab({ contactId }: Props) {
         comercial_responsible_id: form.comercial_responsible_id ?? null,
         categorias: form.categorias ?? null,
         status_cliente: form.status_cliente ?? null,
+        // Data e motivo do status entram na MESMA atualização da troca; o trigger do banco abre/fecha o período.
+        status_cliente_desde: form.status_cliente_desde || null,
+        status_cliente_motivo: form.status_cliente_motivo || null,
         ...Object.fromEntries(DATAS_KEYS.map(k => [k, form[k] || null])),
       });
+      queryClient.invalidateQueries({ queryKey: ['cliente-status-periodos', contactId] });
     } catch {
       setSavingOperacional(false);
       return; // updateSuperPerfil já mostra o toast de erro
@@ -582,6 +592,7 @@ export function ContactCadastroTab({ contactId }: Props) {
       <TabsContent value="operacional" className="mt-6 space-y-4">
         <OperacionalSection
           form={form}
+          original={data ?? {}}
           set={set}
           onSave={saveOperacionalSection}
           isPending={savingOperacional}
@@ -697,10 +708,12 @@ function useContactObligations(contactId: string, enabled: boolean) {
 
 // ============ Operacional ============
 function OperacionalSection({
-  form, set, onSave, isPending, contactId, isPessoaFisica,
+  form, original, set, onSave, isPending, contactId, isPessoaFisica,
   obligationsCatalog, selectedObligations, setSelectedObligations,
 }: {
   form: Record<string, any>;
+  /** Ficha como está salva no banco (a troca de status é comparada com ela). */
+  original: Record<string, any>;
   set: (k: string, v: any) => void;
   onSave: () => void;
   isPending: boolean;
@@ -726,6 +739,26 @@ function OperacionalSection({
 
   const { data: profiles } = useTeamProfiles();
 
+  const hoje = format(new Date(), 'yyyy-MM-dd');
+  const trocouStatus = (form.status_cliente || '') !== (original.status_cliente || '');
+  const mudarStatus = (v: string) => {
+    if (!v) return; // Radix dispara onValueChange('') espúrio
+    set('status_cliente', v);
+    if (v === (original.status_cliente || '')) {
+      // Voltou ao status salvo: devolve a data e o motivo que já valiam.
+      set('status_cliente_desde', original.status_cliente_desde ?? '');
+      set('status_cliente_motivo', original.status_cliente_motivo ?? '');
+    } else {
+      set('status_cliente_desde', hoje);
+      set('status_cliente_motivo', '');
+    }
+  };
+  const efeitoDoStatus = statusEhInativo(form.status_cliente)
+    ? 'Cliente inativo: sem tarefas, boletos, avisos nem Serpro.'
+    : statusPedeAviso(form.status_cliente)
+      ? 'Fora do Ativo: não recebe novas tarefas nem consulta no Serpro. Os boletos continuam, com aviso.'
+      : 'Volta a receber tarefas e consulta no Serpro a partir desta data.';
+
   const categoriasDisponiveis = ['cliente', 'fornecedor', 'colaborador', 'outros'];
   const toggleCategoria = (cat: string) => {
     const current: string[] = form.categorias || ['outros'];
@@ -739,13 +772,38 @@ function OperacionalSection({
         <CardHeader><CardTitle className="text-base">Responsáveis por setor</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <Field label="Status do Cliente">
-            <Select value={form.status_cliente || ''} onValueChange={v => set('status_cliente', v)}>
+            <Select value={form.status_cliente || ''} onValueChange={mudarStatus}>
               <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
               <SelectContent>
                 {STATUS_CLIENTE.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
             <p className="mt-1.5 text-xs text-muted-foreground">{STATUS_AJUDA}</p>
+            {trocouStatus && (
+              <div className="mt-3 grid grid-cols-1 gap-3 rounded-md border border-warn/40 bg-warn/10 p-3 sm:grid-cols-2">
+                <p className="text-sm text-warn sm:col-span-2">
+                  <strong>
+                    Status vai mudar de {original.status_cliente || 'sem status'} para {form.status_cliente}.
+                  </strong>{' '}
+                  {efeitoDoStatus} Informe desde quando e salve para registrar o período.
+                </p>
+                <Field label="Desde quando?">
+                  <Input
+                    type="date"
+                    max={hoje}
+                    value={form.status_cliente_desde || ''}
+                    onChange={e => set('status_cliente_desde', e.target.value)}
+                  />
+                </Field>
+                <Field label="Motivo (opcional)">
+                  <Input
+                    value={form.status_cliente_motivo || ''}
+                    onChange={e => set('status_cliente_motivo', e.target.value)}
+                    placeholder="Ex.: inadimplência, inaptidão por omissão"
+                  />
+                </Field>
+              </div>
+            )}
           </Field>
           {RESPONSIBLE_FIELDS.map(rf => (
             <Field key={rf.key} label={rf.label}>
@@ -780,18 +838,22 @@ function OperacionalSection({
 
       <Card>
         <CardHeader><CardTitle className="text-base">Datas</CardTitle></CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SituacaoClientePanel contactId={contactId} form={form} set={set} original={original} trocouStatus={trocouStatus} hoje={hoje} />
           {DATAS_GRUPOS.map(grupo => (
-            <div key={grupo.titulo} className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{grupo.titulo}</p>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <section key={grupo.titulo} className="rounded-lg border border-line bg-paper p-4">
+              <header className="mb-4 border-b border-line pb-2">
+                <h4 className="text-sm font-semibold text-ink">{grupo.titulo}</h4>
+                {grupo.ajuda && <p className="text-meta text-muted-ink">{grupo.ajuda}</p>}
+              </header>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {grupo.campos.map(c => (
                   <Field key={c.key} label={c.label}>
                     <Input type="date" value={form[c.key] || ''} onChange={e => set(c.key, e.target.value)} />
                   </Field>
                 ))}
               </div>
-            </div>
+            </section>
           ))}
         </CardContent>
       </Card>
@@ -879,6 +941,115 @@ function OperacionalSection({
       </AlertDialog>
       )}
     </>
+  );
+}
+
+// ============ Situação do cliente (períodos de status) ============
+const fmtData = (d: string) => format(parseISO(d), 'dd/MM/yyyy');
+function faixaDoPeriodo(p: StatusPeriodo) {
+  if (p.inicio && p.fim) return `de ${fmtData(p.inicio)} até ${fmtData(p.fim)}`;
+  if (p.inicio) return `desde ${fmtData(p.inicio)} (vigente)`;
+  if (p.fim) return `até ${fmtData(p.fim)}`;
+  return 'data não informada (vigente)';
+}
+
+function SituacaoClientePanel({
+  contactId, form, set, original, trocouStatus, hoje,
+}: {
+  contactId: string;
+  form: Record<string, any>;
+  set: (k: string, v: any) => void;
+  original: Record<string, any>;
+  trocouStatus: boolean;
+  hoje: string;
+}) {
+  const { data: periodos = [], isLoading } = useStatusPeriodos(contactId);
+  const { data: dispensadas = [] } = useTarefasDispensadas(contactId);
+  const dispensadasPorPeriodo = useMemo(() => {
+    const m = new Map<string, typeof dispensadas>();
+    dispensadas.forEach(d => { if (d.periodo_id) m.set(d.periodo_id, [...(m.get(d.periodo_id) ?? []), d]); });
+    return m;
+  }, [dispensadas]);
+  const statusAtual: string = original.status_cliente || 'Ativo';
+  const semData = !trocouStatus && !form.status_cliente_desde && statusAtual !== 'Ativo';
+
+  return (
+    <section className="rounded-lg border border-line bg-paper p-4 lg:col-span-2">
+      <header className="mb-4 border-b border-line pb-2">
+        <h4 className="text-sm font-semibold text-ink">Situação do cliente</h4>
+        <p className="text-meta text-muted-ink">
+          Quando o cliente entra ou sai do Ativo. Fora do Ativo não geramos tarefas nem consultamos o Serpro; o que ficou sem entrega nesse intervalo se explica por aqui.
+        </p>
+      </header>
+
+      {trocouStatus ? (
+        <p className="text-sm text-muted-ink">Troca de status pendente: informe a data no campo Status do Cliente (acima) e salve.</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Status atual</Label>
+            <div className="pt-1"><DsBadge tone={getContactStatusTone(statusAtual)}>{statusAtual}</DsBadge></div>
+          </div>
+          <Field label="Desde">
+            <Input
+              type="date"
+              max={hoje}
+              value={form.status_cliente_desde || ''}
+              onChange={e => set('status_cliente_desde', e.target.value)}
+            />
+            {semData && <p className="mt-1 text-xs text-warn">Informe desde quando o cliente está fora do Ativo.</p>}
+          </Field>
+          <Field label="Motivo">
+            <Input
+              value={form.status_cliente_motivo || ''}
+              onChange={e => set('status_cliente_motivo', e.target.value)}
+              placeholder="Opcional"
+            />
+          </Field>
+        </div>
+      )}
+
+      <div className="mt-5">
+        <p className="text-[11px] uppercase tracking-[0.05em] text-muted-ink-2">Histórico</p>
+        {isLoading ? (
+          <Skeleton className="mt-2 h-10 w-full" />
+        ) : periodos.length === 0 ? (
+          <p className="mt-2 text-sm text-muted-ink">Nenhum período registrado.</p>
+        ) : (
+          <ul className="mt-2 divide-y divide-line rounded-md border border-line">
+            {periodos.map(p => {
+              const apagadas = dispensadasPorPeriodo.get(p.id) ?? [];
+              return (
+                <li key={p.id} className="px-3 py-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <DsBadge tone={getContactStatusTone(p.status)}>{p.status}</DsBadge>
+                    <span className="text-ink">{faixaDoPeriodo(p)}</span>
+                    <span className="text-meta text-muted-ink">
+                      {ORIGEM_PERIODO_LABEL[p.origem]}{p.motivo ? ` · ${p.motivo}` : ''}
+                    </span>
+                  </div>
+                  {apagadas.length > 0 && (
+                    <details className="mt-1.5">
+                      <summary className="cursor-pointer text-meta text-muted-ink">
+                        {apagadas.length} {apagadas.length === 1 ? 'tarefa apagada ou não gerada' : 'tarefas apagadas ou não geradas'} neste período
+                      </summary>
+                      <ul className="mt-1 space-y-0.5 pl-4 text-meta text-muted-ink">
+                        {apagadas.map(d => (
+                          <li key={d.id}>
+                            {d.fiscal_obligations_catalog?.name ?? 'Obrigação'} · competência {String(d.competence_month).padStart(2, '0')}/{d.competence_year}
+                            {d.due_date ? ` · vence ${fmtData(d.due_date)}` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }
 

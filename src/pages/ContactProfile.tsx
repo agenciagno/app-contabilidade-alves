@@ -17,6 +17,7 @@ import { ContactLogsWithComunicacaoTab } from '@/components/contacts/ContactLogs
 import { getDocumentType } from '@/lib/utils';
 import { getContactDisplayName, getContactStatusTone } from '@/lib/contact-display';
 import { DsBadge } from '@/components/ds';
+import { FaixaStatusCliente } from '@/components/contacts/FaixaStatusCliente';
 
 const taxRegimeLabels: Record<string, string> = {
   mei: 'MEI',
@@ -145,6 +146,8 @@ export default function ContactProfile() {
           </div>
         </div>
       </div>
+
+      <FaixaStatusCliente status={contact.status_cliente} desde={contact.status_cliente_desde} motivo={contact.status_cliente_motivo} />
 
       {/* Tabs */}
       {visibleTabCount === 0 ? (

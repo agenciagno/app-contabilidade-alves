@@ -17,8 +17,10 @@ import {
   UserPlus,
   UserMinus
 } from 'lucide-react';
-import { useContactLogs } from '@/hooks/useContactLogs';
-import { format } from 'date-fns';
+import { useMemo } from 'react';
+import { useContactLogs, type ContactLog } from '@/hooks/useContactLogs';
+import { useStatusPeriodos, ORIGEM_PERIODO_LABEL } from '@/hooks/useStatusPeriodos';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface ContactLogsTabProps {
@@ -39,6 +41,7 @@ const actionIcons: Record<string, React.ReactNode> = {
   SOCIO_ADICIONADO: <UserPlus className="h-4 w-4" />,
   SOCIO_EDITADO: <Users className="h-4 w-4" />,
   SOCIO_REMOVIDO: <UserMinus className="h-4 w-4" />,
+  STATUS_CLIENTE: <RefreshCw className="h-4 w-4" />,
 };
 
 const actionLabels: Record<string, string> = {
@@ -55,6 +58,7 @@ const actionLabels: Record<string, string> = {
   SOCIO_ADICIONADO: 'Sócio Adicionado',
   SOCIO_EDITADO: 'Sócio Editado',
   SOCIO_REMOVIDO: 'Sócio Removido',
+  STATUS_CLIENTE: 'Status do Cliente',
 };
 
 const actionColors: Record<string, string> = {
@@ -71,10 +75,35 @@ const actionColors: Record<string, string> = {
   SOCIO_ADICIONADO: 'bg-indigo-500/10 text-indigo-500',
   SOCIO_EDITADO: 'bg-violet-500/10 text-violet-500',
   SOCIO_REMOVIDO: 'bg-danger/10 text-danger',
+  STATUS_CLIENTE: 'bg-warn/10 text-warn',
 };
 
 export function ContactLogsTab({ contactId }: ContactLogsTabProps) {
-  const { logs, isLoading } = useContactLogs(contactId);
+  const { logs: registros, isLoading } = useContactLogs(contactId);
+  const { data: periodos = [] } = useStatusPeriodos(contactId);
+
+  // Cada período de status vira um evento (quando foi registrado, quem/qual origem), junto com o resto da auditoria.
+  const logs = useMemo<ContactLog[]>(() => {
+    const dia = (d: string) => format(parseISO(d), 'dd/MM/yyyy');
+    const eventos = periodos
+      .filter((p) => p.inicio || p.fim || p.status !== 'Ativo')
+      .map((p): ContactLog => {
+        const faixa = p.inicio
+          ? `desde ${dia(p.inicio)}${p.fim ? ` até ${dia(p.fim)}` : ' (vigente)'}`
+          : p.fim ? `até ${dia(p.fim)}` : '(data não informada)';
+        return {
+          id: `periodo-${p.id}`,
+          contact_id: contactId,
+          company_id: '',
+          action: 'STATUS_CLIENTE',
+          description: `Status ${p.status} ${faixa}${p.motivo ? ` · ${p.motivo}` : ''}`,
+          user_id: '',
+          user_name: p.registrado_por_nome || ORIGEM_PERIODO_LABEL[p.origem],
+          created_at: p.created_at,
+        };
+      });
+    return [...registros, ...eventos].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }, [registros, periodos, contactId]);
 
   if (isLoading) {
     return (

@@ -180,7 +180,12 @@ async function conferir(c: Contato, dryRun: boolean) {
   let statusDepois: string | null = c.status_cliente;
   if (mudou) {
     // Troca condicionada ao valor lido: se outra execução já trocou, esta não grava nem avisa em duplicidade.
-    let q = supabase.from("contacts").update({ situacao_cadastral: r.situacao }).eq("id", c.id).eq("company_id", COMPANY_ID);
+    // Data e motivo da Receita vão junto (12/10/2026): se a situação trocar o status, o trigger do banco abre o período com a data oficial;
+    // sem troca de status o banco ignora os dois campos.
+    const dados: Record<string, unknown> = { situacao_cadastral: r.situacao };
+    if (r.data) dados.status_cliente_desde = r.data;
+    if (r.motivo) dados.status_cliente_motivo = r.motivo;
+    let q = supabase.from("contacts").update(dados).eq("id", c.id).eq("company_id", COMPANY_ID);
     q = c.situacao_cadastral === null ? q.is("situacao_cadastral", null) : q.eq("situacao_cadastral", c.situacao_cadastral);
     const { data: upd, error } = await q.select("status_cliente");
     if (error) {

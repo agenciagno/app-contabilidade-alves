@@ -15,6 +15,7 @@ import { formatarCnpj } from '@/components/gestao360/ClienteFiltro';
 import { ExportarMenu } from '@/components/serpro/ExportarMenu';
 import { SeloMonitor, TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 import { NotificacoesFiscais } from '@/components/monitor/NotificacoesFiscais';
+import { ForaDeAtendimentoBox } from '@/components/contacts/ForaDeAtendimentoBox';
 import { useFichaFiscal } from '@/components/monitor/FichaFiscal';
 import { Caixa, DeclaracoesBox, LimiteSimplesBox, MensagensEcacBox, ParcelamentosBox, type LinhaDeclaracao } from '@/components/monitor/PainelBoxes';
 import { consultadoEm as consultaParcelamento, useMatrizParcelamentos } from '@/hooks/useSerproParcelamentos';
@@ -294,6 +295,7 @@ export default function DashboardFederal() {
           <div className="flex min-w-0 flex-col gap-4">
             <NotificacoesFiscais />
             <DeclaracoesBox linhas={declaracoes} subtitulo={`Competência ${siglaCompetencia(competencia)}`} />
+            <ForaDeAtendimentoBox />
           </div>
         </div>
       )}

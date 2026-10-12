@@ -35,6 +35,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { ForaDeAtendimentoBox } from '@/components/contacts/ForaDeAtendimentoBox';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { cn, maskCPFCNPJ } from '@/lib/utils';
 
@@ -256,6 +257,9 @@ export default function FiscalDashboard() {
           { label: `Concluídas do ${escopo}`, value: kpis.concluidas },
         ]}
       />
+
+      {/* Clientes fora do Ativo: não geram tarefa, então precisam aparecer aqui para o que não foi entregue ter explicação */}
+      <ForaDeAtendimentoBox />
 
       {/* Calendário Fiscal */}
       <FiscalCalendarCard

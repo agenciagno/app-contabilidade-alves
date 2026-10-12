@@ -78,6 +78,21 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
   // Fiscal fields
   const [taxRegime, setTaxRegime] = useState<TaxRegime | ''>(contact.tax_regime || '');
   const [statusCliente, setStatusCliente] = useState<string>(contact.status_cliente || 'Ativo');
+  const [statusDesde, setStatusDesde] = useState<string>(contact.status_cliente_desde || '');
+  const [statusMotivo, setStatusMotivo] = useState<string>(contact.status_cliente_motivo || '');
+  const hojeISO = new Date().toISOString().slice(0, 10);
+  const statusTrocou = statusCliente !== (contact.status_cliente || 'Ativo');
+  const trocarStatus = (v: string) => {
+    if (!v) return; // Radix dispara onValueChange('') espúrio
+    setStatusCliente(v);
+    if (v === (contact.status_cliente || 'Ativo')) {
+      setStatusDesde(contact.status_cliente_desde || '');
+      setStatusMotivo(contact.status_cliente_motivo || '');
+    } else {
+      setStatusDesde(hojeISO);
+      setStatusMotivo('');
+    }
+  };
   const [responsibleId, setResponsibleId] = useState<string>(contact.responsible_id || 'none');
   const [dpResponsibleId, setDpResponsibleId] = useState<string>(contact.dp_responsible_id || 'none');
   const [financeiroResponsibleId, setFinanceiroResponsibleId] = useState<string>(contact.financeiro_responsible_id || 'none');
@@ -172,6 +187,8 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
     setState(contact.state || '');
     setTaxRegime(contact.tax_regime || '');
     setStatusCliente(contact.status_cliente || 'Ativo');
+    setStatusDesde(contact.status_cliente_desde || '');
+    setStatusMotivo(contact.status_cliente_motivo || '');
     setResponsibleId(contact.responsible_id || 'none');
     setDpResponsibleId(contact.dp_responsible_id || 'none');
     setFinanceiroResponsibleId(contact.financeiro_responsible_id || 'none');
@@ -322,6 +339,8 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
       updates = {
         tax_regime: (taxRegime as TaxRegime) || null,
         status_cliente: statusCliente,
+        // Troca de status leva a data e o motivo na mesma atualização; sem troca, nada de data (só o responsável/admin ajusta).
+        ...(statusTrocou ? { status_cliente_desde: statusDesde || null, status_cliente_motivo: statusMotivo.trim() || null } : {}),
         responsible_id: responsibleId === 'none' ? null : responsibleId,
         dp_responsible_id: dpResponsibleId === 'none' ? null : dpResponsibleId,
         financeiro_responsible_id: financeiroResponsibleId === 'none' ? null : financeiroResponsibleId,
@@ -497,13 +516,25 @@ export function ContactEditSheet({ contact, section, open, onOpenChange }: Conta
               </div>
               <div className="space-y-1.5">
                 <Label>Status do Cliente</Label>
-                <Select value={statusCliente} onValueChange={setStatusCliente}>
+                <Select value={statusCliente} onValueChange={trocarStatus}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
                     {STATUS_CLIENTE.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">{STATUS_AJUDA}</p>
+                {statusTrocou && (
+                  <div className="grid grid-cols-1 gap-3 rounded-md border border-warn/40 bg-warn/10 p-3">
+                    <div className="space-y-1.5">
+                      <Label>Desde quando?</Label>
+                      <Input type="date" max={hojeISO} value={statusDesde} onChange={(e) => setStatusDesde(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Motivo (opcional)</Label>
+                      <Input value={statusMotivo} onChange={(e) => setStatusMotivo(e.target.value)} placeholder="Ex.: inadimplência" />
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>Responsável — Fiscal</Label>

@@ -80,6 +80,9 @@ export interface Contact {
   grupo_escritorio: string | null;
   data_inicio_contrato: string | null;
   data_saida_cliente: string | null;
+  // Desde quando o status atual vale e por quê (espelho do período aberto; o trigger valida)
+  status_cliente_desde: string | null;
+  status_cliente_motivo: string | null;
   porte: string | null;
   categorias: string[];
   // Datas por esfera
@@ -102,7 +105,7 @@ type ContactOptionalKeys =
   | 'ie' | 'im' | 'regime_apuracao' | 'numero_alvara' | 'validade_alvara'
   | 'setor_atuacao' | 'segmento_atuacao'
   | 'status_cliente' | 'tipo_cliente' | 'tipo_estabelecimento' | 'grupo_escritorio'
-  | 'data_inicio_contrato' | 'data_saida_cliente' | 'porte' | 'categorias'
+  | 'data_inicio_contrato' | 'data_saida_cliente' | 'status_cliente_desde' | 'status_cliente_motivo' | 'porte' | 'categorias'
   | 'data_abertura_junta' | 'data_abertura_rf' | 'data_abertura_prefeitura' | 'data_abertura_estado'
   | 'data_encerramento_junta' | 'data_encerramento_rf' | 'data_encerramento_prefeitura' | 'data_encerramento_estado'
   | 'siare_senha_encrypted';

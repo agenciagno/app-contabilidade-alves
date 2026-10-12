@@ -46,6 +46,7 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
   const [porte, setPorte] = useState('');
   const [editStatusCliente, setEditStatusCliente] = useState(false);
   const [statusCliente, setStatusCliente] = useState('');
+  const [statusDesde, setStatusDesde] = useState(() => new Date().toISOString().slice(0, 10));
   const [editRegime, setEditRegime] = useState(false);
   const [taxRegime, setTaxRegime] = useState('');
   const [editResponsibleFields, setEditResponsibleFields] = useState<Record<string, boolean>>({});
@@ -138,7 +139,9 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
     try {
       const updates: Record<string, any> = {};
       if (editPorte && porte) updates.porte = porte;
-      if (editStatusCliente && statusCliente) updates.status_cliente = statusCliente;
+      // Status vai à parte (abaixo): a data só pode ir para quem de fato muda de status; para quem já está nele
+      // o banco trataria a data como ajuste do período vigente.
+      const trocaStatus = editStatusCliente && !!statusCliente;
       if (editRegime && taxRegime) updates.tax_regime = taxRegime;
       RESPONSIBLE_FIELDS.forEach(rf => {
         if (editResponsibleFields[rf.key] && responsibleIdValues[rf.key]) {
@@ -154,7 +157,7 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
       if (editEnviarAuto) updates.enviar_cobranca_auto = enviarAuto;
 
       const hasContactUpdates = Object.keys(updates).length > 0;
-      if (!hasContactUpdates && !editObrigacoes) {
+      if (!hasContactUpdates && !trocaStatus && !editObrigacoes) {
         toast({ title: 'Nenhum campo selecionado para edição', variant: 'destructive' });
         setSaving(false);
         return;
@@ -166,6 +169,22 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
           .update(updates)
           .in('id', selectedIds);
         if (error) throw error;
+      }
+
+      if (trocaStatus) {
+        const { data: atuais, error: atuaisErr } = await (supabase as any)
+          .from('contacts').select('id, status_cliente').in('id', selectedIds);
+        if (atuaisErr) throw atuaisErr;
+        const idsMudam = ((atuais ?? []) as { id: string; status_cliente: string | null }[])
+          .filter(c => (c.status_cliente || 'Ativo') !== statusCliente)
+          .map(c => c.id);
+        if (idsMudam.length > 0) {
+          const { error } = await (supabase as any)
+            .from('contacts')
+            .update({ status_cliente: statusCliente, ...(statusDesde ? { status_cliente_desde: statusDesde } : {}) })
+            .in('id', idsMudam);
+          if (error) throw error;
+        }
       }
 
       if (editObrigacoes && companyId) {
@@ -246,6 +265,12 @@ export function ContactBulkEditDialog({ open, onOpenChange, selectedIds, onDone 
                       {STATUS_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                )}
+                {editStatusCliente && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Desde quando? (vale para quem mudar de status)</Label>
+                    <Input type="date" max={new Date().toISOString().slice(0, 10)} value={statusDesde} onChange={e => setStatusDesde(e.target.value)} />
+                  </div>
                 )}
               </div>
 

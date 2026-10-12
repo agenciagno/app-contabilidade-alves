@@ -54,6 +54,12 @@ export function LancarTarefasDialog({ open, onOpenChange, year, month, mesLabel 
 
   const escolhidos = useMemo(() => candidatos.filter((c) => clientes.has(c.contact_id)), [candidatos, clientes]);
 
+  // Fora do Ativo (Suspensa/Inapta) não recebe tarefa sozinho; lançar aqui é exceção e pede confirmação explícita (12/10/2026).
+  const especiais = useMemo(() => escolhidos.filter((c) => statusPedeAviso(c.status_cliente)), [escolhidos]);
+  const [confirmouEspeciais, setConfirmouEspeciais] = useState(false);
+  const chaveEspeciais = especiais.map((c) => c.contact_id).join(',');
+  useEffect(() => { setConfirmouEspeciais(false); }, [chaveEspeciais, open]);
+
   // Obrigações do mês que ao menos um cliente escolhido tem no cadastro.
   const obrigacoes = useMemo(() => {
     const map = new Map<string, { id: string; nome: string; vencimento: string; clientes: number; aLancar: number }>();
@@ -186,14 +192,20 @@ export function LancarTarefasDialog({ open, onOpenChange, year, month, mesLabel 
           </div>
         </div>
 
-        {escolhidos.some((c) => statusPedeAviso(c.status_cliente)) && (
+        {especiais.length > 0 && (
           <div className="flex items-start gap-2 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>
-              <strong>Situação especial na seleção:</strong>{' '}
-              {escolhidos.filter((c) => statusPedeAviso(c.status_cliente)).map((c) => `${c.nome} (${c.status_cliente})`).join(' · ')}.
-              Eles ainda recebem tarefa; confirme antes de lançar.
-            </p>
+            <div className="space-y-2">
+              <p>
+                <strong>Fora do Ativo na seleção:</strong>{' '}
+                {especiais.map((c) => `${c.nome} (${c.status_cliente})`).join(' · ')}.
+                Só clientes Ativos recebem tarefa sozinhos; lançar aqui é uma exceção.
+              </p>
+              <label className="flex cursor-pointer items-center gap-2">
+                <Checkbox checked={confirmouEspeciais} onCheckedChange={(v) => setConfirmouEspeciais(!!v)} />
+                <span>Confirmo lançar tarefa mesmo fora do Ativo</span>
+              </label>
+            </div>
           </div>
         )}
 
@@ -212,7 +224,7 @@ export function LancarTarefasDialog({ open, onOpenChange, year, month, mesLabel 
           </p>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={confirmar} disabled={resumo.criar === 0 || lancar.isPending}>
+            <Button onClick={confirmar} disabled={resumo.criar === 0 || lancar.isPending || (especiais.length > 0 && !confirmouEspeciais)}>
               {lancar.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Lançar
             </Button>

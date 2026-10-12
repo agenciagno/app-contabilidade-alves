@@ -513,7 +513,7 @@ export function TaskDetailModal({ open, onOpenChange, task, contacts, profiles, 
                 <strong>Situação do cliente: {situacaoCliente}.</strong>{' '}
                 {statusEhInativo(situacaoCliente)
                   ? 'Cliente inativo: não deveria receber novas tarefas. Confira se esta ainda vale.'
-                  : 'O cliente segue na carteira e a obrigação continua valendo; confira a situação antes de entregar.'}
+                  : 'Fora do Ativo: não recebe novas tarefas automáticas. Esta foi lançada antes ou à mão; confira a situação antes de entregar.'}
               </p>
             </div>
           )}

@@ -300,17 +300,17 @@ export default function FiscalCalendar() {
                 {tarefasALancar !== null
                   ? <>Serão criadas <strong className="text-ink">{tarefasALancar}</strong> tarefa{tarefasALancar === 1 ? '' : 's'} para <strong className="text-ink">{resumo.data?.clientes_a_lancar ?? 0}</strong> cliente{(resumo.data?.clientes_a_lancar ?? 0) === 1 ? '' : 's'}, com as datas da agenda.</>
                   : 'As tarefas do mês serão criadas com as datas da agenda.'}{' '}
-                Clientes Baixada, Cancelada, Ex-cliente e Ex-Colaborador não recebem tarefa.
+                Só clientes com status Ativo recebem tarefa.
               </AlertDialogDescription>
             </AlertDialogHeader>
             {avisos.data && avisos.data.length > 0 && (
               <div className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">
                 <p className="font-medium">
-                  {avisos.data.length} cliente{avisos.data.length === 1 ? '' : 's'} com situação especial {avisos.data.length === 1 ? 'vai' : 'vão'} receber tarefa:
+                  {avisos.data.length} cliente{avisos.data.length === 1 ? '' : 's'} fora do Ativo {avisos.data.length === 1 ? 'fica' : 'ficam'} sem tarefa neste mês:
                 </p>
                 <ul className="mt-1 max-h-40 list-disc space-y-0.5 overflow-y-auto pl-5">
                   {avisos.data.map((a) => (
-                    <li key={a.contact_id}>{a.nome} · {a.status_cliente} · {a.tarefas} tarefa{a.tarefas === 1 ? '' : 's'}</li>
+                    <li key={a.contact_id}>{a.nome} · {a.status_cliente} · {a.tarefas} obrigaç{a.tarefas === 1 ? 'ão' : 'ões'}</li>
                   ))}
                 </ul>
               </div>

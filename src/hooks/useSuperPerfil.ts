@@ -9,7 +9,7 @@ const SUPER_PERFIL_COLUMNS = [
   'id', 'company_id', 'name', 'document', 'email', 'phone', 'whatsapp', 'notes',
   'is_active', 'created_at', 'updated_at', 'origin', 'type',
   'razao_social', 'nome_fantasia', 'display_name', 'porte', 'natureza_juridica', 'situacao_cadastral',
-  'tipo_estabelecimento', 'status_cliente', 'tipo_cliente', 'grupo_escritorio',
+  'tipo_estabelecimento', 'status_cliente', 'status_cliente_desde', 'status_cliente_motivo', 'tipo_cliente', 'grupo_escritorio',
   'cnae_principal', 'cnaes_secundarios', 'data_abertura_receita',
   'representative_legal', 'segundo_email_contato',
   'address', 'address_number', 'complemento', 'neighborhood', 'city', 'state', 'cep',
