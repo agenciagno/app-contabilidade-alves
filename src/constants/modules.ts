@@ -115,11 +115,12 @@ export const MODULE_TREE: ModuleNode[] = [
     label: 'Perfil do Cliente',
     children: [
       { key: 'perfil_cliente_identificacao', label: 'Cadastro' },
-      { key: 'perfil_cliente_fiscal', label: 'Dpto. Fiscal' },
-      { key: 'perfil_cliente_pessoal', label: 'Dpto Pessoal' },
+      { key: 'perfil_cliente_socios', label: 'Societário' },
+      { key: 'perfil_cliente_fiscal', label: 'Fiscal' },
+      { key: 'perfil_cliente_pessoal', label: 'Pessoal' },
+      { key: 'perfil_cliente_contabil', label: 'Contábil' },
       { key: 'perfil_cliente_operacional', label: 'Operacional' },
       { key: 'perfil_cliente_operacional_excluir', label: 'Operacional · Excluir cliente' },
-      { key: 'perfil_cliente_socios', label: 'Sócios' },
       { key: 'perfil_cliente_acessos', label: 'Acessos' },
       { key: 'perfil_cliente_financeiro', label: 'Financeiro' },
       { key: 'perfil_cliente_logs', label: 'Logs' },
@@ -240,12 +241,15 @@ export const INTERNAL_PICKER_TREE: PickerNode[] = [
         key: 'contatos',
         label: 'Contatos',
         standalone: true,
-        // Cada aba do perfil da empresa é um acesso separado. Sócios é uma seção
-        // dentro da aba Cadastro, então acompanha ela.
+        // Cada aba do perfil da empresa é um acesso separado. Societário virou aba
+        // própria em 12/10/2026 e continua na chave `perfil_cliente_socios`, então
+        // quem já tinha o quadro societário segue vendo.
         children: [
-          { key: 'perfil_cliente_identificacao', label: 'Cadastro', grants: ['perfil_cliente', 'perfil_cliente_socios'] },
-          { key: 'perfil_cliente_fiscal', label: 'Dpto Fiscal', grants: ['perfil_cliente'] },
-          { key: 'perfil_cliente_pessoal', label: 'Dpto Pessoal', grants: ['perfil_cliente'] },
+          { key: 'perfil_cliente_identificacao', label: 'Cadastro', grants: ['perfil_cliente'] },
+          { key: 'perfil_cliente_socios', label: 'Societário', grants: ['perfil_cliente'] },
+          { key: 'perfil_cliente_fiscal', label: 'Fiscal', grants: ['perfil_cliente'] },
+          { key: 'perfil_cliente_pessoal', label: 'Pessoal', grants: ['perfil_cliente'] },
+          { key: 'perfil_cliente_contabil', label: 'Contábil', grants: ['perfil_cliente'] },
           { key: 'perfil_cliente_acessos', label: 'Acessos', grants: ['perfil_cliente'] },
           { key: 'perfil_cliente_financeiro', label: 'Financeiro', grants: ['perfil_cliente'] },
           { key: 'perfil_cliente_operacional', label: 'Operacional', grants: ['perfil_cliente'] },

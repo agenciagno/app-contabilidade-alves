@@ -45,6 +45,48 @@ interface Props {
   contactId: string;
 }
 
+// Box "Datas" do Operacional (12/10/2026). Abertura e Baixa já existiam no banco (`data_encerramento_*` é a Baixa);
+// Paralisação, Início do Fiscal/Pessoal e Balanço de Abertura vieram na migration 20261012120000.
+const ESFERAS_DATAS = [
+  { label: 'Junta / Cartório', sufixo: 'junta' },
+  { label: 'Receita Federal', sufixo: 'rf' },
+  { label: 'Prefeitura', sufixo: 'prefeitura' },
+  { label: 'Estado', sufixo: 'estado' },
+] as const;
+
+const DATAS_GRUPOS: { titulo: string; campos: { key: string; label: string }[] }[] = [
+  { titulo: 'Abertura', campos: ESFERAS_DATAS.map(e => ({ key: `data_abertura_${e.sufixo}`, label: e.label })) },
+  { titulo: 'Baixa', campos: ESFERAS_DATAS.map(e => ({ key: `data_encerramento_${e.sufixo}`, label: e.label })) },
+  { titulo: 'Paralisação', campos: ESFERAS_DATAS.map(e => ({ key: `data_paralisacao_${e.sufixo}`, label: e.label })) },
+  {
+    titulo: 'Outras',
+    campos: [
+      { key: 'data_inicio_contrato', label: 'Início do contrato' },
+      { key: 'data_saida_cliente', label: 'Fim do contrato' },
+      { key: 'data_inicio_fiscal', label: 'Início do Fiscal' },
+      { key: 'data_inicio_pessoal', label: 'Início do Pessoal' },
+      { key: 'data_balanco_abertura', label: 'Balanço de abertura' },
+    ],
+  },
+];
+const DATAS_KEYS = DATAS_GRUPOS.flatMap(g => g.campos.map(c => c.key));
+
+function EmBreveAba({ texto }: { texto: string }) {
+  return (
+    <div className="flex min-h-[360px] items-center justify-center rounded-lg border border-dashed">
+      <div className="max-w-md space-y-3 px-6 text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md bg-muted">
+          <Clock className="h-6 w-6 text-muted-foreground" strokeWidth={1.75} />
+        </div>
+        <div className="space-y-1.5">
+          <h3 className="text-base font-semibold">Em breve.</h3>
+          <p className="text-sm text-muted-foreground">{texto}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const BR_STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
 const AutofillBadge = () => (
@@ -119,6 +161,7 @@ export function ContactCadastroTab({ contactId }: Props) {
   const canViewIdentificacao = canViewSub('perfil_cliente_identificacao');
   const canViewFiscalTab = !isPessoaFisica && canViewSub('perfil_cliente_fiscal');
   const canViewPessoal = canViewSub('perfil_cliente_pessoal');
+  const canViewContabil = canViewSub('perfil_cliente_contabil');
   const canViewOperacional = canViewSub('perfil_cliente_operacional');
   const canViewSocios = !isPessoaFisica && canViewSub('perfil_cliente_socios');
 
@@ -165,8 +208,7 @@ export function ContactCadastroTab({ contactId }: Props) {
         comercial_responsible_id: form.comercial_responsible_id ?? null,
         categorias: form.categorias ?? null,
         status_cliente: form.status_cliente ?? null,
-        data_inicio_contrato: form.data_inicio_contrato ?? null,
-        data_saida_cliente: form.data_saida_cliente ?? null,
+        ...Object.fromEntries(DATAS_KEYS.map(k => [k, form[k] || null])),
       });
     } catch {
       setSavingOperacional(false);
@@ -248,7 +290,7 @@ export function ContactCadastroTab({ contactId }: Props) {
 
   return (
     <>
-      {/* CADASTRO (Identificação & Contatos + Endereço + Sócios) */}
+      {/* CADASTRO (Identificação & Contatos + Endereço + Observações Gerais) */}
       {canViewIdentificacao && (
       <TabsContent value="cadastro" className="mt-6 space-y-4">
         <Card>
@@ -335,11 +377,6 @@ export function ContactCadastroTab({ contactId }: Props) {
                 placeholder="(XX) XXXXX-XXXX"
               />
             </Field>
-            <div className="md:col-span-2">
-              <Field label="Observações Gerais">
-                <Textarea rows={3} value={form.notes || ''} onChange={e => set('notes', e.target.value)} />
-              </Field>
-            </div>
           </CardContent>
         </Card>
         <Card>
@@ -374,7 +411,12 @@ export function ContactCadastroTab({ contactId }: Props) {
           </CardContent>
         </Card>
 
-        {canViewSocios && !isPessoaFisica && <SociosSection contactId={contactId} />}
+        <Card>
+          <CardHeader><CardTitle className="text-base">Observações Gerais</CardTitle></CardHeader>
+          <CardContent>
+            <Textarea rows={3} value={form.notes || ''} onChange={e => set('notes', e.target.value)} />
+          </CardContent>
+        </Card>
 
         <div className="flex justify-end">
           <Button onClick={() => saveSection([
@@ -391,7 +433,14 @@ export function ContactCadastroTab({ contactId }: Props) {
       </TabsContent>
       )}
 
-      {/* DPTO. FISCAL (só PJ) */}
+      {/* SOCIETÁRIO (só PJ) — saiu da aba Cadastro em 12/10/2026 */}
+      {canViewSocios && (
+        <TabsContent value="societario" className="mt-6 space-y-4">
+          <SociosSection contactId={contactId} />
+        </TabsContent>
+      )}
+
+      {/* FISCAL (só PJ) */}
       {canViewFiscalTab && (
         <TabsContent value="fiscal" className="mt-6 space-y-4">
           <Card>
@@ -514,22 +563,17 @@ export function ContactCadastroTab({ contactId }: Props) {
         </TabsContent>
       )}
 
-      {/* DPTO PESSOAL — em breve */}
+      {/* PESSOAL — em breve */}
       {canViewPessoal && (
         <TabsContent value="pessoal" className="mt-6">
-          <div className="flex min-h-[360px] items-center justify-center rounded-lg border border-dashed">
-            <div className="max-w-md space-y-3 px-6 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md bg-muted">
-                <Clock className="h-6 w-6 text-muted-foreground" strokeWidth={1.75} />
-              </div>
-              <div className="space-y-1.5">
-                <h3 className="text-base font-semibold">Em breve.</h3>
-                <p className="text-sm text-muted-foreground">
-                  O Departamento Pessoal deste cliente ainda está em construção.
-                </p>
-              </div>
-            </div>
-          </div>
+          <EmBreveAba texto="O Departamento Pessoal deste cliente ainda está em construção." />
+        </TabsContent>
+      )}
+
+      {/* CONTÁBIL — em breve (12/10/2026) */}
+      {canViewContabil && (
+        <TabsContent value="contabil" className="mt-6">
+          <EmBreveAba texto="A área contábil deste cliente ainda está em construção." />
         </TabsContent>
       )}
 
@@ -692,7 +736,7 @@ function OperacionalSection({
   return (
     <>
       <Card>
-        <CardHeader><CardTitle className="text-base">Responsável & Categorias</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Responsáveis por setor</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <Field label="Status do Cliente">
             <Select value={form.status_cliente || ''} onValueChange={v => set('status_cliente', v)}>
@@ -735,14 +779,20 @@ function OperacionalSection({
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Datas do Relacionamento</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Data de entrada como cliente">
-            <Input type="date" value={form.data_inicio_contrato || ''} onChange={e => set('data_inicio_contrato', e.target.value)} />
-          </Field>
-          <Field label="Data de saída / encerramento">
-            <Input type="date" value={form.data_saida_cliente || ''} onChange={e => set('data_saida_cliente', e.target.value)} />
-          </Field>
+        <CardHeader><CardTitle className="text-base">Datas</CardTitle></CardHeader>
+        <CardContent className="space-y-5">
+          {DATAS_GRUPOS.map(grupo => (
+            <div key={grupo.titulo} className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{grupo.titulo}</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {grupo.campos.map(c => (
+                  <Field key={c.key} label={c.label}>
+                    <Input type="date" value={form[c.key] || ''} onChange={e => set(c.key, e.target.value)} />
+                  </Field>
+                ))}
+              </div>
+            </div>
+          ))}
         </CardContent>
       </Card>
 
@@ -834,7 +884,7 @@ function OperacionalSection({
 
 // ============ Sócios ============
 function SociosSection({ contactId }: { contactId: string }) {
-  const { partners, isLoading, totalParticipation } = useContactPartners(contactId);
+  const { partners, isLoading, totalParticipation, updatePartner } = useContactPartners(contactId);
   const [showInactive, setShowInactive] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [open, setOpen] = useState(false);
@@ -891,12 +941,7 @@ function SociosSection({ contactId }: { contactId: string }) {
                       size="icon"
                       variant="ghost"
                       title="Marcar saída"
-                      onClick={async () => {
-                        await supabase.from('contact_partners')
-                          .update({ data_saida: new Date().toISOString().slice(0, 10) })
-                          .eq('id', p.id);
-                        window.location.reload();
-                      }}
+                      onClick={() => updatePartner.mutate({ id: p.id, data_saida: new Date().toISOString().slice(0, 10) } as any)}
                     >
                       <LogOut className="h-4 w-4" />
                     </Button>

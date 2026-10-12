@@ -6,6 +6,7 @@ import { AcessoPortal, useAcessosCliente } from '@/hooks/useAcessosCliente';
 import { AcessosTable } from './AcessosTable';
 import { AcessoFormDialog } from './AcessoFormDialog';
 import { AlvarasSection } from './AlvarasCertificadosTab';
+import { CertificadoDigitalSection } from './CertificadoDigitalSection';
 
 interface Props {
   contactId: string;
@@ -66,6 +67,8 @@ export function AcessosTab({ contactId }: Props) {
           acesso={editing}
         />
       </div>
+
+      <CertificadoDigitalSection contactId={contactId} />
 
       <AlvarasSection contactId={contactId} />
     </div>

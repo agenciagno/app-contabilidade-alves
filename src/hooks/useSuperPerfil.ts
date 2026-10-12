@@ -21,6 +21,8 @@ const SUPER_PERFIL_COLUMNS = [
   'data_abertura_rf', 'data_encerramento_rf',
   'data_abertura_prefeitura', 'data_encerramento_prefeitura',
   'data_abertura_estado', 'data_encerramento_estado',
+  'data_paralisacao_junta', 'data_paralisacao_rf', 'data_paralisacao_prefeitura', 'data_paralisacao_estado',
+  'data_inicio_fiscal', 'data_inicio_pessoal', 'data_balanco_abertura',
   'canal_entrega', 'email_cobranca', 'whatsapp_cobranca', 'enviar_cobranca_auto',
   'boleto_value', 'boleto_due_day',
   'recebe_das_ca', 'recebe_guia_dctfweb_ca',

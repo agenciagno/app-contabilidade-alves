@@ -6,13 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, User, DollarSign, ClipboardList, Download, History, KeyRound, Building2, Landmark, Users } from 'lucide-react';
+import { ArrowLeft, User, DollarSign, ClipboardList, History, KeyRound, Building2, Landmark, Users, Handshake, Calculator } from 'lucide-react';
 import { useContacts } from '@/hooks/useContacts';
 import { useContactTransactions, useContactFinancialStatus } from '@/hooks/useContactTransactions';
-import { useContactDocuments, DOCUMENT_CATEGORIES } from '@/hooks/useContactDocuments';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { ContactFinancialTab } from '@/components/contacts/ContactFinancialTab';
-import { generateContactReport } from '@/components/contacts/ContactReportPDF';
 import { AcessosTab } from '@/components/contacts/AcessosTab';
 import { ContactCadastroTab } from '@/components/contacts/cadastro/ContactCadastroTab';
 import { ContactLogsWithComunicacaoTab } from '@/components/contacts/ContactLogsWithComunicacaoTab';
@@ -33,15 +31,16 @@ export default function ContactProfile() {
   const navigate = useNavigate();
   const { contacts, isLoading: isLoadingContacts } = useContacts();
   const { data: transactions } = useContactTransactions(id);
-  const { documents, getDocumentCounts } = useContactDocuments(id);
   const { isModuleVisible, isSubItemVisible } = useModuleAccess();
   const canViewSub = (subKey: string) =>
     isModuleVisible('perfil_cliente') && isSubItemVisible('perfil_cliente', subKey);
   const contact = contacts.find(c => c.id === id);
   const isPessoaFisica = getDocumentType(contact?.document) === 'CPF';
   const canViewCadastro = canViewSub('perfil_cliente_identificacao');
+  const canViewSocios = !isPessoaFisica && canViewSub('perfil_cliente_socios');
   const canViewFiscal = !isPessoaFisica && canViewSub('perfil_cliente_fiscal');
   const canViewPessoal = canViewSub('perfil_cliente_pessoal');
+  const canViewContabil = canViewSub('perfil_cliente_contabil');
   const canViewAcessos = canViewSub('perfil_cliente_acessos');
   const canViewFinanceiro = canViewSub('perfil_cliente_financeiro');
   const canViewOperacional = canViewSub('perfil_cliente_operacional');
@@ -61,27 +60,6 @@ export default function ContactProfile() {
     });
   }, [id]);
 
-
-  const handleGenerateReport = () => {
-    if (!contact) return;
-
-    const financialSummary = {
-      totalPago: transactions?.filter(t => t.is_paid).reduce((sum, t) => sum + Number(t.amount), 0) || 0,
-      totalPendente: transactions?.filter(t => !t.is_paid).reduce((sum, t) => sum + Number(t.amount), 0) || 0,
-    };
-
-    const documentCounts = getDocumentCounts();
-    const documentCountsArray = DOCUMENT_CATEGORIES
-      .map(cat => ({ category: cat.value, count: documentCounts[cat.value] }))
-      .filter(item => item.count > 0);
-
-    generateContactReport(
-      contact,
-      transactions || [],
-      documentCountsArray,
-      financialSummary
-    );
-  };
 
   if (isLoadingContacts) {
     return (
@@ -110,26 +88,22 @@ export default function ContactProfile() {
     );
   }
 
-  const visibleTabCount = (canViewCadastro ? 1 : 0) + (canViewFiscal ? 1 : 0) + (canViewPessoal ? 1 : 0)
-    + (canViewAcessos ? 1 : 0) + (canViewFinanceiro ? 1 : 0) + (canViewOperacional ? 1 : 0) + (canViewLogs ? 1 : 0);
-  const GRID_COLS_CLASS: Record<number, string> = {
-    1: 'grid-cols-1',
-    2: 'grid-cols-2 md:grid-cols-2',
-    3: 'grid-cols-2 md:grid-cols-3',
-    4: 'grid-cols-2 md:grid-cols-4',
-    5: 'grid-cols-2 md:grid-cols-5',
-    6: 'grid-cols-2 md:grid-cols-6',
-    7: 'grid-cols-2 md:grid-cols-7',
-  };
-  const tabsColsClass = GRID_COLS_CLASS[visibleTabCount] ?? 'grid-cols-1';
+  const visibleTabCount = [
+    canViewCadastro, canViewSocios, canViewFiscal, canViewPessoal, canViewContabil,
+    canViewAcessos, canViewFinanceiro, canViewOperacional, canViewLogs,
+  ].filter(Boolean).length;
   const defaultProfileTab = canViewCadastro ? 'cadastro'
+    : canViewSocios ? 'societario'
     : canViewFiscal ? 'fiscal'
     : canViewPessoal ? 'pessoal'
+    : canViewContabil ? 'contabil'
     : canViewAcessos ? 'acessos'
     : canViewFinanceiro ? 'financeiro'
     : canViewOperacional ? 'operacional'
     : canViewLogs ? 'logs'
     : 'cadastro';
+  // Títulos das sub-abas em caixa alta (12/10/2026). Flex com rolagem: com 9 abas a grade fixa estourava em tela estreita.
+  const triggerClass = 'min-w-fit flex-1 items-center gap-1.5 text-xs font-semibold uppercase tracking-wide';
 
   return (
     <div className="space-y-6">
@@ -170,23 +144,7 @@ export default function ContactProfile() {
             </DsBadge>
           </div>
         </div>
-
-        <Button variant="outline" onClick={handleGenerateReport} className="hidden sm:flex">
-          <Download className="h-4 w-4" />
-          Gerar relatório
-        </Button>
       </div>
-
-      {/* Mobile Report Button */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleGenerateReport}
-        className="sm:hidden w-full"
-      >
-        <Download className="h-4 w-4 mr-2" />
-        Gerar Relatório PDF
-      </Button>
 
       {/* Tabs */}
       {visibleTabCount === 0 ? (
@@ -195,45 +153,57 @@ export default function ContactProfile() {
         </div>
       ) : (
       <Tabs defaultValue={defaultProfileTab} className="w-full">
-        <TabsList className={`w-full grid ${tabsColsClass} gap-1 h-auto`}>
+        <TabsList className="flex h-auto w-full justify-start gap-1 overflow-x-auto">
           {canViewCadastro && (
-            <TabsTrigger value="cadastro" className="flex items-center gap-1.5">
+            <TabsTrigger value="cadastro" className={triggerClass}>
               <ClipboardList className="h-4 w-4" />
               <span className="hidden sm:inline">Cadastro</span>
             </TabsTrigger>
           )}
+          {canViewSocios && (
+            <TabsTrigger value="societario" className={triggerClass}>
+              <Handshake className="h-4 w-4" />
+              <span className="hidden sm:inline">Societário</span>
+            </TabsTrigger>
+          )}
           {canViewFiscal && (
-            <TabsTrigger value="fiscal" className="flex items-center gap-1.5">
+            <TabsTrigger value="fiscal" className={triggerClass}>
               <Landmark className="h-4 w-4" />
-              <span className="hidden sm:inline">Dpto. Fiscal</span>
+              <span className="hidden sm:inline">Fiscal</span>
             </TabsTrigger>
           )}
           {canViewPessoal && (
-            <TabsTrigger value="pessoal" className="flex items-center gap-1.5">
+            <TabsTrigger value="pessoal" className={triggerClass}>
               <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Dpto Pessoal</span>
+              <span className="hidden sm:inline">Pessoal</span>
+            </TabsTrigger>
+          )}
+          {canViewContabil && (
+            <TabsTrigger value="contabil" className={triggerClass}>
+              <Calculator className="h-4 w-4" />
+              <span className="hidden sm:inline">Contábil</span>
             </TabsTrigger>
           )}
           {canViewAcessos && (
-            <TabsTrigger value="acessos" className="flex items-center gap-1.5">
+            <TabsTrigger value="acessos" className={triggerClass}>
               <KeyRound className="h-4 w-4" />
               <span className="hidden sm:inline">Acessos</span>
             </TabsTrigger>
           )}
           {canViewFinanceiro && (
-            <TabsTrigger value="financeiro" className="flex items-center gap-1.5">
+            <TabsTrigger value="financeiro" className={triggerClass}>
               <DollarSign className="h-4 w-4" />
               <span className="hidden sm:inline">Financeiro</span>
             </TabsTrigger>
           )}
           {canViewOperacional && (
-            <TabsTrigger value="operacional" className="flex items-center gap-1.5">
+            <TabsTrigger value="operacional" className={triggerClass}>
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">Operacional</span>
             </TabsTrigger>
           )}
           {canViewLogs && (
-            <TabsTrigger value="logs" className="flex items-center gap-1.5">
+            <TabsTrigger value="logs" className={triggerClass}>
               <History className="h-4 w-4" />
               <span className="hidden sm:inline">Logs</span>
             </TabsTrigger>
