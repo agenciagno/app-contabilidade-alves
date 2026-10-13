@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader, StatCardRow, DsBadge, SearchField, DateField, tabsListClass, tabsTriggerClass } from '@/components/ds';
 import { useBoletoControls, type BoletoWithContact } from '@/hooks/useBoletoControls';
 import { BoletoGenerationDialog } from '@/components/financeiro/BoletoGenerationDialog';
+import { Boleto13Dialog } from '@/components/financeiro/Boleto13Dialog';
 import { IndividualBoletoDialog } from '@/components/financeiro/IndividualBoletoDialog';
 import { BoletoCalendarView } from '@/components/financeiro/BoletoCalendarView';
 import { NotificarCobrancaDialog } from '@/components/financeiro/NotificarCobrancaDialog';
@@ -105,6 +106,7 @@ export default function Boletos() {
   const [alterarOf, setAlterarOf] = useState<{ boleto: BoletoWithContact; campo: 'prorrogacaoVencimento' | 'valorNominal' } | null>(null);
   const [movimentacaoOpen, setMovimentacaoOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [generate13Open, setGenerate13Open] = useState(false);
   const [singleOpen, setSingleOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
@@ -112,7 +114,7 @@ export default function Boletos() {
 
   const {
     boletoList, isLoading, markAsPrinted, fetchPreview, generateBoletos,
-    generateSingleBoleto, listSyncContacts, findOrphanBoletos, downloadBoletoPdf,
+    fetchPreview13, generateBoletos13, generateSingleBoleto, listSyncContacts, findOrphanBoletos, downloadBoletoPdf,
     fetchLancamentosAbertos, liquidarBoleto, darBaixaManual, alterarBoleto,
     atualizarPagador, movimentacaoSync, checkSicoobHealth,
   } = useBoletoControls(vencimentoMonth);
@@ -232,6 +234,11 @@ export default function Boletos() {
             </Button>
             <Button variant="outline" onClick={() => setSingleOpen(true)}>
               Boleto avulso
+            </Button>
+            {/* 13º honorário em lote: lista os clientes com o lançamento "Honorários Contábeis 13º"
+                e gera a parcela escolhida — fluxo próprio, não passa pelo "Gerar lote" (13/10/2026). */}
+            <Button variant="outline" onClick={() => setGenerate13Open(true)}>
+              13º honorário
             </Button>
             <Button className="gap-2" onClick={() => setGenerateOpen(true)}>
               <Plus className="h-4 w-4" />
@@ -482,6 +489,9 @@ export default function Boletos() {
                             {b.contact_document && (
                               <span className="text-xs text-muted-ink-2">{b.contact_document}</span>
                             )}
+                            {b.tipo?.startsWith('13_') && (
+                              <span className="mt-1"><DsBadge tone="info">13º · {b.tipo === '13_p1' ? '1ª' : '2ª'} parcela</DsBadge></span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>{fmtBRL(b.valor)}</TableCell>
@@ -661,6 +671,14 @@ export default function Boletos() {
         onOpenChange={setGenerateOpen}
         fetchPreview={fetchPreview}
         generateBoletos={generateBoletos}
+      />
+
+      {/* Dialog: 13º honorário (parcela → lista de clientes com o lançamento → geração) */}
+      <Boleto13Dialog
+        open={generate13Open}
+        onOpenChange={setGenerate13Open}
+        fetchPreview13={fetchPreview13}
+        generateBoletos13={generateBoletos13}
       />
 
       {/* Dialog: boleto avulso (busca cliente → valor/vencimento → geração) */}

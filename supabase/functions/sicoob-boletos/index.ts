@@ -25,6 +25,48 @@ const NUMERO_CONTRATO = Deno.env.get("SICOOB_NUMERO_CONTRATO")!;
 // histórico sincronizado via find_orphans não entra nessa automação.
 const N8N_DRIVE_WEBHOOK_URL = "https://n8n.contabilidadealves.com.br/webhook/boleto-pdf-drive";
 
+// ---------------------------------------------------------------------------
+// 13º honorário (13/10/2026, pedido de Gabriel): boleto em lote por parcela, valor = valor do
+// lançamento "Honorários Contábeis 13º" do cliente naquele vencimento (não o boleto_value do
+// cadastro). Um único desconto de 2% até 13/11; multa e juros iguais ao mensal.
+// Vencimento do boleto = vencimento do lançamento (decisão de Gabriel, 13/10/2026).
+// Parcela 2 fica travada aqui no servidor, não só na tela: liberar = trocar `liberada` e
+// definir o desconto/mensagem dela.
+// ---------------------------------------------------------------------------
+const CATEGORIA_13 = "fd6e3941-0b83-4f9e-8cc3-ad3c910365ea"; // Receitas > Honorários Contábeis 13º
+interface Parcela13 {
+  numero: 1 | 2;
+  tipo: "13_p1" | "13_p2";
+  rotulo: string;
+  vencimento: string;
+  liberada: boolean;
+  descontoAte: string | null;
+  descontoPct: number | null;
+  mensagemFinal: string;
+}
+const PARCELAS_13: Parcela13[] = [
+  {
+    numero: 1,
+    tipo: "13_p1",
+    rotulo: "1º Parcela",
+    vencimento: "2026-11-18",
+    liberada: true,
+    descontoAte: "2026-11-13",
+    descontoPct: 2,
+    mensagemFinal: "1º Parcela do Fechamento do Exercício 2026",
+  },
+  {
+    numero: 2,
+    tipo: "13_p2",
+    rotulo: "2º Parcela",
+    vencimento: "2026-12-15",
+    liberada: false,
+    descontoAte: null, // Gabriel define depois
+    descontoPct: null,
+    mensagemFinal: "2º Parcela do Fechamento do Exercício 2026",
+  },
+];
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -117,8 +159,13 @@ const REQUIRED_FIELDS: { key: string; label: string }[] = [
   { key: "state", label: "UF" },
   { key: "cep", label: "CEP" },
 ];
-function missingFields(c: Record<string, unknown>): string[] {
-  return REQUIRED_FIELDS.filter(({ key }) => {
+// 13º: o valor vem do lançamento e o vencimento é fixo por parcela — mensalidade e dia de
+// vencimento do cadastro não são exigidos (cliente com boleto mensal desligado também recebe).
+const REQUIRED_FIELDS_13 = REQUIRED_FIELDS.filter(
+  ({ key }) => key !== "boleto_value" && key !== "boleto_due_day",
+);
+function missingFields(c: Record<string, unknown>, fields = REQUIRED_FIELDS): string[] {
+  return fields.filter(({ key }) => {
     const v = c[key];
     return v === null || v === undefined || v === "";
   }).map(({ label }) => label);
@@ -295,10 +342,52 @@ interface ContactDatas {
   desconto2ISO: string;
 }
 
-async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: ContactDatas, seuNumero: string) {
+// Variante do 13º: um único desconto percentual (ou nenhum, se a data já passou) e uma frase final
+// nas instruções. Sem `opts13` o payload é exatamente o do ciclo mensal.
+interface Opcoes13 {
+  desconto: { ateISO: string; pct: number } | null;
+  mensagemFinal: string;
+}
+
+async function criarBoletoSicoob(
+  token: string,
+  c: Record<string, any>,
+  datas: ContactDatas,
+  seuNumero: string,
+  opts13?: Opcoes13,
+) {
   // @ts-ignore unstable API
   const client = Deno.createHttpClient({ cert: SICOOB_CERT, key: SICOOB_KEY });
   const diaSeguinteVenc = addDaysISO(datas.dataVencimentoISO, 1);
+  const pctBR = (n: number) => `${n.toFixed(2).replace(".", ",")}%`;
+  const descontoPayload = opts13
+    ? (opts13.desconto
+        ? { tipoDesconto: 2, dataPrimeiroDesconto: opts13.desconto.ateISO, valorPrimeiroDesconto: opts13.desconto.pct }
+        : { tipoDesconto: 0 })
+    : {
+        // Desconto: 2 = percentual até a data informada (Sicoob v3). 3% até dia 24 do mês de
+        // emissão, 2% até o último dia do mês de emissão.
+        tipoDesconto: 2,
+        dataPrimeiroDesconto: datas.desconto1ISO,
+        valorPrimeiroDesconto: 3,
+        dataSegundoDesconto: datas.desconto2ISO,
+        valorSegundoDesconto: 2,
+      };
+  const mensagensInstrucao = opts13
+    ? [
+        `A partir ${formatBR(diaSeguinteVenc)} Juros 0,07%/dia.`,
+        `A partir ${formatBR(diaSeguinteVenc)} Multa de 2%.`,
+        ...(opts13.desconto
+          ? [`Até ${formatBR(opts13.desconto.ateISO)} desconto de ${pctBR(opts13.desconto.pct)}`]
+          : []),
+        opts13.mensagemFinal,
+      ]
+    : [
+        `A partir ${formatBR(diaSeguinteVenc)} Juros 0,07%/dia.`,
+        `A partir ${formatBR(diaSeguinteVenc)} Multa de 2%.`,
+        `Até ${formatBR(datas.desconto1ISO)} desconto de 3,00%`,
+        `Até ${formatBR(datas.desconto2ISO)} desconto de 2,00%`,
+      ];
   const payload = {
     numeroCliente: NUMERO_CLIENTE,
     codigoModalidade: 1, // 1 = SIMPLES COM REGISTRO
@@ -315,13 +404,7 @@ async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: C
     dataLimitePagamento: addDaysISO(datas.dataVencimentoISO, 30),
     valor: Number(c.boleto_value),
     valorAbatimento: 0,
-    // Desconto: 2 = percentual até a data informada (Sicoob v3). 3% até dia 24 do mês de
-    // emissão, 2% até o último dia do mês de emissão.
-    tipoDesconto: 2,
-    dataPrimeiroDesconto: datas.desconto1ISO,
-    valorPrimeiroDesconto: 3,
-    dataSegundoDesconto: datas.desconto2ISO,
-    valorSegundoDesconto: 2,
+    ...descontoPayload,
     // Multa 2% e juros de mora 0,07%/dia a partir do dia seguinte ao vencimento.
     tipoMulta: 2,
     dataMulta: diaSeguinteVenc,
@@ -345,13 +428,9 @@ async function criarBoletoSicoob(token: string, c: Record<string, any>, datas: C
       email: c.email_cobranca || c.email,
     },
     // Texto padrão obrigatório em todo boleto — datas calculadas por boleto (dia seguinte ao
-    // vencimento p/ multa/juros; dia 24 e último dia do mês de emissão p/ desconto).
-    mensagensInstrucao: [
-      `A partir ${formatBR(diaSeguinteVenc)} Juros 0,07%/dia.`,
-      `A partir ${formatBR(diaSeguinteVenc)} Multa de 2%.`,
-      `Até ${formatBR(datas.desconto1ISO)} desconto de 3,00%`,
-      `Até ${formatBR(datas.desconto2ISO)} desconto de 2,00%`,
-    ],
+    // vencimento p/ multa/juros; dia 24 e último dia do mês de emissão p/ desconto; no 13º,
+    // a data do desconto único e a frase da parcela).
+    mensagensInstrucao,
   };
   const res = await fetch(
     `https://api.sicoob.com.br/cobranca-bancaria/v3/boletos?numeroContrato=${NUMERO_CONTRATO}`,
@@ -420,6 +499,257 @@ function extractSicoobError(data: any, status: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// 13º HONORÁRIO — preview e geração por parcela. Não passa pela carga de contatos do ciclo
+// mensal (boleto_active/is_active): quem tem o lançamento da parcela entra, mesmo com o boleto
+// mensal desligado (pagam o ano inteiro; decisão de Gabriel, 13/10/2026).
+// ---------------------------------------------------------------------------
+interface Item13 {
+  contact_id: string;
+  name: string | null;
+  document: string | null;
+  valor: number | null;
+  transaction_id: string | null;
+  canal_entrega: string | null;
+  data_vencimento: string;
+  bloqueio: string | null;
+  contato: Record<string, any> | null;
+}
+
+async function carregarItens13(
+  supabase: ReturnType<typeof createClient>,
+  parcela: Parcela13,
+  dataEmissaoISO: string,
+  soIds?: string[],
+): Promise<Item13[]> {
+  let q = supabase
+    .from("transactions")
+    .select("id, contact_id, amount, is_paid")
+    .eq("company_id", COMPANY_ID)
+    .eq("category_id", CATEGORIA_13)
+    .eq("due_date", parcela.vencimento)
+    .is("deleted_at", null)
+    .not("contact_id", "is", null);
+  if (soIds?.length) q = q.in("contact_id", soIds);
+  const { data: txs, error: tErr } = await q;
+  if (tErr) throw tErr;
+
+  const porContato = new Map<string, { id: string; amount: number; is_paid: boolean }[]>();
+  for (const t of txs || []) {
+    if (!porContato.has(t.contact_id)) porContato.set(t.contact_id, []);
+    porContato.get(t.contact_id)!.push({ id: t.id, amount: Number(t.amount), is_paid: !!t.is_paid });
+  }
+  const ids = [...porContato.keys()];
+  if (!ids.length) return [];
+
+  const { data: contatos, error: cErr } = await supabase
+    .from("contacts")
+    .select(`${CONTACT_COLS},is_active`)
+    .eq("company_id", COMPANY_ID)
+    .in("id", ids);
+  if (cErr) throw cErr;
+  const contatoById = new Map((contatos || []).map((c: any) => [c.id, c]));
+
+  // Duplicidade por vencimento EXATO (não por mês, como o lote mensal): qualquer boleto do
+  // cliente com esse vencimento, de qualquer origem/status.
+  const { data: existentes, error: eErr } = await supabase
+    .from("boleto_controls")
+    .select("contact_id")
+    .eq("company_id", COMPANY_ID)
+    .in("contact_id", ids)
+    .eq("data_vencimento", parcela.vencimento);
+  if (eErr) throw eErr;
+  const jaTem = new Set((existentes || []).map((r: any) => r.contact_id));
+
+  const vencimentoPassou = parcela.vencimento < dataEmissaoISO;
+
+  return ids.map((id): Item13 => {
+    const c: any = contatoById.get(id) ?? null;
+    const lancs = porContato.get(id)!;
+    const lanc = lancs.length === 1 ? lancs[0] : null;
+    let bloqueio: string | null = null;
+    if (!c) bloqueio = "Cliente não encontrado";
+    else if (vencimentoPassou) bloqueio = "Vencimento já passou";
+    else if (c.is_active === false) bloqueio = "Cliente inativo";
+    else if (lancs.length > 1) bloqueio = `${lancs.length} lançamentos nesta parcela`;
+    else if (lanc?.is_paid) bloqueio = "Lançamento já liquidado";
+    else if (jaTem.has(id)) bloqueio = "Já gerado";
+    else if (!lanc || !(lanc.amount > 0)) bloqueio = "Valor do lançamento inválido";
+    else {
+      const faltando = missingFields(c, REQUIRED_FIELDS_13);
+      if (faltando.length) bloqueio = `Falta: ${faltando.join(", ")}`;
+    }
+    return {
+      contact_id: id,
+      name: c?.name ?? null,
+      document: c?.document ?? null,
+      valor: lanc ? lanc.amount : null,
+      transaction_id: lanc ? lanc.id : null,
+      canal_entrega: c?.canal_entrega ?? null,
+      data_vencimento: parcela.vencimento,
+      bloqueio,
+      contato: c,
+    };
+  });
+}
+
+function desconto13(parcela: Parcela13, dataEmissaoISO: string): { ateISO: string; pct: number } | null {
+  if (!parcela.descontoAte || parcela.descontoPct == null) return null;
+  // Data de desconto que já passou não vai pro Sicoob — o boleto sai sem desconto.
+  return parcela.descontoAte >= dataEmissaoISO ? { ateISO: parcela.descontoAte, pct: parcela.descontoPct } : null;
+}
+
+async function preview13(
+  supabase: ReturnType<typeof createClient>,
+  parcela: Parcela13,
+  dataEmissaoISO: string,
+) {
+  const itens = await carregarItens13(supabase, parcela, dataEmissaoISO);
+  const items = itens.map(({ contato: _c, ...rest }) => rest);
+  items.sort((a, b) => (a.name || "").localeCompare(b.name || "", "pt-BR"));
+  const elegiveis = items.filter((i) => !i.bloqueio);
+  const desc = desconto13(parcela, dataEmissaoISO);
+  return {
+    parcela: parcela.numero,
+    data_emissao: dataEmissaoISO,
+    data_vencimento: parcela.vencimento,
+    vencimento_passou: parcela.vencimento < dataEmissaoISO,
+    desconto_ate: parcela.descontoAte,
+    desconto_percentual: parcela.descontoPct,
+    desconto_vigente: !!desc,
+    mensagem_final: parcela.mensagemFinal,
+    parcelas: PARCELAS_13.map((p) => ({
+      numero: p.numero,
+      rotulo: p.rotulo,
+      vencimento: p.vencimento,
+      liberada: p.liberada,
+    })),
+    total: items.length,
+    elegiveis: elegiveis.length,
+    valor_elegivel: elegiveis.reduce((s, i) => s + (i.valor ?? 0), 0),
+    items,
+  };
+}
+
+async function generate13(
+  supabase: ReturnType<typeof createClient>,
+  parcela: Parcela13,
+  contactIds: string[],
+  dataEmissaoISO: string,
+  emissaoMonth: string,
+) {
+  if (parcela.vencimento < dataEmissaoISO) {
+    return json({ error: `O vencimento ${formatBR(parcela.vencimento)} já passou.` }, 400);
+  }
+  const itens = await carregarItens13(supabase, parcela, dataEmissaoISO, contactIds);
+  const byId = new Map(itens.map((i) => [i.contact_id, i]));
+  const desc = desconto13(parcela, dataEmissaoISO);
+  const results: any[] = [];
+
+  let token: string;
+  try {
+    token = await getSicoobToken();
+  } catch (e) {
+    return json({ error: String((e as Error).message || e) }, 502);
+  }
+
+  for (const id of contactIds) {
+    const it = byId.get(id);
+    if (!it || !it.contato) {
+      results.push({ contact_id: id, name: it?.name ?? null, status: "error", message: "Cliente sem lançamento do 13º nesta parcela" });
+      continue;
+    }
+    const c = it.contato;
+    if (it.bloqueio) {
+      results.push({
+        contact_id: id,
+        name: c.name,
+        status: it.bloqueio === "Já gerado" ? "skipped" : "error",
+        message: it.bloqueio === "Já gerado" ? "Cliente já tem boleto com este vencimento" : it.bloqueio,
+      });
+      continue;
+    }
+
+    try {
+      const datas: ContactDatas = {
+        dataEmissaoISO,
+        dataVencimentoISO: parcela.vencimento,
+        ...computeDescontoDatas(dataEmissaoISO), // não usados na variante do 13º
+      };
+      // Sufixo próprio: o seuNumero do ciclo mensal é aaaamm + 4 últimos do documento.
+      const seuNumero = `${seuNumeroFor(emissaoMonth, c.document)}13P${parcela.numero}`;
+      const resp = await criarBoletoSicoob(token, { ...c, boleto_value: it.valor }, datas, seuNumero, {
+        desconto: desc,
+        mensagemFinal: parcela.mensagemFinal,
+      });
+      if (!resp.ok) {
+        results.push({ contact_id: id, name: c.name, status: "error", message: extractSicoobError(resp.data, resp.status) });
+        continue;
+      }
+      const resultado = resp.data?.resultado ?? resp.data;
+
+      // PDF em caminho próprio — o do mensal ({mês}/{cliente}.pdf, upsert) seria sobrescrito.
+      let pdfPath: string | null = null;
+      const pdfB64: string | undefined = resultado?.pdfBoleto;
+      if (pdfB64) {
+        try {
+          const bytes = Uint8Array.from(atob(pdfB64), (ch) => ch.charCodeAt(0));
+          pdfPath = `${emissaoMonth}/${id}-13p${parcela.numero}.pdf`;
+          const up = await supabase.storage.from("boletos").upload(pdfPath, bytes, {
+            contentType: "application/pdf",
+            upsert: true,
+          });
+          if (up.error) pdfPath = null;
+        } catch {
+          pdfPath = null;
+        }
+      }
+
+      const { pdfBoleto: _omit, ...resultadoSemPdf } = resultado || {};
+
+      const { error: insErr } = await supabase.from("boleto_controls").insert({
+        company_id: COMPANY_ID,
+        contact_id: id,
+        reference_month: emissaoMonth,
+        status: "PENDENTE",
+        tipo: parcela.tipo,
+        generated_at: new Date().toISOString(),
+        nosso_numero: resultado?.nossoNumero ?? null,
+        linha_digitavel: resultado?.linhaDigitavel ?? null,
+        codigo_barras: resultado?.codigoBarras ?? null,
+        url_qrcode: resultado?.qrCode ?? null,
+        valor: it.valor,
+        data_vencimento: parcela.vencimento,
+        seu_numero: seuNumero,
+        canal_entrega: c.canal_entrega,
+        sicoob_response: resultadoSemPdf,
+        pdf_url: pdfPath,
+      });
+      if (insErr) {
+        results.push({ contact_id: id, name: c.name, status: "error", message: `Boleto gerado no Sicoob mas falhou ao salvar: ${insErr.message}` });
+        continue;
+      }
+      if (pdfPath) {
+        // deno-lint-ignore no-explicit-any
+        (globalThis as any).EdgeRuntime?.waitUntil(avisarDriveWebhook(supabase, {
+          nomeCliente: legalNameUpper(c),
+          valor: it.valor as number,
+          dataVencimento: parcela.vencimento,
+          pdfPath,
+        }));
+      }
+      results.push({ contact_id: id, name: c.name, status: "ok", pdf: !!pdfPath });
+    } catch (e) {
+      results.push({ contact_id: id, name: c.name, status: "error", message: String((e as Error).message || e) });
+    }
+  }
+
+  const ok = results.filter((r) => r.status === "ok").length;
+  const errors = results.filter((r) => r.status === "error").length;
+  const skipped = results.filter((r) => r.status === "skipped").length;
+  return json({ ok, errors, skipped, results });
+}
+
+// ---------------------------------------------------------------------------
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -436,6 +766,17 @@ Deno.serve(async (req) => {
     // Ciclo de geração = mês real de hoje — não depende de qual mês está selecionado na tela
     // (que agora filtra por vencimento). Evita duplicar boleto se o filtro da tabela mudar.
     const emissaoMonth = `${dataEmissaoISO.slice(0, 7)}-01`;
+
+    // 13º honorário: fluxo próprio, antes da carga de contatos do ciclo mensal.
+    if (action === "preview_13" || action === "generate_13") {
+      const parcela = PARCELAS_13.find((p) => p.numero === Number(payload.parcela));
+      if (!parcela) return json({ error: "Parcela inválida" }, 400);
+      if (!parcela.liberada) return json({ error: `${parcela.rotulo} ainda não está liberada.` }, 403);
+      if (action === "preview_13") return json(await preview13(supabase, parcela, dataEmissaoISO));
+      const ids: string[] = Array.isArray(payload.contact_ids) ? payload.contact_ids : [];
+      if (!ids.length) return json({ error: "contact_ids vazio" }, 400);
+      return await generate13(supabase, parcela, ids, dataEmissaoISO, emissaoMonth);
+    }
 
     // Contatos elegíveis (boleto ativo)
     const { data: contatos, error: cErr } = await supabase
@@ -457,10 +798,13 @@ Deno.serve(async (req) => {
     const contactIds = (contatos || []).map((c: any) => c.id);
     const vencimentoMonthsByContact = new Map<string, Set<string>>();
     if (contactIds.length) {
+      // tipo = 'mensal': boleto do 13º (botão próprio) não conta como "já tem boleto no mês" —
+      // senão um 13º vencendo em novembro faria o lote pular o honorário mensal do cliente.
       const { data: existentes, error: eErr } = await supabase
         .from("boleto_controls")
         .select("contact_id, data_vencimento")
         .eq("company_id", COMPANY_ID)
+        .eq("tipo", "mensal")
         .in("contact_id", contactIds);
       if (eErr) throw eErr;
       for (const row of existentes || []) {

@@ -40,6 +40,8 @@ export interface BoletoControl {
   // antes desse fluxo existir (nunca fica elegível pro botão "Liquidar", mesmo sem vínculo).
   transaction_id: string | null;
   liquidacao_habilitada: boolean;
+  // 'mensal' (lote, avulso, sincronizado) | '13_p1' | '13_p2' (13º honorário, botão próprio)
+  tipo: string;
 }
 
 // Lançamento candidato a ser liquidado por um boleto pago (busca por cliente + vencimento).
@@ -67,6 +69,40 @@ export interface PreviewResponse {
   total: number;
   elegiveis: number;
   items: PreviewItem[];
+}
+
+// Preview do 13º honorário (action=preview_13): um item por cliente com lançamento da parcela.
+// `bloqueio` = por que não pode gerar (null = elegível); o servidor é a fonte única da regra.
+export interface Preview13Item {
+  contact_id: string;
+  name: string | null;
+  document: string | null;
+  valor: number | null;
+  transaction_id: string | null;
+  canal_entrega: CanalEntrega;
+  data_vencimento: string;
+  bloqueio: string | null;
+}
+export interface Parcela13Opcao {
+  numero: number;
+  rotulo: string;
+  vencimento: string;
+  liberada: boolean;
+}
+export interface Preview13Response {
+  parcela: number;
+  data_emissao: string;
+  data_vencimento: string;
+  vencimento_passou: boolean;
+  desconto_ate: string | null;
+  desconto_percentual: number | null;
+  desconto_vigente: boolean;
+  mensagem_final: string;
+  parcelas: Parcela13Opcao[];
+  total: number;
+  elegiveis: number;
+  valor_elegivel: number;
+  items: Preview13Item[];
 }
 
 // Resultado por item (action=generate)
@@ -137,7 +173,7 @@ export function useBoletoControls(vencimentoMonth: string) {
           created_at, updated_at,
           valor, valor_pago, data_vencimento, data_pagamento, canal_entrega,
           nosso_numero, seu_numero, linha_digitavel, codigo_barras, url_qrcode,
-          origem_baixa, sicoob_response, pdf_url, transaction_id, liquidacao_habilitada,
+          origem_baixa, sicoob_response, pdf_url, transaction_id, liquidacao_habilitada, tipo,
           contacts:contact_id ( id, name, type, document, email, phone, whatsapp, display_name, nome_fantasia, razao_social )
         `)
         .gte('data_vencimento', vencimentoMonth)
@@ -202,6 +238,38 @@ export function useBoletoControls(vencimentoMonth: string) {
       onProgress?.(Math.min(i + GENERATE_CHUNK_SIZE, contactIds.length), contactIds.length);
     }
     // Boletos gerados vencem no mês seguinte à emissão — pode não ser o mês em exibição agora.
+    queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2'] });
+    return all;
+  };
+
+  // 5a. 13º honorário: preview e geração por parcela (valor = lançamento "Honorários Contábeis 13º").
+  // Mesmo esquema do lote mensal, em lotes de GENERATE_CHUNK_SIZE; o servidor refaz toda a
+  // validação (parcela liberada, duplicidade, valor do lançamento) — a tela só escolhe quem.
+  const fetchPreview13 = async (parcela: number): Promise<Preview13Response> => {
+    const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
+      body: { action: 'preview_13', parcela },
+    });
+    if (error) throw new Error(error.message || 'Falha ao carregar o 13º');
+    if ((data as any)?.error) throw new Error((data as any).error);
+    return data as Preview13Response;
+  };
+
+  const generateBoletos13 = async (
+    parcela: number,
+    contactIds: string[],
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<GenerateResult[]> => {
+    const all: GenerateResult[] = [];
+    for (let i = 0; i < contactIds.length; i += GENERATE_CHUNK_SIZE) {
+      const chunk = contactIds.slice(i, i + GENERATE_CHUNK_SIZE);
+      const { data, error } = await supabase.functions.invoke('sicoob-boletos', {
+        body: { action: 'generate_13', parcela, contact_ids: chunk },
+      });
+      if (error) throw new Error(error.message || 'Falha na geração');
+      if ((data as any)?.error) throw new Error((data as any).error);
+      all.push(...(((data as any)?.results ?? []) as GenerateResult[]));
+      onProgress?.(Math.min(i + GENERATE_CHUNK_SIZE, contactIds.length), contactIds.length);
+    }
     queryClient.invalidateQueries({ queryKey: ['boleto-controls-v2'] });
     return all;
   };
@@ -494,6 +562,8 @@ export function useBoletoControls(vencimentoMonth: string) {
     markAsPrinted,
     fetchPreview,
     generateBoletos,
+    fetchPreview13,
+    generateBoletos13,
     generateSingleBoleto,
     listSyncContacts,
     findOrphanBoletos,

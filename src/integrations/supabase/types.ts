@@ -767,6 +767,7 @@ export type Database = {
           seu_numero: string | null
           sicoob_response: Json | null
           status: string
+          tipo: string
           transaction_id: string | null
           updated_at: string
           url_qrcode: string | null
@@ -793,6 +794,7 @@ export type Database = {
           seu_numero?: string | null
           sicoob_response?: Json | null
           status?: string
+          tipo?: string
           transaction_id?: string | null
           updated_at?: string
           url_qrcode?: string | null
@@ -819,6 +821,7 @@ export type Database = {
           seu_numero?: string | null
           sicoob_response?: Json | null
           status?: string
+          tipo?: string
           transaction_id?: string | null
           updated_at?: string
           url_qrcode?: string | null
