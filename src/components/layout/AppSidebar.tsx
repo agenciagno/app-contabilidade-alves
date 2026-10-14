@@ -400,11 +400,11 @@ export const menuEntries: MenuEntry[] = [
     subKey: 'cadastros_alvaras',
     menu: 'lateral',
   },
+  // Processos (14/10/2026): saiu do "em breve"; controle de abertura, alteração e baixa do Legalização (antes, planilha).
   {
     kind: 'simple',
     title: 'Processos',
     url: '/processos',
-    emBreve: true,
     icon: Gavel,
     iconName: 'gavel',
     moduleKey: 'processos',

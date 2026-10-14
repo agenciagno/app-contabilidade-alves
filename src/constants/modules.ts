@@ -504,8 +504,7 @@ export const EM_BREVE: Record<string, EmBreveInfo> = {
   },
   processos: {
     titulo: 'Processos',
-    descricao: 'Acompanhamento de processos e situação fiscal (e-Processo, SITFIS).',
-    fase: 'F4 · Serpro / Integra Contador',
+    descricao: 'Processos de abertura, alteração e baixa pedidos pelo cliente, com status, órgão e protocolo.',
   },
   score_fiscal: {
     titulo: 'Score Fiscal',
