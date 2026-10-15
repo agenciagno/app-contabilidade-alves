@@ -13,7 +13,7 @@ const BodySchema = z.object({ company_id: z.string().uuid() });
 // Tabelas com company_id que NAO cascateiam (NO ACTION) ou nao tem FK (orfas) -> limpar explicito
 const EXPLICIT_DELETE_TABLES = [
   'transaction_attachments', 'transfer_log', 'dre_budgets', 'boleto_controls',
-  'honorarios_historico', 'acessos_portais', 'client_obligations', 'cnds',
+  'honorarios_historico', 'acessos_portais', 'acesso_tipos', 'client_obligations', 'cnds',
   'collaborator_coverage', 'fiscal_obligations_catalog', 'monitor_cnpj', 'onboarding_steps',
 ];
 

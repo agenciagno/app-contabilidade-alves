@@ -13,11 +13,6 @@ export const PORTAL_LABELS: Record<string, string> = {
   outros: 'Outros',
 };
 
-export const PORTAL_OPTIONS = Object.entries(PORTAL_LABELS).map(([value, label]) => ({
-  value,
-  label,
-}));
-
 export type PortalTipo = keyof typeof PORTAL_LABELS;
 
 export interface AcessoPortal {
@@ -32,19 +27,20 @@ export interface AcessoPortal {
   anexo_url: string | null;
   updated_at: string;
   atualizado_por: string | null;
-  /** Tipo personalizado (catálogo da empresa); nesse caso `portal` é 'outros'. */
+  /** Tipo de acesso (lista única da empresa, tabela acesso_tipos); `portal` acompanha o tipo. */
   tipo_id?: string | null;
   tipo?: { nome: string } | null;
+  created_at?: string;
 }
 
-/** Nome do tipo de acesso como aparece nas telas: o personalizado, ou o do portal fixo. */
+/** Nome do tipo de acesso como aparece nas telas (vem do tipo; o rótulo do portal fixo é só reserva). */
 export const nomeDoTipoDeAcesso = (a: { portal: string; tipo?: { nome: string } | null }) =>
   a.tipo?.nome ?? PORTAL_LABELS[a.portal] ?? a.portal;
 export interface SalvarAcessoInput {
   acesso_id?: string;
   contact_id: string;
   portal: PortalTipo;
-  /** Tipo personalizado (acesso_tipos). Quando vem, o servidor grava portal = 'outros'. */
+  /** Tipo (acesso_tipos). Quando vem, o servidor deriva o portal dele. */
   tipo_id?: string | null;
   portal_label?: string | null;
   login?: string | null;
@@ -61,12 +57,16 @@ export function useAcessosCliente(contactId: string | undefined) {
       const { data, error } = await (supabase as any)
         .from('acessos_portais')
         .select(
-          'id, contact_id, company_id, portal, portal_label, login, validade_certificado, observacao, anexo_url, updated_at, atualizado_por, tipo_id, tipo:acesso_tipos(nome)'
+          'id, contact_id, company_id, portal, portal_label, login, validade_certificado, observacao, anexo_url, updated_at, created_at, atualizado_por, tipo_id, tipo:acesso_tipos(nome)'
         )
-        .eq('contact_id', contactId)
-        .order('portal', { ascending: true });
+        .eq('contact_id', contactId);
       if (error) throw error;
-      return (data ?? []) as AcessoPortal[];
+      // Mesmo item junto (vários acessos do mesmo tipo ficam em sequência), do mais antigo ao mais novo.
+      return ((data ?? []) as AcessoPortal[]).sort(
+        (a, b) =>
+          nomeDoTipoDeAcesso(a).localeCompare(nomeDoTipoDeAcesso(b), 'pt-BR') ||
+          (a.created_at ?? '').localeCompare(b.created_at ?? '')
+      );
     },
     enabled: !!contactId,
   });

@@ -34,39 +34,14 @@ import {
 import { cn } from '@/lib/utils';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCofreGlobal, CofreGlobalRow } from '@/hooks/useCofreGlobal';
-import {
-  PORTAL_LABELS,
-  PortalTipo,
-  useRevelarSenha,
-} from '@/hooks/useAcessosCliente';
-
-const PORTAL_ORDER: PortalTipo[] = [
-  'gov_br',
-  'ecac',
-  'siare',
-  'prefeitura_nfse',
-  'sefaz_estadual',
-  'certificado_digital',
-  'esocial',
-  'outros',
-];
-
-const PORTAL_SHORT: Record<PortalTipo, string> = {
-  gov_br: 'GOV.BR',
-  ecac: 'eCac',
-  siare: 'SIARE',
-  prefeitura_nfse: 'Prefeitura/NFS-e',
-  sefaz_estadual: 'SEFAZ',
-  certificado_digital: 'Cert. Digital',
-  esocial: 'e-Social',
-  conectividade_social: 'Conect. Social',
-  outros: 'Outros',
-};
+import { useRevelarSenha } from '@/hooks/useAcessosCliente';
+import { useAcessoTipos } from '@/hooks/useAcessoTipos';
 
 interface ClienteAgrupado {
   contact_id: string;
   nome_cliente: string;
-  acessos: Partial<Record<PortalTipo, CofreGlobalRow>>;
+  /** Por tipo de acesso (id): o cliente pode ter vários acessos do mesmo tipo. */
+  acessos: Record<string, CofreGlobalRow[]>;
   temAlerta: boolean;
 }
 
@@ -83,6 +58,7 @@ export default function CofreGlobal() {
   }, [roleLoading, podeAcessar, navigate]);
 
   const { data, isLoading, isError } = useCofreGlobal();
+  const { data: tipos = [] } = useAcessoTipos();
   const revelar = useRevelarSenha();
 
   const [search, setSearch] = useState('');
@@ -115,8 +91,11 @@ export default function CofreGlobal() {
         };
         map.set(row.contact_id, entry);
       }
-      // Tipo personalizado tem coluna própria (chave "tipo:<id>"); o resto segue a coluna do portal.
-      entry.acessos[row.tipo_id ? `tipo:${row.tipo_id}` : row.portal] = row;
+      // Uma coluna por tipo de acesso; vários acessos do mesmo tipo ficam empilhados na célula.
+      if (row.acesso_id) {
+        const chave = row.tipo_id ?? row.portal;
+        (entry.acessos[chave] ??= []).push(row);
+      }
       if (row.alerta_vencimento) entry.temAlerta = true;
     }
     return Array.from(map.values());
@@ -131,16 +110,11 @@ export default function CofreGlobal() {
     });
   }, [clientes, search, apenasAlertas]);
 
-  // Colunas: os portais fixos e, depois, um tipo personalizado por coluna (os que aparecem nos acessos).
-  const colunas = useMemo(() => {
-    const fixas = PORTAL_ORDER.map((p) => ({ key: p as string, titulo: PORTAL_SHORT[p], rotulo: PORTAL_LABELS[p] }));
-    const personalizadas = new Map<string, string>();
-    (data ?? []).forEach((r) => { if (r.tipo_id && r.tipo_nome) personalizadas.set(`tipo:${r.tipo_id}`, r.tipo_nome); });
-    const extras = [...personalizadas.entries()]
-      .sort((a, b) => a[1].localeCompare(b[1]))
-      .map(([key, nome]) => ({ key, titulo: nome, rotulo: nome }));
-    return [...fixas, ...extras];
-  }, [data]);
+  // Colunas: a lista única de tipos de acesso da empresa (renomear na lista renomeia a coluna).
+  const colunas = useMemo(
+    () => tipos.map((t) => ({ key: t.id, titulo: t.nome, rotulo: t.nome })),
+    [tipos]
+  );
   const colunasVisiveis = colunas.filter((c) => !ocultas.includes(c.key));
 
   const stats = useMemo(() => ({
@@ -289,16 +263,15 @@ export default function CofreGlobal() {
                     </TableCell>
                     {colunasVisiveis.map((col) => {
                       const p = col.key;
-                      const acc = c.acessos[p];
-                      if (!acc) {
+                      const accs = c.acessos[p] ?? [];
+                      if (accs.length === 0) {
                         return (
                           <TableCell key={p} className="text-center text-muted-foreground/50">
                             —
                           </TableCell>
                         );
                       }
-                      const alerta = acc.alerta_vencimento;
-                      const isOpen = popoverState?.key === acc.acesso_id;
+                      const alerta = accs.some((a) => a.alerta_vencimento);
                       return (
                         <TableCell
                           key={p}
@@ -307,71 +280,80 @@ export default function CofreGlobal() {
                             alerta && 'bg-destructive/10'
                           )}
                         >
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="inline-flex items-center gap-1">
-                                {alerta && (
-                                  <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                                )}
-                                <Popover
-                                  open={isOpen}
-                                  onOpenChange={(o) => !o && setPopoverState(null)}
-                                >
-                                  <PopoverTrigger asChild>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-7 w-7"
-                                      disabled={loadingAction === acc.acesso_id + ':rev'}
-                                      onClick={() => handleRevelar(acc)}
-                                    >
-                                      {loadingAction === acc.acesso_id + ':rev' ? (
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                      ) : (
-                                        <Eye className="h-3.5 w-3.5" />
+                          <div className="flex flex-col items-center gap-1">
+                            {accs.map((acc) => {
+                              const alertaAcc = acc.alerta_vencimento;
+                              const isOpen = popoverState?.key === acc.acesso_id;
+                              return (
+                                <Tooltip key={acc.acesso_id}>
+                                  <TooltipTrigger asChild>
+                                    <div className="inline-flex items-center gap-1">
+                                      {alertaAcc && (
+                                        <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
                                       )}
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-3" align="center">
-                                    <div className="space-y-1">
-                                      <p className="text-xs text-muted-foreground">
-                                        Senha (fecha em 5s)
-                                      </p>
-                                      <p className="font-mono text-sm select-all">
-                                        {popoverState?.senha}
-                                      </p>
+                                      <Popover
+                                        open={isOpen}
+                                        onOpenChange={(o) => !o && setPopoverState(null)}
+                                      >
+                                        <PopoverTrigger asChild>
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-7 w-7"
+                                            disabled={loadingAction === acc.acesso_id + ':rev'}
+                                            onClick={() => handleRevelar(acc)}
+                                          >
+                                            {loadingAction === acc.acesso_id + ':rev' ? (
+                                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            ) : (
+                                              <Eye className="h-3.5 w-3.5" />
+                                            )}
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-3" align="center">
+                                          <div className="space-y-1">
+                                            <p className="text-xs text-muted-foreground">
+                                              Senha (fecha em 5s)
+                                            </p>
+                                            <p className="font-mono text-sm select-all">
+                                              {popoverState?.senha}
+                                            </p>
+                                          </div>
+                                        </PopoverContent>
+                                      </Popover>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-7 w-7"
+                                        disabled={loadingAction === acc.acesso_id + ':cp'}
+                                        onClick={() => handleCopiar(acc)}
+                                      >
+                                        {loadingAction === acc.acesso_id + ':cp' ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                          <Copy className="h-3.5 w-3.5" />
+                                        )}
+                                      </Button>
                                     </div>
-                                  </PopoverContent>
-                                </Popover>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7"
-                                  disabled={loadingAction === acc.acesso_id + ':cp'}
-                                  onClick={() => handleCopiar(acc)}
-                                >
-                                  {loadingAction === acc.acesso_id + ':cp' ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Copy className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-xs">
-                                <div>Login: {acc.login ?? '—'}</div>
-                                {alerta && acc.validade_certificado && (
-                                  <div className="text-destructive">
-                                    Certificado vence em{' '}
-                                    {new Date(
-                                      acc.validade_certificado + 'T00:00:00'
-                                    ).toLocaleDateString('pt-BR')}
-                                  </div>
-                                )}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="text-xs">
+                                      {acc.portal_label && <div className="font-medium">{acc.portal_label}</div>}
+                                      <div>Login: {acc.login ?? '—'}</div>
+                                      {alertaAcc && acc.validade_certificado && (
+                                        <div className="text-destructive">
+                                          Certificado vence em{' '}
+                                          {new Date(
+                                            acc.validade_certificado + 'T00:00:00'
+                                          ).toLocaleDateString('pt-BR')}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })}
+                          </div>
                         </TableCell>
                       );
                     })}

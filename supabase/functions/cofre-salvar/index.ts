@@ -79,8 +79,8 @@ serve(async (req) => {
 
     const body = await req.json();
     const { acesso_id, contact_id, portal: portalRecebido, portal_label, login, senha, validade_certificado, observacao, tipo_id } = body;
-    // Tipo personalizado (catálogo acesso_tipos) sempre grava portal = 'outros'.
-    const portal = tipo_id ? "outros" : portalRecebido;
+    // Com tipo_id, o portal segue o tipo (fixo: o próprio portal; criado pela equipe: 'outros').
+    let portal = tipo_id ? "outros" : portalRecebido;
 
     if (!contact_id || !portal) {
       return new Response(
@@ -112,13 +112,14 @@ serve(async (req) => {
     }
 
     if (tipo_id) {
-      const { data: tipo } = await supabaseAdmin.from("acesso_tipos").select("id, company_id").eq("id", tipo_id).maybeSingle();
+      const { data: tipo } = await supabaseAdmin.from("acesso_tipos").select("id, company_id, portal").eq("id", tipo_id).maybeSingle();
       if (!tipo || tipo.company_id !== company_id) {
         return new Response(
           JSON.stringify({ success: false, error: "Tipo de acesso inválido." }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+      portal = tipo.portal ?? "outros";
     }
 
     let senha_encrypted = undefined;
@@ -166,15 +167,7 @@ serve(async (req) => {
         .insert(payload)
         .select()
         .single();
-      if (error) {
-        if (error.code === "23505") {
-          return new Response(
-            JSON.stringify({ success: false, error: tipo_id ? "Já existe um acesso deste tipo neste cliente." : `Já existe um acesso para o portal ${portal} neste cliente.` }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        throw error;
-      }
+      if (error) throw error;
       result = data;
     }
 

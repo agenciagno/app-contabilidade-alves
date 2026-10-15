@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { CalendarIcon, Eye, EyeOff, Upload, Paperclip } from 'lucide-react';
+import { CalendarIcon, Eye, EyeOff, Upload, Paperclip, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,11 +27,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   AcessoPortal,
-  PORTAL_OPTIONS,
   PortalTipo,
   useSalvarAcesso,
 } from '@/hooks/useAcessosCliente';
 import { useAcessoTipos, useCriarAcessoTipo } from '@/hooks/useAcessoTipos';
+import { GerenciarTiposAcessoDialog } from './GerenciarTiposAcessoDialog';
 
 interface Props {
   open: boolean;
@@ -47,14 +47,15 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
-  // 'gov_br' | 'siare' | ... (portal fixo) ou 'tipo:<id>' (tipo criado pela equipe, gravado como portal 'outros').
-  const [tipoSel, setTipoSel] = useState<string>('gov_br');
+  // Id do tipo escolhido na lista única (acesso_tipos). O portal acompanha o tipo.
+  const [tipoSel, setTipoSel] = useState<string>('');
   const [criandoTipo, setCriandoTipo] = useState(false);
   const [novoTipo, setNovoTipo] = useState('');
+  const [gerenciando, setGerenciando] = useState(false);
   const { data: tipos = [] } = useAcessoTipos();
   const criarTipo = useCriarAcessoTipo();
-  const tipoPersonalizadoId = tipoSel.startsWith('tipo:') ? tipoSel.slice(5) : null;
-  const portal: PortalTipo = tipoPersonalizadoId ? 'outros' : tipoSel;
+  const tipoAtual = tipos.find((t) => t.id === tipoSel);
+  const portal: PortalTipo = tipoAtual?.portal ?? 'outros';
   const [portalLabel, setPortalLabel] = useState('');
   const [login, setLogin] = useState('');
   const [senha, setSenha] = useState('');
@@ -68,9 +69,7 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
 
   useEffect(() => {
     if (open) {
-      setTipoSel(lockCertificado
-        ? 'certificado_digital'
-        : acesso?.tipo_id ? `tipo:${acesso.tipo_id}` : ((acesso?.portal as string) ?? 'gov_br'));
+      setTipoSel('');
       setCriandoTipo(false);
       setNovoTipo('');
       setPortalLabel(acesso?.portal_label ?? '');
@@ -83,6 +82,16 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
     }
   }, [open, acesso, lockCertificado]);
 
+  // Escolhe o tipo inicial quando a lista chega, e volta para um válido se o escolhido sair da lista.
+  useEffect(() => {
+    if (!open || tipos.length === 0 || tipos.some((t) => t.id === tipoSel)) return;
+    const porPortal = (p: string) => tipos.find((t) => t.portal === p)?.id;
+    const inicial = lockCertificado
+      ? porPortal('certificado_digital')
+      : (acesso?.tipo_id && tipos.some((t) => t.id === acesso.tipo_id) ? acesso.tipo_id : porPortal((acesso?.portal as string) ?? 'gov_br'));
+    setTipoSel(inicial ?? tipos[0].id);
+  }, [open, tipos, tipoSel, acesso, lockCertificado]);
+
   const isCertificado = portal === 'certificado_digital';
 
   const handleSubmit = async () => {
@@ -90,12 +99,16 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
       toast.error('Informe a senha.');
       return;
     }
+    if (!tipoSel) {
+      toast.error('Escolha o tipo de acesso.');
+      return;
+    }
     try {
       const data = await salvar.mutateAsync({
         acesso_id: acesso?.id,
         contact_id: contactId,
         portal,
-        tipo_id: tipoPersonalizadoId,
+        tipo_id: tipoSel,
         portal_label: portalLabel || null,
         login: login || null,
         senha: senha || undefined,
@@ -138,7 +151,7 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
     const existente = tipos.find((t) => t.nome.trim().toLowerCase() === nome.toLowerCase());
     try {
       const tipo = existente ?? await criarTipo.mutateAsync(nome);
-      setTipoSel(`tipo:${tipo.id}`);
+      setTipoSel(tipo.id);
       setCriandoTipo(false);
       setNovoTipo('');
       toast.success(existente ? `Tipo "${tipo.nome}" selecionado` : `Tipo "${tipo.nome}" criado e salvo na lista`);
@@ -175,13 +188,8 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PORTAL_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
                   {tipos.map((t) => (
-                    <SelectItem key={t.id} value={`tipo:${t.id}`}>
+                    <SelectItem key={t.id} value={t.id}>
                       {t.nome}
                     </SelectItem>
                   ))}
@@ -190,6 +198,14 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
                   </SelectItem>
                 </SelectContent>
               </Select>
+              <button
+                type="button"
+                onClick={() => setGerenciando(true)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                Renomear ou excluir itens da lista
+              </button>
               {criandoTipo && (
                 <div className="space-y-2 rounded-md border border-dashed p-3">
                   <Label className="text-xs">Nome do novo tipo de acesso</Label>
@@ -329,6 +345,12 @@ export function AcessoFormDialog({ open, onOpenChange, contactId, acesso, lockCe
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <GerenciarTiposAcessoDialog
+        open={gerenciando}
+        onOpenChange={setGerenciando}
+        onExcluido={(id, movidoPara) => { if (id === tipoSel && movidoPara) setTipoSel(movidoPara); }}
+      />
     </Dialog>
   );
 }
