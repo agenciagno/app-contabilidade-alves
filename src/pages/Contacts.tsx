@@ -44,6 +44,14 @@ function Contador({ tom, valor, label }: { tom: string; valor: number; label: st
 const ARCHIVED_STATUSES = ['Baixada', 'Ex-cliente', 'Ex-Colaborador'];
 const isArchivedContact = (c: Contact) => ARCHIVED_STATUSES.includes(((c as any).status_cliente || '').toString());
 
+// TEMPORÁRIO (15/10/2026): filtro por letra inicial do nome de exibição. Remover junto com `filterLetra`,
+// `LETRAS`, `letraDoContato` e a barra "Filtro por letra" quando não for mais necessário.
+const LETRAS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','#'];
+const letraDoContato = (c: Contact) => {
+  const inicial = (getContactDisplayName(c) || '').trim().charAt(0).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  return /^[A-Z]$/.test(inicial) ? inicial : '#';
+};
+
 export default function Contacts() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -58,6 +66,7 @@ export default function Contacts() {
   const [filterRegime, setFilterRegime] = useState('all');
   const [filterResponsible, setFilterResponsible] = useState('all');
   const [filterResponsibleDp, setFilterResponsibleDp] = useState('all');
+  const [filterLetra, setFilterLetra] = useState('all'); // TEMPORÁRIO: ver comentário em LETRAS
   const { data: fiscalProfiles = [] } = useAllFiscalProfiles();
   const { data: activeProfiles = [] } = useTeamProfiles();
 
@@ -120,9 +129,17 @@ export default function Contacts() {
         matchesResponsibleDp = filterResponsibleDp === 'none' ? !rid : rid === filterResponsibleDp;
       }
 
-      return matchesSearch && matchesStatusCliente && matchesCategoria && matchesRegime && matchesResponsible && matchesResponsibleDp && !isArchivedContact(c);
+      const matchesLetra = filterLetra === 'all' || letraDoContato(c) === filterLetra;
+
+      return matchesSearch && matchesStatusCliente && matchesCategoria && matchesRegime && matchesResponsible && matchesResponsibleDp && matchesLetra && !isArchivedContact(c);
     }).sort((a, b) => getContactDisplayName(a).localeCompare(getContactDisplayName(b), 'pt-BR', { sensitivity: 'base' }));
-  }, [contacts, searchTerm, filterStatusCliente, filterCategoria, filterRegime, filterResponsible, filterResponsibleDp, transactions]);
+  }, [contacts, searchTerm, filterStatusCliente, filterCategoria, filterRegime, filterResponsible, filterResponsibleDp, filterLetra, transactions]);
+
+  // Letras que existem entre os contatos não arquivados (as outras ficam apagadas na barra).
+  const letrasComContato = useMemo(
+    () => new Set(contacts.filter(c => !isArchivedContact(c)).map(letraDoContato)),
+    [contacts]
+  );
 
   const archivedContacts = useMemo(() => {
     const q = searchTerm.toLowerCase();
@@ -202,7 +219,7 @@ export default function Contacts() {
 
   // Aba Clientes: só quem está marcado como Cliente (mesmos filtros e busca da tela; arquivados ficam de fora como em Todos).
   const clienteContacts = filteredContacts.filter(c => (c.categorias || []).some(x => (x || '').toLowerCase() === 'cliente'));
-  const hasActiveFilters = searchTerm || filterStatusCliente !== 'all' || filterCategoria !== 'all' || filterRegime !== 'all' || filterResponsible !== 'all' || filterResponsibleDp !== 'all';
+  const hasActiveFilters = searchTerm || filterStatusCliente !== 'all' || filterCategoria !== 'all' || filterRegime !== 'all' || filterResponsible !== 'all' || filterResponsibleDp !== 'all' || filterLetra !== 'all';
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -211,6 +228,7 @@ export default function Contacts() {
     setFilterRegime('all');
     setFilterResponsible('all');
     setFilterResponsibleDp('all');
+    setFilterLetra('all');
   };
 
 
@@ -496,6 +514,30 @@ export default function Contacts() {
                     Limpar
                   </Button>
                 )}
+              </div>
+
+              {/* TEMPORÁRIO: filtro por letra inicial do nome de exibição */}
+              <div className="flex flex-wrap items-center gap-1" aria-label="Filtro por letra">
+                <Button
+                  size="sm"
+                  variant={filterLetra === 'all' ? 'default' : 'outline'}
+                  className="h-7 px-2.5 text-xs"
+                  onClick={() => setFilterLetra('all')}
+                >
+                  Todas
+                </Button>
+                {LETRAS.map(l => (
+                  <Button
+                    key={l}
+                    size="sm"
+                    variant={filterLetra === l ? 'default' : 'outline'}
+                    className="h-7 w-7 px-0 text-xs"
+                    disabled={!letrasComContato.has(l) && filterLetra !== l}
+                    onClick={() => setFilterLetra(filterLetra === l ? 'all' : l)}
+                  >
+                    {l}
+                  </Button>
+                ))}
               </div>
 
               {/* Total muda com os filtros aplicados — reflete base, não o total bruto */}
