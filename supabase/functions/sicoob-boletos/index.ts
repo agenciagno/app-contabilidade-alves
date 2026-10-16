@@ -42,7 +42,9 @@ interface Parcela13 {
   liberada: boolean;
   descontoAte: string | null;
   descontoPct: number | null;
-  mensagemFinal: string;
+  // Linhas finais das instruções, já quebradas: o Sicoob aceita 5 linhas de até 40 caracteres
+  // (o texto inteiro da parcela tem 42 e foi recusado em 16/10/2026: tamanho.mensagemIntrucao.maximo).
+  mensagensFinais: string[];
 }
 const PARCELAS_13: Parcela13[] = [
   {
@@ -53,7 +55,7 @@ const PARCELAS_13: Parcela13[] = [
     liberada: true,
     descontoAte: "2026-11-13",
     descontoPct: 2,
-    mensagemFinal: "1º Parcela do Fechamento do Exercício 2026",
+    mensagensFinais: ["1º Parcela do Fechamento", "do Exercício 2026"],
   },
   {
     numero: 2,
@@ -63,7 +65,7 @@ const PARCELAS_13: Parcela13[] = [
     liberada: false,
     descontoAte: null, // Gabriel define depois
     descontoPct: null,
-    mensagemFinal: "2º Parcela do Fechamento do Exercício 2026",
+    mensagensFinais: ["2º Parcela do Fechamento", "do Exercício 2026"],
   },
 ];
 
@@ -346,7 +348,7 @@ interface ContactDatas {
 // nas instruções. Sem `opts13` o payload é exatamente o do ciclo mensal.
 interface Opcoes13 {
   desconto: { ateISO: string; pct: number } | null;
-  mensagemFinal: string;
+  mensagensFinais: string[];
 }
 
 async function criarBoletoSicoob(
@@ -380,7 +382,7 @@ async function criarBoletoSicoob(
         ...(opts13.desconto
           ? [`Até ${formatBR(opts13.desconto.ateISO)} desconto de ${pctBR(opts13.desconto.pct)}`]
           : []),
-        opts13.mensagemFinal,
+        ...opts13.mensagensFinais,
       ]
     : [
         `A partir ${formatBR(diaSeguinteVenc)} Juros 0,07%/dia.`,
@@ -388,6 +390,16 @@ async function criarBoletoSicoob(
         `Até ${formatBR(datas.desconto1ISO)} desconto de 3,00%`,
         `Até ${formatBR(datas.desconto2ISO)} desconto de 2,00%`,
       ];
+  // Limite do Sicoob: 5 linhas de até 40 caracteres. Falha aqui, com mensagem legível, em vez de
+  // gastar a chamada e devolver o código cru "tamanho.mensagemIntrucao.maximo".
+  const linhaLonga = mensagensInstrucao.find((m) => m.length > 40);
+  if (linhaLonga || mensagensInstrucao.length > 5) {
+    throw new Error(
+      linhaLonga
+        ? `Instrução do boleto acima de 40 caracteres (${linhaLonga.length}): "${linhaLonga}"`
+        : `Instrução do boleto com ${mensagensInstrucao.length} linhas (máximo 5)`,
+    );
+  }
   const payload = {
     numeroCliente: NUMERO_CLIENTE,
     codigoModalidade: 1, // 1 = SIMPLES COM REGISTRO
@@ -626,7 +638,7 @@ async function preview13(
     desconto_ate: parcela.descontoAte,
     desconto_percentual: parcela.descontoPct,
     desconto_vigente: !!desc,
-    mensagem_final: parcela.mensagemFinal,
+    mensagem_final: parcela.mensagensFinais.join(" "),
     parcelas: PARCELAS_13.map((p) => ({
       numero: p.numero,
       rotulo: p.rotulo,
@@ -689,7 +701,7 @@ async function generate13(
       const seuNumero = `${seuNumeroFor(emissaoMonth, c.document)}13P${parcela.numero}`;
       const resp = await criarBoletoSicoob(token, { ...c, boleto_value: it.valor }, datas, seuNumero, {
         desconto: desc,
-        mensagemFinal: parcela.mensagemFinal,
+        mensagensFinais: parcela.mensagensFinais,
       });
       if (!resp.ok) {
         results.push({ contact_id: id, name: c.name, status: "error", message: extractSicoobError(resp.data, resp.status) });
