@@ -704,7 +704,10 @@ async function generate13(
         mensagensFinais: parcela.mensagensFinais,
       });
       if (!resp.ok) {
-        results.push({ contact_id: id, name: c.name, status: "error", message: extractSicoobError(resp.data, resp.status) });
+        // Corpo completo no log da função: "Erro interno do servidor" sozinho não diz o que o
+        // Sicoob recusou (16/10/2026).
+        console.error(`generate_13 Sicoob HTTP ${resp.status} cliente=${c.name} seuNumero=${seuNumero}`, JSON.stringify(resp.data).slice(0, 1500));
+        results.push({ contact_id: id, name: c.name, status: "error", message: `${extractSicoobError(resp.data, resp.status)} (HTTP ${resp.status})` });
         continue;
       }
       const resultado = resp.data?.resultado ?? resp.data;
@@ -772,6 +775,54 @@ async function generate13(
   return json({ ok, errors, skipped, results });
 }
 
+// Só leitura: o que o Sicoob tem registrado para cada cliente (GET /pagadores/{doc}/boletos), sem
+// gravar nada aqui. Serve para conferir se uma geração que deu erro chegou a registrar o boleto
+// no banco (não dá pra assumir que um HTTP 500 não registrou). `vencimento` (AAAA-MM-DD) filtra.
+async function consultarPagadores(
+  supabase: ReturnType<typeof createClient>,
+  contactIds: string[],
+  vencimento: string | null,
+) {
+  const { data: contatos, error } = await supabase
+    .from("contacts")
+    .select("id,name,document")
+    .eq("company_id", COMPANY_ID)
+    .in("id", contactIds);
+  if (error) throw error;
+  const token = await getSicoobToken();
+  const porContato = await mapWithConcurrency(contatos || [], 5, async (c: any) => {
+    const cpfCnpj = String(c.document || "").replace(/\D/g, "");
+    if (!cpfCnpj) return { contact_id: c.id, name: c.name, status: "skipped", boletos: [] };
+    try {
+      const resp = await listarBoletosPorPagador(token, cpfCnpj);
+      if (!resp.ok) {
+        // 400/404 = pagador sem boletos no Sicoob; outro status = falha real
+        if (resp.status === 400 || resp.status === 404) return { contact_id: c.id, name: c.name, status: "ok", boletos: [] };
+        return { contact_id: c.id, name: c.name, status: "error", message: `${extractSicoobError(resp.data, resp.status)} (HTTP ${resp.status})`, boletos: [] };
+      }
+      const lista: SicoobPagadorBoleto[] = Array.isArray(resp.data?.resultado) ? resp.data.resultado : [];
+      const boletos = lista
+        .filter((b) => !vencimento || String(b.dataVencimento || "").slice(0, 10) === vencimento)
+        .map((b) => ({
+          nossoNumero: b.nossoNumero,
+          seuNumero: b.seuNumero ?? null,
+          dataVencimento: String(b.dataVencimento || "").slice(0, 10),
+          valor: b.valor ?? null,
+          situacaoBoleto: b.situacaoBoleto ?? null,
+        }));
+      return { contact_id: c.id, name: c.name, status: "ok", boletos };
+    } catch (e) {
+      return { contact_id: c.id, name: c.name, status: "error", message: String((e as Error).message || e), boletos: [] };
+    }
+  });
+  return {
+    consultados: porContato.length,
+    com_boleto: porContato.filter((r) => r.boletos.length > 0).length,
+    erros: porContato.filter((r) => r.status === "error").length,
+    items: porContato,
+  };
+}
+
 // ---------------------------------------------------------------------------
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -789,6 +840,18 @@ Deno.serve(async (req) => {
     // Ciclo de geração = mês real de hoje — não depende de qual mês está selecionado na tela
     // (que agora filtra por vencimento). Evita duplicar boleto se o filtro da tabela mudar.
     const emissaoMonth = `${dataEmissaoISO.slice(0, 7)}-01`;
+
+    // Consulta só de leitura ao Sicoob por cliente (diagnóstico).
+    if (action === "consultar_pagador") {
+      const ids: string[] = Array.isArray(payload.contact_ids) ? payload.contact_ids.slice(0, 80) : [];
+      if (!ids.length) return json({ error: "contact_ids vazio" }, 400);
+      const venc = /^\d{4}-\d{2}-\d{2}$/.test(payload.vencimento || "") ? payload.vencimento : null;
+      try {
+        return json(await consultarPagadores(supabase, ids, venc));
+      } catch (e) {
+        return json({ error: String((e as Error).message || e) }, 502);
+      }
+    }
 
     // 13º honorário: fluxo próprio, antes da carga de contatos do ciclo mensal.
     if (action === "preview_13" || action === "generate_13") {
