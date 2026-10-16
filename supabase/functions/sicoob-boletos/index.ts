@@ -452,9 +452,18 @@ async function criarBoletoSicoob(
 // Assina a URL do PDF (10 min) e dispara o webhook N8N que sobe pro Drive. Usado tanto pelo
 // aviso automático (fire-and-forget) quanto pelo resync manual (action: 'resync_drive'), que
 // precisa saber se deu certo pra reportar item a item.
+// `tipo` (boleto_controls.tipo) decide a pasta no N8N: 'mensal' = BOLETOS SICOOB > 2026 > mês do
+// vencimento; '13_pN' = pasta fixa da parcela do 13º (16/10/2026).
+interface ParamsDrive {
+  nomeCliente: string;
+  valor: number;
+  dataVencimento: string;
+  pdfPath: string;
+  tipo?: string;
+}
 async function enviarParaDrive(
   supabase: ReturnType<typeof createClient>,
-  params: { nomeCliente: string; valor: number; dataVencimento: string; pdfPath: string },
+  params: ParamsDrive,
 ): Promise<{ ok: boolean; message?: string }> {
   const { data: signed, error } = await supabase.storage
     .from("boletos")
@@ -470,6 +479,7 @@ async function enviarParaDrive(
       valor: params.valor,
       data_vencimento: params.dataVencimento,
       pdf_signed_url: signed.signedUrl,
+      tipo: params.tipo ?? "mensal",
     }),
   });
   if (!res.ok) return { ok: false, message: `Webhook N8N respondeu HTTP ${res.status}` };
@@ -480,7 +490,7 @@ async function enviarParaDrive(
 // falha aqui nunca derruba o boleto, que já está gerado e salvo no Sicoob/banco.
 async function avisarDriveWebhook(
   supabase: ReturnType<typeof createClient>,
-  params: { nomeCliente: string; valor: number; dataVencimento: string; pdfPath: string },
+  params: ParamsDrive,
 ) {
   try {
     await enviarParaDrive(supabase, params);
@@ -735,6 +745,7 @@ async function generate13(
           valor: it.valor as number,
           dataVencimento: parcela.vencimento,
           pdfPath,
+          tipo: parcela.tipo,
         }));
       }
       results.push({ contact_id: id, name: c.name, status: "ok", pdf: !!pdfPath });
@@ -1260,7 +1271,7 @@ Deno.serve(async (req) => {
 
       const { data: rows, error: rowsErr } = await supabase
         .from("boleto_controls")
-        .select("id, contact_id, valor, data_vencimento, pdf_url")
+        .select("id, contact_id, valor, data_vencimento, pdf_url, tipo")
         .eq("company_id", COMPANY_ID)
         .in("id", boletoIds);
       if (rowsErr) throw rowsErr;
@@ -1287,6 +1298,7 @@ Deno.serve(async (req) => {
             valor: Number(row.valor),
             dataVencimento: row.data_vencimento,
             pdfPath: row.pdf_url,
+            tipo: row.tipo,
           });
           results.push({ id: row.id, contact_id: row.contact_id, name: nomeCliente, status: outcome.ok ? "ok" : "error", message: outcome.message });
         } catch (e) {
