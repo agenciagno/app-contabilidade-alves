@@ -33,7 +33,7 @@ import { useTeamProfiles } from '@/hooks/useTeamProfiles';
 import { ContactObligationsSelector } from '@/components/fiscal/ContactObligationsSelector';
 import { ClienteTarefasStatus } from './ClienteTarefasStatus';
 import { useCompany } from '@/hooks/useCompany';
-import { maskPhone, maskCPF, maskCPFCNPJ, getDocumentType } from '@/lib/utils';
+import { maskPhone, maskCPF, maskCNPJ, maskCPFCNPJ, getDocumentType } from '@/lib/utils';
 import { toast } from 'sonner';
 import { TAX_REGIMES } from '@/constants/taxRegimes';
 import { PORTE_OPTIONS } from '@/constants/porte';
@@ -124,6 +124,17 @@ function Field({ label, children, autofill }: { label: React.ReactNode; children
         {autofill && <AutofillBadge />}
       </Label>
       {children}
+    </div>
+  );
+}
+
+/** Divisor de seção dentro de um box (Endereço, Contatos, Responsável técnico): título no centro, linha dos dois lados. */
+function Divisor({ titulo }: { titulo: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-1" role="separator" aria-label={titulo}>
+      <span className="h-px flex-1 bg-line" />
+      <span className="text-ui-strong text-action">{titulo}</span>
+      <span className="h-px flex-1 bg-line" />
     </div>
   );
 }
@@ -300,142 +311,201 @@ export function ContactCadastroTab({ contactId }: Props) {
 
   return (
     <>
-      {/* CADASTRO (Identificação & Contatos + Endereço + Observações Gerais) */}
+      {/* CADASTRO: um box "Geral" com divisores (Endereço, Contatos, Responsável técnico), no molde do Makro (17/10/2026).
+          Observações Gerais saiu daqui e virou a sub-aba própria "Observações". */}
       {canViewIdentificacao && (
       <TabsContent value="cadastro" className="mt-6 space-y-4">
         <Card>
-          <CardHeader><CardTitle className="text-base">Identificação & Contatos</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label={<>CNPJ / CPF<PersonTypeBadge type={documentType} /></>}>
-              <div className="flex gap-2">
-                <Input
-                  value={form.document || ''}
-                  onChange={e => set('document', maskCPFCNPJ(e.target.value))}
-                  placeholder="CNPJ ou CPF"
-                />
-                {documentType !== 'CPF' && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={handleCnpjLookup}
-                    disabled={cnpjLoading || documentType !== 'CNPJ'}
-                    title="Buscar dados do CNPJ"
-                  >
-                    {cnpjLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                  </Button>
-                )}
-              </div>
-            </Field>
-            {isPessoaFisica ? (
-              <Field label="Nome">
-                <Input value={form.name || ''} onChange={e => set('name', e.target.value)} />
+          <CardHeader><CardTitle className="text-base">Geral</CardTitle></CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Field label={<>CNPJ / CPF<PersonTypeBadge type={documentType} /></>}>
+                <div className="flex gap-2">
+                  <Input
+                    value={form.document || ''}
+                    onChange={e => set('document', maskCPFCNPJ(e.target.value))}
+                    placeholder="CNPJ ou CPF"
+                  />
+                  {documentType !== 'CPF' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={handleCnpjLookup}
+                      disabled={cnpjLoading || documentType !== 'CNPJ'}
+                      title="Buscar dados do CNPJ"
+                    >
+                      {cnpjLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                    </Button>
+                  )}
+                </div>
               </Field>
-            ) : (
-              <>
-                <Field label="Razão Social" autofill>
-                  <Input value={form.razao_social || ''} onChange={e => set('razao_social', e.target.value)} />
+              {isPessoaFisica ? (
+                <Field label="Nome">
+                  <Input value={form.name || ''} onChange={e => set('name', e.target.value)} />
                 </Field>
-                <Field label="Nome Fantasia" autofill>
-                  <Input value={form.nome_fantasia || ''} onChange={e => set('nome_fantasia', e.target.value)} />
-                </Field>
-              </>
-            )}
-            <Field label="Nome de Exibição">
-              <Input
-                value={form.display_name ?? form.nome_fantasia ?? ''}
-                onChange={e => set('display_name', e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Preenchido automaticamente com o Nome Fantasia — edite livremente. É o nome exibido na listagem de contatos.
-              </p>
-            </Field>
+              ) : (
+                <>
+                  <Field label="Razão Social" autofill>
+                    <Input value={form.razao_social || ''} onChange={e => set('razao_social', e.target.value)} />
+                  </Field>
+                  <Field label="Nome Fantasia" autofill>
+                    <Input value={form.nome_fantasia || ''} onChange={e => set('nome_fantasia', e.target.value)} />
+                  </Field>
+                </>
+              )}
+              <Field label="Nome de Exibição">
+                <Input
+                  value={form.display_name ?? form.nome_fantasia ?? ''}
+                  onChange={e => set('display_name', e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Preenchido automaticamente com o Nome Fantasia — edite livremente. É o nome exibido na listagem de contatos.
+                </p>
+              </Field>
+              {!isPessoaFisica && (
+                <>
+                  <Field label="Porte">
+                    <Select value={form.porte || ''} onValueChange={v => set('porte', v)}>
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        {PORTE_OPTIONS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Representante Legal">
+                    <Input value={form.representative_legal || ''} onChange={e => set('representative_legal', e.target.value)} />
+                  </Field>
+                  <Field label="Natureza Jurídica" autofill>
+                    <Input value={form.natureza_juridica || ''} onChange={e => set('natureza_juridica', e.target.value)} />
+                  </Field>
+                  <Field label="Data de Abertura / Fundação" autofill>
+                    <Input type="date" value={form.data_abertura_receita || ''} onChange={e => set('data_abertura_receita', e.target.value)} />
+                  </Field>
+                  <Field label="Situação na Receita Federal" autofill>
+                    <Input value={form.situacao_cadastral || ''} readOnly className="bg-muted/40" />
+                  </Field>
+                </>
+              )}
+            </div>
+
+            <Divisor titulo="Endereço" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Field label="CEP" autofill>
+                <Input value={form.cep || ''} onChange={e => set('cep', e.target.value)} onBlur={handleCepBlur} />
+              </Field>
+              <Field label="Logradouro" autofill>
+                <Input value={form.address || ''} onChange={e => set('address', e.target.value)} />
+              </Field>
+              <Field label="Número" autofill>
+                <Input value={form.address_number || ''} onChange={e => set('address_number', e.target.value)} />
+              </Field>
+              <Field label="Complemento" autofill>
+                <Input value={form.complemento || ''} onChange={e => set('complemento', e.target.value)} />
+              </Field>
+              <Field label="Bairro" autofill>
+                <Input value={form.neighborhood || ''} onChange={e => set('neighborhood', e.target.value)} />
+              </Field>
+              <Field label="Cidade" autofill>
+                <Input value={form.city || ''} onChange={e => set('city', e.target.value)} />
+              </Field>
+              <Field label="Estado (UF)" autofill>
+                <Select value={form.state || ''} onValueChange={v => set('state', v)}>
+                  <SelectTrigger><SelectValue placeholder="UF" /></SelectTrigger>
+                  <SelectContent>
+                    {BR_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+
+            <Divisor titulo="Contatos" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Field label="E-mail">
+                <Input type="email" value={form.email || ''} onChange={e => set('email', e.target.value)} />
+              </Field>
+              <Field label="Telefone">
+                <Input value={form.phone || ''} onChange={e => set('phone', maskPhone(e.target.value))} />
+              </Field>
+              <Field label="WhatsApp">
+                <Input
+                  value={form.whatsapp || ''}
+                  onChange={e => set('whatsapp', maskPhone(e.target.value))}
+                  placeholder="(XX) XXXXX-XXXX"
+                />
+              </Field>
+            </div>
+
             {!isPessoaFisica && (
               <>
-                <Field label="Porte">
-                  <Select value={form.porte || ''} onValueChange={v => set('porte', v)}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      {PORTE_OPTIONS.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Representante Legal">
-                  <Input value={form.representative_legal || ''} onChange={e => set('representative_legal', e.target.value)} />
-                </Field>
-                <Field label="Natureza Jurídica" autofill>
-                  <Input value={form.natureza_juridica || ''} onChange={e => set('natureza_juridica', e.target.value)} />
-                </Field>
-                <Field label="Data de Abertura / Fundação" autofill>
-                  <Input type="date" value={form.data_abertura_receita || ''} onChange={e => set('data_abertura_receita', e.target.value)} />
-                </Field>
-                <Field label="Situação na Receita Federal" autofill>
-                  <Input value={form.situacao_cadastral || ''} readOnly className="bg-muted/40" />
-                </Field>
+                <Divisor titulo="Responsável técnico" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Field label="Nome">
+                    <Input value={form.resp_tecnico_nome || ''} onChange={e => set('resp_tecnico_nome', e.target.value)} />
+                  </Field>
+                  <Field label="CPF">
+                    <Input
+                      value={form.resp_tecnico_cpf || ''}
+                      onChange={e => set('resp_tecnico_cpf', maskCPF(e.target.value))}
+                      placeholder="000.000.000-00"
+                    />
+                  </Field>
+                  <Field label="CNPJ">
+                    <Input
+                      value={form.resp_tecnico_cnpj || ''}
+                      onChange={e => set('resp_tecnico_cnpj', maskCNPJ(e.target.value))}
+                      placeholder="00.000.000/0000-00"
+                    />
+                  </Field>
+                  <Field label="CRC">
+                    <Input value={form.resp_tecnico_crc || ''} onChange={e => set('resp_tecnico_crc', e.target.value)} />
+                  </Field>
+                  <Field label="UF/CRC">
+                    <Select value={form.resp_tecnico_uf_crc || ''} onValueChange={v => v && set('resp_tecnico_uf_crc', v)}>
+                      <SelectTrigger><SelectValue placeholder="UF" /></SelectTrigger>
+                      <SelectContent>
+                        {BR_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label="Cargo">
+                    <Input value={form.resp_tecnico_cargo || ''} onChange={e => set('resp_tecnico_cargo', e.target.value)} />
+                  </Field>
+                </div>
               </>
             )}
-            <Field label="E-mail">
-              <Input type="email" value={form.email || ''} onChange={e => set('email', e.target.value)} />
-            </Field>
-            <Field label="Telefone">
-              <Input value={form.phone || ''} onChange={e => set('phone', maskPhone(e.target.value))} />
-            </Field>
-            <Field label="WhatsApp">
-              <Input
-                value={form.whatsapp || ''}
-                onChange={e => set('whatsapp', maskPhone(e.target.value))}
-                placeholder="(XX) XXXXX-XXXX"
-              />
-            </Field>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-base">Endereço</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Field label="CEP" autofill>
-              <Input value={form.cep || ''} onChange={e => set('cep', e.target.value)} onBlur={handleCepBlur} />
-            </Field>
-            <Field label="Logradouro" autofill>
-              <Input value={form.address || ''} onChange={e => set('address', e.target.value)} />
-            </Field>
-            <Field label="Número" autofill>
-              <Input value={form.address_number || ''} onChange={e => set('address_number', e.target.value)} />
-            </Field>
-            <Field label="Complemento" autofill>
-              <Input value={form.complemento || ''} onChange={e => set('complemento', e.target.value)} />
-            </Field>
-            <Field label="Bairro" autofill>
-              <Input value={form.neighborhood || ''} onChange={e => set('neighborhood', e.target.value)} />
-            </Field>
-            <Field label="Cidade" autofill>
-              <Input value={form.city || ''} onChange={e => set('city', e.target.value)} />
-            </Field>
-            <Field label="Estado (UF)" autofill>
-              <Select value={form.state || ''} onValueChange={v => set('state', v)}>
-                <SelectTrigger><SelectValue placeholder="UF" /></SelectTrigger>
-                <SelectContent>
-                  {BR_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </Field>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">Observações Gerais</CardTitle></CardHeader>
-          <CardContent>
-            <Textarea rows={3} value={form.notes || ''} onChange={e => set('notes', e.target.value)} />
           </CardContent>
         </Card>
 
         <div className="flex justify-end">
           <Button onClick={() => saveSection([
             'document', 'name', 'razao_social', 'nome_fantasia', 'display_name', 'porte', 'natureza_juridica',
-            'data_abertura_receita', 'situacao_cadastral', 'email', 'phone', 'whatsapp', 'notes',
+            'data_abertura_receita', 'situacao_cadastral', 'email', 'phone', 'whatsapp',
             'cnae_principal', 'cnaes_secundarios',
             'representative_legal',
             'cep', 'address', 'address_number', 'complemento', 'neighborhood', 'city', 'state',
+            ...(isPessoaFisica ? [] : [
+              'resp_tecnico_nome', 'resp_tecnico_cpf', 'resp_tecnico_cnpj', 'resp_tecnico_crc', 'resp_tecnico_uf_crc', 'resp_tecnico_cargo',
+            ]),
           ])} disabled={updateSuperPerfil.isPending}>
+            {updateSuperPerfil.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            Salvar
+          </Button>
+        </div>
+      </TabsContent>
+      )}
+
+      {/* OBSERVAÇÕES — era o box "Observações Gerais" da aba Cadastro; mesmo campo (`notes`), agora sub-aba própria (17/10/2026) */}
+      {canViewIdentificacao && (
+      <TabsContent value="observacoes" className="mt-6 space-y-4">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Observações Gerais</CardTitle></CardHeader>
+          <CardContent>
+            <Textarea rows={10} value={form.notes || ''} onChange={e => set('notes', e.target.value)} />
+          </CardContent>
+        </Card>
+        <div className="flex justify-end">
+          <Button onClick={() => saveSection(['notes'])} disabled={updateSuperPerfil.isPending}>
             {updateSuperPerfil.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Salvar
           </Button>

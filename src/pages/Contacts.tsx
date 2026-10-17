@@ -44,8 +44,7 @@ function Contador({ tom, valor, label }: { tom: string; valor: number; label: st
 const ARCHIVED_STATUSES = ['Baixada', 'Ex-cliente', 'Ex-Colaborador'];
 const isArchivedContact = (c: Contact) => ARCHIVED_STATUSES.includes(((c as any).status_cliente || '').toString());
 
-// TEMPORÁRIO (15/10/2026): filtro por letra inicial do nome de exibição. Remover junto com `filterLetra`,
-// `LETRAS`, `letraDoContato` e a barra "Filtro por letra" quando não for mais necessário.
+// Filtro por letra inicial do nome de exibição (dropdown na barra de filtros; "#" = nome que não começa com letra).
 const LETRAS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','#'];
 const letraDoContato = (c: Contact) => {
   const inicial = (getContactDisplayName(c) || '').trim().charAt(0).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
@@ -66,7 +65,7 @@ export default function Contacts() {
   const [filterRegime, setFilterRegime] = useState('all');
   const [filterResponsible, setFilterResponsible] = useState('all');
   const [filterResponsibleDp, setFilterResponsibleDp] = useState('all');
-  const [filterLetra, setFilterLetra] = useState('all'); // TEMPORÁRIO: ver comentário em LETRAS
+  const [filterLetra, setFilterLetra] = useState('all');
   const { data: fiscalProfiles = [] } = useAllFiscalProfiles();
   const { data: activeProfiles = [] } = useTeamProfiles();
 
@@ -426,19 +425,32 @@ export default function Contacts() {
                 </Button>
               </div>
 
-              {/* Filters Bar */}
-              <div className="flex flex-wrap gap-3 items-center">
-                <div className="relative flex-1 min-w-[200px]">
+              {/* Filters Bar — tudo na mesma linha: busca menor e os filtros dividem o espaço (quebra só em tela estreita) */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <div className="relative min-w-[130px] flex-[1.2]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Buscar por nome ou CNPJ..."
+                    placeholder="Buscar nome ou CNPJ..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     className="pl-9 h-9 bg-card border-border"
                   />
                 </div>
+                <Select value={filterLetra} onValueChange={setFilterLetra}>
+                  <SelectTrigger className="w-[148px] shrink-0 h-9 bg-card border-border" aria-label="Filtrar pela letra inicial do nome">
+                    <SelectValue placeholder="Letra" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as letras</SelectItem>
+                    {LETRAS.map(l => (
+                      <SelectItem key={l} value={l} disabled={!letrasComContato.has(l) && filterLetra !== l}>
+                        {l === '#' ? '# (sem letra)' : l}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Select value={filterStatusCliente} onValueChange={setFilterStatusCliente}>
-                  <SelectTrigger className="w-[140px] h-9 bg-card border-border">
+                  <SelectTrigger className="min-w-[120px] max-w-[210px] flex-1 h-9 bg-card border-border">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -452,7 +464,7 @@ export default function Contacts() {
                 </Select>
                 {mostrarCategoria && (
                   <Select value={filterCategoria} onValueChange={setFilterCategoria}>
-                    <SelectTrigger className="w-[160px] h-9 bg-card border-border">
+                    <SelectTrigger className="min-w-[120px] max-w-[210px] flex-1 h-9 bg-card border-border">
                       <SelectValue placeholder="Categoria" />
                     </SelectTrigger>
                     <SelectContent>
@@ -465,11 +477,11 @@ export default function Contacts() {
                   </Select>
                 )}
                 <Select value={filterRegime} onValueChange={setFilterRegime}>
-                  <SelectTrigger className="w-[180px] h-9 bg-card border-border">
+                  <SelectTrigger className="min-w-[120px] max-w-[210px] flex-1 h-9 bg-card border-border">
                     <SelectValue placeholder="Regime Tributário" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos os regimes</SelectItem>
+                    <SelectItem value="all">Regime</SelectItem>
                     <SelectItem value="simples_nacional">Simples Nacional</SelectItem>
                     <SelectItem value="lucro_presumido">Lucro Presumido</SelectItem>
                     <SelectItem value="lucro_real">Lucro Real</SelectItem>
@@ -481,11 +493,11 @@ export default function Contacts() {
                   </SelectContent>
                 </Select>
                 <Select value={filterResponsible} onValueChange={setFilterResponsible}>
-                  <SelectTrigger className="w-[200px] h-9 bg-card border-border">
+                  <SelectTrigger className="min-w-[120px] max-w-[210px] flex-1 h-9 bg-card border-border">
                     <SelectValue placeholder="Responsável Fiscal" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos resp. Fiscal</SelectItem>
+                    <SelectItem value="all">Resp. Fiscal</SelectItem>
                     <SelectItem value="none">Sem responsável Fiscal</SelectItem>
                     {fiscalProfiles.map(p => (
                       <SelectItem key={p.id} value={p.id}>
@@ -495,11 +507,11 @@ export default function Contacts() {
                   </SelectContent>
                 </Select>
                 <Select value={filterResponsibleDp} onValueChange={setFilterResponsibleDp}>
-                  <SelectTrigger className="w-[200px] h-9 bg-card border-border">
+                  <SelectTrigger className="min-w-[120px] max-w-[210px] flex-1 h-9 bg-card border-border">
                     <SelectValue placeholder="Responsável DP" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos resp. DP</SelectItem>
+                    <SelectItem value="all">Resp. DP</SelectItem>
                     <SelectItem value="none">Sem responsável DP</SelectItem>
                     {activeProfiles.map(p => (
                       <SelectItem key={p.id} value={p.id}>
@@ -514,30 +526,6 @@ export default function Contacts() {
                     Limpar
                   </Button>
                 )}
-              </div>
-
-              {/* TEMPORÁRIO: filtro por letra inicial do nome de exibição */}
-              <div className="flex flex-wrap items-center gap-1" aria-label="Filtro por letra">
-                <Button
-                  size="sm"
-                  variant={filterLetra === 'all' ? 'default' : 'outline'}
-                  className="h-7 px-2.5 text-xs"
-                  onClick={() => setFilterLetra('all')}
-                >
-                  Todas
-                </Button>
-                {LETRAS.map(l => (
-                  <Button
-                    key={l}
-                    size="sm"
-                    variant={filterLetra === l ? 'default' : 'outline'}
-                    className="h-7 w-7 px-0 text-xs"
-                    disabled={!letrasComContato.has(l) && filterLetra !== l}
-                    onClick={() => setFilterLetra(filterLetra === l ? 'all' : l)}
-                  >
-                    {l}
-                  </Button>
-                ))}
               </div>
 
               {/* Total muda com os filtros aplicados — reflete base, não o total bruto */}
@@ -695,7 +683,7 @@ export default function Contacts() {
         </TabsContent>
 
         <TabsContent value="saida-clientes">
-          <SaidaClientesTab />
+          <SaidaClientesTab contacts={contacts} />
         </TabsContent>
 
         <TabsContent value="colaboradores">

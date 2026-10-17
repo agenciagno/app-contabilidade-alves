@@ -12,6 +12,7 @@ const SUPER_PERFIL_COLUMNS = [
   'tipo_estabelecimento', 'status_cliente', 'status_cliente_desde', 'status_cliente_motivo', 'tipo_cliente', 'grupo_escritorio',
   'cnae_principal', 'cnaes_secundarios', 'data_abertura_receita',
   'representative_legal', 'segundo_email_contato',
+  'resp_tecnico_nome', 'resp_tecnico_cpf', 'resp_tecnico_cnpj', 'resp_tecnico_crc', 'resp_tecnico_uf_crc', 'resp_tecnico_cargo',
   'address', 'address_number', 'complemento', 'neighborhood', 'city', 'state', 'cep',
   'tax_regime', 'ie', 'im', 'regime_apuracao', 'numero_alvara', 'validade_alvara',
   'setor_atuacao', 'segmento_atuacao',

@@ -16,6 +16,11 @@ export function getContactStatusTone(status?: string | null): BadgeTone {
   return (status && CONTACT_STATUS_TONE[status]) || 'neutral';
 }
 
+// Contato marcado como Cliente na categoria (a mesma regra da aba Clientes, de Entrada e de Saída de Clientes).
+export function ehCliente(c: { categorias?: string[] | null }): boolean {
+  return (c.categorias || []).some(x => (x || '').toLowerCase() === 'cliente');
+}
+
 // Helper para obter o nome de exibição de um contato, com fallback.
 export function getContactDisplayName(c: {
   display_name?: string | null;

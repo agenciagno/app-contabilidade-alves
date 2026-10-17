@@ -85,7 +85,15 @@ function Secao({ id, titulo, link, children }: { id: SecaoFicha; titulo: string;
 
 const TOM_PRIORIDADE: Record<AcaoPlano['prioridade'], 'danger' | 'warn' | 'info' | 'neutral'> = { 1: 'danger', 2: 'warn', 3: 'info', 4: 'neutral' };
 
-function FichaFiscalSheet({ contactId, secao, onClose }: { contactId: string; secao?: SecaoFicha; onClose: () => void }) {
+/**
+ * Conteúdo da ficha, sem moldura: o painel lateral (`FichaFiscalSheet`) usa dentro do Sheet, e a sub-aba Relatórios do Super Perfil usa direto.
+ * `cabecalho` é só do painel (SheetHeader precisa estar dentro do Sheet); na sub-aba não há cabeçalho, o Super Perfil já mostra o cliente.
+ */
+export function FichaFiscalConteudo({ contactId, secao, cabecalho }: {
+  contactId: string;
+  secao?: SecaoFicha;
+  cabecalho?: (info: { naCarteira: boolean; nome: string; documento: string }) => ReactNode;
+}) {
   const { linhas, carregando, faturamento } = useSituacaoCarteira();
   const { data: sitfis = [], isLoading: carregandoSitfis } = useMatrizSitfis();
   const { data: parcelamentos = [], isLoading: carregandoParc } = useMatrizParcelamentos();
@@ -117,139 +125,155 @@ function FichaFiscalSheet({ contactId, secao, onClose }: { contactId: string; se
   const atual = competenciaAtual();
   const historico = sf?.historico ?? [];
 
+  const topo = cabecalho ? 'mt-5 ' : '';
+
   return (
-    <Sheet open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent className="w-full overflow-y-auto bg-bg-2 sm:max-w-[820px]">
-        <SheetHeader className="space-y-1 text-left">
-          <p className="text-kicker uppercase text-muted-ink-2">Ficha fiscal</p>
-          {/* Com o cliente na carteira, nome e CNPJ já vêm no cabeçalho da ficha logo abaixo: aqui ficam só para o leitor de tela. */}
-          <SheetTitle className={l ? 'sr-only' : 'text-[20px]'}>{nome}</SheetTitle>
-          <SheetDescription className={l ? 'sr-only' : undefined}>{documento ? formatarCnpj(documento) : ''} · tudo o que está salvo, sem consultar a Receita</SheetDescription>
-          {l && <p className="text-meta text-muted-ink-2">Tudo o que está salvo do cliente, sem consultar a Receita.</p>}
-        </SheetHeader>
+    <>
+      {cabecalho?.({ naCarteira: !!l, nome, documento })}
 
-        {ocupadoTudo ? (
-          <div className="mt-5 space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}</div>
-        ) : (
-          <div className="mt-5 space-y-4">
-            {l ? (
-              <FichaCliente
-                linha={l}
-                faturamento={ultimaLeituraFaturamento(faturamento, contactId)}
-                extra={(
-                  <div id="ficha-plano" className="scroll-mt-4 space-y-2 rounded-md border border-line-2 p-3">
-                    <p className="text-ui-strong text-ink">O que fazer</p>
-                    {plano.length === 0 ? (
-                      <p className="text-meta text-muted-ink">Nada pendente nos itens verificados.</p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {plano.map((a) => (
-                          <li key={a.titulo} className="flex items-start gap-2">
-                            <DsBadge tone={TOM_PRIORIDADE[a.prioridade]} dot={false} className="mt-0.5 shrink-0">{ROTULO_PRIORIDADE[a.prioridade]}</DsBadge>
-                            <span className="min-w-0">
-                              <span className="block text-ui text-ink">{a.titulo}</span>
-                              <span className="block text-meta text-muted-ink">{a.oQueFazer} · <span className="text-muted-ink-2">{a.quem}</span></span>
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              />
-            ) : (
-              <section className="rounded-lg border border-line bg-paper p-5 text-ui text-muted-ink">
-                Este cliente não está na carteira monitorada (cliente inativo, filial ou sem regime no cadastro). Abaixo, só o que já está salvo dele.{' '}
-                <Link to={`/crm/cliente/${contactId}`} className="text-ui-strong text-action hover:underline">Abrir cadastro</Link>
-              </section>
-            )}
-
-            <Secao id="pagamentos" titulo="Pagamentos" link={{ to: `/dashboard-federal/pagamentos${q}`, rotulo: 'Abrir em Pagamentos' }}>
-              <PagamentosDoCliente contactId={contactId} competencia={competenciaPadrao()} soMesInicial={false} />
-            </Secao>
-
-            <Secao id="sitfis" titulo="Situação fiscal" link={{ to: `/dashboard-federal/situacao-fiscal${q}`, rotulo: 'Abrir em Situação Fiscal' }}>
-              {historico.length === 0 ? (
-                <p className="text-meta text-muted-ink">Nenhum relatório guardado. A rotina mensal gera um por cliente; para gerar agora, abra a Situação Fiscal.</p>
-              ) : (
-                <div className="divide-y divide-line-2">
-                  {(verTodos ? historico : historico.slice(0, 3)).map((r, i) => (
-                    <div key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
-                      <span className="w-[130px] shrink-0 font-mono text-ui text-ink">{r.gerado_em ? format(new Date(r.gerado_em), 'dd/MM/yyyy HH:mm') : '—'}</span>
-                      <SeloMini selo={seloDoRelatorio(r)} />
-                      {i === 0 && <DsBadge tone="neutral" dot={false}>Mais recente</DsBadge>}
-                      <span className="min-w-0 flex-1 text-meta text-muted-ink">
-                        {r.categorias.length > 0 ? r.categorias.join('; ') : ''}
-                        {r.certidao_tipo ? `${r.categorias.length ? ' · ' : ''}${r.certidao_tipo} até ${dataBR(r.certidao_validade)}` : ''}
-                      </span>
-                      <DicaBotao texto="Abre o PDF deste relatório, que já está guardado. Não consulta a Receita.">
-                        <Button size="sm" variant="ghost" disabled={!r.pdf_path || ocupado === r.id} onClick={() => abrirPdf(r.id)}>
-                          {ocupado === r.id ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileText className="mr-1.5 h-4 w-4" />}PDF
-                        </Button>
-                      </DicaBotao>
-                    </div>
-                  ))}
-                  {historico.length > 3 && (
-                    <button type="button" className="pt-2 text-ui-strong text-action hover:underline" onClick={() => setVerTodos((v) => !v)}>
-                      {verTodos ? 'Mostrar só os 3 mais recentes' : `Ver os ${historico.length} relatórios`}
-                    </button>
+      {ocupadoTudo ? (
+        <div className={`${topo}space-y-3`}>{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}</div>
+      ) : (
+        <div className={`${topo}space-y-4`}>
+          {l ? (
+            <FichaCliente
+              linha={l}
+              faturamento={ultimaLeituraFaturamento(faturamento, contactId)}
+              extra={(
+                <div id="ficha-plano" className="scroll-mt-4 space-y-2 rounded-md border border-line-2 p-3">
+                  <p className="text-ui-strong text-ink">O que fazer</p>
+                  {plano.length === 0 ? (
+                    <p className="text-meta text-muted-ink">Nada pendente nos itens verificados.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {plano.map((a) => (
+                        <li key={a.titulo} className="flex items-start gap-2">
+                          <DsBadge tone={TOM_PRIORIDADE[a.prioridade]} dot={false} className="mt-0.5 shrink-0">{ROTULO_PRIORIDADE[a.prioridade]}</DsBadge>
+                          <span className="min-w-0">
+                            <span className="block text-ui text-ink">{a.titulo}</span>
+                            <span className="block text-meta text-muted-ink">{a.oQueFazer} · <span className="text-muted-ink-2">{a.quem}</span></span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
               )}
-            </Secao>
+            />
+          ) : (
+            <section className="rounded-lg border border-line bg-paper p-5 text-ui text-muted-ink">
+              Este cliente não está na carteira monitorada (cliente inativo, filial ou sem regime no cadastro). Abaixo, só o que já está salvo dele.{' '}
+              <Link to={`/crm/cliente/${contactId}`} className="text-ui-strong text-action hover:underline">Abrir cadastro</Link>
+            </section>
+          )}
 
-            <Secao id="parcelamentos" titulo="Parcelamentos" link={{ to: `/dashboard-federal/parcelamentos${q}`, rotulo: 'Abrir em Parcelamentos' }}>
-              {!pc ? (
-                <p className="text-meta text-muted-ink">Fora da lista de parcelamentos (só Simples Nacional e MEI).</p>
-              ) : (() => {
-                const atrasadas = parcelasAtrasadas(pc, atual);
-                const doMes = parcelasDoMes(pc, atual);
-                const ativas = modalidadesAtivas(pc);
-                return (
-                  <div className="space-y-1.5">
-                    <SeloMini selo={seloParcelamento(estadoParcelamento(pc, atual), atrasadas.length, doMes.length)} vazio="Não consultado" />
-                    {ativas.length > 0 && <p className="text-ui text-ink">Ativos: {ativas.map((m) => ROTULO_MOD[m]).join(', ')}</p>}
-                    {atrasadas.length > 0 && (
-                      <p className="text-meta text-muted-ink">
-                        {atrasadas.length} {atrasadas.length === 1 ? 'parcela atrasada' : 'parcelas atrasadas'} ({atrasadas.map((p) => rotuloParcela(p.parcela)).join(', ')})
-                        {` · ${moeda(somaValor(atrasadas))}`}
-                      </p>
-                    )}
-                    {doMes.length > 0 && <p className="text-meta text-muted-ink">Parcela do mês em aberto · {moeda(somaValor(doMes))}</p>}
+          <Secao id="pagamentos" titulo="Pagamentos" link={{ to: `/dashboard-federal/pagamentos${q}`, rotulo: 'Abrir em Pagamentos' }}>
+            <PagamentosDoCliente contactId={contactId} competencia={competenciaPadrao()} soMesInicial={false} />
+          </Secao>
+
+          <Secao id="sitfis" titulo="Situação fiscal" link={{ to: `/dashboard-federal/situacao-fiscal${q}`, rotulo: 'Abrir em Situação Fiscal' }}>
+            {historico.length === 0 ? (
+              <p className="text-meta text-muted-ink">Nenhum relatório guardado. A rotina mensal gera um por cliente; para gerar agora, abra a Situação Fiscal.</p>
+            ) : (
+              <div className="divide-y divide-line-2">
+                {(verTodos ? historico : historico.slice(0, 3)).map((r, i) => (
+                  <div key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                    <span className="w-[130px] shrink-0 font-mono text-ui text-ink">{r.gerado_em ? format(new Date(r.gerado_em), 'dd/MM/yyyy HH:mm') : '—'}</span>
+                    <SeloMini selo={seloDoRelatorio(r)} />
+                    {i === 0 && <DsBadge tone="neutral" dot={false}>Mais recente</DsBadge>}
+                    <span className="min-w-0 flex-1 text-meta text-muted-ink">
+                      {r.categorias.length > 0 ? r.categorias.join('; ') : ''}
+                      {r.certidao_tipo ? `${r.categorias.length ? ' · ' : ''}${r.certidao_tipo} até ${dataBR(r.certidao_validade)}` : ''}
+                    </span>
+                    <DicaBotao texto="Abre o PDF deste relatório, que já está guardado. Não consulta a Receita.">
+                      <Button size="sm" variant="ghost" disabled={!r.pdf_path || ocupado === r.id} onClick={() => abrirPdf(r.id)}>
+                        {ocupado === r.id ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileText className="mr-1.5 h-4 w-4" />}PDF
+                      </Button>
+                    </DicaBotao>
                   </div>
-                );
-              })()}
-            </Secao>
+                ))}
+                {historico.length > 3 && (
+                  <button type="button" className="pt-2 text-ui-strong text-action hover:underline" onClick={() => setVerTodos((v) => !v)}>
+                    {verTodos ? 'Mostrar só os 3 mais recentes' : `Ver os ${historico.length} relatórios`}
+                  </button>
+                )}
+              </div>
+            )}
+          </Secao>
 
-            <Secao id="eprocesso" titulo="e-Processo" link={{ to: `/dashboard-federal/eprocesso${q}`, rotulo: 'Abrir em e-Processo' }}>
-              {!ep?.consulta ? (
-                <p className="text-meta text-muted-ink">Ainda não consultado.</p>
-              ) : ep.processos.length === 0 ? (
-                <p className="text-meta text-muted-ink">Nenhum processo em que o cliente é interessado (consulta de {dataBR(ep.consulta.consultado_em)}).</p>
-              ) : (
-                <div className="divide-y divide-line-2">
-                  {ep.processos.map((p) => (
-                    <div key={p.id} className="py-2">
-                      <p className="text-ui text-ink"><span className="font-mono">{p.numero}</span> · {p.tipo ?? 'Processo'}{p.subtipo ? ` (${p.subtipo})` : ''}</p>
-                      <p className="text-meta text-muted-ink">Protocolo {dataBR(p.data_protocolo)}{p.situacao ? ` · ${p.situacao}` : ''}{p.localizacao ? ` · ${p.localizacao}` : ''}</p>
-                    </div>
-                  ))}
+          <Secao id="parcelamentos" titulo="Parcelamentos" link={{ to: `/dashboard-federal/parcelamentos${q}`, rotulo: 'Abrir em Parcelamentos' }}>
+            {!pc ? (
+              <p className="text-meta text-muted-ink">Fora da lista de parcelamentos (só Simples Nacional e MEI).</p>
+            ) : (() => {
+              const atrasadas = parcelasAtrasadas(pc, atual);
+              const doMes = parcelasDoMes(pc, atual);
+              const ativas = modalidadesAtivas(pc);
+              return (
+                <div className="space-y-1.5">
+                  <SeloMini selo={seloParcelamento(estadoParcelamento(pc, atual), atrasadas.length, doMes.length)} vazio="Não consultado" />
+                  {ativas.length > 0 && <p className="text-ui text-ink">Ativos: {ativas.map((m) => ROTULO_MOD[m]).join(', ')}</p>}
+                  {atrasadas.length > 0 && (
+                    <p className="text-meta text-muted-ink">
+                      {atrasadas.length} {atrasadas.length === 1 ? 'parcela atrasada' : 'parcelas atrasadas'} ({atrasadas.map((p) => rotuloParcela(p.parcela)).join(', ')})
+                      {` · ${moeda(somaValor(atrasadas))}`}
+                    </p>
+                  )}
+                  {doMes.length > 0 && <p className="text-meta text-muted-ink">Parcela do mês em aberto · {moeda(somaValor(doMes))}</p>}
                 </div>
-              )}
-            </Secao>
+              );
+            })()}
+          </Secao>
 
-            <Secao id="certificado" titulo="Certificado digital" link={{ to: '/dashboard-federal/procuracoes?aba=certificados', rotulo: 'Abrir em Certificados' }}>
-              {cert ? (
-                <div className="flex flex-wrap items-center gap-3">
-                  <SeloMini selo={seloCertificado(cert.dias)} />
-                  <span className="text-meta text-muted-ink">{cert.modelo} · válido até {dataBR(cert.validade)}</span>
-                </div>
-              ) : (
-                <p className="text-meta text-muted-ink">Nenhum certificado do cliente cadastrado.</p>
-              )}
-            </Secao>
-          </div>
-        )}
+          <Secao id="eprocesso" titulo="e-Processo" link={{ to: `/dashboard-federal/eprocesso${q}`, rotulo: 'Abrir em e-Processo' }}>
+            {!ep?.consulta ? (
+              <p className="text-meta text-muted-ink">Ainda não consultado.</p>
+            ) : ep.processos.length === 0 ? (
+              <p className="text-meta text-muted-ink">Nenhum processo em que o cliente é interessado (consulta de {dataBR(ep.consulta.consultado_em)}).</p>
+            ) : (
+              <div className="divide-y divide-line-2">
+                {ep.processos.map((p) => (
+                  <div key={p.id} className="py-2">
+                    <p className="text-ui text-ink"><span className="font-mono">{p.numero}</span> · {p.tipo ?? 'Processo'}{p.subtipo ? ` (${p.subtipo})` : ''}</p>
+                    <p className="text-meta text-muted-ink">Protocolo {dataBR(p.data_protocolo)}{p.situacao ? ` · ${p.situacao}` : ''}{p.localizacao ? ` · ${p.localizacao}` : ''}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Secao>
+
+          <Secao id="certificado" titulo="Certificado digital" link={{ to: '/dashboard-federal/procuracoes?aba=certificados', rotulo: 'Abrir em Certificados' }}>
+            {cert ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <SeloMini selo={seloCertificado(cert.dias)} />
+                <span className="text-meta text-muted-ink">{cert.modelo} · válido até {dataBR(cert.validade)}</span>
+              </div>
+            ) : (
+              <p className="text-meta text-muted-ink">Nenhum certificado do cliente cadastrado.</p>
+            )}
+          </Secao>
+        </div>
+      )}
+    </>
+  );
+}
+
+function FichaFiscalSheet({ contactId, secao, onClose }: { contactId: string; secao?: SecaoFicha; onClose: () => void }) {
+  return (
+    <Sheet open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent className="w-full overflow-y-auto bg-bg-2 sm:max-w-[820px]">
+        <FichaFiscalConteudo
+          contactId={contactId}
+          secao={secao}
+          cabecalho={({ naCarteira, nome, documento }) => (
+            <SheetHeader className="space-y-1 text-left">
+              <p className="text-kicker uppercase text-muted-ink-2">Ficha fiscal</p>
+              {/* Com o cliente na carteira, nome e CNPJ já vêm no cabeçalho da ficha logo abaixo: aqui ficam só para o leitor de tela. */}
+              <SheetTitle className={naCarteira ? 'sr-only' : 'text-[20px]'}>{nome}</SheetTitle>
+              <SheetDescription className={naCarteira ? 'sr-only' : undefined}>{documento ? formatarCnpj(documento) : ''} · tudo o que está salvo, sem consultar a Receita</SheetDescription>
+              {naCarteira && <p className="text-meta text-muted-ink-2">Tudo o que está salvo do cliente, sem consultar a Receita.</p>}
+            </SheetHeader>
+          )}
+        />
       </SheetContent>
     </Sheet>
   );
