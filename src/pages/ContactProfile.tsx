@@ -110,14 +110,19 @@ export default function ContactProfile() {
     : canViewLogs ? 'logs'
     : 'cadastro';
   // Títulos das sub-abas em caixa alta (12/10/2026). Flex que quebra linha: com 11 abas na coluna da direita (17/10/2026) nem a rolagem lateral cabia sem esconder abas.
-  const triggerClass = 'min-w-fit flex-1 items-center gap-1.5 text-xs font-semibold uppercase tracking-wide';
+  // Aba ativa: fundo azul e texto branco (token da ação primária).
+  const triggerClass = 'min-w-fit flex-1 items-center gap-1.5 text-xs font-semibold uppercase tracking-wide data-[state=active]:bg-action data-[state=active]:text-on-action data-[state=active]:shadow-none';
 
   return (
-    // Duas colunas (17/10/2026): resumo fixo à esquerda (~1/3) e as sub-abas à direita. Abaixo de `lg` empilha.
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(280px,33%)_minmax(0,1fr)] lg:items-start">
+    // Duas colunas 20/80: resumo à esquerda e as sub-abas à direita. No desktop a página não rola: as duas colunas ocupam a altura
+    // da tela (data-ocupa-tela, ver AppLayout), as sub-abas ficam paradas e só o conteúdo de dentro rola. Abaixo de `lg` empilha e a página rola.
+    <div
+      data-ocupa-tela
+      className="grid grid-cols-1 gap-3 lg:h-full lg:grid-cols-[minmax(240px,20%)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]"
+    >
       <PerfilResumoCard contact={contact} inadimplente={isInadimplente} onVoltar={() => navigate('/contatos')} />
 
-      <div className="min-w-0 space-y-6">
+      <div className="flex min-h-0 min-w-0 flex-col gap-3">
         <FaixaStatusCliente status={contact.status_cliente} desde={contact.status_cliente_desde} motivo={contact.status_cliente_motivo} />
 
         {/* Tabs */}
@@ -126,8 +131,8 @@ export default function ContactProfile() {
             Sem permissão para ver o perfil deste cliente.
           </div>
         ) : (
-        <Tabs defaultValue={defaultProfileTab} className="w-full">
-          <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+        <Tabs defaultValue={defaultProfileTab} className="flex min-h-0 w-full flex-1 flex-col">
+          <TabsList className="flex h-auto w-full shrink-0 flex-wrap justify-start gap-1">
             {canViewCadastro && (
               <TabsTrigger value="cadastro" className={triggerClass}>
                 <ClipboardList className="h-4 w-4" />
@@ -196,6 +201,8 @@ export default function ContactProfile() {
             )}
           </TabsList>
 
+          {/* Só esta área rola (no desktop); a lista de abas acima fica parada. */}
+          <div className="-mx-1 mt-3 min-h-0 flex-1 px-1 lg:overflow-y-auto [&>[role=tabpanel]]:mt-0">
           <ContactCadastroTab contactId={contact.id} />
 
           {canViewAcessos && (
@@ -222,6 +229,7 @@ export default function ContactProfile() {
               <ContactLogsWithComunicacaoTab contactId={contact.id} />
             </TabsContent>
           )}
+          </div>
         </Tabs>
         )}
       </div>

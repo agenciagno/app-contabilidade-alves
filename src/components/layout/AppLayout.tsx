@@ -168,7 +168,9 @@ export function AppLayout({ children }: AppLayoutProps) {
             <ViewAsClientBanner />
             <MenuMonitoramento />
             {/* pb extra no mobile: a bottom nav é fixa e cobriria o fim da página */}
-            <main className="min-w-0 max-w-full flex-1 p-3 pb-24 sm:p-4 sm:pb-24 md:p-6 md:pb-6 lg:p-8 lg:pb-8">
+            {/* Tela que ocupa exatamente a altura disponível e rola só por dentro (Super Perfil): ela marca o filho direto com
+                data-ocupa-tela e, no desktop, o main passa a ter a altura do espaço que sobra, sem crescer pelo conteúdo. */}
+            <main className="min-w-0 max-w-full flex-1 p-3 pb-24 sm:p-4 sm:pb-24 md:p-6 md:pb-6 lg:p-8 lg:pb-8 lg:has-[>[data-ocupa-tela]]:min-h-0 lg:has-[>[data-ocupa-tela]]:overflow-hidden">
               {/* Fallback de navegação: se uma página lazy suspender aqui, só o
                   miolo mostra spinner — sidebar e header ficam no lugar. Com
                   v7_startTransition no router isso quase nunca aparece: a tela
