@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, User, DollarSign, ClipboardList, History, KeyRound, Landmark, Users, Handshake, Calculator, StickyNote, FileBarChart } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, User, DollarSign, ClipboardList, History, KeyRound, Landmark, Users, Handshake, Calculator, StickyNote, FileBarChart } from 'lucide-react';
 import { useContacts } from '@/hooks/useContacts';
 import { useContactTransactions, useContactFinancialStatus } from '@/hooks/useContactTransactions';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
 import { ContactFinancialTab } from '@/components/contacts/ContactFinancialTab';
 import { AcessosTab } from '@/components/contacts/AcessosTab';
 import { ContactCadastroTab } from '@/components/contacts/cadastro/ContactCadastroTab';
+import { PerfilSalvarProvider, usePerfilSalvar } from '@/components/contacts/cadastro/PerfilSalvar';
 import { ContactLogsWithComunicacaoTab } from '@/components/contacts/ContactLogsWithComunicacaoTab';
 import { getDocumentType } from '@/lib/utils';
 import { FaixaStatusCliente } from '@/components/contacts/FaixaStatusCliente';
@@ -43,6 +44,21 @@ export default function ContactProfile() {
   const canViewObservacoes = canViewCadastro;
   const canViewRelatorios = canViewFiscal;
   const { isInadimplente } = useContactFinancialStatus(id, transactions);
+
+  // Sub-aba aberta (controlada): o botão Salvar do rodapé salva a que estiver aberta. null = ainda a padrão (calculada mais abaixo).
+  const [abaEscolhida, setAbaEscolhida] = useState<string | null>(null);
+  const defaultProfileTab = canViewCadastro ? 'cadastro'
+    : canViewSocios ? 'societario'
+    : canViewFiscal ? 'fiscal'
+    : canViewPessoal ? 'pessoal'
+    : canViewContabil ? 'contabil'
+    : canViewAcessos ? 'acessos'
+    : canViewFinanceiro ? 'financeiro'
+    : canViewOperacional ? 'operacional'
+    : canViewLogs ? 'logs'
+    : 'cadastro';
+  const abaAtiva = abaEscolhida ?? defaultProfileTab;
+  const salvarPerfil = usePerfilSalvar(abaAtiva);
 
   // Ao entrar no Super Perfil o menu lateral recolhe (a tela ganha espaço); ao sair volta como estava. Só no desktop: no celular o menu já é gaveta.
   const { open: menuAberto, setOpen: setMenuAberto, isMobile } = useSidebar();
@@ -100,16 +116,6 @@ export default function ContactProfile() {
     canViewCadastro, canViewSocios, canViewFiscal, canViewPessoal, canViewContabil,
     canViewAcessos, canViewFinanceiro, canViewOperacional, canViewObservacoes, canViewRelatorios, canViewLogs,
   ].filter(Boolean).length;
-  const defaultProfileTab = canViewCadastro ? 'cadastro'
-    : canViewSocios ? 'societario'
-    : canViewFiscal ? 'fiscal'
-    : canViewPessoal ? 'pessoal'
-    : canViewContabil ? 'contabil'
-    : canViewAcessos ? 'acessos'
-    : canViewFinanceiro ? 'financeiro'
-    : canViewOperacional ? 'operacional'
-    : canViewLogs ? 'logs'
-    : 'cadastro';
   // Sub-abas só com ícone e tooltip, fixas no rodapé do box (17/10/2026). Aba ativa: fundo azul e ícone branco (token da ação primária).
   const abas = [
     { valor: 'cadastro', rotulo: 'Cadastro', Icone: ClipboardList, visivel: canViewCadastro },
@@ -143,8 +149,10 @@ export default function ContactProfile() {
             Sem permissão para ver o perfil deste cliente.
           </div>
         ) : (
+        <PerfilSalvarProvider value={salvarPerfil.provider}>
         <Tabs
-          defaultValue={defaultProfileTab}
+          value={abaAtiva}
+          onValueChange={setAbaEscolhida}
           className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-lg border border-b-[3px] border-line border-b-action bg-paper shadow-sm"
         >
           {/* Só esta área rola (no desktop); a barra de ícones fica parada no rodapé do box. */}
@@ -177,27 +185,39 @@ export default function ContactProfile() {
             )}
           </div>
 
-          {/* Rodapé do box no desktop; em tela estreita (a página rola) as abas sobem para o topo do box. */}
-          <TabsList className="h-auto w-full shrink-0 flex-wrap justify-center gap-1 rounded-none border-t border-line bg-transparent p-1.5 max-lg:order-first max-lg:border-b max-lg:border-t-0">
-            {abas.map(({ valor, rotulo, Icone }) => (
-              <Tooltip key={valor}>
-                {/* O tooltip fica num span em volta: no próprio TabsTrigger o data-state do tooltip trocaria o "active" da aba. */}
-                <TooltipTrigger asChild>
-                  <span className="inline-flex">
-                    <TabsTrigger
-                      value={valor}
-                      aria-label={rotulo}
-                      className="h-9 w-9 shrink-0 rounded-md p-0 text-action transition-colors hover:bg-action-tint data-[state=active]:bg-action data-[state=active]:text-on-action data-[state=active]:shadow-none"
-                    >
-                      <Icone className="h-[18px] w-[18px]" />
-                    </TabsTrigger>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top">{rotulo}</TooltipContent>
-              </Tooltip>
-            ))}
-          </TabsList>
+          {/* Rodapé fixo do box: Salvar (um só, salva a sub-aba aberta) e as sub-abas em ícones. Em tela estreita (a página rola) sobe para o topo do box. */}
+          <div className="grid shrink-0 items-center gap-1 border-t border-line p-1.5 lg:grid-cols-[1fr_auto_1fr] max-lg:order-first max-lg:border-b max-lg:border-t-0">
+            <div className="lg:justify-self-start">
+              {salvarPerfil.podeSalvar && (
+                <Button size="sm" className="gap-2" onClick={salvarPerfil.salvar} disabled={salvarPerfil.salvando}>
+                  {salvarPerfil.salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Salvar
+                </Button>
+              )}
+            </div>
+            <TabsList className="h-auto flex-wrap justify-center gap-1 rounded-none bg-transparent p-0">
+              {abas.map(({ valor, rotulo, Icone }) => (
+                <Tooltip key={valor}>
+                  {/* O tooltip fica num span em volta: no próprio TabsTrigger o data-state do tooltip trocaria o "active" da aba. */}
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <TabsTrigger
+                        value={valor}
+                        aria-label={rotulo}
+                        className="h-9 w-9 shrink-0 rounded-md p-0 text-action transition-colors hover:bg-action-tint data-[state=active]:bg-action data-[state=active]:text-on-action data-[state=active]:shadow-none"
+                      >
+                        <Icone className="h-[18px] w-[18px]" />
+                      </TabsTrigger>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">{rotulo}</TooltipContent>
+                </Tooltip>
+              ))}
+            </TabsList>
+            <div className="max-lg:hidden" />
+          </div>
         </Tabs>
+        </PerfilSalvarProvider>
         )}
       </div>
     </div>

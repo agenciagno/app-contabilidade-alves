@@ -21,7 +21,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, Search, Info, Save, UserPlus, Pencil, LogOut, Trash2, AlertTriangle, Clock } from 'lucide-react';
+import { Loader2, Search, Info, UserPlus, Pencil, LogOut, Trash2, AlertTriangle, Clock } from 'lucide-react';
 import { useSuperPerfil } from '@/hooks/useSuperPerfil';
 import { useContactPartners } from '@/hooks/useContactPartners';
 import { useContacts } from '@/hooks/useContacts';
@@ -32,6 +32,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTeamProfiles } from '@/hooks/useTeamProfiles';
 import { ContactObligationsSelector } from '@/components/fiscal/ContactObligationsSelector';
 import { ClienteTarefasStatus } from './ClienteTarefasStatus';
+import { useRegistrarSalvar } from './PerfilSalvar';
 import { useCompany } from '@/hooks/useCompany';
 import { maskPhone, maskCPF, maskCNPJ, maskCPFCNPJ, getDocumentType } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -185,7 +186,7 @@ export function ContactCadastroTab({ contactId }: Props) {
   const saveSection = (keys: string[]) => {
     const payload: Record<string, any> = {};
     keys.forEach(k => { payload[k] = form[k] ?? null; });
-    updateSuperPerfil.mutate(payload);
+    return updateSuperPerfil.mutateAsync(payload);
   };
 
   const {
@@ -195,27 +196,18 @@ export function ContactCadastroTab({ contactId }: Props) {
     sync: syncObligations,
   } = useContactObligations(contactId, !isPessoaFisica);
 
-  const [savingFiscal, setSavingFiscal] = useState(false);
-  const saveFiscalSection = async () => {
-    setSavingFiscal(true);
-    try {
-      await updateSuperPerfil.mutateAsync({
-        tax_regime: form.tax_regime ?? null,
-        im: form.im ?? null,
-        ie: form.ie ?? null,
-        setor_atuacao: form.setor_atuacao ?? null,
-        segmento_atuacao: form.segmento_atuacao ?? null,
-        recebe_das_ca: !!form.recebe_das_ca,
-        recebe_guia_dctfweb_ca: !!form.recebe_guia_dctfweb_ca,
-      });
-    } finally {
-      setSavingFiscal(false);
-    }
-  };
+  const saveFiscalSection = () =>
+    updateSuperPerfil.mutateAsync({
+      tax_regime: form.tax_regime ?? null,
+      im: form.im ?? null,
+      ie: form.ie ?? null,
+      setor_atuacao: form.setor_atuacao ?? null,
+      segmento_atuacao: form.segmento_atuacao ?? null,
+      recebe_das_ca: !!form.recebe_das_ca,
+      recebe_guia_dctfweb_ca: !!form.recebe_guia_dctfweb_ca,
+    });
 
-  const [savingOperacional, setSavingOperacional] = useState(false);
   const saveOperacionalSection = async () => {
-    setSavingOperacional(true);
     try {
       await updateSuperPerfil.mutateAsync({
         responsible_id: form.responsible_id ?? null,
@@ -232,7 +224,6 @@ export function ContactCadastroTab({ contactId }: Props) {
       });
       queryClient.invalidateQueries({ queryKey: ['cliente-status-periodos', contactId] });
     } catch {
-      setSavingOperacional(false);
       return; // updateSuperPerfil já mostra o toast de erro
     }
     try {
@@ -249,8 +240,6 @@ export function ContactCadastroTab({ contactId }: Props) {
       }
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao salvar tarefas');
-    } finally {
-      setSavingOperacional(false);
     }
   };
 
@@ -306,6 +295,23 @@ export function ContactCadastroTab({ contactId }: Props) {
       }
     } catch { /* silent */ }
   };
+
+  // O botão Salvar fica no rodapé do box (ContactProfile) e salva a sub-aba aberta. Só vale com a ficha já carregada no formulário:
+  // salvar antes disso gravaria campos vazios por cima dos dados.
+  const pronto = !isLoading && form.id === contactId;
+  useRegistrarSalvar('cadastro', canViewIdentificacao && pronto ? () => saveSection([
+    'document', 'name', 'razao_social', 'nome_fantasia', 'display_name', 'porte', 'natureza_juridica',
+    'data_abertura_receita', 'situacao_cadastral', 'email', 'phone', 'whatsapp',
+    'cnae_principal', 'cnaes_secundarios',
+    'representative_legal',
+    'cep', 'address', 'address_number', 'complemento', 'neighborhood', 'city', 'state',
+    ...(isPessoaFisica ? [] : [
+      'resp_tecnico_nome', 'resp_tecnico_cpf', 'resp_tecnico_cnpj', 'resp_tecnico_crc', 'resp_tecnico_uf_crc', 'resp_tecnico_cargo',
+    ]),
+  ]) : null);
+  useRegistrarSalvar('observacoes', canViewIdentificacao && pronto ? () => saveSection(['notes']) : null);
+  useRegistrarSalvar('fiscal', canViewFiscalTab && pronto ? saveFiscalSection : null);
+  useRegistrarSalvar('operacional', canViewOperacional && pronto ? saveOperacionalSection : null);
 
   if (isLoading) return <Skeleton className="h-[400px] w-full" />;
 
@@ -476,22 +482,6 @@ export function ContactCadastroTab({ contactId }: Props) {
             )}
           </CardContent>
         </Card>
-
-        <div className="flex justify-end">
-          <Button onClick={() => saveSection([
-            'document', 'name', 'razao_social', 'nome_fantasia', 'display_name', 'porte', 'natureza_juridica',
-            'data_abertura_receita', 'situacao_cadastral', 'email', 'phone', 'whatsapp',
-            'cnae_principal', 'cnaes_secundarios',
-            'representative_legal',
-            'cep', 'address', 'address_number', 'complemento', 'neighborhood', 'city', 'state',
-            ...(isPessoaFisica ? [] : [
-              'resp_tecnico_nome', 'resp_tecnico_cpf', 'resp_tecnico_cnpj', 'resp_tecnico_crc', 'resp_tecnico_uf_crc', 'resp_tecnico_cargo',
-            ]),
-          ])} disabled={updateSuperPerfil.isPending}>
-            {updateSuperPerfil.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Salvar
-          </Button>
-        </div>
       </TabsContent>
       )}
 
@@ -504,12 +494,6 @@ export function ContactCadastroTab({ contactId }: Props) {
             <Textarea rows={10} value={form.notes || ''} onChange={e => set('notes', e.target.value)} />
           </CardContent>
         </Card>
-        <div className="flex justify-end">
-          <Button onClick={() => saveSection(['notes'])} disabled={updateSuperPerfil.isPending}>
-            {updateSuperPerfil.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Salvar
-          </Button>
-        </div>
       </TabsContent>
       )}
 
@@ -634,12 +618,6 @@ export function ContactCadastroTab({ contactId }: Props) {
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
-            <Button onClick={saveFiscalSection} disabled={savingFiscal}>
-              {savingFiscal ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-              Salvar
-            </Button>
-          </div>
         </TabsContent>
       )}
 
@@ -664,8 +642,6 @@ export function ContactCadastroTab({ contactId }: Props) {
           form={form}
           original={data ?? {}}
           set={set}
-          onSave={saveOperacionalSection}
-          isPending={savingOperacional}
           contactId={contactId}
           isPessoaFisica={isPessoaFisica}
           obligationsCatalog={obligationsCatalog}
@@ -778,15 +754,13 @@ function useContactObligations(contactId: string, enabled: boolean) {
 
 // ============ Operacional ============
 function OperacionalSection({
-  form, original, set, onSave, isPending, contactId, isPessoaFisica,
+  form, original, set, contactId, isPessoaFisica,
   obligationsCatalog, selectedObligations, setSelectedObligations,
 }: {
   form: Record<string, any>;
   /** Ficha como está salva no banco (a troca de status é comparada com ela). */
   original: Record<string, any>;
   set: (k: string, v: any) => void;
-  onSave: () => void;
-  isPending: boolean;
   contactId: string;
   isPessoaFisica: boolean;
   obligationsCatalog: { id: string; name: string; is_custom?: boolean }[];
@@ -941,13 +915,6 @@ function OperacionalSection({
           </CardContent>
         </Card>
       )}
-
-      <div className="flex justify-end">
-        <Button onClick={onSave} disabled={isPending}>
-          {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-          Salvar
-        </Button>
-      </div>
 
       {canDeleteContact && (
         <Card className="border-destructive/30">
