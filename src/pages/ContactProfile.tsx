@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ArrowLeft, User, DollarSign, ClipboardList, History, KeyRound, Landmark, Users, Handshake, Calculator, StickyNote, FileBarChart } from 'lucide-react';
 import { useContacts } from '@/hooks/useContacts';
 import { useContactTransactions, useContactFinancialStatus } from '@/hooks/useContactTransactions';
@@ -109,9 +110,20 @@ export default function ContactProfile() {
     : canViewOperacional ? 'operacional'
     : canViewLogs ? 'logs'
     : 'cadastro';
-  // Títulos das sub-abas em caixa alta (12/10/2026). Flex que quebra linha: com 11 abas na coluna da direita (17/10/2026) nem a rolagem lateral cabia sem esconder abas.
-  // Aba ativa: fundo azul e texto branco (token da ação primária).
-  const triggerClass = 'min-w-fit flex-1 items-center gap-1.5 text-xs font-semibold uppercase tracking-wide data-[state=active]:bg-action data-[state=active]:text-on-action data-[state=active]:shadow-none';
+  // Sub-abas só com ícone e tooltip, fixas no rodapé do box (17/10/2026). Aba ativa: fundo azul e ícone branco (token da ação primária).
+  const abas = [
+    { valor: 'cadastro', rotulo: 'Cadastro', Icone: ClipboardList, visivel: canViewCadastro },
+    { valor: 'societario', rotulo: 'Societário', Icone: Handshake, visivel: canViewSocios },
+    { valor: 'fiscal', rotulo: 'Fiscal', Icone: Landmark, visivel: canViewFiscal },
+    { valor: 'pessoal', rotulo: 'Pessoal', Icone: Users, visivel: canViewPessoal },
+    { valor: 'contabil', rotulo: 'Contábil', Icone: Calculator, visivel: canViewContabil },
+    { valor: 'acessos', rotulo: 'Acessos', Icone: KeyRound, visivel: canViewAcessos },
+    { valor: 'financeiro', rotulo: 'Financeiro', Icone: DollarSign, visivel: canViewFinanceiro },
+    { valor: 'operacional', rotulo: 'Operacional', Icone: User, visivel: canViewOperacional },
+    { valor: 'observacoes', rotulo: 'Observações', Icone: StickyNote, visivel: canViewObservacoes },
+    { valor: 'relatorios', rotulo: 'Relatórios', Icone: FileBarChart, visivel: canViewRelatorios },
+    { valor: 'logs', rotulo: 'Logs', Icone: History, visivel: canViewLogs },
+  ].filter(a => a.visivel);
 
   return (
     // Duas colunas 20/80: resumo à esquerda e as sub-abas à direita. No desktop a página não rola: as duas colunas ocupam a altura
@@ -131,105 +143,60 @@ export default function ContactProfile() {
             Sem permissão para ver o perfil deste cliente.
           </div>
         ) : (
-        <Tabs defaultValue={defaultProfileTab} className="flex min-h-0 w-full flex-1 flex-col">
-          <TabsList className="flex h-auto w-full shrink-0 flex-wrap justify-start gap-1">
-            {canViewCadastro && (
-              <TabsTrigger value="cadastro" className={triggerClass}>
-                <ClipboardList className="h-4 w-4" />
-                <span className="hidden sm:inline">Cadastro</span>
-              </TabsTrigger>
-            )}
-            {canViewSocios && (
-              <TabsTrigger value="societario" className={triggerClass}>
-                <Handshake className="h-4 w-4" />
-                <span className="hidden sm:inline">Societário</span>
-              </TabsTrigger>
-            )}
-            {canViewFiscal && (
-              <TabsTrigger value="fiscal" className={triggerClass}>
-                <Landmark className="h-4 w-4" />
-                <span className="hidden sm:inline">Fiscal</span>
-              </TabsTrigger>
-            )}
-            {canViewPessoal && (
-              <TabsTrigger value="pessoal" className={triggerClass}>
-                <Users className="h-4 w-4" />
-                <span className="hidden sm:inline">Pessoal</span>
-              </TabsTrigger>
-            )}
-            {canViewContabil && (
-              <TabsTrigger value="contabil" className={triggerClass}>
-                <Calculator className="h-4 w-4" />
-                <span className="hidden sm:inline">Contábil</span>
-              </TabsTrigger>
-            )}
+        <Tabs
+          defaultValue={defaultProfileTab}
+          className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-lg border border-b-[3px] border-line border-b-action bg-paper shadow-sm"
+        >
+          {/* Só esta área rola (no desktop); a barra de ícones fica parada no rodapé do box. */}
+          <div className="min-h-0 flex-1 p-3 lg:overflow-y-auto [&>[role=tabpanel]]:mt-0">
+            <ContactCadastroTab contactId={contact.id} />
+
             {canViewAcessos && (
-              <TabsTrigger value="acessos" className={triggerClass}>
-                <KeyRound className="h-4 w-4" />
-                <span className="hidden sm:inline">Acessos</span>
-              </TabsTrigger>
+              <TabsContent value="acessos" className="mt-6">
+                <AcessosTab contactId={contact.id} />
+              </TabsContent>
             )}
+
             {canViewFinanceiro && (
-              <TabsTrigger value="financeiro" className={triggerClass}>
-                <DollarSign className="h-4 w-4" />
-                <span className="hidden sm:inline">Financeiro</span>
-              </TabsTrigger>
+              <TabsContent value="financeiro" className="mt-6">
+                <ContactFinancialTab contactId={contact.id} contactName={contact.name} contact={contact} />
+              </TabsContent>
             )}
-            {canViewOperacional && (
-              <TabsTrigger value="operacional" className={triggerClass}>
-                <User className="h-4 w-4" />
-                <span className="hidden sm:inline">Operacional</span>
-              </TabsTrigger>
-            )}
-            {canViewObservacoes && (
-              <TabsTrigger value="observacoes" className={triggerClass}>
-                <StickyNote className="h-4 w-4" />
-                <span className="hidden sm:inline">Observações</span>
-              </TabsTrigger>
-            )}
+
+            {/* Relatórios: por enquanto só a Ficha fiscal do cliente (a mesma do painel lateral do Monitoramento). */}
             {canViewRelatorios && (
-              <TabsTrigger value="relatorios" className={triggerClass}>
-                <FileBarChart className="h-4 w-4" />
-                <span className="hidden sm:inline">Relatórios</span>
-              </TabsTrigger>
+              <TabsContent value="relatorios" className="mt-6">
+                <FichaFiscalConteudo contactId={contact.id} />
+              </TabsContent>
             )}
+
             {canViewLogs && (
-              <TabsTrigger value="logs" className={triggerClass}>
-                <History className="h-4 w-4" />
-                <span className="hidden sm:inline">Logs</span>
-              </TabsTrigger>
+              <TabsContent value="logs" className="mt-6">
+                <ContactLogsWithComunicacaoTab contactId={contact.id} />
+              </TabsContent>
             )}
-          </TabsList>
-
-          {/* Só esta área rola (no desktop); a lista de abas acima fica parada. */}
-          <div className="-mx-1 mt-3 min-h-0 flex-1 px-1 lg:overflow-y-auto [&>[role=tabpanel]]:mt-0">
-          <ContactCadastroTab contactId={contact.id} />
-
-          {canViewAcessos && (
-            <TabsContent value="acessos" className="mt-6">
-              <AcessosTab contactId={contact.id} />
-            </TabsContent>
-          )}
-
-          {canViewFinanceiro && (
-            <TabsContent value="financeiro" className="mt-6">
-              <ContactFinancialTab contactId={contact.id} contactName={contact.name} contact={contact} />
-            </TabsContent>
-          )}
-
-          {/* Relatórios: por enquanto só a Ficha fiscal do cliente (a mesma do painel lateral do Monitoramento). */}
-          {canViewRelatorios && (
-            <TabsContent value="relatorios" className="mt-6">
-              <FichaFiscalConteudo contactId={contact.id} />
-            </TabsContent>
-          )}
-
-          {canViewLogs && (
-            <TabsContent value="logs" className="mt-6">
-              <ContactLogsWithComunicacaoTab contactId={contact.id} />
-            </TabsContent>
-          )}
           </div>
+
+          {/* Rodapé do box no desktop; em tela estreita (a página rola) as abas sobem para o topo do box. */}
+          <TabsList className="h-auto w-full shrink-0 flex-wrap justify-center gap-1 rounded-none border-t border-line bg-transparent p-1.5 max-lg:order-first max-lg:border-b max-lg:border-t-0">
+            {abas.map(({ valor, rotulo, Icone }) => (
+              <Tooltip key={valor}>
+                {/* O tooltip fica num span em volta: no próprio TabsTrigger o data-state do tooltip trocaria o "active" da aba. */}
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <TabsTrigger
+                      value={valor}
+                      aria-label={rotulo}
+                      className="h-9 w-9 shrink-0 rounded-md p-0 text-action transition-colors hover:bg-action-tint data-[state=active]:bg-action data-[state=active]:text-on-action data-[state=active]:shadow-none"
+                    >
+                      <Icone className="h-[18px] w-[18px]" />
+                    </TabsTrigger>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">{rotulo}</TooltipContent>
+              </Tooltip>
+            ))}
+          </TabsList>
         </Tabs>
         )}
       </div>

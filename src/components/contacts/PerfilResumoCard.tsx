@@ -1,31 +1,70 @@
 import type { ReactNode } from 'react';
 import { format, parseISO } from 'date-fns';
-import { ArrowLeft, Building2 } from 'lucide-react';
+import { ArrowLeft, Building2, Copy } from 'lucide-react';
 import { DsBadge } from '@/components/ds';
-import { Contact } from '@/hooks/useContacts';
+import { Contact, TAX_REGIME_LABELS } from '@/hooks/useContacts';
+import { useToast } from '@/hooks/use-toast';
 import { getContactDisplayName, getContactStatusTone } from '@/lib/contact-display';
 import { getDocumentType, maskPhone } from '@/lib/utils';
 
-const dataBR = (iso?: string | null) => (iso ? format(parseISO(iso.slice(0, 10)), 'dd/MM/yyyy') : '—');
+const dataBR = (iso?: string | null) => (iso ? format(parseISO(iso.slice(0, 10)), 'dd/MM/yyyy') : '');
 
-function Dado({ label, children }: { label: string; children: ReactNode }) {
+/** Texto que aparece e que vai para a área de transferência ao clicar. Vazio = dado não preenchido (mostra "—" e não copia). */
+function useCopiar() {
+  const { toast } = useToast();
+  return async (texto: string, rotulo: string) => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      toast({ title: `${rotulo} copiado!`, duration: 2000 });
+    } catch {
+      toast({ title: 'Erro ao copiar', variant: 'destructive' });
+    }
+  };
+}
+
+/** Dado do cliente: rótulo + valor. Com valor, o clique copia (o ícone de copiar aparece ao passar o mouse). */
+function Dado({ rotulo, texto, copiar, children }: {
+  rotulo: string;
+  texto: string;
+  copiar: (texto: string, rotulo: string) => void;
+  children?: ReactNode;
+}) {
   return (
     <div className="space-y-0.5">
-      <dt className="text-[13px] font-semibold text-muted-ink">{label}</dt>
-      <dd className="text-[15px] font-medium text-ink">{children}</dd>
+      <dt className="text-[13px] font-semibold text-muted-ink">{rotulo}</dt>
+      <dd>
+        {texto ? (
+          <button
+            type="button"
+            onClick={() => copiar(texto, rotulo)}
+            title="Clique para copiar"
+            className="group flex max-w-full items-center gap-1.5 text-left text-[15px] font-medium text-ink transition-colors hover:text-action"
+          >
+            {children ?? <span className="min-w-0 [overflow-wrap:anywhere]">{texto}</span>}
+            <Copy className="h-3 w-3 shrink-0 text-muted-ink opacity-0 transition-opacity group-hover:opacity-100" />
+          </button>
+        ) : (
+          <span className="text-[15px] font-medium text-muted-ink-2">—</span>
+        )}
+      </dd>
     </div>
   );
 }
 
 /**
- * Coluna fixa da esquerda do Super Perfil (17/10/2026, no molde do Makro): quem é o cliente em seis dados.
- * Ocupa a altura da tela e fica parada enquanto o conteúdo da direita rola por dentro; em tela estreita vira um bloco acima das abas.
+ * Coluna da esquerda do Super Perfil (17/10/2026, no molde do Makro): quem é o cliente em oito dados, todos clicáveis (copiam para
+ * a área de transferência). Ocupa a altura da tela e fica parada enquanto o conteúdo da direita rola por dentro; em tela estreita vira
+ * um bloco acima das abas. A barra azul no rodapé separa o box do fundo da tela.
  */
 export function PerfilResumoCard({ contact, inadimplente, onVoltar }: { contact: Contact; inadimplente: boolean; onVoltar: () => void }) {
+  const copiar = useCopiar();
+  const nome = getContactDisplayName(contact);
   const tipoDocumento = getDocumentType(contact.document) === 'CPF' ? 'CPF' : 'CNPJ';
+  const regime = contact.tax_regime ? TAX_REGIME_LABELS[contact.tax_regime] ?? contact.tax_regime : '';
+  const status = contact.status_cliente || 'Sem status';
 
   return (
-    <aside className="space-y-5 rounded-lg border border-line bg-paper p-4 lg:h-full lg:overflow-y-auto">
+    <aside className="space-y-5 rounded-lg border border-b-[3px] border-line border-b-action bg-paper p-4 shadow-sm lg:h-full lg:overflow-y-auto">
       <button
         type="button"
         onClick={onVoltar}
@@ -45,22 +84,39 @@ export function PerfilResumoCard({ contact, inadimplente, onVoltar }: { contact:
           <Building2 className="h-5 w-5" strokeWidth={1.75} />
         </div>
         {/* Largura da coluna é fixa em qualquer sub-aba (a página não rola), então o nome quebra sempre do mesmo jeito. */}
-        <h1 className="text-balance break-words text-[18px] font-bold leading-snug tracking-tight text-ink" title={getContactDisplayName(contact)}>
-          {getContactDisplayName(contact)}
+        <h1 className="text-balance break-words text-[18px] font-bold leading-snug tracking-tight text-ink">
+          <button
+            type="button"
+            onClick={() => copiar(nome, 'Nome')}
+            title="Clique para copiar"
+            className="font-bold transition-colors hover:text-action"
+          >
+            {nome}
+          </button>
         </h1>
         {contact.document && (
           <p className="text-[14px] text-muted-ink">
-            {tipoDocumento}: <span className="font-mono text-[14px] text-ink">{contact.document}</span>
+            {tipoDocumento}:{' '}
+            <button
+              type="button"
+              onClick={() => copiar(contact.document!, tipoDocumento)}
+              title="Clique para copiar"
+              className="font-mono text-[14px] text-ink transition-colors hover:text-action"
+            >
+              {contact.document}
+            </button>
           </p>
         )}
       </div>
 
       <dl className="space-y-4 border-t border-line pt-5">
-        <Dado label="Telefone">{contact.phone ? maskPhone(contact.phone) : '—'}</Dado>
-        <Dado label="Abertura - Receita Federal">{dataBR(contact.data_abertura_receita)}</Dado>
-        <Dado label="Início do contrato">{dataBR(contact.data_inicio_contrato)}</Dado>
-        <Dado label="Status">
-          <DsBadge tone={getContactStatusTone(contact.status_cliente)}>{contact.status_cliente || 'Sem status'}</DsBadge>
+        <Dado rotulo="Telefone" texto={contact.phone ? maskPhone(contact.phone) : ''} copiar={copiar} />
+        <Dado rotulo="E-mail" texto={contact.email || ''} copiar={copiar} />
+        <Dado rotulo="Regime Tributário" texto={regime} copiar={copiar} />
+        <Dado rotulo="Abertura - Receita Federal" texto={dataBR(contact.data_abertura_receita)} copiar={copiar} />
+        <Dado rotulo="Início do contrato" texto={dataBR(contact.data_inicio_contrato)} copiar={copiar} />
+        <Dado rotulo="Status" texto={status} copiar={copiar}>
+          <DsBadge tone={getContactStatusTone(contact.status_cliente)}>{status}</DsBadge>
         </Dado>
       </dl>
     </aside>
