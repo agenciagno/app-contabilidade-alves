@@ -43,11 +43,14 @@ interface Props {
   companyId?: string;
   year: number;
   month: number;
+  /** Competência encerrada: as tarefas dela são bloqueadas para edição, então o lote também não conclui. */
+  locked?: boolean;
 }
 
+const STATUS_LABEL: Record<string, string> = { a_fazer: 'A fazer', em_progresso: 'Em progresso', aguardando_cliente: 'Aguardando cliente' };
 const MONTH_LABEL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
-export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month }: Props) {
+export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month, locked = false }: Props) {
   const qc = useQueryClient();
   const [step, setStep] = useState(1);
   const [obligationId, setObligationId] = useState<string>('');
@@ -127,10 +130,16 @@ export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month 
   );
 
   // ===== Step navigation =====
-  const canGoStep2 = !!obligationId && selectedIds.size > 0;
+  const canGoStep2 = !locked && !!obligationId && selectedIds.size > 0;
   const canGoStep3 = () => {
     if (completionType === 'protocol') return protocol.trim().length > 0;
     return true;
+  };
+
+  // Escolheu a tarefa: já vem marcado todo cliente que a tem em aberto (desmarca quem não deve entrar).
+  const escolherObrigacao = (id: string) => {
+    setObligationId(id);
+    setSelectedIds(new Set((pendingQ.data ?? []).filter((t) => (t.obligation_id ?? '__none__') === id).map((t) => t.id)));
   };
 
   const toggleAll = (checked: boolean) => {
@@ -203,15 +212,20 @@ export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month 
           {/* STEP 1 */}
           {step === 1 && (
             <div className="space-y-4">
+              {locked && (
+                <p className="rounded-md border border-muted-foreground/30 bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  <strong>Competência encerrada.</strong> As tarefas de {MONTH_LABEL[month - 1]}/{year} estão bloqueadas para edição; não dá para concluir em lote.
+                </p>
+              )}
               <div className="space-y-1.5">
-                <Label>Obrigação</Label>
+                <Label>Tarefa</Label>
                 {pendingQ.isLoading ? (
                   <Skeleton className="h-10 w-full" />
                 ) : obligationGroups.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhuma tarefa pendente nesta competência.</p>
                 ) : (
-                  <Select value={obligationId} onValueChange={(v) => { setObligationId(v); setSelectedIds(new Set()); }}>
-                    <SelectTrigger><SelectValue placeholder="Selecione uma obrigação" /></SelectTrigger>
+                  <Select value={obligationId} onValueChange={escolherObrigacao}>
+                    <SelectTrigger><SelectValue placeholder="Selecione a tarefa" /></SelectTrigger>
                     <SelectContent>
                       {obligationGroups.map((g) => (
                         <SelectItem key={g.id} value={g.id}>
@@ -252,11 +266,12 @@ export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month 
                         {tasksForObligation.map((t) => (
                           <TableRow key={t.id} className="cursor-pointer" onClick={() => toggleOne(t.id)}>
                             <TableCell>
-                              <Checkbox checked={selectedIds.has(t.id)} onCheckedChange={() => toggleOne(t.id)} />
+                              {/* stopPropagation: sem ele o clique na caixa também aciona o clique da linha e a marca se anula. */}
+                              <Checkbox checked={selectedIds.has(t.id)} onCheckedChange={() => toggleOne(t.id)} onClick={(e) => e.stopPropagation()} />
                             </TableCell>
                             <TableCell className="font-medium">{t.contact_name}</TableCell>
                             <TableCell className="text-xs text-muted-foreground">{t.contact_document ?? '—'}</TableCell>
-                            <TableCell><Badge variant="outline" className="text-xs">{t.status}</Badge></TableCell>
+                            <TableCell><Badge variant="outline" className="text-xs">{STATUS_LABEL[t.status] ?? t.status}</Badge></TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -363,7 +378,7 @@ export function BulkCompleteDialog({ open, onOpenChange, companyId, year, month 
             </Button>
           )}
           {step === 3 && (
-            <Button onClick={execute} disabled={submitting || selectedTasks.length === 0}>
+            <Button onClick={execute} disabled={locked || submitting || selectedTasks.length === 0}>
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               Confirmar conclusão em lote
             </Button>

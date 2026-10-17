@@ -796,6 +796,10 @@ export default function FiscalTasks() {
         companyId={companyId}
         year={(selectedCompetence ?? competenceFromMonthYear(now.getMonth() + 1, now.getFullYear())).year}
         month={(selectedCompetence ?? competenceFromMonthYear(now.getMonth() + 1, now.getFullYear())).month}
+        locked={!!closedPeriods?.has(periodKey(
+          (selectedCompetence ?? competenceFromMonthYear(now.getMonth() + 1, now.getFullYear())).year,
+          (selectedCompetence ?? competenceFromMonthYear(now.getMonth() + 1, now.getFullYear())).month,
+        ))}
       />
 
       {/* Detail Modal */}
