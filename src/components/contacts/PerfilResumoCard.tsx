@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { format, parseISO } from 'date-fns';
-import { ArrowLeft, Building2, Copy } from 'lucide-react';
+import { ArrowLeft, Building2, Copy, ListChecks } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { DsBadge } from '@/components/ds';
 import { Contact, TAX_REGIME_LABELS } from '@/hooks/useContacts';
 import { useToast } from '@/hooks/use-toast';
@@ -56,7 +57,15 @@ function Dado({ rotulo, texto, copiar, children }: {
  * a área de transferência). Ocupa a altura da tela e fica parada enquanto o conteúdo da direita rola por dentro; em tela estreita vira
  * um bloco acima das abas. A barra azul no rodapé separa o box do fundo da tela.
  */
-export function PerfilResumoCard({ contact, inadimplente, onVoltar }: { contact: Contact; inadimplente: boolean; onVoltar: () => void }) {
+/** Cadastro feito pelo assistente com etapas ainda não concluídas (puladas ou pendentes). */
+export interface CadastroPendente { concluidas: number; total: number; onContinuar: () => void }
+
+export function PerfilResumoCard({ contact, inadimplente, onVoltar, cadastroPendente }: {
+  contact: Contact;
+  inadimplente: boolean;
+  onVoltar: () => void;
+  cadastroPendente?: CadastroPendente;
+}) {
   const copiar = useCopiar();
   const nome = getContactDisplayName(contact);
   const tipoDocumento = getDocumentType(contact.document) === 'CPF' ? 'CPF' : 'CNPJ';
@@ -94,6 +103,9 @@ export function PerfilResumoCard({ contact, inadimplente, onVoltar }: { contact:
             {nome}
           </button>
         </h1>
+        {contact.tipo_cliente === 'Em processo de abertura' && (
+          <DsBadge tone="warn">Abertura de empresa</DsBadge>
+        )}
         {contact.document && (
           <p className="text-[14px] text-muted-ink">
             {tipoDocumento}:{' '}
@@ -108,6 +120,21 @@ export function PerfilResumoCard({ contact, inadimplente, onVoltar }: { contact:
           </p>
         )}
       </div>
+
+      {cadastroPendente && (
+        <div className="space-y-2 rounded-md border border-line bg-bg p-3">
+          <div className="flex items-center justify-between gap-2 text-[13px]">
+            <span className="font-semibold text-ink">Cadastro em andamento</span>
+            <span className="tabular-nums text-muted-ink">{cadastroPendente.concluidas} de {cadastroPendente.total}</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-bg-3">
+            <div className="h-full rounded-full bg-action" style={{ width: `${(cadastroPendente.concluidas / cadastroPendente.total) * 100}%` }} />
+          </div>
+          <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={cadastroPendente.onContinuar}>
+            <ListChecks className="h-4 w-4" /> Continuar cadastro
+          </Button>
+        </div>
+      )}
 
       <dl className="space-y-4 border-t border-line pt-5">
         <Dado rotulo="Telefone" texto={contact.phone ? maskPhone(contact.phone) : ''} copiar={copiar} />

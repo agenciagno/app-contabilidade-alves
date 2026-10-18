@@ -45,6 +45,7 @@ const FiscalDashboard = lazy(() => import("@/pages/FiscalDashboard"));
 const FiscalCollaborators = lazy(() => import("@/pages/FiscalCollaborators"));
 const FiscalObrigacoes = lazy(() => import("@/pages/FiscalObrigacoes"));
 const Newsletter = lazy(() => import("@/pages/Newsletter"));
+const PaginaCliente = lazy(() => import("@/pages/PaginaCliente"));
 const CofreGlobal = lazy(() => import("@/pages/CofreGlobal"));
 const TechClientesExternos = lazy(() => import("@/pages/TechClientesExternos"));
 const TechClienteExternoDetalhe = lazy(() => import("@/pages/TechClienteExternoDetalhe"));
@@ -72,6 +73,7 @@ const DctfwebMitFederal = lazy(() => import("@/pages/DctfwebMitFederal"));
 const RelatoriosFederal = lazy(() => import("@/pages/RelatoriosFederal"));
 const ConferenciaCadastroFederal = lazy(() => import("@/pages/ConferenciaCadastroFederal"));
 const TechConsumoSerpro = lazy(() => import("@/pages/TechConsumoSerpro"));
+const TechOnboarding = lazy(() => import("@/pages/TechOnboarding"));
 const ClassificacaoFiscal = lazy(() => import("@/pages/ClassificacaoFiscal"));
 
 const RouteFallback = () => (
@@ -125,6 +127,8 @@ const App = () => (
               <Route path="/escolher-conta" element={<EscolherConta />} />
               <Route path="/redefinir-senha" element={<RedefinirSenha />} />
               <Route path="/newsletter/:slug" element={<Newsletter />} />
+              {/* Link do cliente (onboarding): página pública, sem login; os dados vêm da edge onboarding-publico pelo token */}
+              <Route path="/c/:token" element={<PaginaCliente />} />
               <Route path="/sem-acesso" element={<NoAccess />} />
               <Route path="/" element={<AppLayout><ModuleGuard moduleName="home"><Home /></ModuleGuard></AppLayout>} />
               <Route path="/painel-financeiro" element={<AppLayout><ModuleGuard moduleName="financeiro" subModule="financeiro_dashboard"><Dashboard /></ModuleGuard></AppLayout>} />
@@ -165,6 +169,7 @@ const App = () => (
               <Route path="/admin/provisionar-cliente" element={<Navigate to="/tech/clientes-externos" replace />} />
               <Route path="/tech/operacao" element={<Navigate to="/tech/clientes-externos" replace />} />
               <Route path="/tech/lgpd" element={<AppLayout><AudienceGuard audience="external"><TechLGPD /></AudienceGuard></AppLayout>} />
+              <Route path="/tech/onboarding" element={<AppLayout><AudienceGuard audience="internal"><TechOnboarding /></AudienceGuard></AppLayout>} />
               <Route path="/tech/consumo-serpro" element={<AppLayout><AudienceGuard audience="internal"><TechConsumoSerpro /></AudienceGuard></AppLayout>} />
               <Route path="/central-notificacoes" element={<AppLayout><CentralNotificacoes /></AppLayout>} />
 

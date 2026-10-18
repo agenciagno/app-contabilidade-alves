@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Loader2, Save, User, DollarSign, ClipboardList, History, KeyRound, Landmark, Users, Handshake, Calculator, StickyNote, FileBarChart } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, User, DollarSign, ClipboardList, History, KeyRound, Landmark, Users, Handshake, Calculator, StickyNote, FileBarChart, Link2 } from 'lucide-react';
 import { useContacts } from '@/hooks/useContacts';
 import { useContactTransactions, useContactFinancialStatus } from '@/hooks/useContactTransactions';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
@@ -19,7 +20,10 @@ import { getDocumentType } from '@/lib/utils';
 import { FaixaStatusCliente } from '@/components/contacts/FaixaStatusCliente';
 import { PerfilResumoCard } from '@/components/contacts/PerfilResumoCard';
 import { FichaFiscalConteudo } from '@/components/monitor/FichaFiscal';
+import { ClienteLinkTab } from '@/components/contacts/ClienteLinkTab';
 import { useSidebar } from '@/components/ui/sidebar';
+import { AssistenteCadastroBarra } from '@/components/contacts/cadastro/AssistenteCadastroBarra';
+import { ETAPAS_CADASTRO, EtapaCadastro, useOnboardingCadastro } from '@/hooks/useOnboardingCadastro';
 
 export default function ContactProfile() {
   const { id } = useParams<{ id: string }>();
@@ -43,10 +47,14 @@ export default function ContactProfile() {
   // Observações (era um box do Cadastro) segue a permissão do Cadastro; Relatórios (Ficha fiscal) segue a do Fiscal. Sem chave nova: ninguém perde nem ganha acesso.
   const canViewObservacoes = canViewCadastro;
   const canViewRelatorios = canViewFiscal;
+  // Link do cliente (documentos e boas-vindas, 17/10/2026) segue a permissão do Cadastro, como Observações.
+  const canViewLink = canViewCadastro;
   const { isInadimplente } = useContactFinancialStatus(id, transactions);
 
   // Sub-aba aberta (controlada): o botão Salvar do rodapé salva a que estiver aberta. null = ainda a padrão (calculada mais abaixo).
-  const [abaEscolhida, setAbaEscolhida] = useState<string | null>(null);
+  // ?aba=link abre direto uma sub-aba (ex.: aviso de documento enviado pelo cliente).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [abaEscolhida, setAbaEscolhida] = useState<string | null>(() => searchParams.get('aba'));
   const defaultProfileTab = canViewCadastro ? 'cadastro'
     : canViewSocios ? 'societario'
     : canViewFiscal ? 'fiscal'
@@ -59,6 +67,74 @@ export default function ContactProfile() {
     : 'cadastro';
   const abaAtiva = abaEscolhida ?? defaultProfileTab;
   const salvarPerfil = usePerfilSalvar(abaAtiva);
+
+  // Assistente de cadastro (17/10/2026): ?assistente=1 percorre as sub-abas na ordem do cadastro, com Voltar, Pular e Salvar e continuar.
+  const onboarding = useOnboardingCadastro(id);
+  const etapasAssistente = ETAPAS_CADASTRO.filter(e => {
+    const visivel = { cadastro: canViewCadastro, societario: canViewSocios, fiscal: canViewFiscal, operacional: canViewOperacional, financeiro: canViewFinanceiro, link: canViewLink }[e.etapa];
+    return visivel && onboarding.statusDe(e.etapa) !== null;
+  });
+  const modoAssistente = searchParams.get('assistente') === '1' && etapasAssistente.length > 0;
+  const etapaAtual = etapasAssistente.find(e => e.etapa === abaAtiva)?.etapa ?? null;
+  // Ao entrar no assistente, abre a primeira etapa ainda não concluída (uma vez só; depois quem manda é o usuário).
+  const assistenteIniciado = useRef(false);
+  useEffect(() => {
+    // Rearma só depois que a URL já saiu do assistente: rearmar antes deixava um render no meio reabrir a primeira etapa pendente.
+    if (!modoAssistente) { assistenteIniciado.current = false; return; }
+    if (assistenteIniciado.current) return;
+    assistenteIniciado.current = true;
+    const primeira = etapasAssistente.find(e => onboarding.statusDe(e.etapa) !== 'concluido') ?? etapasAssistente[0];
+    setAbaEscolhida(primeira.etapa);
+  }, [modoAssistente, etapasAssistente, onboarding]);
+
+  const sairDoAssistente = () => {
+    setSearchParams(prev => { const p = new URLSearchParams(prev); p.delete('assistente'); return p; }, { replace: true });
+  };
+  const irParaEtapa = (etapa: EtapaCadastro) => setAbaEscolhida(etapa);
+  const avancar = (de: EtapaCadastro, statusDaAtual: 'concluido' | 'pulado') => {
+    const i = etapasAssistente.findIndex(e => e.etapa === de);
+    const proxima = etapasAssistente[i + 1];
+    if (proxima) { setAbaEscolhida(proxima.etapa); return; }
+    // Última etapa: resume o que ficou para depois e volta ao perfil normal.
+    const faltam = etapasAssistente.filter(e => e.etapa !== de && onboarding.statusDe(e.etapa) !== 'concluido').length + (statusDaAtual === 'pulado' ? 1 : 0);
+    if (faltam === 0) toast.success('Cadastro concluído');
+    else toast.success('Cadastro salvo', { description: `${faltam} etapa(s) ficaram para depois. Use "Continuar cadastro" no resumo.` });
+    sairDoAssistente();
+  };
+  const proximaEtapa = async () => {
+    // Numa sub-aba fora do cadastro (ex.: Logs), os botões trazem de volta para a primeira etapa.
+    if (!etapaAtual) { setAbaEscolhida(etapasAssistente[0].etapa); return; }
+    const ok = await salvarPerfil.salvar();
+    if (!ok) return;
+    try {
+      await onboarding.marcar.mutateAsync({ etapa: etapaAtual, status: 'concluido' });
+    } catch {
+      toast.error('Os dados foram salvos, mas o progresso do cadastro não. Tente de novo.');
+      return;
+    }
+    avancar(etapaAtual, 'concluido');
+  };
+  const pularEtapa = async () => {
+    // Numa sub-aba fora do cadastro (ex.: Logs), os botões trazem de volta para a primeira etapa.
+    if (!etapaAtual) { setAbaEscolhida(etapasAssistente[0].etapa); return; }
+    // Etapa já concluída antes continua concluída: pular só passa adiante.
+    if (onboarding.statusDe(etapaAtual) !== 'concluido') {
+      try {
+        await onboarding.marcar.mutateAsync({ etapa: etapaAtual, status: 'pulado' });
+      } catch {
+        toast.error('Não foi possível marcar a etapa. Tente de novo.');
+        return;
+      }
+    }
+    avancar(etapaAtual, onboarding.statusDe(etapaAtual) === 'concluido' ? 'concluido' : 'pulado');
+  };
+  const voltarEtapa = () => {
+    const i = etapasAssistente.findIndex(e => e.etapa === etapaAtual);
+    if (i > 0) setAbaEscolhida(etapasAssistente[i - 1].etapa);
+  };
+  const continuarCadastro = () => {
+    setSearchParams(prev => { const p = new URLSearchParams(prev); p.set('assistente', '1'); return p; }, { replace: true });
+  };
 
   // Ao entrar no Super Perfil o menu lateral recolhe (a tela ganha espaço); ao sair volta como estava. Só no desktop: no celular o menu já é gaveta.
   const { open: menuAberto, setOpen: setMenuAberto, isMobile } = useSidebar();
@@ -114,7 +190,7 @@ export default function ContactProfile() {
 
   const visibleTabCount = [
     canViewCadastro, canViewSocios, canViewFiscal, canViewPessoal, canViewContabil,
-    canViewAcessos, canViewFinanceiro, canViewOperacional, canViewObservacoes, canViewRelatorios, canViewLogs,
+    canViewAcessos, canViewFinanceiro, canViewOperacional, canViewObservacoes, canViewRelatorios, canViewLogs, canViewLink,
   ].filter(Boolean).length;
   // Sub-abas só com ícone e tooltip, fixas no rodapé do box (17/10/2026). Aba ativa: fundo azul e ícone branco (token da ação primária).
   const abas = [
@@ -127,6 +203,7 @@ export default function ContactProfile() {
     { valor: 'financeiro', rotulo: 'Financeiro', Icone: DollarSign, visivel: canViewFinanceiro },
     { valor: 'operacional', rotulo: 'Operacional', Icone: User, visivel: canViewOperacional },
     { valor: 'observacoes', rotulo: 'Observações', Icone: StickyNote, visivel: canViewObservacoes },
+    { valor: 'link', rotulo: 'Link do cliente', Icone: Link2, visivel: canViewLink },
     { valor: 'relatorios', rotulo: 'Relatórios', Icone: FileBarChart, visivel: canViewRelatorios },
     { valor: 'logs', rotulo: 'Logs', Icone: History, visivel: canViewLogs },
   ].filter(a => a.visivel);
@@ -138,10 +215,32 @@ export default function ContactProfile() {
       data-ocupa-tela
       className="grid grid-cols-1 gap-3 lg:h-full lg:grid-cols-[minmax(240px,20%)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]"
     >
-      <PerfilResumoCard contact={contact} inadimplente={isInadimplente} onVoltar={() => navigate('/contatos')} />
+      <PerfilResumoCard
+        contact={contact}
+        inadimplente={isInadimplente}
+        onVoltar={() => navigate('/contatos')}
+        cadastroPendente={!modoAssistente && onboarding.temOnboarding && !onboarding.completo
+          ? { concluidas: onboarding.concluidas, total: onboarding.total, onContinuar: continuarCadastro }
+          : undefined}
+      />
 
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
         <FaixaStatusCliente status={contact.status_cliente} desde={contact.status_cliente_desde} motivo={contact.status_cliente_motivo} />
+
+        {modoAssistente && (
+          <AssistenteCadastroBarra
+            etapas={etapasAssistente}
+            atual={etapaAtual ?? etapasAssistente[0].etapa}
+            fluxo={onboarding.fluxo}
+            statusDe={onboarding.statusDe}
+            salvando={salvarPerfil.salvando || onboarding.marcar.isPending}
+            onIr={irParaEtapa}
+            onVoltar={voltarEtapa}
+            onPular={pularEtapa}
+            onProxima={proximaEtapa}
+            onSair={sairDoAssistente}
+          />
+        )}
 
         {/* Tabs */}
         {visibleTabCount === 0 ? (
@@ -168,6 +267,12 @@ export default function ContactProfile() {
             {canViewFinanceiro && (
               <TabsContent value="financeiro" className="mt-6">
                 <ContactFinancialTab contactId={contact.id} contactName={contact.name} contact={contact} />
+              </TabsContent>
+            )}
+
+            {canViewLink && (
+              <TabsContent value="link" className="mt-6">
+                <ClienteLinkTab contact={contact} />
               </TabsContent>
             )}
 

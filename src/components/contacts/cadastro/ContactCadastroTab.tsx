@@ -223,8 +223,8 @@ export function ContactCadastroTab({ contactId }: Props) {
         ...Object.fromEntries(DATAS_KEYS.map(k => [k, form[k] || null])),
       });
       queryClient.invalidateQueries({ queryKey: ['cliente-status-periodos', contactId] });
-    } catch {
-      return; // updateSuperPerfil já mostra o toast de erro
+    } catch (e) {
+      throw e; // updateSuperPerfil já mostra o toast de erro; repassa para o Salvar (e o assistente) saber que falhou
     }
     try {
       const result = await syncObligations();

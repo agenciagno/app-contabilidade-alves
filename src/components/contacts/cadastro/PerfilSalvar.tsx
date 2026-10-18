@@ -27,14 +27,17 @@ export function usePerfilSalvar(abaAtiva: string) {
     });
   }, []);
 
-  const salvar = useCallback(async () => {
+  /** Salva a sub-aba aberta. Devolve se deu certo (sub-aba sem nada para salvar conta como certo): o assistente de cadastro só avança assim. */
+  const salvar = useCallback(async (): Promise<boolean> => {
     const fn = registros.current[abaAtiva];
-    if (!fn) return;
+    if (!fn) return true;
     setSalvando(true);
     try {
       await fn();
+      return true;
     } catch {
       // Quem salva já avisa o erro (toast); aqui só garante que o botão volte ao normal.
+      return false;
     } finally {
       setSalvando(false);
     }

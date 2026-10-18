@@ -250,6 +250,8 @@ export const menuEntries: MenuEntry[] = [
       { title: 'Clientes Externos', url: '/tech/clientes-externos', icon: Building2, iconName: 'building-2', requireSuperAdmin: true, audience: 'external' },
       { title: 'Canais de Suporte', url: '/tech/suporte-canais', icon: MessageSquare, iconName: 'message-square', requireSuperAdmin: true, audience: 'external' },
       { title: 'LGPD', url: '/tech/lgpd', icon: ShieldCheck, iconName: 'shield-check', requireAdmin: true, audience: 'external' },
+      // Lista de documentos e textos do link do cliente novo (17/10/2026); só admin edita (RLS).
+      { title: 'Onboarding', url: '/tech/onboarding', icon: ListChecks, iconName: 'list-checks', requireAdmin: true, audience: 'internal' },
       { title: 'SERPRO', url: '/tech/consumo-serpro', icon: Gauge, iconName: 'gauge', subKey: 'tech_consumo_serpro', requireAdmin: true, audience: 'internal' },
       { title: 'Central de Notificações', url: '/central-notificacoes', icon: BellRing, iconName: 'bell-ring', subKey: 'tech_central_notificacoes', requireSuperAdmin: true },
     ],

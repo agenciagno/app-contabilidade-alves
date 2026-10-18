@@ -65,7 +65,8 @@ export function PwaInstallBanner() {
   };
 
   const showBanner = !dismissed && (deferredPrompt || showIosBanner);
-  if (!showBanner) return null;
+  // A página pública do cliente (/c/<token>) não oferece instalar o app da equipe.
+  if (!showBanner || window.location.pathname.startsWith('/c/')) return null;
 
   return (
     <div

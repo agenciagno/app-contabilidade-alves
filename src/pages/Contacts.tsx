@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -11,11 +11,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, User, Mail, Phone, Copy, Users, X, FileText, LayoutGrid, List, Pencil, Trash2, Building2, CalendarDays, FolderOpen, UserCheck } from 'lucide-react';
+import { Plus, Search, User, Mail, Phone, Copy, Users, X, FileText, LayoutGrid, List, Pencil, Trash2, Building2, CalendarDays, FolderOpen, UserCheck, Target } from 'lucide-react';
 import { useContacts, Contact, ContactInsert, TAX_REGIME_LABELS } from '@/hooks/useContacts';
 import { useTeamProfiles } from '@/hooks/useTeamProfiles';
 import { useTransactions } from '@/hooks/useTransactions';
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
+import { NovoClienteDialog } from '@/components/contacts/NovoClienteDialog';
+import { useContatosComCadastroPendente } from '@/hooks/useOnboardingCadastro';
+import { InteressadosTab } from '@/components/interessados/InteressadosTab';
 import { ContactBulkEditDialog } from '@/components/contacts/ContactBulkEditDialog';
 import { useToast } from '@/hooks/use-toast';
 import { EntradaClientesTab } from '@/components/contacts/EntradaClientesTab';
@@ -51,6 +54,8 @@ const letraDoContato = (c: Contact) => {
   return /^[A-Z]$/.test(inicial) ? inicial : '#';
 };
 
+const CADASTRO_EM_ANDAMENTO = '__cadastro_em_andamento';
+
 export default function Contacts() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -58,6 +63,10 @@ export default function Contacts() {
   const { contacts, isLoading, createContact, updateContact, deleteContact } = useContacts();
   const { transactions } = useTransactions();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [novoClienteOpen, setNovoClienteOpen] = useState(false);
+  const cadastroPendente = useContatosComCadastroPendente();
+  // ?aba=interessados abre direto o funil (link do aviso de follow-up no sino).
+  const [searchParams] = useSearchParams();
   const [editingContact, setEditingContact] = useState<Contact | undefined>();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatusCliente, setFilterStatusCliente] = useState('all');
@@ -92,7 +101,9 @@ export default function Contacts() {
         (c.nome_fantasia || '').toLowerCase().includes(q) ||
         (c.document || '').toLowerCase().includes(q);
       let matchesStatusCliente = true;
-      if (filterStatusCliente !== 'all') {
+      if (filterStatusCliente === CADASTRO_EM_ANDAMENTO) {
+        matchesStatusCliente = cadastroPendente.has(c.id);
+      } else if (filterStatusCliente !== 'all') {
         matchesStatusCliente = (c.status_cliente || '') === filterStatusCliente;
       }
       let matchesCategoria = true;
@@ -132,7 +143,7 @@ export default function Contacts() {
 
       return matchesSearch && matchesStatusCliente && matchesCategoria && matchesRegime && matchesResponsible && matchesResponsibleDp && matchesLetra && !isArchivedContact(c);
     }).sort((a, b) => getContactDisplayName(a).localeCompare(getContactDisplayName(b), 'pt-BR', { sensitivity: 'base' }));
-  }, [contacts, searchTerm, filterStatusCliente, filterCategoria, filterRegime, filterResponsible, filterResponsibleDp, filterLetra, transactions]);
+  }, [contacts, cadastroPendente, searchTerm, filterStatusCliente, filterCategoria, filterRegime, filterResponsible, filterResponsibleDp, filterLetra, transactions]);
 
   // Letras que existem entre os contatos não arquivados (as outras ficam apagadas na barra).
   const letrasComContato = useMemo(
@@ -271,7 +282,9 @@ export default function Contacts() {
     }
   };
 
-  const handleNew = () => { setEditingContact(undefined); setDialogOpen(true); };
+  // "Novo cadastro" pergunta o tipo: cliente (com CNPJ ou abertura) vai para o assistente do Super Perfil; fornecedor/outros, para o formulário simples.
+  const handleNew = () => setNovoClienteOpen(true);
+  const abrirFormularioSimples = () => { setEditingContact(undefined); setDialogOpen(true); };
   const goToProfile = (contact: Contact) => navigate(`/crm/cliente/${contact.id}`);
 
   if (isLoading) {
@@ -421,7 +434,7 @@ export default function Contacts() {
                 </ToggleGroup>
                 <Button className="gap-2" onClick={handleNew}>
                   <Plus className="w-4 h-4" />
-                  Novo Cliente/Fornecedor
+                  Novo cadastro
                 </Button>
               </div>
 
@@ -460,6 +473,8 @@ export default function Contacts() {
                     <SelectItem value="Suspensa - Receita Federal">Suspensa - Receita Federal</SelectItem>
                     <SelectItem value="Inapta - Receita Federal">Inapta - Receita Federal</SelectItem>
                     <SelectItem value="Cancelada - Receita Federal">Cancelada - Receita Federal</SelectItem>
+                    {/* Clientes do assistente de cadastro com etapa pendente ou pulada (17/10/2026) */}
+                    {cadastroPendente.size > 0 && <SelectItem value={CADASTRO_EM_ANDAMENTO}>Cadastro em andamento</SelectItem>}
                   </SelectContent>
                 </Select>
                 {mostrarCategoria && (
@@ -623,7 +638,7 @@ export default function Contacts() {
         title="Contatos."
       />
 
-      <Tabs defaultValue="todos" className="space-y-4">
+      <Tabs defaultValue={searchParams.get('aba') === 'interessados' ? 'interessados' : 'todos'} className="space-y-4">
         {/* Abas com underline e ícone, como no protótipo — não pills */}
         <TabsList className="h-auto w-full justify-start gap-1 rounded-none border-b border-line bg-transparent p-0">
           <TabsTrigger
@@ -639,6 +654,13 @@ export default function Contacts() {
           >
             <UserCheck className="h-4 w-4" strokeWidth={1.75} />
             Clientes ({clienteContacts.length})
+          </TabsTrigger>
+          <TabsTrigger
+            value="interessados"
+            className="h-11 gap-[7px] rounded-none border-b-2 border-transparent px-3.5 text-nav text-muted-ink data-[state=active]:border-ink data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-ink data-[state=active]:shadow-none"
+          >
+            <Target className="h-4 w-4" strokeWidth={1.75} />
+            Interessados
           </TabsTrigger>
           <TabsTrigger
             value="entrada-clientes"
@@ -678,6 +700,10 @@ export default function Contacts() {
           {renderLista(clienteContacts, false)}
         </TabsContent>
 
+        <TabsContent value="interessados">
+          <InteressadosTab />
+        </TabsContent>
+
         <TabsContent value="entrada-clientes">
           <EntradaClientesTab contacts={contacts} />
         </TabsContent>
@@ -695,6 +721,7 @@ export default function Contacts() {
         </TabsContent>
       </Tabs>
 
+      <NovoClienteDialog open={novoClienteOpen} onOpenChange={setNovoClienteOpen} onOutroContato={abrirFormularioSimples} />
       <ContactFormDialog open={dialogOpen} onOpenChange={setDialogOpen} contact={editingContact} onSubmit={handleSubmit} isLoading={createContact.isPending || updateContact.isPending} />
 
       {/* Bulk Edit Dialog */}
