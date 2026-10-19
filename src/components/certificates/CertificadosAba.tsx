@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { TABELA_ROLAVEL } from '@/components/monitor/MonitorUi';
 import { format } from 'date-fns';
 import {
-  Bell, Copy, Download, Eye, Loader2, MoreHorizontal, Pencil, Plus, RotateCw, Trash2,
+  ArrowDown, ArrowUp, ArrowUpDown, Bell, Copy, Download, Eye, Loader2, MoreHorizontal, Pencil, Plus, RotateCw, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -39,6 +39,7 @@ import { NotificarClienteDialog } from '@/components/certificates/NotificarClien
 
 type FiltroTipo = 'todos' | 'PJ' | 'PF';
 type FiltroModelo = 'todos' | 'A1' | 'A3';
+type OrdemCol = 'titular' | 'validade' | 'dias';
 
 /**
  * Aba Certificados da tela Procurações e Certificados (era a tela Cadastros > Certificados até 09/10/2026; `/cadastros/certificados`
@@ -54,6 +55,8 @@ export function CertificadosAba() {
   const [filtroModelo, setFiltroModelo] = useState<FiltroModelo>('todos');
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [filtroVencimento, setFiltroVencimento] = useState('todos');
+  // Sem clique no cabeçalho, a lista segue por vencimento mais próximo (o que a tela sempre fez).
+  const [ordem, setOrdem] = useState<{ col: OrdemCol; dir: 'asc' | 'desc' }>({ col: 'dias', dir: 'asc' });
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CertificateRow | null>(null);
@@ -89,8 +92,42 @@ export function CertificadosAba() {
         return diasParaVencer(c.data_validade) <= Number(filtroVencimento);
       })
       .filter((c) => !q || titularLabel(c).toLowerCase().includes(q))
-      .sort((a, b) => diasParaVencer(a.data_validade) - diasParaVencer(b.data_validade));
-  }, [certificates, busca, filtroTipo, filtroModelo, filtroStatus, filtroVencimento]);
+      .sort((a, b) => {
+        const sentido = ordem.dir === 'asc' ? 1 : -1;
+        if (ordem.col === 'titular') {
+          const porNome = titularLabel(a).localeCompare(titularLabel(b), 'pt-BR', { sensitivity: 'base' });
+          if (porNome) return porNome * sentido;
+        } else {
+          // Validade e Dias p/ vencer andam juntos (data maior = mais dias), então as duas colunas ordenam pela data.
+          const porData = a.data_validade.localeCompare(b.data_validade);
+          if (porData) return porData * sentido;
+        }
+        // Desempate fixo: vencimento mais próximo e depois o nome, para a ordem não embaralhar entre cliques.
+        return a.data_validade.localeCompare(b.data_validade) || titularLabel(a).localeCompare(titularLabel(b), 'pt-BR', { sensitivity: 'base' });
+      });
+  }, [certificates, busca, filtroTipo, filtroModelo, filtroStatus, filtroVencimento, ordem]);
+
+  const alternarOrdem = (col: OrdemCol) =>
+    setOrdem((o) => (o.col === col ? { col, dir: o.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' }));
+
+  /** Cabeçalho clicável: alterna crescente/decrescente; a seta mostra a ordem ativa. */
+  const CabecalhoOrdenavel = ({ col, children }: { col: OrdemCol; children: React.ReactNode }) => {
+    const ativa = ordem.col === col;
+    const Seta = !ativa ? ArrowUpDown : ordem.dir === 'asc' ? ArrowUp : ArrowDown;
+    return (
+      <TableHead aria-sort={ativa ? (ordem.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+        <button
+          type="button"
+          onClick={() => alternarOrdem(col)}
+          className="inline-flex items-center gap-1 hover:text-ink"
+          title={ativa && ordem.dir === 'asc' ? 'Ordenar do maior para o menor' : 'Ordenar do menor para o maior'}
+        >
+          {children}
+          <Seta className={cn('h-3 w-3', ativa ? 'text-ink' : 'text-muted-ink-2')} />
+        </button>
+      </TableHead>
+    );
+  };
 
   const handleNovo = () => { setEditing(null); setFormOpen(true); };
   const handleEditar = (c: CertificateRow) => { setEditing(c); setFormOpen(true); };
@@ -206,11 +243,11 @@ export function CertificadosAba() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Titular</TableHead>
+                <CabecalhoOrdenavel col="titular">Titular</CabecalhoOrdenavel>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Modelo</TableHead>
-                <TableHead>Validade</TableHead>
-                <TableHead>Dias p/ vencer</TableHead>
+                <CabecalhoOrdenavel col="validade">Validade</CabecalhoOrdenavel>
+                <CabecalhoOrdenavel col="dias">Dias p/ vencer</CabecalhoOrdenavel>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>

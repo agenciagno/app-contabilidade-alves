@@ -187,9 +187,22 @@ export function CertificateFormDialog({ open, onOpenChange, certificate }: Props
                       <CommandEmpty>Nenhuma empresa encontrada.</CommandEmpty>
                       <CommandGroup>
                         {contacts.map((c) => (
-                          <CommandItem key={c.id} value={c.display_name || c.name} onSelect={() => { setContactId(c.id); setEmpresaOpen(false); }}>
-                            <Check className={cn('mr-2 h-4 w-4', contactId === c.id ? 'opacity-100' : 'opacity-0')} />
-                            {c.display_name || c.name}
+                          // O valor do item é o que a busca compara: nome, razão social e CNPJ (com e sem pontuação). O id evita itens iguais.
+                          <CommandItem
+                            key={c.id}
+                            value={`${c.display_name || c.name} ${c.razao_social ?? ''} ${c.document ?? ''} ${(c.document ?? '').replace(/\D/g, '')} ${c.id}`}
+                            onSelect={() => { setContactId(c.id); setEmpresaOpen(false); }}
+                          >
+                            <Check className={cn('mr-2 h-4 w-4 shrink-0', contactId === c.id ? 'opacity-100' : 'opacity-0')} />
+                            <div className="min-w-0">
+                              <p className="truncate">{c.display_name || c.name}</p>
+                              {(c.razao_social || c.document) && (
+                                <p className="flex min-w-0 items-baseline gap-1.5 text-meta text-muted-ink-2">
+                                  {c.razao_social && <span className="truncate">{c.razao_social}</span>}
+                                  {c.document && <span className="shrink-0 font-mono">{c.document}</span>}
+                                </p>
+                              )}
+                            </div>
                           </CommandItem>
                         ))}
                       </CommandGroup>

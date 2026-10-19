@@ -123,7 +123,7 @@ export function useContactsForCertificado() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('contacts')
-        .select('id, name, display_name, document')
+        .select('id, name, display_name, razao_social, document')
         .eq('is_active', true)
         .order('name', { ascending: true });
       if (error) throw error;
