@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, User, Mail, Phone, Copy, Users, X, FileText, LayoutGrid, List, Pencil, Trash2, Building2, CalendarDays, FolderOpen, UserCheck, Target } from 'lucide-react';
+import { Plus, Search, User, Mail, Phone, Copy, Users, X, FileText, LayoutGrid, List, Pencil, Trash2, Building2, CalendarDays, FolderOpen, UserCheck, Target, ExternalLink } from 'lucide-react';
 import { useContacts, Contact, ContactInsert, TAX_REGIME_LABELS } from '@/hooks/useContacts';
 import { useTeamProfiles } from '@/hooks/useTeamProfiles';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -28,6 +28,7 @@ import { maskPhone } from '@/lib/utils';
 import { getContactDisplayName } from '@/lib/contact-display';
 import { useAllFiscalProfiles } from '@/hooks/useCollaboratorCoverage';
 import { EmpresaCard } from '@/components/contacts/EmpresaCard';
+import { AbrirContatoMenu, abrirPerfisEmNovasAbas } from '@/components/contacts/AbrirContatoMenu';
 import { PageHeader } from '@/components/ds';
 
 
@@ -328,6 +329,8 @@ export default function Contacts() {
   const ContactCard = ({ contact }: { contact: Contact }) => {
     const responsavel = fiscalProfiles.find(p => p.id === contact.responsible_id)?.full_name;
     return (
+      <AbrirContatoMenu contactId={contact.id} selectedIds={selectedIds} onAbrir={() => goToProfile(contact)}>
+      <div className="contents">
       <EmpresaCard
         nome={getContactDisplayName(contact)}
         razaoSocial={contact.razao_social}
@@ -343,6 +346,8 @@ export default function Contacts() {
           copyToClipboard(getContactDisplayName(contact), 'Nome');
         }}
       />
+      </div>
+      </AbrirContatoMenu>
     );
   };
 
@@ -356,8 +361,8 @@ export default function Contacts() {
       {list.map(contact => {
         const { isInadimplente } = getFinancialStatus(contact.id);
         return (
+          <AbrirContatoMenu key={contact.id} contactId={contact.id} selectedIds={selectedIds} onAbrir={() => goToProfile(contact)}>
           <TableRow
-            key={contact.id}
             className={`cursor-pointer hover:bg-muted/40 ${!contact.is_active ? 'opacity-60' : ''}`}
             onClick={() => goToProfile(contact)}
           >
@@ -412,6 +417,7 @@ export default function Contacts() {
               />
             </TableCell>
           </TableRow>
+          </AbrirContatoMenu>
         );
       })}
     </>
@@ -572,6 +578,10 @@ export default function Contacts() {
               {canBulkAction && selectedIds.length > 0 && (
                 <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
                   <span className="text-sm font-medium text-foreground">{selectedIds.length} selecionado(s)</span>
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => abrirPerfisEmNovasAbas(selectedIds)}>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Abrir em novas abas
+                  </Button>
                   <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setBulkEditOpen(true)}>
                     <Pencil className="w-3.5 h-3.5" />
                     Editar Selecionados
