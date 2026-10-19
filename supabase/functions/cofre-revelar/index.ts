@@ -46,7 +46,10 @@ serve(async (req) => {
 
     if (!profile) throw new Error("Perfil não encontrado.");
 
-    const hasAcessosModule = Array.isArray(profile.allowed_modules) && profile.allowed_modules.includes("acessos");
+    // Vale quem vê o Cofre global (`acessos`) ou a aba Acessos do perfil do cliente
+    // (`perfil_cliente_acessos`) — a aba mostra o botão de ver/copiar para a equipe toda.
+    const modulos: string[] = Array.isArray(profile.allowed_modules) ? profile.allowed_modules : [];
+    const hasAcessosModule = modulos.includes("acessos") || modulos.includes("perfil_cliente_acessos");
     if (!profile.is_super_admin && profile.role !== "admin" && !hasAcessosModule) {
       throw new Error("Você não tem permissão para revelar senhas do cofre.");
     }
