@@ -39,7 +39,7 @@ serve(async (req) => {
     const { data: { user }, error: userErr } = await supabaseUser.auth.getUser();
     if (userErr || !user) throw new Error("Sessão inválida.");
 
-    const { data: profile } = await perfilAtivo(authHeader, user.id, "id, role, is_super_admin, company_id, allowed_modules");
+    const { data: profile } = await perfilAtivo(authHeader, user.id, "id, full_name, role, is_super_admin, company_id, allowed_modules");
     if (!profile) throw new Error("Perfil não encontrado.");
 
     const hasCadastroModule = Array.isArray(profile.allowed_modules) && profile.allowed_modules.includes("cadastro");
@@ -76,15 +76,18 @@ serve(async (req) => {
     );
     if (decryptErr) throw new Error("Falha ao descriptografar: " + decryptErr.message);
 
-    // Reaproveita o log de auditoria do Cofre (mesma tabela, sem FK rígida a acessos_portais).
-    await supabaseAdmin.from("cofre_acessos_log").insert({
-      acesso_id: certificate_id,
+    // Reaproveita o log de auditoria do Cofre. acesso_id tem FK para acessos_portais,
+    // então o certificado vai em certificate_id (antes ia em acesso_id e o insert falhava calado).
+    const { error: logErr } = await supabaseAdmin.from("cofre_acessos_log").insert({
+      certificate_id,
       contact_id: certificado.contact_id,
       portal: "certificado_cadastro",
       usuario_id: user.id,
-      usuario_nome: profile.id,
+      usuario_nome: profile.full_name ?? profile.id,
       acao: acao === "COPIAR" ? "COPIAR" : "REVELAR",
+      ip_address: req.headers.get("x-forwarded-for") ?? null,
     });
+    if (logErr) console.error("cofre_acessos_log:", logErr.message);
 
     return new Response(
       JSON.stringify({ success: true, senha: decrypted }),

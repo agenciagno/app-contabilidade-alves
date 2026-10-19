@@ -42,7 +42,7 @@ serve(async (req) => {
     const { data: { user }, error: userErr } = await supabaseUser.auth.getUser();
     if (userErr || !user) throw new Error("Sessão inválida.");
 
-    const { data: profile } = await perfilAtivo(authHeader, user.id, "id, role, is_super_admin, company_id, allowed_modules");
+    const { data: profile } = await perfilAtivo(authHeader, user.id, "id, full_name, role, is_super_admin, company_id, allowed_modules");
 
     if (!profile) throw new Error("Perfil não encontrado.");
 
@@ -85,13 +85,17 @@ serve(async (req) => {
 
     if (decryptErr) throw new Error("Falha ao descriptografar: " + decryptErr.message);
 
-    await supabaseAdmin.from("cofre_acessos_log").insert({
+    // Auditoria: não bloqueia a senha, mas a falha aparece no log da function (antes era engolida e nada gravava).
+    const { error: logErr } = await supabaseAdmin.from("cofre_acessos_log").insert({
       acesso_id,
+      contact_id: acesso.contact_id,
+      portal: acesso.portal,
       usuario_id: user.id,
-      usuario_nome: profile.id,
+      usuario_nome: profile.full_name ?? profile.id,
       acao: acao === "COPIAR" ? "COPIAR" : "REVELAR",
       ip_address: req.headers.get("x-forwarded-for") ?? null,
     });
+    if (logErr) console.error("cofre_acessos_log:", logErr.message);
 
     return new Response(
       JSON.stringify({ success: true, senha: decrypted }),
