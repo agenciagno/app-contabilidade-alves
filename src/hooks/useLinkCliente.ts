@@ -30,6 +30,8 @@ export interface DocumentoCliente {
   arquivos: ArquivoDocumento[];
 }
 
+interface ListaPadrao { temFuncionarios: boolean; fluxo: 'cnpj_existente' | 'abertura'; regime: string | null }
+
 export const BUCKET_ONBOARDING = 'onboarding-documentos';
 export const urlDoLink = (token: string) => `${window.location.origin}/c/${token}`;
 
@@ -72,33 +74,60 @@ export function useLinkCliente(contactId: string) {
     queryClient.invalidateQueries({ queryKey: chaveDocs });
   };
 
-  /** Cria o link e copia a lista padrão filtrada para o cliente. */
+  /** Copia a lista padrão (Tech → Onboarding) filtrada por fluxo, regime e funcionários para o fim da lista do cliente. */
+  const copiarListaPadrao = async ({ temFuncionarios, fluxo, regime }: ListaPadrao) => {
+    const { data: modelos, error: e1 } = await supabase
+      .from('onboarding_documentos_modelo')
+      .select('id, titulo, descricao, so_com_funcionarios, regimes, ordem')
+      .eq('company_id', activeCompanyId!)
+      .eq('fluxo', fluxo)
+      .eq('ativo', true)
+      .order('ordem');
+    if (e1) throw e1;
+    const lista = (modelos ?? []).filter(m =>
+      (!m.so_com_funcionarios || temFuncionarios) && (!m.regimes?.length || (regime && m.regimes.includes(regime))));
+    if (lista.length) {
+      const inicio = documentos.at(-1)?.ordem ?? 0;
+      const { error: e3 } = await supabase.from('onboarding_documentos').insert(lista.map((m, i) => ({
+        company_id: activeCompanyId!, contact_id: contactId, modelo_id: m.id, titulo: m.titulo, descricao: m.descricao, ordem: inicio + i + 1,
+      })));
+      if (e3) throw e3;
+    }
+    return lista.length;
+  };
+
+  /**
+   * Cria o link. Cliente novo: com a lista de documentos (boas-vindas liberadas depois). Cliente que já é da CA (`soBoasVindas`):
+   * sem documentos e com as boas-vindas já liberadas (20/10/2026, pedido de Gabriel).
+   */
   const gerar = useMutation({
-    mutationFn: async ({ temFuncionarios, fluxo, regime }: { temFuncionarios: boolean; fluxo: 'cnpj_existente' | 'abertura'; regime: string | null }) => {
-      const { data: modelos, error: e1 } = await supabase
-        .from('onboarding_documentos_modelo')
-        .select('id, titulo, descricao, so_com_funcionarios, regimes, ordem')
-        .eq('company_id', activeCompanyId!)
-        .eq('fluxo', fluxo)
-        .eq('ativo', true)
-        .order('ordem');
-      if (e1) throw e1;
-      const lista = (modelos ?? []).filter(m =>
-        (!m.so_com_funcionarios || temFuncionarios) && (!m.regimes?.length || (regime && m.regimes.includes(regime))));
+    mutationFn: async ({ soBoasVindas, ...lista }: ListaPadrao & { soBoasVindas?: boolean }) => {
       const { error: e2 } = await supabase.from('onboarding_links').insert({
-        company_id: activeCompanyId!, contact_id: contactId, token: novoToken(), tem_funcionarios: temFuncionarios,
+        company_id: activeCompanyId!, contact_id: contactId, token: novoToken(), tem_funcionarios: lista.temFuncionarios,
+        ...(soBoasVindas ? { boas_vindas_liberada: true, prazo_envio: null } : {}),
       });
       if (e2) throw e2;
-      if (lista.length) {
-        const { error: e3 } = await supabase.from('onboarding_documentos').insert(lista.map((m, i) => ({
-          company_id: activeCompanyId!, contact_id: contactId, modelo_id: m.id, titulo: m.titulo, descricao: m.descricao, ordem: i + 1,
-        })));
-        if (e3) throw e3;
-      }
-      return lista.length;
+      return soBoasVindas ? null : await copiarListaPadrao(lista);
     },
-    onSuccess: n => { recarregar(); toast.success(`Link criado com ${n} documento(s)`); },
+    onSuccess: n => {
+      recarregar();
+      toast.success(n === null ? 'Link de boas-vindas criado' : `Link criado com ${n} documento(s)`);
+    },
     onError: (e: Error) => toast.error('Erro ao criar o link', { description: e.message }),
+  });
+
+  /** Link já existente sem documentos (só boas-vindas): passa a pedir a lista padrão. */
+  const incluirListaPadrao = useMutation({
+    mutationFn: async (lista: ListaPadrao) => {
+      const n = await copiarListaPadrao(lista);
+      const { error } = await supabase.from('onboarding_links')
+        .update({ tem_funcionarios: lista.temFuncionarios, prazo_envio: new Date(Date.now() + 60 * 864e5).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }), updated_at: new Date().toISOString() })
+        .eq('contact_id', contactId);
+      if (error) throw error;
+      return n;
+    },
+    onSuccess: n => { recarregar(); toast.success(`${n} documento(s) incluídos no link`); },
+    onError: (e: Error) => toast.error('Erro ao incluir a lista', { description: e.message }),
   });
 
   const atualizarLink = useMutation({
@@ -144,5 +173,5 @@ export function useLinkCliente(contactId: string) {
     window.open(data.signedUrl, '_blank', 'noopener');
   };
 
-  return { link, documentos, isLoading, gerar, atualizarLink, atualizarDocumento, adicionarDocumento, baixar };
+  return { link, documentos, isLoading, gerar, incluirListaPadrao, atualizarLink, atualizarDocumento, adicionarDocumento, baixar };
 }

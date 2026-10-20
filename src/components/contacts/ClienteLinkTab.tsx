@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Check, Copy, ExternalLink, FileDown, Link2, Loader2, MessageCircle, Plus, RotateCcw, Undo2 } from 'lucide-react';
+import { Check, Copy, ExternalLink, FileDown, Link2, ListPlus, Loader2, MessageCircle, Plus, RotateCcw, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,8 @@ import { Contact } from '@/hooks/useContacts';
 import { DocumentoCliente, urlDoLink, useLinkCliente } from '@/hooks/useLinkCliente';
 import { linkWhatsapp } from '@/hooks/useInteressados';
 import { getContactDisplayName } from '@/lib/contact-display';
+import { useOnboardingCadastro } from '@/hooks/useOnboardingCadastro';
+import { cn } from '@/lib/utils';
 
 const STATUS: Record<DocumentoCliente['status'], { rotulo: string; tom: 'neutral' | 'info' | 'ok' | 'warn' }> = {
   pendente: { rotulo: 'Falta enviar', tom: 'warn' },
@@ -26,40 +28,73 @@ const STATUS: Record<DocumentoCliente['status'], { rotulo: string; tom: 'neutral
  * acompanha o que chegou (baixar, aprovar, pedir de novo, dispensar) e libera as boas-vindas quando o cadastro estiver pronto.
  */
 export function ClienteLinkTab({ contact }: { contact: Contact }) {
-  const { link, documentos, isLoading, gerar, atualizarLink, atualizarDocumento, adicionarDocumento, baixar } = useLinkCliente(contact.id);
+  const { link, documentos, isLoading, gerar, incluirListaPadrao, atualizarLink, atualizarDocumento, adicionarDocumento, baixar } = useLinkCliente(contact.id);
+  // Cliente cadastrado pelo assistente = cliente novo (pede documentos). Cadastro antigo = já é da CA (só boas-vindas). Dá para trocar.
+  const { temOnboarding, isLoading: carregandoOnboarding } = useOnboardingCadastro(contact.id);
+  const [modoEscolhido, setModoEscolhido] = useState<'documentos' | 'boas_vindas' | null>(null);
+  const modo = modoEscolhido ?? (temOnboarding ? 'documentos' : 'boas_vindas');
   const [temFuncionarios, setTemFuncionarios] = useState(false);
   const [novoDoc, setNovoDoc] = useState('');
   const fluxo = contact.tipo_cliente === 'Em processo de abertura' ? 'abertura' : 'cnpj_existente';
   const nome = getContactDisplayName(contact);
 
-  if (isLoading) return <Skeleton className="h-64 w-full" />;
+  if (isLoading || carregandoOnboarding) return <Skeleton className="h-64 w-full" />;
 
   if (!link) {
+    const Opcao = ({ valor, titulo, texto }: { valor: 'documentos' | 'boas_vindas'; titulo: string; texto: string }) => (
+      <button
+        type="button"
+        onClick={() => setModoEscolhido(valor)}
+        aria-pressed={modo === valor}
+        className={cn(
+          'flex-1 rounded-lg border p-3 text-left transition-colors',
+          modo === valor ? 'border-action bg-action-tint' : 'border-line bg-paper hover:border-action',
+        )}
+      >
+        <span className="block text-[14px] font-semibold text-ink">{titulo}</span>
+        <span className="block text-[13px] text-muted-ink">{texto}</span>
+      </button>
+    );
     return (
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Link2 className="h-4 w-4" /> Link do cliente</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <p className="text-[14px] text-ink">
-            Um link só deste cliente, com a lista de documentos para ele enviar pelo celular. Depois, o mesmo link mostra as boas-vindas:
+            Um link só deste cliente. Pode levar a lista de documentos para ele enviar pelo celular e, depois, as boas-vindas:
             quem cuida da empresa, impostos do regime, o que ele recebe todo mês e o honorário.
           </p>
-          <div className="flex flex-wrap items-center gap-2 text-[13px]">
-            <span className="text-muted-ink">Lista usada:</span>
-            <DsBadge tone={fluxo === 'abertura' ? 'warn' : 'info'}>{fluxo === 'abertura' ? 'Abertura de empresa' : 'Cliente com CNPJ'}</DsBadge>
-            {contact.tax_regime && <span className="text-muted-ink">· filtrada pelo regime do cadastro</span>}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Opcao valor="documentos" titulo="Cliente novo" texto="Lista de documentos agora; boas-vindas quando o cadastro estiver pronto." />
+            <Opcao valor="boas_vindas" titulo="Já é nosso cliente" texto="Só as boas-vindas, sem pedir documentos. Já abre liberado." />
           </div>
-          <label className="flex max-w-md items-center justify-between gap-3 rounded-md border border-line p-3 text-[14px]">
-            <span>A empresa tem funcionários?</span>
-            <Switch checked={temFuncionarios} onCheckedChange={setTemFuncionarios} />
-          </label>
+
+          {modo === 'documentos' ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2 text-[13px]">
+                <span className="text-muted-ink">Lista usada:</span>
+                <DsBadge tone={fluxo === 'abertura' ? 'warn' : 'info'}>{fluxo === 'abertura' ? 'Abertura de empresa' : 'Cliente com CNPJ'}</DsBadge>
+                {contact.tax_regime && <span className="text-muted-ink">· filtrada pelo regime do cadastro</span>}
+              </div>
+              <label className="flex max-w-md items-center justify-between gap-3 rounded-md border border-line p-3 text-[14px]">
+                <span>A empresa tem funcionários?</span>
+                <Switch checked={temFuncionarios} onCheckedChange={setTemFuncionarios} />
+              </label>
+            </>
+          ) : (
+            <p className="text-[13px] text-muted-ink">
+              Confira antes regime, responsáveis, tarefas e honorário no cadastro: é deles que a página monta o resumo.
+              Se depois precisar pedir documentos, dá para incluir a lista no mesmo link.
+            </p>
+          )}
+
           <Button
             className="gap-2" disabled={gerar.isPending}
-            onClick={() => gerar.mutate({ temFuncionarios, fluxo, regime: contact.tax_regime })}
+            onClick={() => gerar.mutate({ temFuncionarios, fluxo, regime: contact.tax_regime, soBoasVindas: modo === 'boas_vindas' })}
           >
             {gerar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-            Gerar link e lista de documentos
+            {modo === 'documentos' ? 'Gerar link e lista de documentos' : 'Gerar link de boas-vindas'}
           </Button>
-          <p className="text-meta text-muted-ink">A lista padrão é editada em Tech → Onboarding.</p>
+          <p className="text-meta text-muted-ink">A lista padrão e os textos são editados em Tech → Onboarding.</p>
         </CardContent>
       </Card>
     );
@@ -107,6 +142,7 @@ export function ClienteLinkTab({ contact }: { contact: Contact }) {
           )}
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {documentos.length > 0 && (
             <div className="space-y-1.5">
               <Label>Prazo para enviar documentos</Label>
               <Input
@@ -115,6 +151,7 @@ export function ClienteLinkTab({ contact }: { contact: Contact }) {
               />
               <p className="text-meta text-muted-ink">Depois do prazo o cliente ainda vê a página, mas não envia arquivos.</p>
             </div>
+            )}
             <label className="flex items-start justify-between gap-3 rounded-md border border-line p-3">
               <span className="space-y-0.5">
                 <span className="block text-[14px] font-medium text-ink">Mostrar boas-vindas ao cliente</span>
@@ -140,6 +177,37 @@ export function ClienteLinkTab({ contact }: { contact: Contact }) {
         </CardContent>
       </Card>
 
+      {documentos.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+            <div className="space-y-0.5">
+              <p className="text-[14px] font-medium text-ink">Este link não pede documentos</p>
+              <p className="text-meta text-muted-ink">O cliente vê só as boas-vindas. Precisa de algum documento? Inclua a lista ou um item avulso.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-[13px]">
+                <Switch checked={temFuncionarios} onCheckedChange={setTemFuncionarios} /> Tem funcionários
+              </label>
+              <Button
+                variant="outline" size="sm" className="gap-1.5" disabled={incluirListaPadrao.isPending}
+                onClick={() => incluirListaPadrao.mutate({ temFuncionarios, fluxo, regime: contact.tax_regime })}
+              >
+                {incluirListaPadrao.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListPlus className="h-4 w-4" />}
+                Incluir lista padrão
+              </Button>
+            </div>
+            <div className="flex w-full gap-2">
+              <Input value={novoDoc} onChange={e => setNovoDoc(e.target.value)} placeholder="Ou pedir um documento só para este cliente" />
+              <Button
+                variant="outline" className="gap-1.5" disabled={!novoDoc.trim() || adicionarDocumento.isPending}
+                onClick={() => adicionarDocumento.mutate({ titulo: novoDoc.trim() }, { onSuccess: () => setNovoDoc('') })}
+              >
+                <Plus className="h-4 w-4" /> Adicionar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
           <CardTitle className="text-base">Documentos · {recebidos} de {ativos.length} recebidos{conferir > 0 ? ` · ${conferir} para conferir` : ''}</CardTitle>
@@ -210,6 +278,7 @@ export function ClienteLinkTab({ contact }: { contact: Contact }) {
           </div>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }
