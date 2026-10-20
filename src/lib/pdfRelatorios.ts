@@ -392,6 +392,75 @@ export async function gerarPdfFaturamento(
   return doc.output('arraybuffer');
 }
 
+// ---------------------------------------------------------------- Lista de documentos do cliente novo (20/10/2026)
+export interface PdfDocumentosCliente {
+  cliente: string;
+  abertura: boolean;
+  documentos: { titulo: string; descricao: string | null }[];
+  intro: string;
+  link: string | null;
+  prazo: string | null;
+  contato: string;
+}
+
+/**
+ * "Documentos que precisamos": a lista do cliente (cópia do padrão de Tech → Onboarding, já filtrada), com caixas para marcar,
+ * o link para enviar pelo celular e o contato do escritório. Para baixar e mandar junto com o link.
+ */
+export async function gerarPdfDocumentos(d: PdfDocumentosCliente, geradoEm: string, logo?: string): Promise<ArrayBuffer> {
+  const { doc } = await novoDoc();
+  let y = cabecalho(doc, d.abertura ? 'Documentos para abertura de empresa' : 'Documentos para começarmos', geradoEm, logo);
+
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(16); cor(doc, INK);
+  const nome = doc.splitTextToSize(d.cliente, LARGURA) as string[];
+  doc.text(nome, M, y);
+  y += nome.length * 6.5 + 1;
+  if (d.intro) y = paragrafo(doc, d.intro, y, 9.5, MUTED) + 3;
+
+  const novaPaginaSe = (altura: number) => {
+    if (y + altura > 278) { doc.addPage(); y = 20; }
+  };
+
+  d.documentos.forEach((item, i) => {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    const desc = item.descricao ? (doc.splitTextToSize(item.descricao, LARGURA - 10) as string[]) : [];
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
+    const tit = doc.splitTextToSize(`${i + 1}. ${item.titulo}`, LARGURA - 10) as string[];
+    const altura = tit.length * 5 + desc.length * 4 + 5;
+    novaPaginaSe(altura);
+    doc.setDrawColor(MUTED[0], MUTED[1], MUTED[2]); doc.setLineWidth(0.35);
+    doc.rect(M, y - 3.6, 4.2, 4.2); // caixa para o cliente marcar
+    cor(doc, INK); doc.text(tit, M + 8, y);
+    y += tit.length * 5;
+    if (desc.length) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); cor(doc, MUTED);
+      doc.text(desc, M + 8, y - 0.5);
+      y += desc.length * 4;
+    }
+    doc.setDrawColor(LINE[0], LINE[1], LINE[2]); doc.setLineWidth(0.2); doc.line(M, y + 0.5, 210 - M, y + 0.5);
+    y += 5.5;
+  });
+
+  if (d.link) {
+    novaPaginaSe(30);
+    y += 2;
+    fundo(doc, BG2); doc.roundedRect(M, y, LARGURA, d.prazo ? 24 : 19, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); cor(doc, INK);
+    doc.text('Envie os documentos pelo celular, neste link:', M + 5, y + 7);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); cor(doc, ACTION);
+    doc.textWithLink(d.link, M + 5, y + 13, { url: d.link });
+    if (d.prazo) {
+      cor(doc, MUTED); doc.setFontSize(8.5);
+      doc.text(`Prazo para envio: ${dataBR(d.prazo)}. Pode mandar foto ou PDF de cada item.`, M + 5, y + 19);
+    }
+    y += (d.prazo ? 24 : 19) + 6;
+  }
+
+  if (d.contato) { novaPaginaSe(14); paragrafo(doc, d.contato, y, 8.5, MUTED); }
+  rodape(doc, 'Contabilidade Alves · Juatuba/MG · Lista de documentos');
+  return doc.output('arraybuffer');
+}
+
 /** Baixa o PDF no navegador. */
 export function baixarPdf(bytes: ArrayBuffer, nome: string) {
   const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));

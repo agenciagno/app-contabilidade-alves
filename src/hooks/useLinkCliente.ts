@@ -14,6 +14,9 @@ export interface LinkCliente {
   prazo_envio: string | null;
   boas_vindas_liberada: boolean;
   revogado_em: string | null;
+  /** Mensagem de envio só deste cliente (nulo = modelo padrão de Tech → Onboarding). */
+  mensagem_assunto: string | null;
+  mensagem_texto: string | null;
   created_at: string;
 }
 
@@ -48,7 +51,7 @@ export function useLinkCliente(contactId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('onboarding_links')
-        .select('id, token, tem_funcionarios, prazo_envio, boas_vindas_liberada, revogado_em, created_at')
+        .select('id, token, tem_funcionarios, prazo_envio, boas_vindas_liberada, revogado_em, created_at, mensagem_assunto, mensagem_texto')
         .eq('contact_id', contactId)
         .maybeSingle();
       if (error) throw error;
@@ -131,7 +134,7 @@ export function useLinkCliente(contactId: string) {
   });
 
   const atualizarLink = useMutation({
-    mutationFn: async (campos: Partial<Pick<LinkCliente, 'prazo_envio' | 'boas_vindas_liberada' | 'tem_funcionarios'>> & { revogar?: boolean; trocarToken?: boolean }) => {
+    mutationFn: async (campos: Partial<Pick<LinkCliente, 'prazo_envio' | 'boas_vindas_liberada' | 'tem_funcionarios' | 'mensagem_assunto' | 'mensagem_texto'>> & { revogar?: boolean; trocarToken?: boolean }) => {
       const { revogar, trocarToken, ...resto } = campos;
       const update: Record<string, unknown> = { ...resto, updated_at: new Date().toISOString() };
       if (revogar) update.revogado_em = new Date().toISOString();

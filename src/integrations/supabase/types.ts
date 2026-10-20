@@ -1899,9 +1899,11 @@ export type Database = {
         Row: {
           acao: string | null
           acesso_id: string | null
+          certificate_id: string | null
           contact_id: string | null
           created_at: string
           id: string
+          ip_address: string | null
           portal: string | null
           usuario_id: string | null
           usuario_nome: string | null
@@ -1909,9 +1911,11 @@ export type Database = {
         Insert: {
           acao?: string | null
           acesso_id?: string | null
+          certificate_id?: string | null
           contact_id?: string | null
           created_at?: string
           id?: string
+          ip_address?: string | null
           portal?: string | null
           usuario_id?: string | null
           usuario_nome?: string | null
@@ -1919,9 +1923,11 @@ export type Database = {
         Update: {
           acao?: string | null
           acesso_id?: string | null
+          certificate_id?: string | null
           contact_id?: string | null
           created_at?: string
           id?: string
+          ip_address?: string | null
           portal?: string | null
           usuario_id?: string | null
           usuario_nome?: string | null
@@ -1940,6 +1946,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_cofre_global"
             referencedColumns: ["acesso_id"]
+          },
+          {
+            foreignKeyName: "cofre_acessos_log_certificate_id_fkey"
+            columns: ["certificate_id"]
+            isOneToOne: false
+            referencedRelation: "certificates"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "cofre_acessos_log_contact_id_fkey"
@@ -4971,6 +4984,8 @@ export type Database = {
           created_at: string
           criado_por: string | null
           id: string
+          mensagem_assunto: string | null
+          mensagem_texto: string | null
           prazo_envio: string | null
           revogado_em: string | null
           tem_funcionarios: boolean
@@ -4984,6 +4999,8 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           id?: string
+          mensagem_assunto?: string | null
+          mensagem_texto?: string | null
           prazo_envio?: string | null
           revogado_em?: string | null
           tem_funcionarios?: boolean
@@ -4997,6 +5014,8 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           id?: string
+          mensagem_assunto?: string | null
+          mensagem_texto?: string | null
           prazo_envio?: string | null
           revogado_em?: string | null
           tem_funcionarios?: boolean

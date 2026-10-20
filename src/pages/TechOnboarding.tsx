@@ -166,6 +166,7 @@ function Textos() {
     { titulo: 'Depois · boas-vindas', itens: textos.filter(t => t.chave.startsWith('pos_') || t.chave === 'contato_escritorio') },
     { titulo: 'Impostos por regime', itens: textos.filter(t => t.chave.startsWith('imposto_')) },
     { titulo: 'Reforma Tributária por regime', itens: textos.filter(t => t.chave.startsWith('rt_')) },
+    { titulo: 'Mensagem de envio do link (e-mail e WhatsApp)', ajuda: '{nome}, {link} e {prazo} são trocados pelos dados do cliente. No Super Perfil dá para personalizar a mensagem só para um cliente.', itens: textos.filter(t => t.chave.startsWith('msg_')) },
   ]), [textos]);
   const pendentes = textos.filter(t => /\[[^\]]+\]/.test(t.conteudo)).length;
   return (
@@ -176,6 +177,7 @@ function Textos() {
       {grupos.map(g => (
         <section key={g.titulo} className="space-y-2">
           <h2 className="text-[15px] font-semibold text-ink">{g.titulo}</h2>
+          {'ajuda' in g && g.ajuda && <p className="text-[13px] text-muted-ink">{g.ajuda}</p>}
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
             {g.itens.map(t => (
               <EditorTexto key={t.id} texto={t} salvando={salvar.isPending} onSalvar={conteudo => salvar.mutate({ id: t.id, conteudo })} />

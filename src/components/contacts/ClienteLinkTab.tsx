@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Check, Copy, ExternalLink, FileDown, Link2, ListPlus, Loader2, MessageCircle, Plus, RotateCcw, Undo2 } from 'lucide-react';
+import { Check, Copy, ExternalLink, FileDown, FileText, Link2, ListPlus, Loader2, MessageCircle, Plus, RotateCcw, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,9 @@ import { linkWhatsapp } from '@/hooks/useInteressados';
 import { getContactDisplayName } from '@/lib/contact-display';
 import { useOnboardingCadastro } from '@/hooks/useOnboardingCadastro';
 import { cn } from '@/lib/utils';
+import { useTextosOnboarding } from '@/hooks/useOnboardingConteudo';
+import { baixarPdf, carregarLogo, gerarPdfDocumentos } from '@/lib/pdfRelatorios';
+import { MensagemLinkCliente } from './MensagemLinkCliente';
 
 const STATUS: Record<DocumentoCliente['status'], { rotulo: string; tom: 'neutral' | 'info' | 'ok' | 'warn' }> = {
   pendente: { rotulo: 'Falta enviar', tom: 'warn' },
@@ -34,6 +37,9 @@ export function ClienteLinkTab({ contact }: { contact: Contact }) {
   const [modoEscolhido, setModoEscolhido] = useState<'documentos' | 'boas_vindas' | null>(null);
   const modo = modoEscolhido ?? (temOnboarding ? 'documentos' : 'boas_vindas');
   const [temFuncionarios, setTemFuncionarios] = useState(false);
+  const { textos } = useTextosOnboarding();
+  const texto = (chave: string) => textos.find(t => t.chave === chave)?.conteudo ?? '';
+  const [gerandoPdf, setGerandoPdf] = useState(false);
   const [novoDoc, setNovoDoc] = useState('');
   const fluxo = contact.tipo_cliente === 'Em processo de abertura' ? 'abertura' : 'cnpj_existente';
   const nome = getContactDisplayName(contact);
@@ -105,12 +111,33 @@ export function ClienteLinkTab({ contact }: { contact: Contact }) {
   const recebidos = ativos.filter(d => d.status === 'enviado' || d.status === 'aprovado').length;
   const conferir = documentos.filter(d => d.status === 'enviado').length;
   const pendentes = ativos.filter(d => d.status === 'pendente');
-  const mensagem = link.boas_vindas_liberada
-    ? `Olá, ${nome}! Aqui está o seu link da Contabilidade Alves, com tudo sobre a nossa parceria: ${url}`
-    : `Olá, ${nome}! Para começarmos, separe os documentos desta lista e envie por este link, direto do celular: ${url}`;
-  const whats = linkWhatsapp(contact.whatsapp || contact.phone, mensagem);
   const cobrar = linkWhatsapp(contact.whatsapp || contact.phone,
     `Olá, ${nome}! Ainda faltam alguns documentos: ${pendentes.map(d => d.titulo).join('; ')}. Pode enviar por aqui: ${url}`);
+
+  const baixarPdfDocumentos = async () => {
+    setGerandoPdf(true);
+    try {
+      const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      const bytes = await gerarPdfDocumentos({
+        cliente: nome,
+        abertura: fluxo === 'abertura',
+        documentos: ativos.map(d => ({ titulo: d.titulo, descricao: d.descricao })),
+        // O texto da página fala em "botão ao lado"; no papel a orientação é outra.
+        intro: link.revogado_em
+          ? 'Separe os documentos abaixo e envie para a Contabilidade Alves: pode ser foto tirada pelo celular ou PDF.'
+          : 'Separe os documentos abaixo e envie pelo link no fim desta página: pode ser foto tirada pelo celular ou PDF. Marque cada item conforme for enviando.',
+        link: link.revogado_em ? null : url,
+        prazo: link.prazo_envio,
+        contato: texto('contato_escritorio'),
+      }, hoje, await carregarLogo());
+      const arquivo = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
+      baixarPdf(bytes, `documentos-${arquivo || 'cliente'}.pdf`);
+    } catch (e) {
+      toast.error('Não foi possível gerar o PDF', { description: (e as Error)?.message });
+    } finally {
+      setGerandoPdf(false);
+    }
+  };
 
   const copiar = async () => {
     try { await navigator.clipboard.writeText(url); toast.success('Link copiado'); } catch { toast.error('Não foi possível copiar'); }
@@ -133,11 +160,12 @@ export function ClienteLinkTab({ contact }: { contact: Contact }) {
                 <Input readOnly value={url} className="min-w-[260px] flex-1 font-mono text-[13px]" onFocus={e => e.currentTarget.select()} />
                 <Button variant="outline" className="gap-1.5" onClick={copiar}><Copy className="h-4 w-4" /> Copiar</Button>
                 <Button variant="outline" className="gap-1.5" onClick={() => window.open(url, '_blank', 'noopener')}><ExternalLink className="h-4 w-4" /> Abrir</Button>
-                {whats && (
-                  <Button className="gap-1.5" onClick={() => window.open(whats, '_blank', 'noopener')}><MessageCircle className="h-4 w-4" /> Enviar no WhatsApp</Button>
+                {ativos.length > 0 && (
+                  <Button variant="outline" className="gap-1.5" disabled={gerandoPdf} onClick={baixarPdfDocumentos}>
+                    {gerandoPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Baixar PDF da lista
+                  </Button>
                 )}
               </div>
-              {!whats && <p className="text-meta text-muted-ink">Cadastre o WhatsApp do cliente para enviar com um clique.</p>}
             </>
           )}
 
@@ -176,6 +204,23 @@ export function ClienteLinkTab({ contact }: { contact: Contact }) {
           )}
         </CardContent>
       </Card>
+
+      {!link.revogado_em && (
+        <MensagemLinkCliente
+          contactId={contact.id}
+          nome={nome}
+          email={contact.email}
+          link={link}
+          url={url}
+          temDocumentosPendentes={pendentes.length > 0}
+          modeloAssunto={texto('msg_link_assunto') || 'Contabilidade Alves'}
+          modeloTexto={texto(pendentes.length > 0 ? 'msg_link_novo' : 'msg_link_boas_vindas')}
+          salvando={atualizarLink.isPending}
+          onSalvar={campos => atualizarLink.mutate(campos, {
+            onSuccess: () => toast.success(campos.mensagem_texto === null ? 'Voltou ao modelo padrão' : 'Mensagem salva para este cliente'),
+          })}
+        />
+      )}
 
       {documentos.length === 0 ? (
         <Card>
