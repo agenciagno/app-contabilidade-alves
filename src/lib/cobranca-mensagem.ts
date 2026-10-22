@@ -1,8 +1,9 @@
 import { format, parseISO } from 'date-fns';
 
-// Chave Pix (CNPJ) da Alves Assessoria — usada na mensagem geral, quando não faz sentido
-// mandar a linha "copia e cola" de um boleto específico (2+ boletos selecionados).
+// Chave Pix (CNPJ) da Alves Assessoria — única forma de pagamento citada na cobrança,
+// independente de quantos boletos estejam em atraso (decisão de 22/10/2026).
 export const PIX_KEY_CNPJ = '26764962000100';
+export const PIX_LINHA = `PIX: ${PIX_KEY_CNPJ} (Alves Assessoria - Chave CNPJ)`;
 const ASSINATURA = 'José Geraldo Alves - CRC/MG064187';
 
 export const fmtBRL = (n: number) =>
@@ -30,9 +31,7 @@ export function buildCobrancaMensagem(boletos: MensagemBoletoInput[]): string {
     `🗓️ Vencimento: ${datas.join(' e ')}`,
     unico ? `💰Valor: ${fmtBRL(totalValor)}` : `💰Valor: ${boletos.length} boletos, totalizando: ${fmtBRL(totalValor)}`,
     '',
-    unico && boletos[0].url_qrcode
-      ? `📲 Pix copia e cola: ${boletos[0].url_qrcode}`
-      : `📲 PIX: ${PIX_KEY_CNPJ} (Alves Assessoria - Chave CNPJ)`,
+    `📲 ${PIX_LINHA}`,
     '',
     'Qualquer dúvida, estamos à disposição.',
     ASSINATURA,

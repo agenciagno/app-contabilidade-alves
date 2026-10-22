@@ -338,6 +338,10 @@ export function CobrancaTab() {
   );
 }
 
+const AZUL = '#14346F';
+
+// Imagem enviada ao cliente (print do preview via html2canvas) — por isso estilos inline em
+// hex, sem depender de tokens do tema (o print sai igual em claro/escuro).
 const ReciboPreview = forwardRef<HTMLDivElement, {
   contacts: CobrancaContact[];
   boletos: SelectedBoleto[];
@@ -346,67 +350,73 @@ const ReciboPreview = forwardRef<HTMLDivElement, {
   const nomes = contacts.map((c) => c.name).join(', ');
   const unico = boletos.length === 1;
   const hoje = format(new Date(), 'dd/MM/yyyy');
+  const th = 'py-2 px-2 text-[10px] font-semibold uppercase tracking-wide';
 
   return (
-    <div ref={ref} className="mx-auto w-[560px] bg-white p-6 text-[#111]" style={{ fontFamily: 'Arial, sans-serif' }}>
-      <div className="mb-4 flex items-center justify-center">
-        <img src="/logo-azul.png" alt="Contabilidade Alves" className="h-10 w-auto" crossOrigin="anonymous" />
-      </div>
-      <p className="mb-3 text-[13px]">
-        Nosso setor financeiro não identificou a quitação {unico ? 'do boleto' : 'dos boletos'} abaixo:
-      </p>
-      <p className="mb-3 text-[13px]"><strong>{contacts.length === 1 ? 'Empresa' : 'Empresas'}:</strong> {nomes}</p>
+    <div ref={ref} className="mx-auto w-[560px] bg-white text-[#1a1f2b]" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+      <div style={{ height: 6, backgroundColor: AZUL }} />
+      <div className="px-8 pb-7 pt-6">
+        <img src="/logo-azul-2026.svg" alt="Contabilidade Alves" width={176} height={48} style={{ width: 176, height: 48 }} />
 
-      <table className="w-full border-collapse text-[12px]">
-        <thead>
-          <tr className="border-b border-[#111]">
-            <th className="py-1 text-left font-semibold">Valor</th>
-            <th className="py-1 text-left font-semibold">Vencimento</th>
-            <th className="py-1 text-left font-semibold">Dias atraso</th>
-            <th className="py-1 text-right font-semibold">Juros</th>
-            <th className="py-1 text-right font-semibold">Multa</th>
-            <th className="py-1 text-right font-semibold">Vr. Atualizado</th>
-          </tr>
-        </thead>
-        <tbody>
-          {boletos.map((b) => (
-            <tr key={b.id}>
-              <td className="py-1">{fmtBRL(b.valor)}</td>
-              <td className="py-1">{fmtDateCobranca(b.data_vencimento)}</td>
-              <td className="py-1">{b.dias_atraso}</td>
-              <td className="py-1 text-right">{b.encargos_disponiveis ? fmtBRL(b.juros_valor) : '—'}</td>
-              <td className="py-1 text-right">{b.encargos_disponiveis ? fmtBRL(b.multa_valor) : '—'}</td>
-              <td className="py-1 text-right">{fmtBRL(b.valor_atualizado)}</td>
+        <p className="mt-6 text-[11px] font-semibold uppercase tracking-wider" style={{ color: AZUL }}>Aviso de pendência financeira</p>
+        <p className="mt-1 text-[13px] leading-snug">
+          Nosso setor financeiro não identificou a quitação {unico ? 'do boleto' : 'dos boletos'} abaixo:
+        </p>
+
+        <div className="mt-4 rounded-md px-3 py-2 text-[12px]" style={{ backgroundColor: '#eef2f9' }}>
+          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: AZUL }}>
+            {contacts.length === 1 ? 'Empresa' : 'Empresas'}
+          </span>
+          <p className="mt-0.5 text-[13px] font-semibold">{nomes}</p>
+        </div>
+
+        <table className="mt-4 w-full border-collapse text-[12px]">
+          <thead>
+            <tr style={{ backgroundColor: AZUL, color: '#fff' }}>
+              <th className={`${th} text-left`}>Valor</th>
+              <th className={`${th} text-left`}>Vencimento</th>
+              <th className={`${th} text-center`}>Atraso</th>
+              <th className={`${th} text-right`}>Juros</th>
+              <th className={`${th} text-right`}>Multa</th>
+              <th className={`${th} text-right`}>Atualizado</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {boletos.map((b) => (
+              <tr key={b.id} style={{ borderBottom: '1px solid #e3e7ef' }}>
+                <td className="px-2 py-2">{fmtBRL(b.valor)}</td>
+                <td className="px-2 py-2">{fmtDateCobranca(b.data_vencimento)}</td>
+                <td className="px-2 py-2 text-center">{b.dias_atraso} {b.dias_atraso === 1 ? 'dia' : 'dias'}</td>
+                <td className="px-2 py-2 text-right">{b.encargos_disponiveis ? fmtBRL(b.juros_valor) : '—'}</td>
+                <td className="px-2 py-2 text-right">{b.encargos_disponiveis ? fmtBRL(b.multa_valor) : '—'}</td>
+                <td className="px-2 py-2 text-right font-semibold">{fmtBRL(b.valor_atualizado)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-      <div className="mt-2 flex justify-between border-t border-[#111] pt-1 text-[13px] font-semibold">
-        <span>Total</span>
-        <span>{fmtBRL(total)}</span>
-      </div>
+        <div className="mt-3 flex items-center justify-between rounded-md px-3 py-2.5" style={{ backgroundColor: '#eef2f9' }}>
+          <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: AZUL }}>Total a pagar</span>
+          <span className="text-[18px] font-bold" style={{ color: AZUL }}>{fmtBRL(total)}</span>
+        </div>
 
-      <p className="mt-4 text-[12px]">
-        {unico && boletos[0].url_qrcode ? (
-          <><strong>Pix copia e cola:</strong> {boletos[0].url_qrcode}</>
-        ) : (
-          <><strong>Dados para o Pix (CNPJ):</strong> {PIX_KEY_CNPJ}</>
-        )}
-      </p>
+        <div className="mt-4 rounded-md px-3 py-2.5" style={{ border: `1.5px solid ${AZUL}` }}>
+          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: AZUL }}>Pagamento via Pix</span>
+          <p className="mt-0.5 text-[14px] font-bold" style={{ color: AZUL }}>{PIX_KEY_CNPJ}</p>
+          <p className="text-[11px] text-[#4a5160]">Alves Assessoria · Chave CNPJ</p>
+        </div>
 
-      <p className="mt-3 text-[11px] text-[#444]">Caso o pagamento já tenha sido efetuado, favor desconsiderar esta mensagem.</p>
-      <p className="mt-1 text-[11px] text-[#444]">Qualquer dúvida, estamos à disposição.</p>
+        <p className="mt-5 text-[11px] leading-snug text-[#4a5160]">
+          Caso o pagamento já tenha sido efetuado, favor desconsiderar esta mensagem. Qualquer dúvida, estamos à disposição.
+        </p>
 
-      <div className="mt-4 flex items-end justify-between text-[12px]">
-        <span>Juatuba</span>
-        <span>{hoje}</span>
-      </div>
-
-      <div className="mt-4 text-center text-[12px]">
-        <p>Contabilidade Alves</p>
-        <p>José Geraldo Alves</p>
-        <p>CRC/MG 064187</p>
+        <div className="mt-5 flex items-end justify-between pt-3 text-[11px] text-[#4a5160]" style={{ borderTop: '1px solid #e3e7ef' }}>
+          <div className="leading-snug">
+            <p className="font-semibold text-[#1a1f2b]">Contabilidade Alves</p>
+            <p>José Geraldo Alves · CRC/MG 064187</p>
+          </div>
+          <span>Juatuba, {hoje}</span>
+        </div>
       </div>
     </div>
   );
