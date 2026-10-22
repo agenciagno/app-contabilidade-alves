@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { useCobrancaBoletos, type CobrancaBoleto, type CobrancaContact } from '@/hooks/useCobrancaBoletos';
 import { useNotificarCobrancaMultipla, useRegistrarNotificacaoLocalCobranca } from '@/hooks/useBoletoNotifications';
-import { buildCobrancaMensagem, fmtBRL, fmtDateCobranca, PIX_KEY_CNPJ } from '@/lib/cobranca-mensagem';
+import { buildCobrancaMensagem, fmtBRL, fmtDateCobranca, fmtDocumento, PIX_KEY_CNPJ } from '@/lib/cobranca-mensagem';
 
 type SelectedBoleto = CobrancaBoleto & { contact_name: string };
 
@@ -347,34 +347,34 @@ const ReciboPreview = forwardRef<HTMLDivElement, {
   boletos: SelectedBoleto[];
   total: number;
 }>(function ReciboPreview({ contacts, boletos, total }, ref) {
-  const nomes = contacts.map((c) => c.name).join(', ');
   const unico = boletos.length === 1;
   const hoje = format(new Date(), 'dd/MM/yyyy');
-  const th = 'px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide';
-  const tint = '#eef2f9';
+  const th = 'py-2 px-2 text-[10px] font-semibold uppercase tracking-wide';
 
   return (
-    <div ref={ref} className="mx-auto w-[760px] bg-white text-[#1a1f2b]" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-      <div style={{ height: 5, backgroundColor: AZUL }} />
-      <div className="px-7 pb-5 pt-4">
-        <div className="flex items-center justify-between">
-          <img src="/logo-azul-2026.svg" alt="Contabilidade Alves" width={120} height={33} style={{ width: 120, height: 33 }} />
-          <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: AZUL }}>Aviso de pendência financeira</p>
+    <div ref={ref} className="mx-auto w-[560px] bg-white text-[#1a1f2b]" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+      <div style={{ height: 6, backgroundColor: AZUL }} />
+      <div className="px-8 pb-7 pt-6">
+        <img src="/logo-azul-2026.svg" alt="Contabilidade Alves" width={176} height={48} style={{ width: 176, height: 48 }} />
+
+        <p className="mt-6 text-[11px] font-semibold uppercase tracking-wider" style={{ color: AZUL }}>Aviso de pendência financeira</p>
+        <p className="mt-1 text-[13px] leading-snug">
+          Nosso setor financeiro não identificou a quitação {unico ? 'do boleto' : 'dos boletos'} abaixo:
+        </p>
+
+        <div className="mt-4 rounded-md px-3 py-2 text-[12px]" style={{ backgroundColor: '#eef2f9' }}>
+          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: AZUL }}>
+            {contacts.length === 1 ? 'Empresa' : 'Empresas'}
+          </span>
+          {contacts.map((c) => (
+            <p key={c.contact_id} className="mt-0.5 text-[13px] font-semibold">
+              {c.name}
+              {c.document && <span className="ml-2 text-[12px] font-normal text-[#4a5160]">{c.document.replace(/\D/g, '').length === 11 ? 'CPF' : 'CNPJ'} {fmtDocumento(c.document)}</span>}
+            </p>
+          ))}
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-4">
-          <p className="text-[12px] leading-snug">
-            Nosso setor financeiro não identificou a quitação {unico ? 'do boleto' : 'dos boletos'} abaixo:
-          </p>
-          <div className="max-w-[440px] rounded-md px-3 py-1.5 text-right" style={{ backgroundColor: tint }}>
-            <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: AZUL }}>
-              {contacts.length === 1 ? 'Empresa' : 'Empresas'}
-            </span>
-            <p className="text-[12px] font-semibold">{nomes}</p>
-          </div>
-        </div>
-
-        <table className="mt-3 w-full border-collapse text-[11.5px]">
+        <table className="mt-4 w-full border-collapse text-[12px]">
           <thead>
             <tr style={{ backgroundColor: AZUL, color: '#fff' }}>
               <th className={`${th} text-left`}>Valor</th>
@@ -388,38 +388,38 @@ const ReciboPreview = forwardRef<HTMLDivElement, {
           <tbody>
             {boletos.map((b) => (
               <tr key={b.id} style={{ borderBottom: '1px solid #e3e7ef' }}>
-                <td className="px-2 py-1.5">{fmtBRL(b.valor)}</td>
-                <td className="px-2 py-1.5">{fmtDateCobranca(b.data_vencimento)}</td>
-                <td className="px-2 py-1.5 text-center">{b.dias_atraso} {b.dias_atraso === 1 ? 'dia' : 'dias'}</td>
-                <td className="px-2 py-1.5 text-right">{b.encargos_disponiveis ? fmtBRL(b.juros_valor) : '—'}</td>
-                <td className="px-2 py-1.5 text-right">{b.encargos_disponiveis ? fmtBRL(b.multa_valor) : '—'}</td>
-                <td className="px-2 py-1.5 text-right font-semibold">{fmtBRL(b.valor_atualizado)}</td>
+                <td className="px-2 py-2">{fmtBRL(b.valor)}</td>
+                <td className="px-2 py-2">{fmtDateCobranca(b.data_vencimento)}</td>
+                <td className="px-2 py-2 text-center">{b.dias_atraso} {b.dias_atraso === 1 ? 'dia' : 'dias'}</td>
+                <td className="px-2 py-2 text-right">{b.encargos_disponiveis ? fmtBRL(b.juros_valor) : '—'}</td>
+                <td className="px-2 py-2 text-right">{b.encargos_disponiveis ? fmtBRL(b.multa_valor) : '—'}</td>
+                <td className="px-2 py-2 text-right font-semibold">{fmtBRL(b.valor_atualizado)}</td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <div className="flex items-center justify-between rounded-md px-3 py-2" style={{ backgroundColor: tint }}>
-            <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: AZUL }}>Total a pagar</span>
-            <span className="text-[17px] font-bold" style={{ color: AZUL }}>{fmtBRL(total)}</span>
-          </div>
-          <div className="rounded-md px-3 py-1.5" style={{ border: `1.5px solid ${AZUL}` }}>
-            <span className="text-[9px] font-semibold uppercase tracking-wide" style={{ color: AZUL }}>Pagamento via Pix</span>
-            <p className="text-[13px] font-bold leading-tight" style={{ color: AZUL }}>
-              {PIX_KEY_CNPJ} <span className="text-[10px] font-normal text-[#4a5160]">· Alves Assessoria · Chave CNPJ</span>
-            </p>
-          </div>
+        <div className="mt-3 flex items-center justify-between rounded-md px-3 py-2.5" style={{ backgroundColor: '#eef2f9' }}>
+          <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: AZUL }}>Total a pagar</span>
+          <span className="text-[18px] font-bold" style={{ color: AZUL }}>{fmtBRL(total)}</span>
         </div>
 
-        <div className="mt-3 flex items-end justify-between gap-6 pt-2 text-[10.5px] leading-snug text-[#4a5160]" style={{ borderTop: '1px solid #e3e7ef' }}>
-          <p className="max-w-[360px]">
-            Caso o pagamento já tenha sido efetuado, favor desconsiderar esta mensagem. Qualquer dúvida, estamos à disposição.
-          </p>
-          <div className="text-right">
-            <p className="font-semibold text-[#1a1f2b]">Contabilidade Alves · José Geraldo Alves · CRC/MG 064187</p>
-            <p>Juatuba, {hoje}</p>
+        <div className="mt-4 rounded-md px-3 py-2.5" style={{ border: `1.5px solid ${AZUL}` }}>
+          <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: AZUL }}>Pagamento via Pix</span>
+          <p className="mt-0.5 text-[14px] font-bold" style={{ color: AZUL }}>{PIX_KEY_CNPJ}</p>
+          <p className="text-[11px] text-[#4a5160]">Alves Assessoria · Chave CNPJ</p>
+        </div>
+
+        <p className="mt-5 text-[11px] leading-snug text-[#4a5160]">
+          Caso o pagamento já tenha sido efetuado, favor desconsiderar esta mensagem. Qualquer dúvida, estamos à disposição.
+        </p>
+
+        <div className="mt-5 flex items-end justify-between pt-3 text-[11px] text-[#4a5160]" style={{ borderTop: '1px solid #e3e7ef' }}>
+          <div className="leading-snug">
+            <p className="font-semibold text-[#1a1f2b]">Contabilidade Alves</p>
+            <p>José Geraldo Alves · CRC/MG 064187</p>
           </div>
+          <span>Juatuba, {hoje}</span>
         </div>
       </div>
     </div>

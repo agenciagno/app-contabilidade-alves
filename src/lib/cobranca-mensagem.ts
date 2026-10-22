@@ -9,6 +9,14 @@ const ASSINATURA = 'José Geraldo Alves - CRC/MG064187';
 export const fmtBRL = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
+/** CNPJ (14 dígitos) ou CPF (11) com máscara; qualquer outra coisa volta como veio. */
+export function fmtDocumento(doc: string | null | undefined): string {
+  const d = (doc ?? '').replace(/\D/g, '');
+  if (d.length === 14) return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+  if (d.length === 11) return d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+  return doc ?? '';
+}
+
 export const fmtDateCobranca = (s: string) => format(parseISO(s), 'dd/MM/yyyy');
 
 export interface MensagemBoletoInput {
