@@ -1,5 +1,5 @@
-// Roda 1x/dia via pg_cron. Varre certificates ativos, dispara due_alert + popup
-// internos nos limiares 30/15/7/0 dias (uma vez cada) e diariamente quando vencido,
+// Roda 1x/dia via pg_cron. Varre certificates ativos, dispara due_alert (só no sino,
+// sem popup — Gabriel, 23/10/2026) nos limiares 30/15/7/0 dias (uma vez cada) e diariamente quando vencido,
 // e cria a tarefa de renovação em fiscal_tasks na primeira vez que entra na janela.
 // So interno por decisao do Gabriel (27/08/2026) — sem envio automatico ao cliente aqui.
 // Copiado do Supabase em 03/10/2026 (estava só em produção, fora do repositório). Sem alteração.
@@ -56,31 +56,17 @@ Deno.serve(async (req) => {
       if (alvosErr) throw alvosErr;
 
       const actionUrl = `/cadastros/certificados?highlight=${cert.id}`;
-      const rows = (alvos ?? []).flatMap((p) => ([
-        {
-          user_id: p.user_id,
-          company_id: cert.company_id,
-          type: 'due_alert',
-          title: titulo,
-          body: corpo,
-          action_url: actionUrl,
-          reference_type: 'certificate',
-          reference_id: cert.id,
-          show_on_login_only: false,
-        },
-        {
-          user_id: p.user_id,
-          company_id: cert.company_id,
-          type: 'popup',
-          title: titulo,
-          body: corpo,
-          action_url: actionUrl,
-          button_label: 'Ver certificado',
-          reference_type: 'certificate',
-          reference_id: cert.id,
-          show_on_login_only: false,
-        },
-      ]));
+      const rows = (alvos ?? []).map((p) => ({
+        user_id: p.user_id,
+        company_id: cert.company_id,
+        type: 'due_alert',
+        title: titulo,
+        body: corpo,
+        action_url: actionUrl,
+        reference_type: 'certificate',
+        reference_id: cert.id,
+        show_on_login_only: false,
+      }));
 
       if (rows.length > 0) {
         const { error: notifErr } = await admin.from('notifications').insert(rows);
